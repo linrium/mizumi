@@ -29,6 +29,7 @@ RUN pip install --no-cache-dir \
 COPY jobs /opt/spark/jobs
 COPY pipelines /opt/spark/pipelines
 COPY conf/log4j2.properties /opt/spark/conf/log4j2.properties
-RUN chown -R spark:spark /opt/spark/jobs /opt/spark/pipelines /opt/spark/conf/log4j2.properties
+COPY conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+RUN chown -R spark:spark /opt/spark/jobs /opt/spark/pipelines /opt/spark/conf/log4j2.properties /opt/spark/conf/spark-defaults.conf
 
 USER spark
