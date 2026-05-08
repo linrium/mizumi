@@ -1,5 +1,12 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+dagster_namespace := "dagster"
+dagster_release := "dagster"
+dagster_chart := "dagster/dagster"
+dagster_chart_version := "1.13.4"
+dagster_values := "infra/k8s/dagster/helm/values.yaml"
+dagster_image := "mizumi-dagster:1.13.4"
+
 rustfs_namespace := "rustfs"
 rustfs_release := "rustfs"
 rustfs_chart := "rustfs/rustfs"
@@ -17,17 +24,19 @@ spark_pipeline_job := "rustfs-medallion-pipeline-submit"
 spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 
-deploy: rustfs-deploy spark-deploy
+deploy: rustfs-deploy spark-deploy dagster-deploy
 
-destroy: spark-destroy rustfs-destroy
+destroy: spark-destroy rustfs-destroy dagster-destroy
 
 forward:
     trap 'kill 0 2>/dev/null || true' EXIT INT TERM
     just rustfs-forward &
     just spark-forward &
+    just dagster-forward &
     echo "RustFS console: http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
     echo "Spark job UI:    http://127.0.0.1:4040"
+    echo "Dagster UI:      http://127.0.0.1:8080"
     wait
 
 rustfs-helm-repo:
@@ -119,3 +128,30 @@ spark-destroy:
     helm uninstall {{spark_operator_release}} --namespace {{spark_operator_namespace}} || true
     kubectl delete namespace {{spark_namespace}} --ignore-not-found --wait=false
     kubectl delete namespace {{spark_operator_namespace}} --ignore-not-found --wait=false
+
+dagster-helm-repo:
+    helm repo add dagster https://dagster-io.github.io/helm 2>/dev/null || true
+    helm repo update dagster
+
+dagster-image-build:
+    docker build -t {{dagster_image}} packages/dagster
+
+dagster-deploy: dagster-helm-repo dagster-image-build
+    helm upgrade --install {{dagster_release}} {{dagster_chart}} \
+      --namespace {{dagster_namespace}} \
+      --create-namespace \
+      --version {{dagster_chart_version}} \
+      --values {{dagster_values}}
+    kubectl wait --namespace {{dagster_namespace}} --for=condition=Available deployment --all --timeout=300s
+    kubectl get pods -n {{dagster_namespace}}
+
+dagster-forward:
+    pod=$(kubectl get pods --namespace {{dagster_namespace}} \
+      -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
+      -o jsonpath="{.items[0].metadata.name}"); \
+    test -n "$pod"; \
+    kubectl --namespace {{dagster_namespace}} port-forward "$pod" 8080:80
+
+dagster-destroy:
+    helm uninstall {{dagster_release}} --namespace {{dagster_namespace}} || true
+    kubectl delete namespace {{dagster_namespace}} --ignore-not-found --wait=false

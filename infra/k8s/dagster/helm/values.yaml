@@ -1,0 +1,17 @@
+dagster-user-deployments:
+  deployments:
+    - name: mizumi
+      image:
+        repository: mizumi-dagster
+        tag: "1.13.4"
+        pullPolicy: IfNotPresent
+      dagsterApiGrpcArgs:
+        - "--python-file"
+        - "/app/definitions.py"
+      port: 3030
+
+dagsterWebserver:
+  replicaCount: 1
+
+dagsterDaemon:
+  enabled: true
