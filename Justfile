@@ -29,13 +29,25 @@ deploy: rustfs-deploy spark-deploy dagster-deploy
 destroy: spark-destroy rustfs-destroy dagster-destroy
 
 forward:
-    trap 'kill 0 2>/dev/null || true' EXIT INT TERM
-    just rustfs-forward &
-    just spark-forward &
-    just dagster-forward &
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
+    kubectl port-forward -n {{rustfs_namespace}} svc/rustfs-svc 9000:9000 9001:9001 &
+    dagster_pod=$(kubectl get pods --namespace {{dagster_namespace}} \
+      --field-selector=status.phase=Running \
+      -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
+      -o jsonpath="{.items[0].metadata.name}")
+    kubectl --namespace {{dagster_namespace}} port-forward "$dagster_pod" 8080:80 &
+    spark_state=$(kubectl get sparkapplication {{spark_app_name}} -n {{spark_namespace}} \
+      -o jsonpath='{.status.applicationState.state}' 2>/dev/null || true)
+    if [[ "$spark_state" == "RUNNING" ]]; then
+        spark_svc=$(kubectl get sparkapplication {{spark_app_name}} -n {{spark_namespace}} \
+          -o jsonpath='{.status.driverInfo.webUIServiceName}' 2>/dev/null || true)
+        [[ -n "$spark_svc" ]] && kubectl port-forward -n {{spark_namespace}} service/"$spark_svc" 4040:4040 &
+        echo "Spark job UI:    http://127.0.0.1:4040"
+    fi
     echo "RustFS console: http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
-    echo "Spark job UI:    http://127.0.0.1:4040"
     echo "Dagster UI:      http://127.0.0.1:8080"
     wait
 
@@ -148,6 +160,7 @@ dagster-deploy: dagster-helm-repo dagster-image-build
 
 dagster-forward:
     pod=$(kubectl get pods --namespace {{dagster_namespace}} \
+      --field-selector=status.phase=Running \
       -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
       -o jsonpath="{.items[0].metadata.name}"); \
     test -n "$pod"; \
