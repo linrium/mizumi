@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: unitycatalog
+type: Opaque
+stringData:
+  POSTGRES_DB: ucdb
+  POSTGRES_USER: ucuser
+  POSTGRES_PASSWORD: ucpassword
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: unitycatalog-postgres
+  namespace: unitycatalog
+spec:
+  serviceName: unitycatalog-postgres-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unitycatalog-postgres
+  template:
+    metadata:
+      labels:
+        app: unitycatalog-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unitycatalog-postgres-svc
+  namespace: unitycatalog
+spec:
+  selector:
+    app: unitycatalog-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

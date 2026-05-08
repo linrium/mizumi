@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unitycatalog-config
+  namespace: unitycatalog
+data:
+  hibernate.properties: |
+    hibernate.connection.driver_class=org.postgresql.Driver
+    hibernate.connection.url=jdbc:postgresql://unitycatalog-postgres-svc:5432/ucdb
+    hibernate.connection.username=ucuser
+    hibernate.connection.password=ucpassword
+    hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+    hibernate.hbm2ddl.auto=update
+    hibernate.show_sql=false
+    hibernate.archive.autodetection=class
+    hibernate.use_sql_comments=true
+  server.properties: |
+    server.env=dev
+    server.authorization=disable
+    server.authorization-url=
+    server.token-url=
+    server.client-id=
+    server.client-secret=
+    server.redirect-port=
+    server.allowed-issuers=
+    server.audiences=
+    server.cookie-timeout=P5D
+    server.managed-table.enabled=false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unitycatalog
+  namespace: unitycatalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unitycatalog
+  template:
+    metadata:
+      labels:
+        app: unitycatalog
+    spec:
+      containers:
+        - name: unitycatalog
+          image: mizumi-unitycatalog:v0.4.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: rest
+            - containerPort: 8081
+              name: grpc
+          volumeMounts:
+            - name: config
+              mountPath: /home/unitycatalog/etc/conf/hibernate.properties
+              subPath: hibernate.properties
+            - name: config
+              mountPath: /home/unitycatalog/etc/conf/server.properties
+              subPath: server.properties
+      volumes:
+        - name: config
+          configMap:
+            name: unitycatalog-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unitycatalog-svc
+  namespace: unitycatalog
+spec:
+  selector:
+    app: unitycatalog
+  ports:
+    - name: rest
+      port: 8080
+      targetPort: 8080
+    - name: grpc
+      port: 8081
+      targetPort: 8081

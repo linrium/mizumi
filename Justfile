@@ -1,5 +1,9 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+unitycatalog_namespace := "unitycatalog"
+unitycatalog_image := "mizumi-unitycatalog:v0.4.0"
+unitycatalog_ui_image := "mizumi-unitycatalog-ui:v0.4.0"
+
 dagster_namespace := "dagster"
 dagster_release := "dagster"
 dagster_chart := "dagster/dagster"
@@ -46,9 +50,13 @@ forward:
         [[ -n "$spark_svc" ]] && kubectl port-forward -n {{spark_namespace}} service/"$spark_svc" 4040:4040 &
         echo "Spark job UI:    http://127.0.0.1:4040"
     fi
-    echo "RustFS console: http://127.0.0.1:9001"
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
+    echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
     echo "Dagster UI:      http://127.0.0.1:8080"
+    echo "UC API:          http://127.0.0.1:8082"
+    echo "UC UI:           http://127.0.0.1:3001"
     wait
 
 rustfs-helm-repo:
@@ -169,3 +177,32 @@ dagster-forward:
 dagster-destroy:
     helm uninstall {{dagster_release}} --namespace {{dagster_namespace}} || true
     kubectl delete namespace {{dagster_namespace}} --ignore-not-found --wait=false
+
+unitycatalog-image-build:
+    docker build -t {{unitycatalog_image}} packages/unitycatalog
+
+unitycatalog-ui-image-build:
+    docker build \
+      --build-arg PROXY_HOST=unitycatalog-svc \
+      -t {{unitycatalog_ui_image}} \
+      "https://github.com/unitycatalog/unitycatalog.git#v0.4.0:ui"
+
+unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
+    kubectl create namespace {{unitycatalog_namespace}} 2>/dev/null || true
+    kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
+    kubectl rollout status statefulset/unitycatalog-postgres -n {{unitycatalog_namespace}} --timeout=120s
+    kubectl apply -f infra/k8s/unitycatalog/server.yaml
+    kubectl apply -f infra/k8s/unitycatalog/ui.yaml
+    kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s
+    kubectl wait --for=condition=Available deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=300s
+    kubectl get pods,svc -n {{unitycatalog_namespace}}
+
+unitycatalog-forward:
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080
+
+unitycatalog-ui-forward:
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000
+
+unitycatalog-destroy:
+    kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
+    kubectl delete namespace {{unitycatalog_namespace}} --ignore-not-found --wait=false
