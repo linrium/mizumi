@@ -25,4 +25,5 @@ spec:
               mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
               mc mb --ignore-existing rustfs/bronze
               mc mb --ignore-existing rustfs/silver
+              mc mb --ignore-existing rustfs/gold
               mc cp /tmp/orders.jsonl rustfs/bronze/orders/raw/orders.jsonl

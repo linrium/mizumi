@@ -40,8 +40,6 @@ def main() -> None:
     print(f"bronze_rows={bronze_df.count()}")
     print(f"silver_rows={silver_df.count()}")
 
-    spark.stop()
-
 
 if __name__ == "__main__":
     main()

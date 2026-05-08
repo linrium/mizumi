@@ -47,5 +47,5 @@ SELECT
   COUNT(*) AS order_count,
   ROUND(SUM(gross_amount), 2) AS gross_revenue,
   COUNT(DISTINCT customer_id) AS active_customers
-FROM silver_orders_cleaned_base
+FROM silver_orders
 GROUP BY order_date, country_code;
