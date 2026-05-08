@@ -1,0 +1,36 @@
+replicaCount: 1
+
+mode:
+  standalone:
+    enabled: true
+  distributed:
+    enabled: false
+
+secret:
+  rustfs:
+    access_key: rustfsadmin
+    secret_key: rustfsadmin
+
+config:
+  rustfs:
+    address: ":9000"
+    console_enable: "true"
+    console_address: ":9001"
+    log_level: "info"
+    region: "us-east-1"
+    obs_environment: "development"
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+
+storageclass:
+  name: local-path
+  dataStorageSize: 256Mi
+  logStorageSize: 256Mi
+
+affinity:
+  podAntiAffinity:
+    enabled: false
