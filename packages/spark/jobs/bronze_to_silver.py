@@ -38,10 +38,14 @@ def main() -> None:
 
         silver_df.write.mode("overwrite").partitionBy("order_date").parquet(TARGET_PATH)
 
+        bronze_count = bronze_df.count()
+        silver_count = silver_df.count()
+        spark.stop()
+
         pipes.report_asset_materialization(
             metadata={
-                "bronze_rows": bronze_df.count(),
-                "silver_rows": silver_df.count(),
+                "bronze_rows": bronze_count,
+                "silver_rows": silver_count,
                 "target": TARGET_PATH,
             }
         )

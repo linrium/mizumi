@@ -6,6 +6,7 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/usr/lib/jvm/default-java
 
 # S3A JARs — same set as the spark image so SparkPipelinesResource can reach RustFS
 ADD https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.2/hadoop-aws-3.4.2.jar /opt/spark/jars/hadoop-aws-3.4.2.jar
@@ -29,7 +30,8 @@ RUN pip install --no-cache-dir \
     "dagster-spark==0.29.4" \
     "pyspark[pipelines]==4.1.1" \
     "grpcio>=1.48.1" \
-    "grpcio-status>=1.48.1"
+    "grpcio-status>=1.48.1" \
+    "boto3"
 
 # Wrapper: --jars must come before the subcommand so we can't use run_extra_args
 RUN JARS="/opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar,/opt/spark/jars/slf4j-nop-1.7.36.jar" \
@@ -39,7 +41,7 @@ RUN JARS="/opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bund
 # Spark conf (warehouse dir) read at JVM start via SPARK_CONF_DIR
 ENV SPARK_CONF_DIR=/opt/spark/conf
 RUN mkdir -p /opt/spark/conf /opt/spark/pipelines/definitions
-COPY packages/spark/conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+COPY packages/dagster/conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 COPY packages/spark/pipelines/spark-pipeline.yaml /opt/spark/pipelines/spark-pipeline.yaml
 COPY packages/spark/pipelines/definitions/ /opt/spark/pipelines/definitions/
 
