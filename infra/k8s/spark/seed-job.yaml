@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rustfs-seed-bronze
+  namespace: spark
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cat <<'EOF' >/tmp/orders.jsonl
+              {"order_id": 1001, "customer_id": 501, "country": "jp", "status": "paid", "quantity": 2, "unit_price": 1200.50, "ordered_at": "2026-05-01T09:15:00Z"}
+              {"order_id": 1002, "customer_id": 502, "country": "us", "status": "shipped", "quantity": 1, "unit_price": 499.99, "ordered_at": "2026-05-01T10:42:00Z"}
+              {"order_id": 1003, "customer_id": 503, "country": "de", "status": "cancelled", "quantity": 5, "unit_price": 89.50, "ordered_at": "2026-05-02T02:30:00Z"}
+              {"order_id": 1004, "customer_id": 504, "country": "jp", "status": "delivered", "quantity": 3, "unit_price": 75.00, "ordered_at": "2026-05-02T08:00:00Z"}
+              {"order_id": 1004, "customer_id": 504, "country": "jp", "status": "delivered", "quantity": 3, "unit_price": 75.00, "ordered_at": "2026-05-02T08:00:00Z"}
+              EOF
+              mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
+              mc mb --ignore-existing rustfs/bronze
+              mc mb --ignore-existing rustfs/silver
+              mc cp /tmp/orders.jsonl rustfs/bronze/orders/raw/orders.jsonl

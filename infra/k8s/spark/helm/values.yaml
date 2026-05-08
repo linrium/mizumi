@@ -1,0 +1,6 @@
+webhook:
+  enable: false
+
+spark:
+  jobNamespaces:
+    - spark
