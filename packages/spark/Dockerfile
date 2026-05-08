@@ -7,6 +7,12 @@ ADD https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.720/aw
 ADD https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.29.52/bundle-2.29.52.jar /opt/spark/jars/bundle-2.29.52.jar
 ADD https://repo1.maven.org/maven2/software/amazon/s3/analyticsaccelerator/analyticsaccelerator-s3/1.2.1/analyticsaccelerator-s3-1.2.1.jar /opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar
 ADD https://repo1.maven.org/maven2/org/wildfly/openssl/wildfly-openssl/2.1.4.Final/wildfly-openssl-2.1.4.Final.jar /opt/spark/jars/wildfly-openssl-2.1.4.Final.jar
+RUN chmod 644 \
+    /opt/spark/jars/hadoop-aws-3.4.2.jar \
+    /opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar \
+    /opt/spark/jars/bundle-2.29.52.jar \
+    /opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar \
+    /opt/spark/jars/wildfly-openssl-2.1.4.Final.jar
 
 RUN pip install --no-cache-dir \
     "pyspark[pipelines]==4.1.1" \

@@ -18,7 +18,6 @@ spec:
             - -ec
             - |
               spark-pipelines \
-                --packages org.apache.hadoop:hadoop-aws:3.4.2,com.amazonaws:aws-java-sdk-bundle:1.12.720 \
-                --conf spark.jars.ivy=/tmp/.ivy2 \
+                --jars /opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar \
                 run \
                 --spec /opt/spark/pipelines/spark-pipeline.yaml

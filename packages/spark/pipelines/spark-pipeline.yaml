@@ -1,7 +1,7 @@
 name: rustfs_medallion_pipeline
 libraries:
   - glob:
-      include: "definitions/**"
+      include: "rustfs_medallion_pipeline.py"
 storage: s3a://silver/system/checkpoints/rustfs_medallion_pipeline
 database: default
 configuration:

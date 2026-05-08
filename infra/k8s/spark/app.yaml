@@ -14,8 +14,6 @@ spec:
   restartPolicy:
     type: Never
   sparkConf:
-    "spark.jars.ivy": "/tmp/.ivy2"
-    "spark.jars.packages": "org.apache.hadoop:hadoop-aws:3.4.2,com.amazonaws:aws-java-sdk-bundle:1.12.720"
     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
     "spark.hadoop.fs.s3a.endpoint": "http://rustfs-svc.rustfs.svc.cluster.local:9000"
     "spark.hadoop.fs.s3a.path.style.access": "true"
