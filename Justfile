@@ -134,9 +134,10 @@ dagster-helm-repo:
     helm repo update dagster
 
 dagster-image-build:
-    docker build -t {{dagster_image}} packages/dagster
+    docker build -t {{dagster_image}} -f packages/dagster/Dockerfile .
 
 dagster-deploy: dagster-helm-repo dagster-image-build
+    kubectl wait --for=delete namespace/{{dagster_namespace}} --timeout=120s 2>/dev/null || true
     helm upgrade --install {{dagster_release}} {{dagster_chart}} \
       --namespace {{dagster_namespace}} \
       --create-namespace \

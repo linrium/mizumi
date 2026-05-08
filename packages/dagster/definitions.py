@@ -1,5 +1,23 @@
 import dagster as dg
+from dagster_k8s import PipesK8sClient
+from dagster_spark import SparkPipelinesResource
 
+PIPELINE_SPEC = "/opt/spark/pipelines/spark-pipeline.yaml"
+PIPELINE_DIR = "/opt/spark/pipelines"
+S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
+
+S3A_CONF = [
+    "--conf", "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
+    "--conf", f"spark.hadoop.fs.s3a.endpoint={S3A_ENDPOINT}",
+    "--conf", "spark.hadoop.fs.s3a.path.style.access=true",
+    "--conf", "spark.hadoop.fs.s3a.access.key=rustfsadmin",
+    "--conf", "spark.hadoop.fs.s3a.secret.key=rustfsadmin",
+    "--conf", "spark.hadoop.fs.s3a.connection.ssl.enabled=false",
+    "--conf", "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+]
+
+
+# ── Bronze (source placeholder) ───────────────────────────────────────────────
 
 @dg.asset(group_name="bronze")
 def bronze_orders() -> dg.MaterializeResult:
@@ -8,20 +26,58 @@ def bronze_orders() -> dg.MaterializeResult:
     )
 
 
+# ── Silver via Dagster Pipes ───────────────────────────────────────────────────
+# PipesK8sClient creates a K8s Job in the dagster namespace running spark-submit
+# in local mode. The script reports row counts back via pod-log message writer.
+
 @dg.asset(group_name="silver", deps=[bronze_orders])
-def silver_orders() -> dg.MaterializeResult:
-    return dg.MaterializeResult(
-        metadata={"destination": dg.MetadataValue.text("s3a://silver/orders/silver_orders")}
-    )
+def silver_orders(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image="mizumi-spark-rustfs:4.1.1",
+        image_pull_policy="IfNotPresent",
+        command=[
+            "spark-submit",
+            "--master", "local[*]",
+            *S3A_CONF,
+            "/opt/spark/jobs/bronze_to_silver.py",
+        ],
+    ).get_materialize_result()
 
 
-@dg.asset(group_name="gold", deps=[silver_orders])
-def gold_daily_country_sales() -> dg.MaterializeResult:
-    return dg.MaterializeResult(
-        metadata={"destination": dg.MetadataValue.text("s3a://gold/warehouse/default/gold_daily_country_sales")}
+# ── Medallion via Spark Declarative Pipelines ─────────────────────────────────
+# SparkPipelinesResource runs spark-pipelines-s3 (wrapper that prepends --jars)
+# as a subprocess inside the Dagster pod and streams logs to the run UI.
+
+@dg.multi_asset(
+    specs=[
+        dg.AssetSpec("sdp_silver_orders", group_name="sdp", deps=["bronze_orders"]),
+        dg.AssetSpec("sdp_gold_daily_country_sales", group_name="sdp", deps=["bronze_orders"]),
+    ],
+)
+def medallion_sdp(
+    context: dg.AssetExecutionContext,
+    spark_pipelines: SparkPipelinesResource,
+):
+    spark_pipelines.run_and_observe(
+        context=context,
+        pipeline_spec_path=PIPELINE_SPEC,
+        working_dir=PIPELINE_DIR,
+        execution_mode="full_refresh",
     )
+    yield dg.MaterializeResult(asset_key="sdp_silver_orders")
+    yield dg.MaterializeResult(asset_key="sdp_gold_daily_country_sales")
 
 
 defs = dg.Definitions(
-    assets=[bronze_orders, silver_orders, gold_daily_country_sales],
+    assets=[bronze_orders, silver_orders, medallion_sdp],
+    resources={
+        "pipes_k8s_client": PipesK8sClient(),
+        "spark_pipelines": SparkPipelinesResource(
+            spark_pipelines_cmd="spark-pipelines-s3",
+        ),
+    },
 )

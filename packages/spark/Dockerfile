@@ -24,7 +24,8 @@ RUN pip install --no-cache-dir \
     "pandas>=2.2.0" \
     "pyarrow>=15.0.0" \
     "pyyaml>=6.0" \
-    "zstandard>=0.25.0"
+    "zstandard>=0.25.0" \
+    "dagster-pipes"
 
 COPY jobs /opt/spark/jobs
 COPY pipelines /opt/spark/pipelines
