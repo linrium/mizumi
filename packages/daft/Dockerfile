@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1
 
 RUN pip install --no-cache-dir \
-    "daft==0.7.10" \
+    "daft[deltalake]==0.7.10" \
     "dagster-pipes" \
     "ray[client]==2.46.0"
 

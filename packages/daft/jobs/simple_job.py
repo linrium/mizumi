@@ -1,28 +1,39 @@
 # /// script
-# dependencies = ["daft"]
+# dependencies = ["daft[deltalake]"]
 # ///
 import daft
+from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
+
+SILVER_ORDERS = "s3://silver/orders/silver_orders"
+
+IO_CONFIG = IOConfig(
+    s3=S3Config(
+        endpoint_url="http://rustfs-svc.rustfs.svc.cluster.local:9000",
+        key_id="rustfsadmin",
+        access_key="rustfsadmin",
+        use_ssl=False,
+    )
+)
 
 
 def main() -> None:
     with open_dagster_pipes() as pipes:
-        df = daft.from_pydict(
-            {
-                "a": [3, 2, 5, 6, 1, 4],
-                "b": [True, False, False, True, True, False],
-            }
+        df = daft.read_deltalake(SILVER_ORDERS, io_config=IO_CONFIG)
+        row_count = df.count_rows()
+        preview = (
+            df.select("order_id", "customer_id", "country_code", "gross_amount", "order_date")
+            .limit(3)
+            .to_pydict()
         )
-        result = df.where(df["b"]).sort(df["a"]).to_pydict()
-        row_count = len(result["a"])
-        preview = [
-            {"a": result["a"][idx], "b": result["b"][idx]}
-            for idx in range(min(3, row_count))
-        ]
         pipes.report_asset_materialization(
             metadata={
                 "row_count": row_count,
-                "preview": preview,
+                "preview": [
+                    {k: str(preview[k][i]) for k in preview}
+                    for i in range(len(preview["order_id"]))
+                ],
+                "source": SILVER_ORDERS,
             }
         )
 
