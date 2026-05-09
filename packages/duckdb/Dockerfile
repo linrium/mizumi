@@ -13,5 +13,6 @@ RUN python -c "import duckdb; con = duckdb.connect(); con.execute('INSTALL httpf
 RUN mkdir -p /opt/duckdb
 COPY packages/duckdb/query_rustfs.py /opt/duckdb/query_rustfs.py
 COPY packages/duckdb/query_rustfs_dagster.py /opt/duckdb/query_rustfs_dagster.py
+COPY packages/duckdb/query_api.py /opt/duckdb/query_api.py
 
 WORKDIR /opt/duckdb
