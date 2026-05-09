@@ -18,6 +18,7 @@ WHERE UPPER(status) IN ('PAID', 'SHIPPED', 'DELIVERED');
 
 -- Weekly revenue and activity per country
 CREATE MATERIALIZED VIEW gold_weekly_revenue
+USING delta
 AS
 SELECT
   week_start,
@@ -31,6 +32,7 @@ ORDER BY week_start, country_code;
 
 -- Week-over-week growth derived from gold_weekly_revenue
 CREATE MATERIALIZED VIEW gold_weekly_growth
+USING delta
 AS
 WITH lagged AS (
   SELECT

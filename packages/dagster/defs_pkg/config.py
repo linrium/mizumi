@@ -3,11 +3,11 @@ import os
 
 PIPELINE_DIR = "/opt/spark/pipelines"
 
-MEDALLION_SPEC = f"{PIPELINE_DIR}/spark-pipeline.yaml"
+MEDALLION_SPEC = f"{PIPELINE_DIR}/medallion_pipeline/spark-pipeline.yaml"
 CUSTOMER_SPEC = f"{PIPELINE_DIR}/customer_pipeline/customer-pipeline.yaml"
 WEEKLY_SPEC = f"{PIPELINE_DIR}/weekly_pipeline/weekly-pipeline.yaml"
 
-MEDALLION_DIR = PIPELINE_DIR
+MEDALLION_DIR = f"{PIPELINE_DIR}/medallion_pipeline"
 CUSTOMER_DIR = f"{PIPELINE_DIR}/customer_pipeline"
 WEEKLY_DIR = f"{PIPELINE_DIR}/weekly_pipeline"
 

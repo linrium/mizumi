@@ -6,6 +6,7 @@ FROM json.`s3a://bronze/orders/raw/orders.jsonl`;
 
 -- Cleaned, deduplicated orders for customer analysis
 CREATE MATERIALIZED VIEW silver_customers
+USING delta
 AS
 SELECT
   CAST(order_id AS BIGINT)                                       AS order_id,
@@ -26,6 +27,7 @@ WHERE rn = 1;
 
 -- Customer lifetime value with tier segmentation
 CREATE MATERIALIZED VIEW gold_customer_ltv
+USING delta
 AS
 SELECT
   customer_id,

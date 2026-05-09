@@ -54,15 +54,20 @@ RUN cp /opt/spark/jars/*.jar \
 
 # Wrapper: --jars must come before the subcommand so we can't use run_extra_args
 RUN JARS="/opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar,/opt/spark/jars/slf4j-nop-1.7.36.jar,/opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar,/opt/spark/jars/unitycatalog-client-0.4.1.jar,/opt/spark/jars/delta-spark_2.13-4.1.0.jar,/opt/spark/jars/delta-storage-4.1.0.jar,/opt/spark/jars/jackson-databind-nullable-0.2.6.jar" \
-    && printf '#!/bin/bash\nexec spark-pipelines --jars %s "$@"\n' "$JARS" > /usr/local/bin/spark-pipelines-s3 \
+    && printf '#!/bin/bash\nexec spark-pipelines --jars %s --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog "$@"\n' "$JARS" > /usr/local/bin/spark-pipelines-s3 \
     && chmod +x /usr/local/bin/spark-pipelines-s3
+
+# Static Spark configs set as JVM system properties so the Spark Connect server picks them up
+# at startup. PYTHONWARNINGS suppresses the harmless client-side "cannot modify static config"
+# warning that fires because the Python client also reads JAVA_TOOL_OPTIONS.
+ENV JAVA_TOOL_OPTIONS="-Dspark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension -Dspark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+ENV PYTHONWARNINGS="ignore::UserWarning:pyspark.sql.connect.conf"
 
 # Spark conf (warehouse dir) read at JVM start via SPARK_CONF_DIR
 ENV SPARK_CONF_DIR=/opt/spark/conf
-RUN mkdir -p /opt/spark/conf /opt/spark/pipelines/definitions
+RUN mkdir -p /opt/spark/conf /opt/spark/pipelines
 COPY packages/dagster/conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
-COPY packages/spark/pipelines/spark-pipeline.yaml /opt/spark/pipelines/spark-pipeline.yaml
-COPY packages/spark/pipelines/definitions/ /opt/spark/pipelines/definitions/
+COPY packages/spark/pipelines/medallion_pipeline/ /opt/spark/pipelines/medallion_pipeline/
 COPY packages/spark/pipelines/customer_pipeline/ /opt/spark/pipelines/customer_pipeline/
 COPY packages/spark/pipelines/weekly_pipeline/ /opt/spark/pipelines/weekly_pipeline/
 

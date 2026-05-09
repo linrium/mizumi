@@ -26,6 +26,13 @@ spec:
         - name: submit
           image: mizumi-spark-rustfs:4.1.1
           imagePullPolicy: IfNotPresent
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: >-
+                -Dspark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension
+                -Dspark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
+            - name: PYTHONWARNINGS
+              value: "ignore::UserWarning:pyspark.sql.connect.conf"
           command:
             - /bin/sh
             - -ec
@@ -33,4 +40,4 @@ spec:
               spark-pipelines \
                 --jars /opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar,/opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar,/opt/spark/jars/unitycatalog-client-0.4.1.jar,/opt/spark/jars/delta-spark_2.13-4.1.0.jar,/opt/spark/jars/delta-storage-4.1.0.jar,/opt/spark/jars/jackson-databind-nullable-0.2.6.jar \
                 run \
-                --spec /opt/spark/pipelines/spark-pipeline.yaml
+                --spec /opt/spark/pipelines/medallion_pipeline/spark-pipeline.yaml

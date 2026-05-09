@@ -19,6 +19,7 @@ FROM bronze_orders_raw
 WHERE UPPER(status) IN ('PAID', 'SHIPPED', 'DELIVERED');
 
 CREATE MATERIALIZED VIEW silver_orders
+USING delta
 AS
 SELECT
   order_id,
@@ -40,6 +41,7 @@ FROM (
 WHERE row_num = 1;
 
 CREATE MATERIALIZED VIEW gold_daily_country_sales
+USING delta
 AS
 SELECT
   order_date,
