@@ -28,6 +28,7 @@ spark_pipeline_job := "rustfs-medallion-pipeline-submit"
 spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 daft_image := "mizumi-daft:0.7.10"
+datafusion_image := "mizumi-datafusion:50.1.0"
 
 daft_namespace := "daft"
 daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
@@ -40,6 +41,8 @@ daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
 
 ballista_namespace := "ballista"
 ballista_manifests := "infra/k8s/ballista"
+datafusion_namespace := "spark"
+datafusion_query_job := "datafusion-rustfs-query"
 
 deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
 
@@ -114,6 +117,9 @@ spark-image-build:
 
 daft-image-build:
     docker build -t {{daft_image}} -f packages/daft/Dockerfile .
+
+datafusion-image-build:
+    docker build -t {{datafusion_image}} -f packages/datafusion/Dockerfile .
 
 spark-seed-data:
     kubectl delete job rustfs-seed-bronze -n {{spark_namespace}} --ignore-not-found
@@ -327,3 +333,15 @@ ballista-destroy:
     kubectl delete -n {{ballista_namespace}} -f {{ballista_manifests}}/cluster.yaml --ignore-not-found
     kubectl delete -n {{ballista_namespace}} -f {{ballista_manifests}}/pv.yaml --ignore-not-found
     kubectl delete namespace {{ballista_namespace}} --ignore-not-found --wait=false
+
+datafusion-query: datafusion-image-build
+    kubectl delete job {{datafusion_query_job}} -n {{datafusion_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/datafusion/query-job.yaml
+    kubectl wait --for=condition=complete job/{{datafusion_query_job}} -n {{datafusion_namespace}} --timeout=180s
+    kubectl logs job/{{datafusion_query_job}} -n {{datafusion_namespace}}
+
+datafusion-query-logs:
+    kubectl logs job/{{datafusion_query_job}} -n {{datafusion_namespace}}
+
+datafusion-query-destroy:
+    kubectl delete job {{datafusion_query_job}} -n {{datafusion_namespace}} --ignore-not-found

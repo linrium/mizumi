@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: datafusion-rustfs-query
+  namespace: spark
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: datafusion-query
+          image: mizumi-datafusion:50.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/opt/datafusion/query_rustfs.py"]
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+            - name: AWS_ACCESS_KEY_ID
+              value: rustfsadmin
+            - name: AWS_SECRET_ACCESS_KEY
+              value: rustfsadmin
+            - name: RUSTFS_BUCKET
+              value: silver
+            - name: RUSTFS_PARQUET_PATH
+              value: s3://silver/orders/silver_orders/
+  backoffLimit: 0
