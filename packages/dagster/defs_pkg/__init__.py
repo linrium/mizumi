@@ -4,6 +4,7 @@ from dagster_spark import SparkPipelinesResource
 
 from .assets.bronze import bronze_orders
 from .assets.daft import daft_distributed_job, daft_simple_job
+from .assets.datafusion import datafusion_rustfs_query
 from .assets.sdp import customer_sdp, medallion_sdp, weekly_sdp
 from .assets.spark_jobs import (
     gold_country_revenue,
@@ -15,6 +16,7 @@ from .assets.spark_jobs import (
 defs = dg.Definitions(
     assets=[
         bronze_orders,
+        datafusion_rustfs_query,
         daft_distributed_job,
         daft_simple_job,
         silver_orders,
