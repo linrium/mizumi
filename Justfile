@@ -38,6 +38,9 @@ daft_distributed_values := "infra/k8s/daft/helm/distributed-values.yaml"
 daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
 daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
 
+ballista_namespace := "ballista"
+ballista_manifests := "infra/k8s/ballista"
+
 deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy
@@ -298,3 +301,29 @@ daft-distributed-destroy:
 
 daft-destroy: daft-simple-destroy daft-distributed-destroy
     kubectl delete namespace {{daft_namespace}} --ignore-not-found --wait=false
+
+ballista-deploy:
+    kubectl create namespace {{ballista_namespace}} 2>/dev/null || true
+    kubectl apply -n {{ballista_namespace}} -f {{ballista_manifests}}/pv.yaml
+    kubectl delete -n {{ballista_namespace}} -f {{ballista_manifests}}/cluster.yaml --ignore-not-found
+    kubectl apply -n {{ballista_namespace}} -f {{ballista_manifests}}/cluster.yaml
+    kubectl rollout status deployment/ballista-scheduler -n {{ballista_namespace}} --timeout=180s
+    kubectl rollout status deployment/ballista-executor -n {{ballista_namespace}} --timeout=180s
+    kubectl get pods,svc,pvc,pv -n {{ballista_namespace}}
+
+ballista-status:
+    kubectl get pods,svc,pvc,pv -n {{ballista_namespace}}
+
+ballista-scheduler-logs:
+    kubectl logs -n {{ballista_namespace}} deployment/ballista-scheduler
+
+ballista-executor-logs:
+    kubectl logs -n {{ballista_namespace}} deployment/ballista-executor
+
+ballista-forward:
+    kubectl port-forward -n {{ballista_namespace}} service/ballista-scheduler 50050:50050
+
+ballista-destroy:
+    kubectl delete -n {{ballista_namespace}} -f {{ballista_manifests}}/cluster.yaml --ignore-not-found
+    kubectl delete -n {{ballista_namespace}} -f {{ballista_manifests}}/pv.yaml --ignore-not-found
+    kubectl delete namespace {{ballista_namespace}} --ignore-not-found --wait=false
