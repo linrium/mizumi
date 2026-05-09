@@ -63,6 +63,8 @@ RUN mkdir -p /opt/spark/conf /opt/spark/pipelines/definitions
 COPY packages/dagster/conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 COPY packages/spark/pipelines/spark-pipeline.yaml /opt/spark/pipelines/spark-pipeline.yaml
 COPY packages/spark/pipelines/definitions/ /opt/spark/pipelines/definitions/
+COPY packages/spark/pipelines/customer_pipeline/ /opt/spark/pipelines/customer_pipeline/
+COPY packages/spark/pipelines/weekly_pipeline/ /opt/spark/pipelines/weekly_pipeline/
 
 COPY packages/dagster/definitions.py /app/definitions.py
 

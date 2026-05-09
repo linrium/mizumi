@@ -28,9 +28,9 @@ spark_pipeline_job := "rustfs-medallion-pipeline-submit"
 spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 
-deploy: rustfs-deploy spark-deploy dagster-deploy
+deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
 
-destroy: spark-destroy rustfs-destroy dagster-destroy
+destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash

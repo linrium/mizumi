@@ -81,20 +81,91 @@ spec:
                   col("active_customers",  "LONG",   "bigint", "long",    4),
               ]
 
+              CUSTOMER_STATS_COLS = [
+                  col("customer_id",       "LONG",   "bigint", "long",    0),
+                  col("country_code",      "STRING", "string", "string",  1),
+                  col("order_count",       "LONG",   "bigint", "long",    2),
+                  col("total_spend",       "DOUBLE", "double", "double",  3),
+                  col("avg_order_value",   "DOUBLE", "double", "double",  4),
+                  col("first_order_date",  "DATE",   "date",   "date",    5),
+                  col("last_order_date",   "DATE",   "date",   "date",    6),
+              ]
+
+              COUNTRY_REVENUE_COLS = [
+                  col("order_date",          "DATE",   "date",   "date",    0),
+                  col("country_code",        "STRING", "string", "string",  1),
+                  col("daily_revenue",       "DOUBLE", "double", "double",  2),
+                  col("order_count",         "LONG",   "bigint", "long",    3),
+                  col("cumulative_revenue",  "DOUBLE", "double", "double",  4),
+              ]
+
+              SILVER_CUSTOMERS_COLS = [
+                  col("order_id",      "LONG",   "bigint",  "long",    0),
+                  col("customer_id",   "LONG",   "bigint",  "long",    1),
+                  col("country_code",  "STRING", "string",  "string",  2),
+                  col("status",        "STRING", "string",  "string",  3),
+                  col("quantity",      "INT",    "int",     "integer", 4),
+                  col("unit_price",    "DOUBLE", "double",  "double",  5),
+                  col("gross_amount",  "DOUBLE", "double",  "double",  6),
+                  col("order_date",    "DATE",   "date",    "date",    7),
+              ]
+
+              CUSTOMER_LTV_COLS = [
+                  col("customer_id",            "LONG",   "bigint", "long",    0),
+                  col("country_code",           "STRING", "string", "string",  1),
+                  col("order_count",            "LONG",   "bigint", "long",    2),
+                  col("total_revenue",          "DOUBLE", "double", "double",  3),
+                  col("avg_order_value",        "DOUBLE", "double", "double",  4),
+                  col("days_since_last_order",  "INT",    "int",    "integer", 5),
+                  col("ltv_tier",               "STRING", "string", "string",  6),
+              ]
+
+              WEEKLY_REVENUE_COLS = [
+                  col("week_start",        "DATE",   "date",   "date",    0),
+                  col("country_code",      "STRING", "string", "string",  1),
+                  col("weekly_revenue",    "DOUBLE", "double", "double",  2),
+                  col("order_count",       "LONG",   "bigint", "long",    3),
+                  col("active_customers",  "LONG",   "bigint", "long",    4),
+              ]
+
+              WEEKLY_GROWTH_COLS = [
+                  col("week_start",          "DATE",   "date",   "date",    0),
+                  col("country_code",        "STRING", "string", "string",  1),
+                  col("weekly_revenue",      "DOUBLE", "double", "double",  2),
+                  col("prev_week_revenue",   "DOUBLE", "double", "double",  3),
+                  col("revenue_growth_pct",  "DOUBLE", "double", "double",  4),
+              ]
+
               TABLES = [
                   {
                       "name": "silver_orders",
                       "catalog_name": CATALOG, "schema_name": SCHEMA,
                       "table_type": "EXTERNAL", "data_source_format": "PARQUET",
-                      "storage_location": "s3://silver/orders/silver_orders",
+                      "storage_location": "s3a://silver/orders/silver_orders",
                       "columns": ORDER_COLS,
                       "comment": "Cleaned orders — Dagster Pipes (Parquet, partitioned by order_date)",
+                  },
+                  {
+                      "name": "gold_customer_stats",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/customer_stats",
+                      "columns": CUSTOMER_STATS_COLS,
+                      "comment": "Per-customer purchase stats — Dagster Pipes (Delta)",
+                  },
+                  {
+                      "name": "gold_country_revenue",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/country_revenue",
+                      "columns": COUNTRY_REVENUE_COLS,
+                      "comment": "Daily + cumulative revenue per country — Dagster Pipes (Delta)",
                   },
                   {
                       "name": "sdp_silver_orders",
                       "catalog_name": CATALOG, "schema_name": SCHEMA,
                       "table_type": "EXTERNAL", "data_source_format": "DELTA",
-                      "storage_location": "s3://gold/sdp-warehouse/silver_orders",
+                      "storage_location": "s3a://gold/sdp-warehouse/silver_orders",
                       "columns": ORDER_COLS,
                       "comment": "Cleaned orders — Spark Declarative Pipelines (Delta)",
                   },
@@ -102,9 +173,41 @@ spec:
                       "name": "sdp_gold_daily_country_sales",
                       "catalog_name": CATALOG, "schema_name": SCHEMA,
                       "table_type": "EXTERNAL", "data_source_format": "DELTA",
-                      "storage_location": "s3://gold/sdp-warehouse/gold_daily_country_sales",
+                      "storage_location": "s3a://gold/sdp-warehouse/gold_daily_country_sales",
                       "columns": SALES_COLS,
                       "comment": "Daily country sales — Spark Declarative Pipelines (Delta)",
+                  },
+                  {
+                      "name": "sdp_silver_customers",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/sdp-warehouse/silver_customers",
+                      "columns": SILVER_CUSTOMERS_COLS,
+                      "comment": "Deduplicated customer orders — Customer SDP (Delta)",
+                  },
+                  {
+                      "name": "sdp_gold_customer_ltv",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/sdp-warehouse/gold_customer_ltv",
+                      "columns": CUSTOMER_LTV_COLS,
+                      "comment": "Customer lifetime value with tier — Customer SDP (Delta)",
+                  },
+                  {
+                      "name": "sdp_gold_weekly_revenue",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/sdp-warehouse/gold_weekly_revenue",
+                      "columns": WEEKLY_REVENUE_COLS,
+                      "comment": "Weekly revenue per country — Weekly Trends SDP (Delta)",
+                  },
+                  {
+                      "name": "sdp_gold_weekly_growth",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3a://gold/sdp-warehouse/gold_weekly_growth",
+                      "columns": WEEKLY_GROWTH_COLS,
+                      "comment": "Week-over-week revenue growth — Weekly Trends SDP (Delta)",
                   },
               ]
 
