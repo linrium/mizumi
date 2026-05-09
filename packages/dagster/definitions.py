@@ -1,5 +1,6 @@
 import boto3
 import dagster as dg
+import os
 from dagster_k8s import PipesK8sClient
 from dagster_spark import SparkPipelinesResource
 
@@ -16,6 +17,11 @@ WEEKLY_DIR      = f"{PIPELINE_DIR}/weekly_pipeline"
 S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
 S3A_ACCESS_KEY = "rustfsadmin"
 S3A_SECRET_KEY = "rustfsadmin"
+DAFT_IMAGE = "mizumi-daft:0.7.10"
+DAFT_RAY_ADDRESS = os.getenv(
+    "DAFT_RAY_ADDRESS",
+    "ray://daft-distributed-quickstart-head.daft.svc.cluster.local:10001",
+)
 
 S3A_CONF = [
     "--conf", "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
@@ -58,6 +64,35 @@ def bronze_orders() -> dg.MaterializeResult:
     return dg.MaterializeResult(
         metadata={"source": dg.MetadataValue.text("s3a://bronze/orders/raw/orders.jsonl")}
     )
+
+
+@dg.asset(group_name="daft", kinds={"daft", "k8s"})
+def daft_simple_job(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image=DAFT_IMAGE,
+        command=["python", "/opt/daft/jobs/simple_job.py"],
+    ).get_materialize_result()
+
+
+@dg.asset(group_name="daft", kinds={"daft", "k8s", "ray"})
+def daft_distributed_job(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image=DAFT_IMAGE,
+        command=[
+            "python",
+            "/opt/daft/jobs/distributed_job.py",
+            "--ray-address",
+            DAFT_RAY_ADDRESS,
+        ],
+    ).get_materialize_result()
 
 
 # ── Silver via Dagster Pipes ───────────────────────────────────────────────────
@@ -207,6 +242,8 @@ def weekly_sdp(
 defs = dg.Definitions(
     assets=[
         bronze_orders,
+        daft_distributed_job,
+        daft_simple_job,
         silver_orders,
         gold_customer_stats,
         gold_country_revenue,

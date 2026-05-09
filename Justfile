@@ -27,6 +27,7 @@ spark_app_name := "rustfs-medallion"
 spark_pipeline_job := "rustfs-medallion-pipeline-submit"
 spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
+daft_image := "mizumi-daft:0.7.10"
 
 daft_namespace := "daft"
 daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
@@ -107,6 +108,9 @@ spark-operator-deploy: spark-helm-repo
 
 spark-image-build:
     docker build -t {{spark_image}} packages/spark
+
+daft-image-build:
+    docker build -t {{daft_image}} -f packages/daft/Dockerfile .
 
 spark-seed-data:
     kubectl delete job rustfs-seed-bronze -n {{spark_namespace}} --ignore-not-found
