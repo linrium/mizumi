@@ -177,9 +177,12 @@ dagster-helm-repo:
 
 dagster-image-build:
     docker build -t {{dagster_image}} -f packages/dagster/Dockerfile .
+    if kubectl get deployment/{{dagster_release}}-dagster-user-deployments-mizumi -n {{dagster_namespace}} &>/dev/null; then \
+      kubectl rollout restart deployment/{{dagster_release}}-dagster-user-deployments-mizumi -n {{dagster_namespace}}; \
+      kubectl rollout status deployment/{{dagster_release}}-dagster-user-deployments-mizumi -n {{dagster_namespace}} --timeout=120s; \
+    fi
 
 dagster-deploy: dagster-helm-repo dagster-image-build
-    kubectl wait --for=delete namespace/{{dagster_namespace}} --timeout=120s 2>/dev/null || true
     helm upgrade --install {{dagster_release}} {{dagster_chart}} \
       --namespace {{dagster_namespace}} \
       --create-namespace \
@@ -202,12 +205,20 @@ dagster-destroy:
 
 unitycatalog-image-build:
     docker build -t {{unitycatalog_image}} packages/unitycatalog
+    if kubectl get deployment/unitycatalog -n {{unitycatalog_namespace}} &>/dev/null; then \
+      kubectl rollout restart deployment/unitycatalog -n {{unitycatalog_namespace}}; \
+      kubectl rollout status deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=120s; \
+    fi
 
 unitycatalog-ui-image-build:
     docker build \
       --build-arg PROXY_HOST=unitycatalog-svc \
       -t {{unitycatalog_ui_image}} \
       "https://github.com/unitycatalog/unitycatalog.git#v0.4.0:ui"
+    if kubectl get deployment/unitycatalog-ui -n {{unitycatalog_namespace}} &>/dev/null; then \
+      kubectl rollout restart deployment/unitycatalog-ui -n {{unitycatalog_namespace}}; \
+      kubectl rollout status deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=120s; \
+    fi
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl create namespace {{unitycatalog_namespace}} 2>/dev/null || true

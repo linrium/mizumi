@@ -22,7 +22,7 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         spark = build_session()
 
-        silver_df = spark.read.parquet(SOURCE_PATH)
+        silver_df = spark.read.format("delta").load(SOURCE_PATH)
 
         daily = (
             silver_df.groupBy("order_date", "country_code")

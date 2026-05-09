@@ -22,7 +22,7 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         spark = build_session()
 
-        silver_df = spark.read.parquet(SOURCE_PATH)
+        silver_df = spark.read.format("delta").load(SOURCE_PATH)
 
         gold_df = (
             silver_df.groupBy("customer_id", "country_code")

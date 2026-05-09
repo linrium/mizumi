@@ -9,6 +9,11 @@ def build_session() -> SparkSession:
     return (
         SparkSession.builder.appName("rustfs-bronze-to-silver")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
+            "spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+        )
         .getOrCreate()
     )
 
@@ -36,7 +41,7 @@ def main() -> None:
             .withColumn("processed_at", F.current_timestamp())
         )
 
-        silver_df.write.mode("overwrite").partitionBy("order_date").parquet(TARGET_PATH)
+        silver_df.write.format("delta").mode("overwrite").partitionBy("order_date").save(TARGET_PATH)
 
         bronze_count = bronze_df.count()
         silver_count = silver_df.count()
