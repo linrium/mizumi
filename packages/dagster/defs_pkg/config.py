@@ -18,6 +18,7 @@ S3A_SECRET_KEY = "rustfsadmin"
 SPARK_IMAGE = "mizumi-spark-rustfs:4.1.1"
 DAFT_IMAGE = "mizumi-daft:0.7.10"
 DATAFUSION_IMAGE = "mizumi-datafusion:50.1.0"
+DUCKDB_IMAGE = "mizumi-duckdb:1.1.3"
 DAFT_RAY_ADDRESS = os.getenv(
     "DAFT_RAY_ADDRESS",
     "ray://daft-distributed-quickstart-head.daft.svc.cluster.local:10001",

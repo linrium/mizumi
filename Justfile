@@ -43,6 +43,9 @@ ballista_namespace := "ballista"
 ballista_manifests := "infra/k8s/ballista"
 datafusion_namespace := "spark"
 datafusion_query_job := "datafusion-rustfs-query"
+duckdb_image := "mizumi-duckdb:1.1.3"
+duckdb_namespace := "spark"
+duckdb_query_job := "duckdb-rustfs-query"
 
 deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
 
@@ -356,3 +359,18 @@ datafusion-query-logs:
 
 datafusion-query-destroy:
     kubectl delete job {{datafusion_query_job}} -n {{datafusion_namespace}} --ignore-not-found
+
+duckdb-image-build:
+    docker build -t {{duckdb_image}} -f packages/duckdb/Dockerfile .
+
+duckdb-query: duckdb-image-build
+    kubectl delete job {{duckdb_query_job}} -n {{duckdb_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/duckdb/query-job.yaml
+    kubectl wait --for=condition=complete job/{{duckdb_query_job}} -n {{duckdb_namespace}} --timeout=180s
+    kubectl logs job/{{duckdb_query_job}} -n {{duckdb_namespace}}
+
+duckdb-query-logs:
+    kubectl logs job/{{duckdb_query_job}} -n {{duckdb_namespace}}
+
+duckdb-query-destroy:
+    kubectl delete job {{duckdb_query_job}} -n {{duckdb_namespace}} --ignore-not-found

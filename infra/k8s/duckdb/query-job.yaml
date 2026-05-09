@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: duckdb-rustfs-query
+  namespace: spark
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: duckdb-query
+          image: mizumi-duckdb:1.1.3
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/opt/duckdb/query_rustfs.py"]
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+            - name: AWS_ACCESS_KEY_ID
+              value: rustfsadmin
+            - name: AWS_SECRET_ACCESS_KEY
+              value: rustfsadmin
+            - name: DUCKDB_DELTA_PATH
+              value: s3://gold/sdp-warehouse/silver_orders
+  backoffLimit: 0
