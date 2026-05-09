@@ -1,5 +1,8 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+app_ui_namespace := "app-ui"
+app_ui_image := "mizumi-app-ui:0.1.0"
+
 unitycatalog_namespace := "unitycatalog"
 unitycatalog_image := "mizumi-unitycatalog:v0.4.0"
 unitycatalog_ui_image := "mizumi-unitycatalog-ui:v0.4.0"
@@ -71,6 +74,10 @@ forward:
     fi
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
+    if kubectl get deployment/app-ui -n {{app_ui_namespace}} &>/dev/null; then
+        kubectl port-forward -n {{app_ui_namespace}} svc/app-ui-svc 3002:3000 &
+        echo "App UI:          http://127.0.0.1:3002"
+    fi
     echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
     echo "Dagster UI:      http://127.0.0.1:8080"
@@ -374,3 +381,23 @@ duckdb-query-logs:
 
 duckdb-query-destroy:
     kubectl delete job {{duckdb_query_job}} -n {{duckdb_namespace}} --ignore-not-found
+
+app-ui-image-build:
+    docker build -t {{app_ui_image}} app-ui
+    if kubectl get deployment/app-ui -n {{app_ui_namespace}} &>/dev/null; then \
+      kubectl rollout restart deployment/app-ui -n {{app_ui_namespace}}; \
+      kubectl rollout status deployment/app-ui -n {{app_ui_namespace}} --timeout=120s; \
+    fi
+
+app-ui-deploy: app-ui-image-build
+    kubectl create namespace {{app_ui_namespace}} 2>/dev/null || true
+    kubectl apply -f infra/k8s/app-ui/deployment.yaml
+    kubectl wait --for=condition=Available deployment/app-ui -n {{app_ui_namespace}} --timeout=180s
+    kubectl get pods,svc -n {{app_ui_namespace}}
+
+app-ui-forward:
+    kubectl port-forward -n {{app_ui_namespace}} svc/app-ui-svc 3002:3000
+
+app-ui-destroy:
+    kubectl delete -f infra/k8s/app-ui/ --ignore-not-found || true
+    kubectl delete namespace {{app_ui_namespace}} --ignore-not-found --wait=false

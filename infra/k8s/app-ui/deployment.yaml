@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-ui
+  namespace: app-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-ui
+  template:
+    metadata:
+      labels:
+        app: app-ui
+    spec:
+      containers:
+        - name: app-ui
+          image: mizumi-app-ui:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: production
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-ui-svc
+  namespace: app-ui
+spec:
+  selector:
+    app: app-ui
+  ports:
+    - port: 3000
+      targetPort: 3000
