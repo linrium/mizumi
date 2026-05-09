@@ -9,6 +9,19 @@ spec:
     spec:
       serviceAccountName: spark-operator-spark
       restartPolicy: Never
+      initContainers:
+        - name: cleanup-warehouse
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
+              mc rm --recursive --force rustfs/gold/sdp-warehouse/silver_orders 2>/dev/null || true
+              mc rm --recursive --force rustfs/gold/sdp-warehouse/gold_daily_country_sales 2>/dev/null || true
+              mc rm --recursive --force rustfs/gold/warehouse/silver_orders 2>/dev/null || true
+              mc rm --recursive --force rustfs/gold/warehouse/gold_daily_country_sales 2>/dev/null || true
+              echo "Warehouse cleaned"
       containers:
         - name: submit
           image: mizumi-spark-rustfs:4.1.1
@@ -18,6 +31,6 @@ spec:
             - -ec
             - |
               spark-pipelines \
-                --jars /opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar \
+                --jars /opt/spark/jars/hadoop-aws-3.4.2.jar,/opt/spark/jars/aws-java-sdk-bundle-1.12.720.jar,/opt/spark/jars/bundle-2.29.52.jar,/opt/spark/jars/analyticsaccelerator-s3-1.2.1.jar,/opt/spark/jars/wildfly-openssl-2.1.4.Final.jar,/opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar,/opt/spark/jars/unitycatalog-client-0.4.1.jar,/opt/spark/jars/delta-spark_2.13-4.1.0.jar,/opt/spark/jars/delta-storage-4.1.0.jar,/opt/spark/jars/jackson-databind-nullable-0.2.6.jar \
                 run \
                 --spec /opt/spark/pipelines/spark-pipeline.yaml

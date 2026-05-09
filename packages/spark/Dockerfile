@@ -16,6 +16,19 @@ RUN chmod 644 \
     /opt/spark/jars/wildfly-openssl-2.1.4.Final.jar \
     /opt/spark/jars/slf4j-nop-1.7.36.jar
 
+# Unity Catalog + Delta Lake connector
+ADD https://repo1.maven.org/maven2/io/unitycatalog/unitycatalog-spark_2.13/0.4.1/unitycatalog-spark_2.13-0.4.1.jar /opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar
+ADD https://repo1.maven.org/maven2/io/unitycatalog/unitycatalog-client/0.4.1/unitycatalog-client-0.4.1.jar /opt/spark/jars/unitycatalog-client-0.4.1.jar
+ADD https://repo1.maven.org/maven2/io/delta/delta-spark_2.13/4.1.0/delta-spark_2.13-4.1.0.jar /opt/spark/jars/delta-spark_2.13-4.1.0.jar
+ADD https://repo1.maven.org/maven2/io/delta/delta-storage/4.1.0/delta-storage-4.1.0.jar /opt/spark/jars/delta-storage-4.1.0.jar
+ADD https://repo1.maven.org/maven2/org/openapitools/jackson-databind-nullable/0.2.6/jackson-databind-nullable-0.2.6.jar /opt/spark/jars/jackson-databind-nullable-0.2.6.jar
+RUN chmod 644 \
+    /opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar \
+    /opt/spark/jars/unitycatalog-client-0.4.1.jar \
+    /opt/spark/jars/delta-spark_2.13-4.1.0.jar \
+    /opt/spark/jars/delta-storage-4.1.0.jar \
+    /opt/spark/jars/jackson-databind-nullable-0.2.6.jar
+
 RUN pip install --no-cache-dir \
     "pyspark[pipelines]==4.1.1" \
     "pyspark-connect==4.1.1" \
