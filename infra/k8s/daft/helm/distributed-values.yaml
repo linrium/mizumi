@@ -1,0 +1,4 @@
+distributed: true
+
+worker:
+  replicas: 3

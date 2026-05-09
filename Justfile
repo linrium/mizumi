@@ -28,6 +28,15 @@ spark_pipeline_job := "rustfs-medallion-pipeline-submit"
 spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 
+daft_namespace := "daft"
+daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
+daft_simple_release := "daft-simple"
+daft_distributed_release := "daft-distributed"
+daft_simple_values := "infra/k8s/daft/helm/simple-values.yaml"
+daft_distributed_values := "infra/k8s/daft/helm/distributed-values.yaml"
+daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
+daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
+
 deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy
@@ -213,3 +222,75 @@ unitycatalog-ui-forward:
 unitycatalog-destroy:
     kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
     kubectl delete namespace {{unitycatalog_namespace}} --ignore-not-found --wait=false
+
+daft-simple-deploy:
+    kubectl create namespace {{daft_namespace}} 2>/dev/null || true
+    helm upgrade --install {{daft_simple_release}} {{daft_chart}} \
+      --namespace {{daft_namespace}} \
+      --create-namespace \
+      --values {{daft_simple_values}} \
+      --set-file job.script={{daft_simple_script}}
+    just daft-simple-logs
+
+daft-distributed-deploy:
+    kubectl create namespace {{daft_namespace}} 2>/dev/null || true
+    helm upgrade --install {{daft_distributed_release}} {{daft_chart}} \
+      --namespace {{daft_namespace}} \
+      --create-namespace \
+      --values {{daft_distributed_values}} \
+      --set-file job.script={{daft_distributed_script}}
+    just daft-distributed-logs
+
+daft-simple-logs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    job_name="{{daft_simple_release}}-quickstart-job"
+    for attempt in $(seq 1 60); do
+        pod_name=$(kubectl get pods -n {{daft_namespace}} -l job-name="$job_name" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        if [[ -n "${pod_name:-}" ]]; then
+            break
+        fi
+        sleep 2
+    done
+    for attempt in $(seq 1 60); do
+        if kubectl logs -n {{daft_namespace}} -f job/"$job_name"; then
+            exit 0
+        fi
+        sleep 2
+    done
+    kubectl describe job "$job_name" -n {{daft_namespace}}
+    kubectl get pods -n {{daft_namespace}} -l job-name="$job_name"
+    exit 1
+
+daft-distributed-logs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    job_name="{{daft_distributed_release}}-quickstart-job"
+    for attempt in $(seq 1 60); do
+        pod_name=$(kubectl get pods -n {{daft_namespace}} -l job-name="$job_name" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        if [[ -n "${pod_name:-}" ]]; then
+            break
+        fi
+        sleep 2
+    done
+    for attempt in $(seq 1 60); do
+        if kubectl logs -n {{daft_namespace}} -f job/"$job_name"; then
+            exit 0
+        fi
+        sleep 2
+    done
+    kubectl describe job "$job_name" -n {{daft_namespace}}
+    kubectl get pods -n {{daft_namespace}} -l job-name="$job_name"
+    exit 1
+
+daft-distributed-forward:
+    kubectl port-forward -n {{daft_namespace}} service/{{daft_distributed_release}}-quickstart-head 8265:8265 3000:3000
+
+daft-simple-destroy:
+    helm uninstall {{daft_simple_release}} --namespace {{daft_namespace}} || true
+
+daft-distributed-destroy:
+    helm uninstall {{daft_distributed_release}} --namespace {{daft_namespace}} || true
+
+daft-destroy: daft-simple-destroy daft-distributed-destroy
+    kubectl delete namespace {{daft_namespace}} --ignore-not-found --wait=false

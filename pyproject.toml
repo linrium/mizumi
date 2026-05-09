@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "daft>=0.7.10",
     "dagster>=1.13.4",
     "dagster-k8s>=0.29.4",
     "dagster-spark>=0.29.4",
@@ -15,5 +16,6 @@ dependencies = [
     "pyspark>=4.1.1",
     "pyspark-connect>=4.1.1",
     "pyyaml>=6.0",
+    "ray>=2.55.1",
     "zstandard>=0.25.0",
 ]
