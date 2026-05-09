@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession, functions as F, Window
 from dagster_pipes import open_dagster_pipes
 
-SOURCE_TABLE = "mizumi.default.sdp_silver_orders"
+SOURCE_PATH = "s3a://silver/orders/silver_orders"
 TARGET_PATH = "s3a://gold/country_revenue/"
 
 
@@ -9,6 +9,11 @@ def build_session() -> SparkSession:
     return (
         SparkSession.builder.appName("silver-to-gold-country-revenue")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
+            "spark.sql.catalog.spark_catalog",
+            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+        )
         .getOrCreate()
     )
 
@@ -17,7 +22,7 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         spark = build_session()
 
-        silver_df = spark.table(SOURCE_TABLE)
+        silver_df = spark.read.parquet(SOURCE_PATH)
 
         daily = (
             silver_df.groupBy("order_date", "country_code")
@@ -44,7 +49,7 @@ def main() -> None:
         pipes.report_asset_materialization(
             metadata={
                 "row_count": row_count,
-                "source": SOURCE_TABLE,
+                "source": SOURCE_PATH,
                 "target": TARGET_PATH,
             }
         )
