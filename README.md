@@ -1,86 +1,279 @@
 # Mizumi
 
-## Daft on Kubernetes
+Mizumi is a local data platform playground built around Kubernetes. It combines object storage, Spark batch processing, Spark Declarative Pipelines, Dagster orchestration, and query engines such as DuckDB, DataFusion, and Daft.
 
-This repo includes a Helm-based Daft quickstart setup under `infra/k8s/daft/`, following the current upstream quickstart chart documentation.
+The repository is organized as infrastructure plus a small application layer:
 
-Simple mode:
+- `packages/spark`: Spark jobs and Spark Declarative Pipelines.
+- `packages/dagster`: Dagster asset definitions that orchestrate jobs on Kubernetes.
+- `packages/duckdb`, `packages/datafusion`, `packages/daft`: query and compute workloads packaged as container jobs.
+- `packages/unitycatalog`: Unity Catalog container build context.
+- `app-api`: Rust API that launches ad hoc DuckDB query jobs in Kubernetes.
+- `app-ui`: Next.js UI.
+- `infra/k8s`: Kubernetes manifests and Helm values.
+- `Justfile`: operational entrypoint for deploy, destroy, forward, and query commands.
 
-```bash
-just daft-simple-deploy
+## Architecture
+
+Mizumi uses RustFS as the S3-compatible storage layer. Spark reads bronze data from RustFS, writes silver and gold outputs back to RustFS, and Spark Declarative Pipelines produce additional managed datasets. Dagster acts as the control plane and triggers Spark, DuckDB, DataFusion, and Daft workloads as Kubernetes jobs. Unity Catalog provides metadata and catalog services. The Rust API exposes an HTTP endpoint that runs one-off DuckDB queries in cluster jobs, and the Next.js UI is the intended frontend surface.
+
+### Data Flow
+
+```mermaid
+flowchart LR
+    UI["app-ui<br/>Next.js"] --> API["app-api<br/>Axum API"]
+    API --> K8S["Kubernetes Jobs"]
+    K8S --> DDB["DuckDB query container"]
+
+    Dagster["Dagster<br/>asset orchestration"] --> SparkJobs["Spark jobs"]
+    Dagster --> SDP["Spark Declarative Pipelines"]
+    Dagster --> DF["DataFusion job"]
+    Dagster --> Daft["Daft jobs"]
+    Dagster --> DDB
+
+    RustFS["RustFS<br/>S3-compatible storage"] --> SparkJobs
+    RustFS --> SDP
+    RustFS --> DF
+    RustFS --> DDB
+    RustFS --> Daft
+
+    SparkJobs --> RustFS
+    SDP --> RustFS
+
+    Unity["Unity Catalog"] --- SDP
+    Unity --- SparkJobs
 ```
 
-Distributed mode:
+### Runtime Components
 
-```bash
-just daft-distributed-deploy
+- `RustFS`: stores bronze, silver, gold, and pipeline-managed objects through an S3-compatible endpoint.
+- `Spark`: runs Python jobs like `bronze_to_silver.py` and the gold aggregation jobs.
+- `Spark Declarative Pipelines`: runs SQL-driven pipelines under `packages/spark/pipelines/*`.
+- `Dagster`: defines software-defined assets and launches workloads with `dagster-k8s` and `dagster-spark`.
+- `DuckDB`: runs query containers against data stored in RustFS.
+- `DataFusion`: runs Arrow/DataFusion queries as Kubernetes jobs.
+- `Daft`: supports both simple and distributed jobs, with the distributed mode backed by Ray.
+- `Unity Catalog`: supplies catalog services for the Spark-side data platform setup.
+- `app-api`: exposes `/api/query` and creates short-lived DuckDB Kubernetes jobs.
+- `app-ui`: lightweight Next.js frontend deployed separately.
+
+## Repository Layout
+
+```text
+.
+├── app-api/                  # Rust API for ad hoc query execution
+├── app-ui/                   # Next.js frontend
+├── infra/k8s/                # Kubernetes manifests and Helm values
+├── packages/
+│   ├── dagster/              # Dagster definitions and assets
+│   ├── daft/                 # Daft jobs and image
+│   ├── datafusion/           # DataFusion jobs and image
+│   ├── duckdb/               # DuckDB query jobs and image
+│   ├── spark/                # Spark jobs and pipeline specs
+│   └── unitycatalog/         # Unity Catalog image context
+├── Justfile                  # Main operator command surface
+├── pyproject.toml            # Python dependencies for Dagster and data tooling
+└── uv.lock                   # Locked Python environment
 ```
 
-Ray dashboard and Grafana port-forward for distributed mode:
+## Main Commands
+
+Most operational commands live in `Justfile`.
+
+### Environment Setup
 
 ```bash
+uv sync
+```
+
+Installs the Python environment used for Dagster and the data packages declared in `pyproject.toml`.
+
+### Platform Lifecycle
+
+```bash
+just deploy
+```
+
+Deploys the core platform stack:
+
+- RustFS
+- Unity Catalog
+- Spark operator and Spark jobs/pipelines
+- Dagster
+
+```bash
+just destroy
+```
+
+Tears down the core stack namespaces and workloads.
+
+### Access Local UIs
+
+```bash
+just forward
+```
+
+Starts the common port-forwards and prints local endpoints for:
+
+- RustFS console on `http://127.0.0.1:9001`
+- RustFS S3 API on `http://127.0.0.1:9000`
+- Dagster UI on `http://127.0.0.1:8080`
+- Unity Catalog API on `http://127.0.0.1:8082`
+- Unity Catalog UI on `http://127.0.0.1:3001`
+- App UI on `http://127.0.0.1:3002` when deployed
+
+You can also forward individual services:
+
+```bash
+just rustfs-forward
+just dagster-forward
+just spark-forward
+just spark-pipeline-forward
+just unitycatalog-forward
+just unitycatalog-ui-forward
+just app-ui-forward
 just daft-distributed-forward
-```
-
-Cleanup:
-
-```bash
-just daft-destroy
-```
-
-The install commands use the upstream OCI chart `oci://ghcr.io/eventual-inc/daft/quickstart` with script injection via `--set-file job.script=...`.
-
-## Ballista on Kubernetes
-
-This repo also includes a Ballista Kubernetes setup under `infra/k8s/ballista/`, based on the official Apache DataFusion Ballista deployment guide.
-
-Deploy:
-
-```bash
-just ballista-deploy
-```
-
-Status:
-
-```bash
-just ballista-status
-```
-
-Port-forward the scheduler gRPC port:
-
-```bash
 just ballista-forward
 ```
 
-Cleanup:
+### Spark and Pipeline Workloads
 
 ```bash
-just ballista-destroy
+just spark-deploy
 ```
 
-The manifests create:
-- one scheduler deployment and service
-- two executor replicas
-- a `PersistentVolume` and `PersistentVolumeClaim` mounted at `/mnt`
-
-The default `hostPath` for the local volume is `/mnt/ballista`. Change that in `infra/k8s/ballista/pv.yaml` if your cluster nodes use a different local path.
-
-## DataFusion on RustFS
-
-This repo includes a simple Apache DataFusion Python job that queries Parquet data from RustFS using the documented object store registration pattern.
-
-Run:
+Builds the Spark image, seeds source data, submits the Spark application, and runs the Spark Declarative Pipeline job.
 
 ```bash
+just spark-destroy
+```
+
+Removes the Spark application, pipeline jobs, and Spark-related namespaces.
+
+### Dagster
+
+```bash
+just dagster-deploy
+just dagster-image-build
+just dagster-destroy
+```
+
+Use these to build the Dagster image, deploy the Dagster release, or remove it.
+
+### Unity Catalog
+
+```bash
+just unitycatalog-deploy
+just unitycatalog-bootstrap
+just unitycatalog-destroy
+```
+
+`unitycatalog-deploy` provisions the backing Postgres instance, the catalog server, the UI, and runs bootstrap initialization.
+
+### Query Engines
+
+```bash
+just duckdb-query
 just datafusion-query
 ```
 
-It will:
-- build `mizumi-datafusion:50.1.0`
-- run a Kubernetes job in the `spark` namespace
-- connect to RustFS at `http://rustfs-svc.rustfs.svc.cluster.local:9000`
-- query `s3://silver/orders/silver_orders/`
+These build the relevant images, submit Kubernetes jobs, wait for completion, and stream logs.
 
-Files:
-- [packages/datafusion/query_rustfs.py](/Users/linh/Projects/mizumi/packages/datafusion/query_rustfs.py:1)
-- [infra/k8s/datafusion/query-job.yaml](/Users/linh/Projects/mizumi/infra/k8s/datafusion/query-job.yaml:1)
+Useful follow-up commands:
+
+```bash
+just duckdb-query-logs
+just duckdb-query-destroy
+just datafusion-query-logs
+just datafusion-query-destroy
+```
+
+### Daft
+
+```bash
+just daft-simple-deploy
+just daft-distributed-deploy
+just daft-destroy
+```
+
+Runs either the single-node or distributed Daft quickstart workloads.
+
+### Ballista
+
+```bash
+just ballista-deploy
+just ballista-status
+just ballista-scheduler-logs
+just ballista-executor-logs
+just ballista-destroy
+```
+
+Manages the Ballista cluster manifests under `infra/k8s/ballista`.
+
+### Frontend
+
+For local frontend development:
+
+```bash
+cd app-ui
+npm install
+npm run dev
+```
+
+Other frontend commands:
+
+```bash
+cd app-ui
+npm run build
+npm run start
+npm run lint
+npm run format
+```
+
+### API
+
+The Rust API is separate from the Kubernetes deploy commands in `Justfile`. To run it locally:
+
+```bash
+cd app-api
+cargo run
+```
+
+It listens on `0.0.0.0:6000` and exposes:
+
+- `GET /livez`
+- `GET /readyz`
+- `POST /api/query`
+
+`POST /api/query` accepts JSON like:
+
+```json
+{
+  "sql": "select 1 as ok"
+}
+```
+
+The handler creates a short-lived DuckDB Kubernetes job in the `spark` namespace, waits for completion, reads the pod logs, and returns parsed JSON rows.
+
+## Orchestration Model
+
+Dagster definitions are assembled in `packages/dagster/defs_pkg/__init__.py`. The main asset groups are:
+
+- `bronze`: source registration for raw orders data.
+- `silver` and `gold`: Spark jobs that transform bronze data into curated outputs.
+- `sdp`: Spark Declarative Pipeline assets that manage additional silver and gold datasets.
+- `duckdb`, `datafusion`, `daft`: compute and query workloads launched as Kubernetes jobs.
+
+At a high level:
+
+1. Bronze data is stored in RustFS.
+2. Spark materializes silver and gold data.
+3. Spark Declarative Pipelines build additional managed tables.
+4. DuckDB and DataFusion query those outputs.
+5. Daft provides alternative compute paths, including distributed execution.
+
+## Notes
+
+- The root `README.md` was previously empty, while `app-ui/README.md` still contains the default Next.js scaffold text.
+- `app-ui` currently contains a minimal placeholder page.
+- `app-api` exists in source, but there is no matching Kubernetes deployment manifest in `infra/k8s` yet.
