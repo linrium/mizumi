@@ -67,6 +67,7 @@ COPY packages/spark/pipelines/customer_pipeline/ /opt/spark/pipelines/customer_p
 COPY packages/spark/pipelines/weekly_pipeline/ /opt/spark/pipelines/weekly_pipeline/
 
 COPY packages/dagster/definitions.py /app/definitions.py
+COPY packages/dagster/defs_pkg/ /app/defs_pkg/
 
 WORKDIR /app
 EXPOSE 80
