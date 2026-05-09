@@ -195,7 +195,14 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s
     kubectl wait --for=condition=Available deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=300s
+    just unitycatalog-bootstrap
     kubectl get pods,svc -n {{unitycatalog_namespace}}
+
+unitycatalog-bootstrap:
+    kubectl delete job unitycatalog-bootstrap -n {{unitycatalog_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/unitycatalog/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
+    kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
 unitycatalog-forward:
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080

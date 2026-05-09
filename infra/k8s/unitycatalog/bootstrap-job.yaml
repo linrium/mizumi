@@ -1,0 +1,140 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: unitycatalog-bootstrap
+  namespace: unitycatalog
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: create-bucket
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
+              mc mb --ignore-existing rustfs/unitycatalog
+              echo "bucket ready: rustfs/unitycatalog"
+
+      containers:
+        - name: bootstrap
+          image: python:3.11-alpine
+          command:
+            - sh
+            - -c
+            - |
+              cat > /tmp/bootstrap.py << 'PYEOF'
+              import json, time, sys, urllib.request, urllib.error
+
+              UC = "http://unitycatalog-svc:8080/api/2.1/unity-catalog"
+              CATALOG = "mizumi"
+              SCHEMA  = "default"
+
+              def post(path, data):
+                  req = urllib.request.Request(
+                      f"{UC}/{path}",
+                      data=json.dumps(data).encode(),
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  try:
+                      with urllib.request.urlopen(req) as r:
+                          print("  ok:", json.loads(r.read()).get("name", ""))
+                  except urllib.error.HTTPError as e:
+                      msg = e.read().decode()
+                      if e.code == 409:
+                          print("  already exists")
+                      else:
+                          print(f"  ERROR {e.code}: {msg[:300]}", file=sys.stderr)
+
+              def col(name, type_name, type_text, json_type, pos):
+                  return {
+                      "name": name,
+                      "type_name": type_name,
+                      "type_text": type_text,
+                      "type_json": f'{{"name":"{name}","type":"{json_type}","nullable":true,"metadata":{{}}}}',
+                      "position": pos,
+                      "nullable": True,
+                  }
+
+              ORDER_COLS = [
+                  col("order_id",       "LONG",      "bigint",    "long",      0),
+                  col("customer_id",    "LONG",      "bigint",    "long",      1),
+                  col("country_code",   "STRING",    "string",    "string",    2),
+                  col("status",         "STRING",    "string",    "string",    3),
+                  col("quantity",       "INT",       "int",       "integer",   4),
+                  col("unit_price",     "DOUBLE",    "double",    "double",    5),
+                  col("ordered_at",     "TIMESTAMP", "timestamp", "timestamp", 6),
+                  col("order_date",     "DATE",      "date",      "date",      7),
+                  col("gross_amount",   "DOUBLE",    "double",    "double",    8),
+                  col("processed_at",   "TIMESTAMP", "timestamp", "timestamp", 9),
+              ]
+
+              SALES_COLS = [
+                  col("order_date",        "DATE",   "date",   "date",    0),
+                  col("country_code",      "STRING", "string", "string",  1),
+                  col("order_count",       "LONG",   "bigint", "long",    2),
+                  col("gross_revenue",     "DOUBLE", "double", "double",  3),
+                  col("active_customers",  "LONG",   "bigint", "long",    4),
+              ]
+
+              TABLES = [
+                  {
+                      "name": "silver_orders",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "PARQUET",
+                      "storage_location": "s3://silver/orders/silver_orders",
+                      "columns": ORDER_COLS,
+                      "comment": "Cleaned orders — Dagster Pipes (Parquet, partitioned by order_date)",
+                  },
+                  {
+                      "name": "sdp_silver_orders",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3://gold/sdp-warehouse/silver_orders",
+                      "columns": ORDER_COLS,
+                      "comment": "Cleaned orders — Spark Declarative Pipelines (Delta)",
+                  },
+                  {
+                      "name": "sdp_gold_daily_country_sales",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3://gold/sdp-warehouse/gold_daily_country_sales",
+                      "columns": SALES_COLS,
+                      "comment": "Daily country sales — Spark Declarative Pipelines (Delta)",
+                  },
+              ]
+
+              print("Waiting for UC server...")
+              for _ in range(60):
+                  try:
+                      urllib.request.urlopen(f"{UC}/catalogs")
+                      print("UC server ready")
+                      break
+                  except:
+                      time.sleep(5)
+              else:
+                  sys.exit("UC did not start in time")
+
+              print(f"\nCreating catalog: {CATALOG}")
+              post("catalogs", {"name": CATALOG, "comment": "mizumi data platform"})
+
+              print(f"\nCreating schema: {SCHEMA}")
+              post("schemas", {"name": SCHEMA, "catalog_name": CATALOG, "comment": "default schema"})
+
+              for t in TABLES:
+                  print(f"\nRegistering table: {t['name']}")
+                  post("tables", t)
+
+              print("\nBootstrap complete.")
+              with urllib.request.urlopen(
+                  f"{UC}/tables?catalog_name={CATALOG}&schema_name={SCHEMA}"
+              ) as r:
+                  data = json.loads(r.read())
+                  names = [t.get("name") for t in data.get("tables", [])]
+                  print("Tables in mizumi.default:", names)
+              PYEOF
+              python3 /tmp/bootstrap.py
