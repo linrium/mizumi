@@ -16,6 +16,12 @@ async fn main() {
         .route("/readyz", get(|| async { StatusCode::OK }))
         .route("/api/query", post(k8s::run_query))
         .route("/dagster/assets", get(dagster::list_assets))
+        .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
+        .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))
+        .route("/dagster/runs", get(dagster::list_runs).post(dagster::launch_run))
+        .route("/dagster/runs/{run_id}", get(dagster::get_run).delete(dagster::terminate_run))
+        .route("/dagster/jobs", get(dagster::list_jobs))
+        .route("/dagster/schedules", get(dagster::list_schedules))
         // Catalog routes
         .route("/uc/catalogs", get(uc::list_catalogs).post(uc::create_catalog))
         .route(
