@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   async rewrites() {
     return [
+      // dagster routes have no /api/ prefix on the server
+      {
+        source: "/api/dagster/:path*",
+        destination: `${API_BASE_URL}/dagster/:path*`,
+      },
       {
         source: "/api/:path*",
         destination: `${API_BASE_URL}/api/:path*`,

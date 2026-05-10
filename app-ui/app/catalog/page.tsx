@@ -342,9 +342,6 @@ export default function CatalogPage() {
     <div className="flex h-full overflow-hidden">
       {/* Tree panel */}
       <div className="w-64 shrink-0 border-r flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b shrink-0">
-          <h1 className="text-sm font-semibold">Unity Catalog</h1>
-        </div>
 
         <div className="flex-1 overflow-y-auto py-1">
           {loading && <EmptyState message="Loading catalogs…" />}

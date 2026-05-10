@@ -2,12 +2,14 @@
 
 import Editor from '@monaco-editor/react'
 import { useForm } from '@tanstack/react-form'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { PlayIcon, Copy01Icon, SqlIcon } from '@hugeicons/core-free-icons'
-import { cn } from '@/lib/utils'
+import type { ColumnDef } from '@tanstack/react-table'
+import { DataGrid } from '@/components/data-grid/data-grid'
+import { useDataGrid } from '@/hooks/use-data-grid'
 
 const schema = z.object({
   sql: z.string().min(1, 'SQL query is required'),
@@ -23,12 +25,63 @@ type Result =
   | { ok: true; data: QueryResponse; elapsed: number }
   | { ok: false; error: string }
 
+type Row = Record<string, unknown>
+
+// ── Results grid ──────────────────────────────────────────────────────────────
+
+function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(264)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      setHeight(entries[0].contentRect.height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const data = useMemo<Row[]>(
+    () => queryResult.rows.map((row) =>
+      Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
+    ),
+    [queryResult],
+  )
+
+  const columns = useMemo<ColumnDef<Row>[]>(
+    () => queryResult.columns.map((col) => ({
+      id: col,
+      accessorKey: col,
+      header: col,
+      size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+      meta: { cell: { variant: 'short-text' as const } },
+    })),
+    [queryResult],
+  )
+
+  const { table, ...dataGridProps } = useDataGrid<Row>({
+    data,
+    columns,
+    readOnly: true,
+  })
+
+  return (
+    <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+      <DataGrid table={table} {...dataGridProps} height={height} />
+    </div>
+  )
+}
+
+// ── SQL editor ────────────────────────────────────────────────────────────────
+
 export function SqlEditor() {
   const [result, setResult] = useState<Result | null>(null)
   const startRef = useRef<number>(0)
 
   const form = useForm({
-    defaultValues: { sql: 'SELECT 1 AS ok' },
+    defaultValues: { sql: 'select * from mizumi.default.gold_country_revenue' },
     validators: { onSubmit: schema },
     onSubmit: async ({ value }) => {
       setResult(null)
@@ -146,9 +199,7 @@ export function SqlEditor() {
                 {result.data.row_count} {result.data.row_count === 1 ? 'row' : 'rows'}
               </span>
               <span className="text-xs text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground">
-                {result.elapsed}ms
-              </span>
+              <span className="text-xs text-muted-foreground">{result.elapsed}ms</span>
               <div className="flex-1" />
               <button
                 type="button"
@@ -164,67 +215,27 @@ export function SqlEditor() {
         </div>
 
         {/* Results body */}
-        <div className="flex-1 overflow-auto">
-          {!result && (
-            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-              Run a query to see results
-            </div>
-          )}
+        {!result && (
+          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+            Run a query to see results
+          </div>
+        )}
 
-          {result && !result.ok && (
-            <div className="px-4 py-3 text-sm text-destructive font-mono whitespace-pre-wrap">
-              {result.error}
-            </div>
-          )}
+        {result && !result.ok && (
+          <div className="flex-1 overflow-auto px-4 py-3 text-sm text-destructive font-mono whitespace-pre-wrap">
+            {result.error}
+          </div>
+        )}
 
-          {result?.ok && result.data.columns.length === 0 && (
-            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-              Query executed successfully — no rows returned
-            </div>
-          )}
+        {result?.ok && result.data.columns.length === 0 && (
+          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+            Query executed successfully — no rows returned
+          </div>
+        )}
 
-          {result?.ok && result.data.columns.length > 0 && (
-            <table className="w-full text-sm border-collapse">
-              <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
-                <tr>
-                  {result.data.columns.map((col) => (
-                    <th
-                      key={col}
-                      className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground border-b border-border whitespace-nowrap"
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {result.data.rows.map((row, i) => (
-                  <tr
-                    key={i}
-                    className={cn(
-                      'border-b border-border/60 last:border-0',
-                      i % 2 === 0 ? 'bg-background' : 'bg-muted/20',
-                      'hover:bg-accent/40 transition-colors',
-                    )}
-                  >
-                    {row.map((cell, j) => (
-                      <td
-                        key={j}
-                        className="px-3 py-1.5 font-mono text-xs whitespace-nowrap"
-                      >
-                        {cell === null ? (
-                          <span className="text-muted-foreground italic">null</span>
-                        ) : (
-                          String(cell)
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {result?.ok && result.data.columns.length > 0 && (
+          <ResultsGrid key={result.elapsed} queryResult={result.data} />
+        )}
       </div>
     </div>
   )
