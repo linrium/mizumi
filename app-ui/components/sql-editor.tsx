@@ -5,11 +5,19 @@ import { useForm } from '@tanstack/react-form'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PlayIcon, Copy01Icon, SqlIcon } from '@hugeicons/core-free-icons'
+import { PlayIcon, Copy01Icon, SqlIcon, AddCircleIcon, CancelIcon, CpuIcon } from '@hugeicons/core-free-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataGrid } from '@/components/data-grid/data-grid'
 import { useDataGrid } from '@/hooks/use-data-grid'
+import { useSessions } from '@/hooks/use-sessions'
 
 const schema = z.object({
   sql: z.string().min(1, 'SQL query is required'),
@@ -79,6 +87,9 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
 export function SqlEditor() {
   const [result, setResult] = useState<Result | null>(null)
   const startRef = useRef<number>(0)
+  const { sessions, activeId, setActiveId, creating, deleting, fetchSessions, createSession, deleteSession } = useSessions()
+
+  useEffect(() => { fetchSessions() }, [fetchSessions])
 
   const form = useForm({
     defaultValues: { sql: 'select * from mizumi.default.gold_country_revenue' },
@@ -87,7 +98,8 @@ export function SqlEditor() {
       setResult(null)
       startRef.current = Date.now()
       try {
-        const res = await fetch('/api/query', {
+        const url = activeId ? `/api/sessions/${activeId}/query` : '/api/query'
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sql: value.sql }),
@@ -119,6 +131,54 @@ export function SqlEditor() {
         <HugeiconsIcon icon={SqlIcon} size={15} className="text-muted-foreground" />
         <span className="text-sm font-medium text-muted-foreground">query.sql</span>
         <div className="flex-1" />
+
+        {/* Session management */}
+        {creating ? (
+          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border text-xs text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Starting session…
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            {sessions.length > 0 && (
+              <Select value={activeId ?? ''} onValueChange={setActiveId}>
+                <SelectTrigger className="h-7 w-36 text-xs gap-1.5 px-2">
+                  <HugeiconsIcon icon={CpuIcon} size={11} className="text-green-500 shrink-0" />
+                  <SelectValue placeholder="No session" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sessions.map((s) => (
+                    <SelectItem key={s.session_id} value={s.session_id} className="font-mono text-xs">
+                      {s.session_id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={createSession}
+              className="h-7 w-7 text-muted-foreground"
+              title="New session"
+            >
+              <HugeiconsIcon icon={AddCircleIcon} size={14} />
+            </Button>
+            {activeId && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => deleteSession(activeId)}
+                disabled={deleting === activeId}
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                title="Kill session"
+              >
+                <HugeiconsIcon icon={CancelIcon} size={14} />
+              </Button>
+            )}
+          </div>
+        )}
+
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button

@@ -141,7 +141,7 @@ function MatCard({ mat, defaultOpen }: { mat: Materialization; defaultOpen: bool
 export default function AssetDetailPage() {
   const params = useParams()
   const rawPath = params.path
-  const pathSegments = (Array.isArray(rawPath) ? rawPath : [rawPath]).map(decodeURIComponent)
+  const pathSegments = (Array.isArray(rawPath) ? rawPath : [rawPath]).filter(Boolean).map((s) => decodeURIComponent(s!))
 
   const [detail, setDetail] = useState<AssetNodeDetail | null>(null)
   const [loading, setLoading] = useState(true)

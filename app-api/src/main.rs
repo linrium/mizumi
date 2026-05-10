@@ -4,17 +4,22 @@ mod k8s;
 mod models;
 mod uc;
 
-use axum::{Router, http::StatusCode, routing::{get, post}};
+use axum::{Router, http::StatusCode, routing::{delete, get, post}};
 use tower_http::cors::CorsLayer;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let sessions = k8s::new_session_store();
+
     let app = Router::new()
         .route("/livez", get(|| async { StatusCode::OK }))
         .route("/readyz", get(|| async { StatusCode::OK }))
         .route("/api/query", post(k8s::run_query))
+        .route("/api/sessions", get(k8s::list_sessions).post(k8s::create_session))
+        .route("/api/sessions/{id}", delete(k8s::delete_session))
+        .route("/api/sessions/{id}/query", post(k8s::session_query))
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))
@@ -37,6 +42,7 @@ async fn main() {
         // Table routes
         .route("/uc/tables", get(uc::list_tables).post(uc::create_table))
         .route("/uc/tables/{full_name}", get(uc::get_table).delete(uc::delete_table))
+        .with_state(sessions)
         .layer(CorsLayer::permissive());
 
     let addr = "0.0.0.0:6000";
