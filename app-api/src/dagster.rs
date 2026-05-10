@@ -178,6 +178,8 @@ query GetAssetNode($assetKey: AssetKeyInput!) {
       dependencyKeys { path }
       dependedByKeys { path }
       staleStatus
+      tags { key value }
+      repository { location { name } }
       staleCauses {
         key { path }
         reason
@@ -273,6 +275,9 @@ struct GqlAssetNodeDetail {
     depended_by_keys: Vec<GqlAssetKey>,
     #[serde(rename = "staleStatus")]
     stale_status: Option<String>,
+    #[serde(default)]
+    tags: Vec<RunTag>,
+    repository: Option<GqlAssetRepository>,
     #[serde(rename = "staleCauses", default)]
     stale_causes: Vec<GqlStaleCause>,
     #[serde(rename = "assetMaterializations", default)]
@@ -285,6 +290,16 @@ struct GqlStaleCause {
     reason: String,
     dependency: Option<GqlAssetKey>,
     category: String,
+}
+
+#[derive(Deserialize)]
+struct GqlAssetRepository {
+    location: GqlAssetLocationMeta,
+}
+
+#[derive(Deserialize)]
+struct GqlAssetLocationMeta {
+    name: String,
 }
 
 #[derive(Deserialize)]
@@ -358,6 +373,8 @@ pub struct AssetNodeDetail {
     pub dependency_keys: Vec<Vec<String>>,
     pub depended_by_keys: Vec<Vec<String>>,
     pub stale_status: Option<String>,
+    pub tags: Vec<RunTag>,
+    pub repository_location: Option<String>,
     pub stale_causes: Vec<StaleCause>,
     pub materializations: Vec<Materialization>,
 }
@@ -428,6 +445,8 @@ pub async fn get_asset_node(Path(path): Path<String>) -> impl IntoResponse {
                             dependency_keys: n.dependency_keys.into_iter().map(|k| k.path).collect(),
                             depended_by_keys: n.depended_by_keys.into_iter().map(|k| k.path).collect(),
                             stale_status: n.stale_status,
+                            tags: n.tags,
+                            repository_location: n.repository.map(|r| r.location.name),
                             stale_causes: n.stale_causes.into_iter().map(|c| StaleCause {
                                 key: c.key.path,
                                 reason: c.reason,
