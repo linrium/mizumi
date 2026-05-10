@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import {
   Sidebar,
   SidebarContent,
@@ -14,12 +15,14 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Database01Icon,
+  CatalogueIcon,
   WorkflowCircle01Icon,
   Chart01Icon,
   Setting06Icon,
 } from '@hugeicons/core-free-icons'
 
 const navItems = [
+  { title: 'Catalog', href: '/catalog', icon: CatalogueIcon },
   { title: 'SQL Editor', href: '/editor', icon: Database01Icon },
   { title: 'Pipelines', href: '/pipelines', icon: WorkflowCircle01Icon },
   { title: 'Analytics', href: '/analytics', icon: Chart01Icon },
@@ -27,10 +30,14 @@ const navItems = [
 ]
 
 export function AppSidebar() {
+  const pathname = usePathname()
+
   return (
-    <Sidebar>
-      <SidebarHeader className="px-4 py-3">
-        <span className="text-base font-semibold tracking-tight">Mizumi</span>
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="px-3 py-3">
+        <span className="text-sm font-semibold tracking-tight truncate group-data-[collapsible=icon]:hidden">
+          Mizumi
+        </span>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -39,7 +46,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild tooltip={item.title} isActive={pathname === item.href}>
                     <a href={item.href}>
                       <HugeiconsIcon icon={item.icon} size={16} />
                       <span>{item.title}</span>
