@@ -1,12 +1,11 @@
 'use client'
 
+import Editor from '@monaco-editor/react'
 import { useForm } from '@tanstack/react-form'
 import { useState } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 
 const schema = z.object({
   sql: z.string().min(1, 'SQL query is required'),
@@ -57,27 +56,38 @@ export function SqlEditor() {
         }}
         className="flex flex-col gap-3"
       >
-        <form.Field
-          name="sql"
-          validators={{ onChange: schema.shape.sql }}
-        >
+        <form.Field name="sql" validators={{ onChange: schema.shape.sql }}>
           {(field) => (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={field.name}>SQL Query</Label>
-              <Textarea
-                id={field.name}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                aria-invalid={field.state.meta.errors.length > 0}
-                rows={10}
-                placeholder="SELECT * FROM bronze.orders LIMIT 10"
-                spellCheck={false}
-                className={cn('resize-y font-mono text-sm')}
-              />
+              <div className="overflow-hidden rounded-md border border-input focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+                <Editor
+                  height="220px"
+                  language="sql"
+                  theme="vs"
+                  value={field.state.value}
+                  onChange={(v) => field.handleChange(v ?? '')}
+                  onMount={(editor) => {
+                    editor.onDidBlurEditorWidget(() => field.handleBlur())
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    overviewRulerLanes: 0,
+                    renderLineHighlight: 'line',
+                    padding: { top: 8, bottom: 8 },
+                  }}
+                />
+              </div>
               {field.state.meta.errors.length > 0 && (
                 <p className="text-xs text-destructive">
-                  {String((field.state.meta.errors[0] as { message?: string })?.message ?? field.state.meta.errors[0])}
+                  {String(
+                    (field.state.meta.errors[0] as { message?: string })
+                      ?.message ?? field.state.meta.errors[0],
+                  )}
                 </p>
               )}
             </div>
