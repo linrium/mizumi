@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -12,6 +12,9 @@ import {
   ArrowExpand01Icon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import type { ColumnDef } from '@tanstack/react-table'
+import { DataGrid } from '@/components/data-grid/data-grid'
+import { useDataGrid } from '@/hooks/use-data-grid'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +33,14 @@ type TableDetail = {
   columns: Column[]
 }
 
+type QueryResponse = {
+  columns: string[]
+  rows: unknown[][]
+  row_count: number
+}
+
+type Row = Record<string, unknown>
+
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(params: Record<string, string>): Promise<T> {
@@ -38,6 +49,17 @@ async function apiFetch<T>(params: Record<string, string>): Promise<T> {
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as T
+}
+
+async function runQuery(sql: string): Promise<QueryResponse> {
+  const res = await fetch('/api/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  return json as QueryResponse
 }
 
 // ── Tree state ────────────────────────────────────────────────────────────────
@@ -57,60 +79,11 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-function TableDetailPanel({ catalog, schema, table }: { catalog: string; schema: string; table: string }) {
-  const [detail, setDetail] = useState<TableDetail | null>(null)
-  const [error, setError] = useState<string | null>(null)
+// ── Schema tab ────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    setDetail(null)
-    setError(null)
-    apiFetch<TableDetail>({ type: 'table', catalog, schema, table })
-      .then(setDetail)
-      .catch((e) => setError(e.message))
-  }, [catalog, schema, table])
-
-  if (error) {
-    return (
-      <div className="p-4 text-sm text-destructive font-mono">{error}</div>
-    )
-  }
-
-  if (!detail) {
-    return <EmptyState message="Loading…" />
-  }
-
+function SchemaTab({ detail }: { detail: TableDetail }) {
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b shrink-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <HugeiconsIcon icon={Table01Icon} size={15} className="text-muted-foreground" />
-          <h2 className="text-sm font-semibold">{detail.name}</h2>
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {detail.table_type}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 mt-1 group/path">
-          <p className="text-xs text-muted-foreground font-mono">
-            {detail.catalog_name}.{detail.schema_name}.{detail.name}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-                navigator.clipboard.writeText(`${detail.catalog_name}.${detail.schema_name}.${detail.name}`)
-                toast.success('Copied to clipboard')
-              }}
-            className="opacity-0 group-hover/path:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-            aria-label="Copy table path"
-          >
-            <HugeiconsIcon icon={Copy01Icon} size={12} />
-          </button>
-        </div>
-        {detail.comment && (
-          <p className="text-xs text-muted-foreground mt-1.5 italic">{detail.comment}</p>
-        )}
-      </div>
-
+    <div className="flex-1 overflow-auto">
       {/* Meta */}
       {(detail.data_source_format || detail.storage_location) && (
         <div className="px-5 py-3 border-b shrink-0 flex flex-wrap gap-4">
@@ -129,33 +102,190 @@ function TableDetailPanel({ catalog, schema, table }: { catalog: string; schema:
         </div>
       )}
 
-      {/* Columns */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-xs border-collapse">
-          <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
-            <tr>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Column</th>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Type</th>
-              <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Nullable</th>
+      <table className="w-full text-xs border-collapse">
+        <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+          <tr>
+            <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Column</th>
+            <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Type</th>
+            <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">Nullable</th>
+          </tr>
+        </thead>
+        <tbody>
+          {detail.columns.map((col, i) => (
+            <tr
+              key={col.name}
+              className={cn(
+                'border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors',
+                i % 2 === 0 ? 'bg-background' : 'bg-muted/20',
+              )}
+            >
+              <td className="px-4 py-2 font-mono font-medium">{col.name}</td>
+              <td className="px-4 py-2 font-mono text-muted-foreground">{col.type_text}</td>
+              <td className="px-4 py-2 text-muted-foreground">{col.nullable ? 'yes' : 'no'}</td>
             </tr>
-          </thead>
-          <tbody>
-            {detail.columns.map((col, i) => (
-              <tr
-                key={col.name}
-                className={cn(
-                  'border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors',
-                  i % 2 === 0 ? 'bg-background' : 'bg-muted/20',
-                )}
-              >
-                <td className="px-4 py-2 font-mono font-medium">{col.name}</td>
-                <td className="px-4 py-2 font-mono text-muted-foreground">{col.type_text}</td>
-                <td className="px-4 py-2 text-muted-foreground">{col.nullable ? 'yes' : 'no'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Preview tab ───────────────────────────────────────────────────────────────
+
+function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(400)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      setHeight(entries[0].contentRect.height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const data = useMemo<Row[]>(
+    () => queryResult.rows.map((row) =>
+      Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
+    ),
+    [queryResult],
+  )
+
+  const columns = useMemo<ColumnDef<Row>[]>(
+    () => queryResult.columns.map((col) => ({
+      id: col,
+      accessorKey: col,
+      header: col,
+      // ~7.5px per char + 48px for cell padding + sort icon
+      size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+      meta: { cell: { variant: 'short-text' as const } },
+    })),
+    [queryResult],
+  )
+
+  const { table, ...dataGridProps } = useDataGrid<Row>({
+    data,
+    columns,
+    readOnly: true,
+  })
+
+  return (
+    <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+      <DataGrid table={table} {...dataGridProps} height={height} />
+    </div>
+  )
+}
+
+function PreviewTab({ catalog, schema, table }: { catalog: string; schema: string; table: string }) {
+  const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    setQueryResult(null)
+    runQuery(`SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`)
+      .then(setQueryResult)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [catalog, schema, table])
+
+  if (loading) return <EmptyState message="Loading preview…" />
+  if (error) return <div className="p-4 text-sm text-destructive font-mono whitespace-pre-wrap">{error}</div>
+  if (!queryResult) return null
+
+  if (queryResult.row_count === 0) {
+    return <EmptyState message="Table is empty" />
+  }
+
+  return <PreviewGrid queryResult={queryResult} />
+}
+
+// ── Table detail panel ────────────────────────────────────────────────────────
+
+type Tab = 'schema' | 'preview'
+
+function TableDetailPanel({ catalog, schema, table }: { catalog: string; schema: string; table: string }) {
+  const [detail, setDetail] = useState<TableDetail | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('schema')
+
+  useEffect(() => {
+    setDetail(null)
+    setError(null)
+    setActiveTab('schema')
+    apiFetch<TableDetail>({ type: 'table', catalog, schema, table })
+      .then(setDetail)
+      .catch((e: Error) => setError(e.message))
+  }, [catalog, schema, table])
+
+  if (error) return <div className="p-4 text-sm text-destructive font-mono">{error}</div>
+  if (!detail) return <EmptyState message="Loading…" />
+
+  const fullPath = `${detail.catalog_name}.${detail.schema_name}.${detail.name}`
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b shrink-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <HugeiconsIcon icon={Table01Icon} size={15} className="text-muted-foreground" />
+          <h2 className="text-sm font-semibold">{detail.name}</h2>
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            {detail.table_type}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 group/path">
+          <p className="text-xs text-muted-foreground font-mono">{fullPath}</p>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(fullPath)
+              toast.success('Copied to clipboard')
+            }}
+            className="opacity-0 group-hover/path:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+            aria-label="Copy table path"
+          >
+            <HugeiconsIcon icon={Copy01Icon} size={12} />
+          </button>
+        </div>
+        {detail.comment && (
+          <p className="text-xs text-muted-foreground mt-1.5 italic">{detail.comment}</p>
+        )}
       </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-0 px-5 border-b shrink-0">
+        {(['schema', 'preview'] as Tab[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              'px-3 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors',
+              activeTab === tab
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'schema' && <SchemaTab detail={detail} />}
+      {activeTab === 'preview' && (
+        <PreviewTab
+          key={fullPath}
+          catalog={catalog}
+          schema={schema}
+          table={table}
+        />
+      )}
     </div>
   )
 }
@@ -174,7 +304,7 @@ export default function CatalogPage() {
   useEffect(() => {
     apiFetch<{ catalogs: Catalog[] }>({ type: 'catalogs' })
       .then((data) => setCatalogs(data.catalogs ?? []))
-      .catch((e) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -224,7 +354,6 @@ export default function CatalogPage() {
             const catExpanded = expanded.has(cat.name)
             return (
               <div key={cat.name}>
-                {/* Catalog row */}
                 <button
                   type="button"
                   onClick={() => {
@@ -237,20 +366,14 @@ export default function CatalogPage() {
                       'bg-accent text-accent-foreground font-medium',
                   )}
                 >
-                  <HugeiconsIcon
-                    icon={CatalogueIcon}
-                    size={14}
-                    className="shrink-0 text-muted-foreground"
-                  />
+                  <HugeiconsIcon icon={CatalogueIcon} size={14} className="shrink-0 text-muted-foreground" />
                   <span className="truncate flex-1">{cat.name}</span>
                   <HugeiconsIcon
-                    icon={ArrowExpand01Icon}
-                    size={10}
+                    icon={ArrowExpand01Icon} size={10}
                     className={cn('shrink-0 text-muted-foreground transition-transform', catExpanded && 'rotate-180')}
                   />
                 </button>
 
-                {/* Schemas */}
                 {catExpanded && (schemas[cat.name] ?? []).map((sch) => {
                   const schKey = `${cat.name}.${sch.name}`
                   const schExpanded = expanded.has(schKey)
@@ -272,18 +395,15 @@ export default function CatalogPage() {
                       >
                         <HugeiconsIcon
                           icon={schExpanded ? FolderOpenIcon : Folder01Icon}
-                          size={13}
-                          className="shrink-0 text-muted-foreground"
+                          size={13} className="shrink-0 text-muted-foreground"
                         />
                         <span className="truncate flex-1">{sch.name}</span>
                         <HugeiconsIcon
-                          icon={ArrowExpand01Icon}
-                          size={10}
+                          icon={ArrowExpand01Icon} size={10}
                           className={cn('shrink-0 text-muted-foreground transition-transform', schExpanded && 'rotate-180')}
                         />
                       </button>
 
-                      {/* Tables */}
                       {schExpanded && (tables[schKey] ?? []).map((tbl) => (
                         <button
                           key={tbl.name}
@@ -300,11 +420,7 @@ export default function CatalogPage() {
                               'bg-accent text-accent-foreground font-medium',
                           )}
                         >
-                          <HugeiconsIcon
-                            icon={Table01Icon}
-                            size={13}
-                            className="shrink-0 text-muted-foreground"
-                          />
+                          <HugeiconsIcon icon={Table01Icon} size={13} className="shrink-0 text-muted-foreground" />
                           <span className="truncate">{tbl.name}</span>
                         </button>
                       ))}
