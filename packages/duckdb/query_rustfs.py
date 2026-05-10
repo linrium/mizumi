@@ -2,7 +2,6 @@ import os
 
 import duckdb
 
-
 ENDPOINT = os.getenv("AWS_ENDPOINT_URL", "http://rustfs-svc.rustfs.svc.cluster.local:9000")
 ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
 SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
