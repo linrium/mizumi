@@ -81,6 +81,7 @@ forward:
     echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
     echo "Dagster UI:      http://127.0.0.1:8080"
+    echo "Dagster GraphQL: http://127.0.0.1:8080/graphql"
     echo "UC API:          http://127.0.0.1:8082"
     echo "UC UI:           http://127.0.0.1:3001"
     wait
@@ -202,11 +203,15 @@ dagster-deploy: dagster-helm-repo dagster-image-build
     kubectl get pods -n {{dagster_namespace}}
 
 dagster-forward:
+    #!/usr/bin/env bash
+    set -euo pipefail
     pod=$(kubectl get pods --namespace {{dagster_namespace}} \
       --field-selector=status.phase=Running \
       -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
-      -o jsonpath="{.items[0].metadata.name}"); \
-    test -n "$pod"; \
+      -o jsonpath="{.items[0].metadata.name}")
+    test -n "$pod"
+    echo "Dagster UI:      http://127.0.0.1:8080"
+    echo "Dagster GraphQL: http://127.0.0.1:8080/graphql"
     kubectl --namespace {{dagster_namespace}} port-forward "$pod" 8080:80
 
 dagster-destroy:
