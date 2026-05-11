@@ -46,7 +46,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title} isActive={pathname === item.href}>
+                  <SidebarMenuButton asChild tooltip={item.title} isActive={pathname.startsWith(item.href)}>
                     <a href={item.href}>
                       <HugeiconsIcon icon={item.icon} size={16} />
                       <span>{item.title}</span>

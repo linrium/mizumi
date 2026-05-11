@@ -297,7 +297,7 @@ function buildLayout(
         id: `${src}->${tgt}`,
         source: src,
         target: tgt,
-        type: 'smoothstep',
+        type: 'default',
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 14,
@@ -314,8 +314,14 @@ function buildLayout(
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function LineageGraph({ currentPath }: { currentPath: string[] }) {
-  const currentPathStr = currentPath.join('/')
+export function LineageGraph({
+  currentPath,
+  neighborhoodOnly = false,
+}: {
+  currentPath?: string[]
+  neighborhoodOnly?: boolean
+}) {
+  const currentPathStr = currentPath?.join('/') ?? ''
 
   const [apiNodes, setApiNodes] = useState<ApiAssetNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -333,9 +339,21 @@ export function LineageGraph({ currentPath }: { currentPath: string[] }) {
       .finally(() => setLoading(false))
   }, [])
 
+  const visibleNodes = useMemo(() => {
+    if (!neighborhoodOnly || !currentPathStr) return apiNodes
+    const current = apiNodes.find((n) => n.path.join('/') === currentPathStr)
+    if (!current) return apiNodes
+    const neighborKeys = new Set<string>([
+      currentPathStr,
+      ...current.dependency_keys.map((k) => k.join('/')),
+      ...current.depended_by_keys.map((k) => k.join('/')),
+    ])
+    return apiNodes.filter((n) => neighborKeys.has(n.path.join('/')))
+  }, [apiNodes, currentPathStr, neighborhoodOnly])
+
   const { rfNodes, rfEdges } = useMemo(
-    () => buildLayout(apiNodes, currentPathStr),
-    [apiNodes, currentPathStr],
+    () => buildLayout(visibleNodes, currentPathStr),
+    [visibleNodes, currentPathStr],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)

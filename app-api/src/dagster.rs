@@ -582,6 +582,31 @@ mutation LaunchRun($executionParams: ExecutionParams!) {
   }
 }"#;
 
+const ASSET_REQUIRED_KEYS_QUERY: &str = r#"
+query AssetRequiredKeys($assetKeys: [AssetKeyInput!]!) {
+  assetNodeAdditionalRequiredKeys(assetKeys: $assetKeys) { path }
+}"#;
+
+#[derive(Deserialize)]
+struct AssetRequiredKeysData {
+    #[serde(rename = "assetNodeAdditionalRequiredKeys")]
+    additional_required_keys: Vec<GqlAssetKey>,
+}
+
+const MATERIALIZE_ASSET_MUTATION: &str = r#"
+mutation MaterializeAsset($executionParams: ExecutionParams!) {
+  launchRun(executionParams: $executionParams) {
+    __typename
+    ... on LaunchRunSuccess {
+      run { runId jobName status }
+    }
+    ... on PipelineNotFoundError { message }
+    ... on InvalidStepError { invalidStepKey }
+    ... on RunConflict { message }
+    ... on PythonError { message }
+  }
+}"#;
+
 const TERMINATE_RUN_MUTATION: &str = r#"
 mutation TerminateRun($runId: String!) {
   terminateRun(runId: $runId) {
@@ -1130,6 +1155,74 @@ pub struct ScheduleTick {
     pub status: String,
 }
 
+// ---- Materialize asset ----
+
+pub async fn materialize_asset(Path(path): Path<String>) -> impl IntoResponse {
+    let key_path: Vec<String> = path.split('/').map(str::to_string).collect();
+
+    // Resolve required neighbors (non-subsettable multi-assets must be launched together)
+    let mut all_keys: Vec<Vec<String>> = vec![key_path.clone()];
+    match gql_post::<AssetRequiredKeysData>(
+        ASSET_REQUIRED_KEYS_QUERY,
+        json!({ "assetKeys": [{ "path": key_path }] }),
+    )
+    .await
+    {
+        Ok(data) => {
+            for k in data.additional_required_keys {
+                all_keys.push(k.path);
+            }
+        }
+        Err((status, body)) => return (status, Json(body)).into_response(),
+    }
+
+    let asset_selection: Vec<Value> = all_keys.iter().map(|p| json!({ "path": p })).collect();
+
+    let vars = json!({
+        "executionParams": {
+            "selector": {
+                "repositoryLocationName": REPO_LOCATION,
+                "repositoryName": REPO_NAME,
+                "jobName": "__ASSET_JOB",
+                "assetSelection": asset_selection,
+            },
+            "runConfigData": {},
+            "executionMetadata": { "tags": [] },
+        }
+    });
+
+    match gql_post::<LaunchRunData>(MATERIALIZE_ASSET_MUTATION, vars).await {
+        Ok(data) => {
+            let r = data.launch_run;
+            match r.typename.as_str() {
+                "LaunchRunSuccess" => {
+                    if let Some(run) = r.run {
+                        (StatusCode::CREATED, Json(json!(LaunchRunResponse {
+                            run_id: run.run_id,
+                            job_name: run.job_name,
+                            status: run.status,
+                        }))).into_response()
+                    } else {
+                        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "missing run data" }))).into_response()
+                    }
+                }
+                "PipelineNotFoundError" => {
+                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
+                }
+                "InvalidStepError" => {
+                    let key = r.invalid_step_key.unwrap_or_default();
+                    (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("invalid step: {key}") }))).into_response()
+                }
+                _ => {
+                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
+                }
+            }
+        }
+        Err((status, body)) => (status, Json(body)).into_response(),
+    }
+}
+
 pub async fn list_schedules() -> impl IntoResponse {
     let vars = json!({
         "selector": {
@@ -1165,6 +1258,115 @@ pub async fn list_schedules() -> impl IntoResponse {
                 })
                 .collect();
             Json(SchedulesResponse { schedules }).into_response()
+        }
+        Err((status, body)) => (status, Json(body)).into_response(),
+    }
+}
+
+// ---- Asset live status ----
+
+const ASSET_LATEST_INFO_QUERY: &str = r#"
+query AssetLatestInfo($assetKeys: [AssetKeyInput!]!) {
+  assetsLatestInfo(assetKeys: $assetKeys) {
+    assetKey { path }
+    latestRun {
+      runId
+      status
+      startTime
+      endTime
+    }
+    latestMaterialization {
+      timestamp
+      runId
+    }
+    unstartedRunIds
+    inProgressRunIds
+  }
+}"#;
+
+#[derive(Deserialize)]
+struct AssetLatestInfoData {
+    #[serde(rename = "assetsLatestInfo")]
+    assets_latest_info: Vec<GqlAssetLatestInfo>,
+}
+
+#[derive(Deserialize)]
+struct GqlAssetLatestInfo {
+    #[serde(rename = "latestRun")]
+    latest_run: Option<GqlLatestRun>,
+    #[serde(rename = "latestMaterialization")]
+    latest_materialization: Option<GqlLatestMatInfo>,
+    #[serde(rename = "unstartedRunIds", default)]
+    unstarted_run_ids: Vec<String>,
+    #[serde(rename = "inProgressRunIds", default)]
+    in_progress_run_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct GqlLatestRun {
+    #[serde(rename = "runId")]
+    run_id: String,
+    status: String,
+    #[serde(rename = "startTime")]
+    start_time: Option<f64>,
+    #[serde(rename = "endTime")]
+    end_time: Option<f64>,
+}
+
+#[derive(Deserialize)]
+struct GqlLatestMatInfo {
+    timestamp: String,
+    #[serde(rename = "runId")]
+    run_id: String,
+}
+
+#[derive(Serialize)]
+pub struct AssetStatusResponse {
+    pub latest_run: Option<LatestRunInfo>,
+    pub latest_materialization: Option<LatestMatInfo>,
+    pub unstarted_run_ids: Vec<String>,
+    pub in_progress_run_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct LatestRunInfo {
+    pub run_id: String,
+    pub status: String,
+    pub start_time: Option<f64>,
+    pub end_time: Option<f64>,
+}
+
+#[derive(Serialize)]
+pub struct LatestMatInfo {
+    pub timestamp: String,
+    pub run_id: String,
+}
+
+pub async fn get_asset_status(Path(path): Path<String>) -> impl IntoResponse {
+    let key_path: Vec<String> = path.split('/').map(str::to_string).collect();
+    let vars = json!({ "assetKeys": [{ "path": key_path }] });
+
+    match gql_post::<AssetLatestInfoData>(ASSET_LATEST_INFO_QUERY, vars).await {
+        Ok(data) => {
+            let info = match data.assets_latest_info.into_iter().next() {
+                Some(i) => i,
+                None => return (StatusCode::NOT_FOUND, Json(json!({ "error": "asset not found" }))).into_response(),
+            };
+            Json(AssetStatusResponse {
+                latest_run: info.latest_run.map(|r| LatestRunInfo {
+                    run_id: r.run_id,
+                    status: r.status,
+                    start_time: r.start_time,
+                    end_time: r.end_time,
+                }),
+                latest_materialization: info.latest_materialization.map(|m| LatestMatInfo {
+                    timestamp: m.timestamp,
+                    run_id: m.run_id,
+                }),
+                unstarted_run_ids: info.unstarted_run_ids,
+                in_progress_run_ids: info.in_progress_run_ids,
+            })
+            .into_response()
         }
         Err((status, body)) => (status, Json(body)).into_response(),
     }

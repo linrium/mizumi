@@ -23,6 +23,8 @@ async fn main() {
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))
+        .route("/dagster/asset-status/{*path}", get(dagster::get_asset_status))
+        .route("/dagster/materialize/{*path}", post(dagster::materialize_asset))
         .route("/dagster/runs", get(dagster::list_runs).post(dagster::launch_run))
         .route("/dagster/runs/{run_id}", get(dagster::get_run).delete(dagster::terminate_run))
         .route("/dagster/jobs", get(dagster::list_jobs))

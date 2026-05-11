@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { toast } from 'sonner'
 dayjs.extend(relativeTime)
 
 const LineageGraph = dynamic(
@@ -55,9 +56,27 @@ type AssetNodeDetail = {
   repository_location: string | null
 }
 
+type LatestRunInfo = {
+  run_id: string
+  status: string
+  start_time: number | null
+  end_time: number | null
+}
+
+type LatestMatInfo = {
+  timestamp: string
+  run_id: string
+}
+
+type AssetStatus = {
+  latest_run: LatestRunInfo | null
+  latest_materialization: LatestMatInfo | null
+  unstarted_run_ids: string[]
+  in_progress_run_ids: string[]
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Dagster timestamps can be seconds or milliseconds; values > 1e12 are already ms.
 function toDayjs(ts: string | number | null | undefined) {
   if (ts === null || ts === undefined || ts === '') return null
   const v = Number(ts)
@@ -75,6 +94,14 @@ function fmtRelativeTime(ts: string | number | null | undefined): string {
   return d ? d.fromNow() : '—'
 }
 
+function fmtDuration(startSec: number | null, endSec: number | null): string {
+  if (!startSec) return '—'
+  const sec = Math.round((endSec ?? Date.now() / 1000) - startSec)
+  if (sec < 60) return `${sec}s`
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
+}
+
 function fmtMetadataValue(entry: MetadataEntry): string {
   if (entry.value === null || entry.value === undefined) return '—'
   if (entry.type === 'json') {
@@ -90,6 +117,28 @@ function extractKinds(tags: RunTag[] | undefined): string[] {
     .map((t) => t.key.replace('dagster/kind/', ''))
 }
 
+const ACTIVE_STATUSES = new Set(['QUEUED', 'STARTED', 'STARTING', 'CANCELING'])
+
+const RUN_STATUS_LABEL: Record<string, string> = {
+  SUCCESS:  '✓ Success',
+  FAILURE:  '✗ Failed',
+  STARTED:  '▶ Running',
+  STARTING: '▶ Starting',
+  QUEUED:   '· Queued',
+  CANCELING:'⊗ Canceling',
+  CANCELED: '⊘ Canceled',
+}
+
+const RUN_STATUS_CLS: Record<string, string> = {
+  SUCCESS:  'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
+  FAILURE:  'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+  STARTED:  'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
+  STARTING: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
+  QUEUED:   'bg-muted text-muted-foreground',
+  CANCELING:'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
+  CANCELED: 'bg-muted text-muted-foreground',
+}
+
 const STALE_LABEL: Record<string, string> = {
   FRESH:   '✓ Fresh',
   STALE:   '⚠ Stale',
@@ -102,6 +151,61 @@ const STALE_CLS: Record<string, string> = {
   STALE:   'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
   MISSING: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
   UNKNOWN: 'bg-muted text-muted-foreground',
+}
+
+// ── useAssetStatus hook ────────────────────────────────────────────────────────
+
+function useAssetStatus(pathSegments: string[]) {
+  const [status, setStatus] = useState<AssetStatus | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pathKey = pathSegments.join('/')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/dagster/asset-status/${pathKey}`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as AssetStatus
+        if (!cancelled) {
+          setStatus(data)
+          const isActive =
+            data.in_progress_run_ids.length > 0 ||
+            data.unstarted_run_ids.length > 0 ||
+            (data.latest_run !== null && ACTIVE_STATUSES.has(data.latest_run.status))
+          timerRef.current = setTimeout(poll, isActive ? 3000 : 10000)
+        }
+      } catch {
+        if (!cancelled) {
+          timerRef.current = setTimeout(poll, 10000)
+        }
+      }
+    }
+
+    poll()
+
+    return () => {
+      cancelled = true
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathKey])
+
+  return status
+}
+
+// ── ElapsedTime — re-renders every second while a run is active ───────────────
+
+function ElapsedTime({ startSec }: { startSec: number }) {
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  return <>{fmtDuration(startSec, null)}</>
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -148,6 +252,43 @@ function SideSection({
   )
 }
 
+// ── CurrentRunBanner ──────────────────────────────────────────────────────────
+
+function CurrentRunBanner({ liveStatus }: { liveStatus: AssetStatus }) {
+  const run = liveStatus.latest_run
+  const isActive =
+    liveStatus.in_progress_run_ids.length > 0 ||
+    liveStatus.unstarted_run_ids.length > 0 ||
+    (run !== null && ACTIVE_STATUSES.has(run.status))
+
+  if (!run) return null
+
+  const cls = RUN_STATUS_CLS[run.status] ?? 'bg-muted text-muted-foreground'
+  const label = RUN_STATUS_LABEL[run.status] ?? run.status
+
+  return (
+    <div className={cn('rounded-md px-3 py-2.5 flex items-center justify-between gap-3', cls)}>
+      <div className="flex items-center gap-2 min-w-0">
+        {isActive && (
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
+          </span>
+        )}
+        <span className="text-xs font-medium">{label}</span>
+        <span className="text-[10px] font-mono opacity-70 truncate">{run.run_id.slice(0, 8)}…</span>
+      </div>
+      <div className="text-[10px] shrink-0 opacity-80">
+        {isActive && run.start_time ? (
+          <ElapsedTime startSec={run.start_time} />
+        ) : (
+          fmtDuration(run.start_time, run.end_time)
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AssetDetailPage() {
@@ -162,6 +303,23 @@ export default function AssetDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [metaFilter, setMetaFilter] = useState('')
+  const [materializing, setMaterializing] = useState(false)
+
+  const liveStatus = useAssetStatus(pathSegments)
+
+  async function handleMaterialize() {
+    setMaterializing(true)
+    try {
+      const res = await fetch(`/api/dagster/materialize/${pathSegments.join('/')}`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      toast.success('Materialization started', { description: `Run ${(json.run_id as string).slice(0, 8)}…` })
+    } catch (err) {
+      toast.error('Failed to materialize', { description: (err as Error).message })
+    } finally {
+      setMaterializing(false)
+    }
+  }
 
   useEffect(() => {
     const url = `/api/dagster/asset-nodes/${pathSegments.join('/')}`
@@ -180,6 +338,10 @@ export default function AssetDetailPage() {
   const assetName = pathSegments[pathSegments.length - 1]
   const latestMat = detail?.materializations[0]
   const kinds = detail ? extractKinds(detail.tags) : []
+
+  // Prefer live materialization timestamp if newer than the static detail fetch
+  const liveMat = liveStatus?.latest_materialization
+  const latestMatTimestamp = liveMat?.timestamp ?? latestMat?.timestamp
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -213,22 +375,34 @@ export default function AssetDetailPage() {
           ))}
         </div>
 
-        {detail?.stale_status && (
-          <span
-            className={cn(
-              'ml-auto shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full',
-              STALE_CLS[detail.stale_status] ?? STALE_CLS.UNKNOWN,
-            )}
-          >
-            {STALE_LABEL[detail.stale_status] ?? detail.stale_status}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {detail?.stale_status && (
+            <span
+              className={cn(
+                'text-[10px] font-medium px-2 py-0.5 rounded-full',
+                STALE_CLS[detail.stale_status] ?? STALE_CLS.UNKNOWN,
+              )}
+            >
+              {STALE_LABEL[detail.stale_status] ?? detail.stale_status}
+            </span>
+          )}
+          {detail?.is_executable && (
+            <button
+              type="button"
+              onClick={handleMaterialize}
+              disabled={materializing}
+              className="text-xs px-3 py-1 border rounded-md bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {materializing ? 'Starting…' : 'Materialize'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lineage tab — full-bleed graph, no sidebar */}
       {tab === 'lineage' && (
         <div className="flex-1 min-h-0 relative">
-          <LineageGraph currentPath={pathSegments} />
+          <LineageGraph currentPath={pathSegments} neighborhoodOnly />
         </div>
       )}
 
@@ -255,17 +429,22 @@ export default function AssetDetailPage() {
               {/* Status */}
               <Section title="Status">
                 <div className="flex flex-col gap-3">
+
+                  {/* Live run banner */}
+                  {liveStatus && <CurrentRunBanner liveStatus={liveStatus} />}
+
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-muted-foreground">Latest materialization</span>
-                    {latestMat ? (
+                    {latestMatTimestamp ? (
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                        <span className="text-xs">{fmtRelativeTime(latestMat.timestamp)}</span>
+                        <span className="text-xs">{fmtRelativeTime(latestMatTimestamp)}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">Never</span>
                     )}
                   </div>
+
                   {detail.materializations.length > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
