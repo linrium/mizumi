@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
@@ -100,7 +101,7 @@ function ConfirmButton({
       onClick={handleClick}
       onBlur={handleBlur}
       disabled={stage === 'pending'}
-      className={`text-[10px] px-2 py-0.5 border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+      className={`text-xs px-3 py-1 border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
         stage === 'confirming' ? 'bg-muted' : 'hover:bg-muted'
       } ${className ?? ''}`}
     >
@@ -195,6 +196,7 @@ function buildColumns(reload: () => void): ColumnDef<StreamingJob>[] {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function StreamingPage() {
+  const router = useRouter()
   const [jobs, setJobs]       = useState<StreamingJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
@@ -239,7 +241,11 @@ export default function StreamingPage() {
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/pipelines/streaming/${row.original.id}`)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

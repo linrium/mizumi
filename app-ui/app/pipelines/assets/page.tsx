@@ -116,7 +116,7 @@ function MaterializeButton({ path }: { path: string[] }) {
       type="button"
       onClick={handleClick}
       disabled={pending}
-      className="text-[10px] px-2 py-0.5 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+      className="text-xs px-3 py-1 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
     >
       {pending ? 'Starting…' : 'Materialize'}
     </button>
@@ -216,10 +216,6 @@ export default function AssetsPage() {
     const selectedPaths = table.getSelectedRowModel().rows
       .filter((r) => r.original.is_executable)
       .map((r) => r.original.path)
-    if (selectedPaths.length === 0) {
-      toast.warning('No executable assets selected')
-      return
-    }
     setMaterializingAll(true)
     try {
       const { run_id } = await materializeManyAssets(selectedPaths)

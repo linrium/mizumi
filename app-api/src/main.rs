@@ -149,7 +149,7 @@ async fn main() {
             get(streaming::list_streaming_jobs).post(streaming::create_streaming_job),
         )
         .route(
-            "/api/streaming/jobs/{id}",
+                "/api/streaming/jobs/{id}",
             get(streaming::get_streaming_job).delete(streaming::delete_streaming_job),
         )
         .route(
