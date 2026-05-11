@@ -23,7 +23,7 @@ worker:
   resources:
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: 500m
-      memory: 2Gi
+      memory: 3Gi

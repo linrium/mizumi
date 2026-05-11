@@ -667,6 +667,48 @@ mutation MaterializeAsset($executionParams: ExecutionParams!) {
   }
 }"#;
 
+const LAUNCH_PIPELINE_EXECUTION_MUTATION: &str = r#"
+mutation LaunchPipelineExecution($executionParams: ExecutionParams!) {
+  launchPipelineExecution(executionParams: $executionParams) {
+    __typename
+    ... on LaunchRunSuccess {
+      run { id pipelineName status }
+    }
+    ... on PipelineNotFoundError { message }
+    ... on InvalidSubsetError { message }
+    ... on RunConfigValidationInvalid { errors { message } }
+    ... on PythonError { message }
+  }
+}"#;
+
+#[derive(Deserialize)]
+struct LaunchPipelineExecutionData {
+    #[serde(rename = "launchPipelineExecution")]
+    launch_pipeline_execution: GqlLaunchPipelineResult,
+}
+
+#[derive(Deserialize)]
+struct GqlLaunchPipelineResult {
+    #[serde(rename = "__typename")]
+    typename: String,
+    run: Option<GqlLaunchedPipelineRun>,
+    message: Option<String>,
+    errors: Option<Vec<GqlValidationError>>,
+}
+
+#[derive(Deserialize)]
+struct GqlLaunchedPipelineRun {
+    id: String,
+    #[serde(rename = "pipelineName")]
+    pipeline_name: String,
+    status: String,
+}
+
+#[derive(Deserialize)]
+struct GqlValidationError {
+    message: String,
+}
+
 const TERMINATE_RUN_MUTATION: &str = r#"
 mutation TerminateRun($runId: String!) {
   terminateRun(runId: $runId) {
@@ -1265,7 +1307,79 @@ pub struct ScheduleTick {
     pub status: String,
 }
 
-// ---- Materialize asset ----
+// ---- Materialize asset(s) ----
+
+#[derive(Deserialize)]
+pub struct MaterializeManyRequest {
+    pub paths: Vec<Vec<String>>,
+}
+
+pub async fn materialize_many_assets(Json(req): Json<MaterializeManyRequest>) -> impl IntoResponse {
+    if req.paths.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "no assets specified" })),
+        )
+            .into_response();
+    }
+
+    let asset_selection: Vec<Value> = req.paths.iter().map(|p| json!({ "path": p })).collect();
+
+    let vars = json!({
+        "executionParams": {
+            "mode": "default",
+            "executionMetadata": { "tags": [{ "key": "dagster/from_ui", "value": "true" }] },
+            "runConfigData": "{}",
+            "selector": {
+                "repositoryLocationName": REPO_LOCATION,
+                "repositoryName": REPO_NAME,
+                "pipelineName": "__ASSET_JOB",
+                "assetSelection": asset_selection,
+                "assetCheckSelection": [],
+            },
+        }
+    });
+
+    match gql_post::<LaunchPipelineExecutionData>(LAUNCH_PIPELINE_EXECUTION_MUTATION, vars).await {
+        Ok(data) => {
+            let r = data.launch_pipeline_execution;
+            match r.typename.as_str() {
+                "LaunchRunSuccess" => {
+                    if let Some(run) = r.run {
+                        (
+                            StatusCode::CREATED,
+                            Json(json!({ "run_id": run.id, "job_name": run.pipeline_name, "status": run.status })),
+                        )
+                            .into_response()
+                    } else {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "missing run data" })),
+                        )
+                            .into_response()
+                    }
+                }
+                "RunConfigValidationInvalid" => {
+                    let msg = r
+                        .errors
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|e| e.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    (StatusCode::BAD_REQUEST, Json(json!({ "error": msg }))).into_response()
+                }
+                _ => {
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
+                }
+            }
+        }
+        Err((status, body)) => (status, Json(body)).into_response(),
+    }
+}
 
 pub async fn materialize_asset(Path(path): Path<String>) -> impl IntoResponse {
     let key_path: Vec<String> = path.split('/').map(str::to_string).collect();

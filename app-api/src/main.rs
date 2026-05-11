@@ -173,6 +173,10 @@ async fn main() {
             post(dagster::materialize_asset),
         )
         .route(
+            "/dagster/materialize-many",
+            post(dagster::materialize_many_assets),
+        )
+        .route(
             "/dagster/runs",
             get(dagster::list_runs).post(dagster::launch_run),
         )
