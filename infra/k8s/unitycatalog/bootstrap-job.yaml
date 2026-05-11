@@ -151,12 +151,12 @@ spec:
               ]
 
               STREAMING_ORDERS_COLS = [
-                  col("window_start",      "TIMESTAMP", "timestamp", "timestamp", 0),
-                  col("window_end",        "TIMESTAMP", "timestamp", "timestamp", 1),
-                  col("country_code",      "STRING",    "string",    "string",    2),
-                  col("order_count",       "LONG",      "bigint",    "long",      3),
-                  col("total_revenue",     "DOUBLE",    "double",    "double",    4),
-                  col("unique_customers",  "LONG",      "bigint",    "long",      5),
+                  col("timestamp",      "TIMESTAMP", "timestamp", "timestamp", 0),
+                  col("order_id",       "LONG",      "bigint",    "long",      1),
+                  col("customer_id",    "LONG",      "bigint",    "long",      2),
+                  col("country_code",   "STRING",    "string",    "string",    3),
+                  col("status",         "STRING",    "string",    "string",    4),
+                  col("amount",         "DOUBLE",    "double",    "double",    5),
               ]
 
               TABLES = [
@@ -238,7 +238,7 @@ spec:
                       "table_type": "EXTERNAL", "data_source_format": "DELTA",
                       "storage_location": "s3://silver/orders/streaming",
                       "columns": STREAMING_ORDERS_COLS,
-                      "comment": "1-minute streaming order aggregates from Redpanda orders topic (Delta)",
+                      "comment": "Raw streaming order events from Redpanda orders topic (Delta)",
                   },
               ]
 

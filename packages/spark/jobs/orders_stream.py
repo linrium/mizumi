@@ -60,30 +60,8 @@ def main() -> None:
         )
     )
 
-    # 1-minute tumbling window: order count + revenue per country
-    agg = (
-        raw.withWatermark("timestamp", "2 minutes")
-        .groupBy(
-            F.window("timestamp", "1 minute"),
-            "country_code",
-        )
-        .agg(
-            F.count("order_id").alias("order_count"),
-            F.round(F.sum("amount"), 2).alias("total_revenue"),
-            F.approx_count_distinct("customer_id").alias("unique_customers"),
-        )
-        .select(
-            F.col("window.start").alias("window_start"),
-            F.col("window.end").alias("window_end"),
-            "country_code",
-            "order_count",
-            "total_revenue",
-            "unique_customers",
-        )
-    )
-
     query = (
-        agg.writeStream.format("delta")
+        raw.writeStream.format("delta")
         .option("checkpointLocation", CHECKPOINT_PATH)
         .option("path", TARGET_PATH)
         .outputMode("append")
