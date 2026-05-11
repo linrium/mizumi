@@ -1,0 +1,117 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: redpanda
+spec:
+  clusterIP: None
+  selector:
+    app: redpanda
+  ports:
+    - name: kafka-internal
+      port: 9092
+      targetPort: 9092
+    - name: kafka-external
+      port: 19092
+      targetPort: 19092
+    - name: admin
+      port: 9644
+      targetPort: 9644
+    - name: rpc
+      port: 33145
+      targetPort: 33145
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda-svc
+  namespace: redpanda
+spec:
+  selector:
+    app: redpanda
+  ports:
+    - name: kafka-internal
+      port: 9092
+      targetPort: 9092
+    - name: kafka-external
+      port: 19092
+      targetPort: 19092
+    - name: admin
+      port: 9644
+      targetPort: 9644
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  namespace: redpanda
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redpanda
+          image: docker.redpanda.com/redpandadata/redpanda:v24.3.11
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              exec rpk redpanda start \
+                --mode dev-container \
+                --node-id 0 \
+                --smp 1 \
+                --memory 1G \
+                --reserve-memory 0M \
+                --check=false \
+                --rpc-addr 0.0.0.0:33145 \
+                --advertise-rpc-addr redpanda-0.redpanda.redpanda.svc.cluster.local:33145 \
+                --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092 \
+                --advertise-kafka-addr internal://redpanda.redpanda.svc.cluster.local:9092,external://127.0.0.1:19092 \
+                --set redpanda.auto_create_topics_enabled=true
+          ports:
+            - name: kafka-internal
+              containerPort: 9092
+            - name: kafka-external
+              containerPort: 19092
+            - name: admin
+              containerPort: 9644
+            - name: rpc
+              containerPort: 33145
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: redpanda-data
+              mountPath: /var/lib/redpanda/data
+  volumeClaimTemplates:
+    - metadata:
+        name: redpanda-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

@@ -17,6 +17,8 @@ pub enum AppError {
     Parse(String),
     #[error("database error: {0}")]
     Sqlx(#[from] sqlx::Error),
+    #[error("kafka error: {0}")]
+    Kafka(String),
     #[error("not found")]
     NotFound,
     #[error("{0}")]

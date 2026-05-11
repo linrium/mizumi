@@ -22,12 +22,20 @@ ADD https://repo1.maven.org/maven2/io/unitycatalog/unitycatalog-client/0.4.1/uni
 ADD https://repo1.maven.org/maven2/io/delta/delta-spark_2.13/4.1.0/delta-spark_2.13-4.1.0.jar /opt/spark/jars/delta-spark_2.13-4.1.0.jar
 ADD https://repo1.maven.org/maven2/io/delta/delta-storage/4.1.0/delta-storage-4.1.0.jar /opt/spark/jars/delta-storage-4.1.0.jar
 ADD https://repo1.maven.org/maven2/org/openapitools/jackson-databind-nullable/0.2.6/jackson-databind-nullable-0.2.6.jar /opt/spark/jars/jackson-databind-nullable-0.2.6.jar
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.13/4.1.1/spark-sql-kafka-0-10_2.13-4.1.1.jar /opt/spark/jars/spark-sql-kafka-0-10_2.13-4.1.1.jar
+ADD https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.13/4.1.1/spark-token-provider-kafka-0-10_2.13-4.1.1.jar /opt/spark/jars/spark-token-provider-kafka-0-10_2.13-4.1.1.jar
+ADD https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.9.1/kafka-clients-3.9.1.jar /opt/spark/jars/kafka-clients-3.9.1.jar
+ADD https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar /opt/spark/jars/commons-pool2-2.12.0.jar
 RUN chmod 644 \
     /opt/spark/jars/unitycatalog-spark_2.13-0.4.1.jar \
     /opt/spark/jars/unitycatalog-client-0.4.1.jar \
     /opt/spark/jars/delta-spark_2.13-4.1.0.jar \
     /opt/spark/jars/delta-storage-4.1.0.jar \
-    /opt/spark/jars/jackson-databind-nullable-0.2.6.jar
+    /opt/spark/jars/jackson-databind-nullable-0.2.6.jar \
+    /opt/spark/jars/spark-sql-kafka-0-10_2.13-4.1.1.jar \
+    /opt/spark/jars/spark-token-provider-kafka-0-10_2.13-4.1.1.jar \
+    /opt/spark/jars/kafka-clients-3.9.1.jar \
+    /opt/spark/jars/commons-pool2-2.12.0.jar
 
 RUN pip install --no-cache-dir \
     "pyspark[pipelines]==4.1.1" \

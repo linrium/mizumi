@@ -20,6 +20,7 @@ import {
   Chart01Icon,
   DashboardSquare01Icon,
   LakeIcon,
+  LiveStreaming01Icon,
 } from '@hugeicons/core-free-icons'
 
 const navItems = [
@@ -28,6 +29,10 @@ const navItems = [
   { title: 'Pipelines', href: '/pipelines', icon: WorkflowCircle01Icon },
   { title: 'Analytics', href: '/analytics', icon: Chart01Icon },
   { title: 'Dashboard', href: '/dashboard', icon: DashboardSquare01Icon },
+]
+
+const appItems = [
+  { title: 'Test Streaming', href: '/apps/test-streaming', icon: LiveStreaming01Icon },
 ]
 
 export function AppSidebar() {
@@ -49,6 +54,23 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={item.title} isActive={pathname.startsWith(item.href)}>
+                    <a href={item.href}>
+                      <HugeiconsIcon icon={item.icon} size={16} />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Apps</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {appItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title} isActive={pathname.startsWith(item.href)}>
                     <a href={item.href}>

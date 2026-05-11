@@ -16,9 +16,8 @@ fn client() -> &'static reqwest::Client {
 }
 
 fn dagster_graphql_url() -> String {
-    std::env::var("DAGSTER_BASE_URL").unwrap_or_else(|_| {
-        "http://localhost:8080".to_string()
-    }) + "/graphql"
+    std::env::var("DAGSTER_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+        + "/graphql"
 }
 
 const REPO_LOCATION: &str = "mizumi";
@@ -54,16 +53,28 @@ async fn gql_post<T: for<'de> Deserialize<'de>>(
 
     let gql: GqlResponse<T> = resp.json().await.map_err(|e| {
         tracing::error!("Failed to parse Dagster response: {e}");
-        (StatusCode::BAD_GATEWAY, json!({ "error": "invalid response from Dagster" }))
+        (
+            StatusCode::BAD_GATEWAY,
+            json!({ "error": "invalid response from Dagster" }),
+        )
     })?;
 
     if let Some(errors) = gql.errors {
-        let msg = errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; ");
+        let msg = errors
+            .iter()
+            .map(|e| e.message.as_str())
+            .collect::<Vec<_>>()
+            .join("; ");
         tracing::error!("Dagster GraphQL errors: {msg}");
         return Err((StatusCode::BAD_GATEWAY, json!({ "error": msg })));
     }
 
-    gql.data.ok_or_else(|| (StatusCode::BAD_GATEWAY, json!({ "error": "empty response from Dagster" })))
+    gql.data.ok_or_else(|| {
+        (
+            StatusCode::BAD_GATEWAY,
+            json!({ "error": "empty response from Dagster" }),
+        )
+    })
 }
 
 // ---- Shared types ----
@@ -133,9 +144,16 @@ pub async fn list_assets() -> impl IntoResponse {
                 .assets
                 .unwrap_or_default()
                 .into_iter()
-                .map(|a| AssetRecord { id: a.id, path: a.key.path })
+                .map(|a| AssetRecord {
+                    id: a.id,
+                    path: a.key.path,
+                })
                 .collect();
-            Json(AssetsResponse { assets, cursor: conn.cursor }).into_response()
+            Json(AssetsResponse {
+                assets,
+                cursor: conn.cursor,
+            })
+            .into_response()
         }
         Err((status, body)) => (status, Json(body)).into_response(),
     }
@@ -425,7 +443,11 @@ fn gql_metadata_to_entry(e: GqlMetadataEntry) -> MetadataEntry {
         "MarkdownMetadataEntry" => ("markdown".into(), json!(e.md_str)),
         other => (other.to_string(), Value::Null),
     };
-    MetadataEntry { label: e.label, entry_type, value }
+    MetadataEntry {
+        label: e.label,
+        entry_type,
+        value,
+    }
 }
 
 pub async fn get_asset_node(Path(path): Path<String>) -> impl IntoResponse {
@@ -446,34 +468,62 @@ pub async fn get_asset_node(Path(path): Path<String>) -> impl IntoResponse {
                             is_observable: n.is_observable,
                             is_executable: n.is_executable,
                             job_names: n.job_names,
-                            dependency_keys: n.dependency_keys.into_iter().map(|k| k.path).collect(),
-                            depended_by_keys: n.depended_by_keys.into_iter().map(|k| k.path).collect(),
+                            dependency_keys: n
+                                .dependency_keys
+                                .into_iter()
+                                .map(|k| k.path)
+                                .collect(),
+                            depended_by_keys: n
+                                .depended_by_keys
+                                .into_iter()
+                                .map(|k| k.path)
+                                .collect(),
                             stale_status: n.stale_status,
                             tags: n.tags,
                             repository_location: n.repository.map(|r| r.location.name),
-                            stale_causes: n.stale_causes.into_iter().map(|c| StaleCause {
-                                key: c.key.path,
-                                reason: c.reason,
-                                dependency: c.dependency.map(|d| d.path),
-                                category: c.category,
-                            }).collect(),
-                            materializations: n.asset_materializations.into_iter().map(|m| Materialization {
-                                timestamp: m.timestamp,
-                                run_id: m.run_id,
-                                tags: m.tags,
-                                metadata: m.metadata_entries.into_iter().map(gql_metadata_to_entry).collect(),
-                            }).collect(),
+                            stale_causes: n
+                                .stale_causes
+                                .into_iter()
+                                .map(|c| StaleCause {
+                                    key: c.key.path,
+                                    reason: c.reason,
+                                    dependency: c.dependency.map(|d| d.path),
+                                    category: c.category,
+                                })
+                                .collect(),
+                            materializations: n
+                                .asset_materializations
+                                .into_iter()
+                                .map(|m| Materialization {
+                                    timestamp: m.timestamp,
+                                    run_id: m.run_id,
+                                    tags: m.tags,
+                                    metadata: m
+                                        .metadata_entries
+                                        .into_iter()
+                                        .map(gql_metadata_to_entry)
+                                        .collect(),
+                                })
+                                .collect(),
                         };
                         Json(detail).into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "missing node data" }))).into_response()
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "missing node data" })),
+                        )
+                            .into_response()
                     }
                 }
-                "AssetNotFoundError" => {
-                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
+                "AssetNotFoundError" => (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -501,7 +551,10 @@ pub async fn list_asset_nodes() -> impl IntoResponse {
                     stale_status: n.stale_status,
                     tags: n.tags,
                     last_materialization: n.asset_materializations.into_iter().next().map(|m| {
-                        LastMaterialization { timestamp: m.timestamp, run_id: m.run_id }
+                        LastMaterialization {
+                            timestamp: m.timestamp,
+                            run_id: m.run_id,
+                        }
                     }),
                 })
                 .collect();
@@ -775,7 +828,11 @@ pub async fn list_runs(Query(params): Query<ListRunsParams>) -> impl IntoRespons
         if let Some(job) = &params.job_name {
             f.insert("pipelineName".into(), json!(job));
         }
-        if f.is_empty() { json!(null) } else { Value::Object(f) }
+        if f.is_empty() {
+            json!(null)
+        } else {
+            Value::Object(f)
+        }
     };
 
     let vars = json!({
@@ -788,10 +845,17 @@ pub async fn list_runs(Query(params): Query<ListRunsParams>) -> impl IntoRespons
         Ok(data) => {
             let r = data.runs_or_error;
             if r.typename != "Runs" {
-                let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                let msg = r
+                    .message
+                    .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                 return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
             }
-            let runs = r.results.unwrap_or_default().into_iter().map(gql_run_to_run).collect();
+            let runs = r
+                .results
+                .unwrap_or_default()
+                .into_iter()
+                .map(gql_run_to_run)
+                .collect();
             Json(RunsResponse { runs }).into_response()
         }
         Err((status, body)) => (status, Json(body)).into_response(),
@@ -807,14 +871,22 @@ pub async fn get_run(Path(run_id): Path<String>) -> impl IntoResponse {
                     if let Some(run) = r.run {
                         Json(gql_run_to_run(run)).into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "missing run data" }))).into_response()
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "missing run data" })),
+                        )
+                            .into_response()
                     }
                 }
-                "RunNotFoundError" => {
-                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
+                "RunNotFoundError" => (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -865,7 +937,11 @@ pub struct LaunchRunResponse {
 }
 
 pub async fn launch_run(Json(req): Json<LaunchRunRequest>) -> impl IntoResponse {
-    let tags: Vec<Value> = req.tags.iter().map(|t| json!({ "key": t.key, "value": t.value })).collect();
+    let tags: Vec<Value> = req
+        .tags
+        .iter()
+        .map(|t| json!({ "key": t.key, "value": t.value }))
+        .collect();
     let vars = json!({
         "executionParams": {
             "selector": {
@@ -884,24 +960,40 @@ pub async fn launch_run(Json(req): Json<LaunchRunRequest>) -> impl IntoResponse 
             match r.typename.as_str() {
                 "LaunchRunSuccess" => {
                     if let Some(run) = r.run {
-                        (StatusCode::CREATED, Json(json!(LaunchRunResponse {
-                            run_id: run.run_id,
-                            job_name: run.job_name,
-                            status: run.status,
-                        }))).into_response()
+                        (
+                            StatusCode::CREATED,
+                            Json(json!(LaunchRunResponse {
+                                run_id: run.run_id,
+                                job_name: run.job_name,
+                                status: run.status,
+                            })),
+                        )
+                            .into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "missing run data" }))).into_response()
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "missing run data" })),
+                        )
+                            .into_response()
                     }
                 }
-                "PipelineNotFoundError" => {
-                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
+                "PipelineNotFoundError" => (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
                 "InvalidStepError" => {
                     let key = r.invalid_step_key.unwrap_or_default();
-                    (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("invalid step: {key}") }))).into_response()
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("invalid step: {key}") })),
+                    )
+                        .into_response()
                 }
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -943,14 +1035,20 @@ pub async fn terminate_run(Path(run_id): Path<String>) -> impl IntoResponse {
                         StatusCode::NO_CONTENT.into_response()
                     }
                 }
-                "RunNotFoundError" => {
-                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
-                "TerminateRunFailure" | "UnauthorizedError" => {
-                    (StatusCode::BAD_REQUEST, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
+                "RunNotFoundError" => (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
+                "TerminateRunFailure" | "UnauthorizedError" => (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -1052,11 +1150,12 @@ pub async fn list_jobs() -> impl IntoResponse {
                 .into_iter()
                 .flat_map(|loc| {
                     let loc_name = loc.name.clone();
-                    loc.location_or_load_error
-                        .into_iter()
-                        .flat_map(move |rl| {
-                            let loc_name = loc_name.clone();
-                            rl.repositories.unwrap_or_default().into_iter().flat_map(move |repo| {
+                    loc.location_or_load_error.into_iter().flat_map(move |rl| {
+                        let loc_name = loc_name.clone();
+                        rl.repositories
+                            .unwrap_or_default()
+                            .into_iter()
+                            .flat_map(move |repo| {
                                 let loc_name = loc_name.clone();
                                 let repo_name = repo.name.clone();
                                 repo.jobs.into_iter().map(move |j| Job {
@@ -1067,7 +1166,7 @@ pub async fn list_jobs() -> impl IntoResponse {
                                     repository: repo_name.clone(),
                                 })
                             })
-                        })
+                    })
                 })
                 .collect();
             Json(JobsResponse { jobs }).into_response()
@@ -1208,24 +1307,40 @@ pub async fn materialize_asset(Path(path): Path<String>) -> impl IntoResponse {
             match r.typename.as_str() {
                 "LaunchRunSuccess" => {
                     if let Some(run) = r.run {
-                        (StatusCode::CREATED, Json(json!(LaunchRunResponse {
-                            run_id: run.run_id,
-                            job_name: run.job_name,
-                            status: run.status,
-                        }))).into_response()
+                        (
+                            StatusCode::CREATED,
+                            Json(json!(LaunchRunResponse {
+                                run_id: run.run_id,
+                                job_name: run.job_name,
+                                status: run.status,
+                            })),
+                        )
+                            .into_response()
                     } else {
-                        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "missing run data" }))).into_response()
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(json!({ "error": "missing run data" })),
+                        )
+                            .into_response()
                     }
                 }
-                "PipelineNotFoundError" => {
-                    (StatusCode::NOT_FOUND, Json(json!({ "error": r.message.unwrap_or_default() }))).into_response()
-                }
+                "PipelineNotFoundError" => (
+                    StatusCode::NOT_FOUND,
+                    Json(json!({ "error": r.message.unwrap_or_default() })),
+                )
+                    .into_response(),
                 "InvalidStepError" => {
                     let key = r.invalid_step_key.unwrap_or_default();
-                    (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("invalid step: {key}") }))).into_response()
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("invalid step: {key}") })),
+                    )
+                        .into_response()
                 }
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -1359,35 +1474,43 @@ pub async fn get_run_events(
             let r = data.logs_for_run;
             match r.typename.as_str() {
                 "EventConnection" => {
-                    let events = r.events.unwrap_or_default().into_iter().map(|e| {
-                        let error_msg = e.error.map(|err| {
-                            let mut msg = err.message.clone();
-                            for c in &err.causes {
-                                msg.push_str("\nCaused by: ");
-                                msg.push_str(&c.message);
+                    let events = r
+                        .events
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|e| {
+                            let error_msg = e.error.map(|err| {
+                                let mut msg = err.message.clone();
+                                for c in &err.causes {
+                                    msg.push_str("\nCaused by: ");
+                                    msg.push_str(&c.message);
+                                }
+                                msg
+                            });
+                            RunEvent {
+                                event_type: e.typename,
+                                timestamp: e.timestamp,
+                                message: e.message,
+                                level: e.level,
+                                step_key: e.step_key,
+                                error: error_msg,
+                                asset_key: e.asset_key.map(|k| k.path),
+                                label: e.label,
+                                description: e.description,
                             }
-                            msg
-                        });
-                        RunEvent {
-                            event_type: e.typename,
-                            timestamp: e.timestamp,
-                            message: e.message,
-                            level: e.level,
-                            step_key: e.step_key,
-                            error: error_msg,
-                            asset_key: e.asset_key.map(|k| k.path),
-                            label: e.label,
-                            description: e.description,
-                        }
-                    }).collect();
+                        })
+                        .collect();
                     Json(RunEventsResponse {
                         events,
                         cursor: r.cursor,
                         has_more: r.has_more.unwrap_or(false),
-                    }).into_response()
+                    })
+                    .into_response()
                 }
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }
@@ -1408,7 +1531,9 @@ pub async fn list_schedules() -> impl IntoResponse {
         Ok(data) => {
             let r = data.schedules_or_error;
             if r.typename != "Schedules" {
-                let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                let msg = r
+                    .message
+                    .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                 return (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response();
             }
             let schedules = r
@@ -1523,7 +1648,13 @@ pub async fn get_asset_status(Path(path): Path<String>) -> impl IntoResponse {
         Ok(data) => {
             let info = match data.assets_latest_info.into_iter().next() {
                 Some(i) => i,
-                None => return (StatusCode::NOT_FOUND, Json(json!({ "error": "asset not found" }))).into_response(),
+                None => {
+                    return (
+                        StatusCode::NOT_FOUND,
+                        Json(json!({ "error": "asset not found" })),
+                    )
+                        .into_response();
+                }
             };
             Json(AssetStatusResponse {
                 latest_run: info.latest_run.map(|r| LatestRunInfo {

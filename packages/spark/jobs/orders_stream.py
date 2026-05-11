@@ -1,8 +1,27 @@
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
-CHECKPOINT_PATH = "s3a://silver/checkpoints/orders-stream"
+CHECKPOINT_PATH = "s3a://silver/checkpoints/orders-stream-kafka"
 TARGET_PATH = "s3a://silver/orders/streaming"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv(
+    "KAFKA_BOOTSTRAP_SERVERS",
+    "redpanda-svc.redpanda.svc.cluster.local:9092",
+)
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "mizumi-orders")
+
+ORDER_SCHEMA = T.StructType(
+    [
+        T.StructField("timestamp", T.TimestampType(), True),
+        T.StructField("order_id", T.LongType(), True),
+        T.StructField("customer_id", T.LongType(), True),
+        T.StructField("country_code", T.StringType(), True),
+        T.StructField("status", T.StringType(), True),
+        T.StructField("amount", T.DoubleType(), True),
+    ]
+)
 
 
 def build_session() -> SparkSession:
@@ -16,23 +35,28 @@ def build_session() -> SparkSession:
 def main() -> None:
     spark = build_session()
 
-    # Simulated order events — swap for readStream.format("kafka") or .format("json") in production
     raw = (
-        spark.readStream.format("rate")
-        .option("rowsPerSecond", 10)
+        spark.readStream.format("kafka")
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
+        .option("subscribe", KAFKA_TOPIC)
+        .option("startingOffsets", "latest")
+        .option("failOnDataLoss", "false")
         .load()
+        .select(F.from_json(F.col("value").cast("string"), ORDER_SCHEMA).alias("event"))
+        .select("event.*")
+        .where(F.col("timestamp").isNotNull())
+        .where(F.col("order_id").isNotNull())
+        .where(F.col("customer_id").isNotNull())
+        .where(F.col("country_code").isNotNull())
+        .where(F.col("status").isNotNull())
+        .where(F.col("amount").isNotNull())
         .select(
             F.col("timestamp"),
-            (F.col("value") % 1_000_000).alias("order_id"),
-            (F.col("value") % 500).cast("long").alias("customer_id"),
-            F.when(F.col("value") % 3 == 0, "US")
-             .when(F.col("value") % 3 == 1, "GB")
-             .otherwise("DE").alias("country_code"),
-            F.when(F.col("value") % 4 == 0, "PAID")
-             .when(F.col("value") % 4 == 1, "SHIPPED")
-             .when(F.col("value") % 4 == 2, "DELIVERED")
-             .otherwise("PENDING").alias("status"),
-            F.round((F.rand() * 190 + 10), 2).alias("amount"),
+            F.col("order_id").cast("long").alias("order_id"),
+            F.col("customer_id").cast("long").alias("customer_id"),
+            F.col("country_code"),
+            F.col("status"),
+            F.round(F.col("amount").cast("double"), 2).alias("amount"),
         )
     )
 
@@ -59,7 +83,7 @@ def main() -> None:
     )
 
     query = (
-        agg.writeStream.format("parquet")
+        agg.writeStream.format("delta")
         .option("checkpointLocation", CHECKPOINT_PATH)
         .option("path", TARGET_PATH)
         .outputMode("append")

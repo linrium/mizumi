@@ -97,9 +97,11 @@ just deploy
 Deploys the core platform stack:
 
 - RustFS
+- Redpanda
 - Unity Catalog
 - Spark operator and Spark jobs/pipelines
 - Dagster
+- App API
 
 ```bash
 just destroy
@@ -117,23 +119,43 @@ Starts the common port-forwards and prints local endpoints for:
 
 - RustFS console on `http://127.0.0.1:9001`
 - RustFS S3 API on `http://127.0.0.1:9000`
+- Redpanda Kafka on `127.0.0.1:19092`
+- Redpanda Admin API on `http://127.0.0.1:9644`
+- Redpanda Console on `http://127.0.0.1:8081`
 - Dagster UI on `http://127.0.0.1:8080`
 - Unity Catalog API on `http://127.0.0.1:8082`
 - Unity Catalog UI on `http://127.0.0.1:3001`
 - App UI on `http://127.0.0.1:3002` when deployed
+- App API on `http://127.0.0.1:6000` when deployed
 
 You can also forward individual services:
 
 ```bash
 just rustfs-forward
+just redpanda-forward
 just dagster-forward
 just spark-forward
 just spark-pipeline-forward
 just unitycatalog-forward
 just unitycatalog-ui-forward
 just app-ui-forward
+just app-api-forward
 just daft-distributed-forward
 just ballista-forward
+```
+
+`redpanda-deploy` also runs a bootstrap job that creates the default `mizumi-orders` topic.
+
+To create the example Spark streaming job through `app-api` after `just app-api-forward`:
+
+```bash
+just app-api-streaming-job-create
+```
+
+To rebuild the Spark image and recreate that streaming job cleanly:
+
+```bash
+just app-api-streaming-job-recreate
 ```
 
 ### Spark and Pipeline Workloads
@@ -232,7 +254,7 @@ npm run format
 
 ### API
 
-The Rust API is separate from the Kubernetes deploy commands in `Justfile`. To run it locally:
+The Rust API can run locally or inside the Kubernetes stack. To run it locally:
 
 ```bash
 cd app-api
@@ -276,4 +298,4 @@ At a high level:
 
 - The root `README.md` was previously empty, while `app-ui/README.md` still contains the default Next.js scaffold text.
 - `app-ui` currently contains a minimal placeholder page.
-- `app-api` exists in source, but there is no matching Kubernetes deployment manifest in `infra/k8s` yet.
+- `app-api` has Kubernetes manifests under `infra/k8s/app-api`.

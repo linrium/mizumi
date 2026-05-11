@@ -34,7 +34,10 @@ impl IntoResponse for UcError {
 async fn call(builder: reqwest::RequestBuilder) -> Result<(StatusCode, Value), UcError> {
     let resp = builder.send().await.map_err(|e| {
         tracing::error!("UC request failed: {e}");
-        UcError(StatusCode::BAD_GATEWAY, serde_json::json!({"message": e.to_string()}))
+        UcError(
+            StatusCode::BAD_GATEWAY,
+            serde_json::json!({"message": e.to_string()}),
+        )
     })?;
     let status =
         StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
@@ -103,8 +106,12 @@ pub async fn update_catalog(
     Path(name): Path<String>,
     Json(body): Json<Value>,
 ) -> Result<impl IntoResponse, UcError> {
-    let (status, resp) =
-        call(client().patch(uc_url(&format!("catalogs/{name}"))).json(&body)).await?;
+    let (status, resp) = call(
+        client()
+            .patch(uc_url(&format!("catalogs/{name}")))
+            .json(&body),
+    )
+    .await?;
     Ok((status, Json(resp)))
 }
 
@@ -152,8 +159,12 @@ pub async fn update_schema(
     Path(full_name): Path<String>,
     Json(body): Json<Value>,
 ) -> Result<impl IntoResponse, UcError> {
-    let (status, resp) =
-        call(client().patch(uc_url(&format!("schemas/{full_name}"))).json(&body)).await?;
+    let (status, resp) = call(
+        client()
+            .patch(uc_url(&format!("schemas/{full_name}")))
+            .json(&body),
+    )
+    .await?;
     Ok((status, Json(resp)))
 }
 

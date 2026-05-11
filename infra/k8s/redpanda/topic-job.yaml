@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redpanda-default-topic
+  namespace: redpanda
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: rpk
+          image: docker.redpanda.com/redpandadata/redpanda:v24.3.11
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              rpk topic create mizumi-orders \
+                --brokers redpanda-svc.redpanda.svc.cluster.local:9092 \
+                --partitions 1 \
+                --replicas 1 \
+                || rpk topic describe mizumi-orders --brokers redpanda-svc.redpanda.svc.cluster.local:9092

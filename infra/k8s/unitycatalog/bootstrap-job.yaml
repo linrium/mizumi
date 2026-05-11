@@ -150,6 +150,15 @@ spec:
                   col("revenue_growth_pct",  "DOUBLE", "double", "double",  4),
               ]
 
+              STREAMING_ORDERS_COLS = [
+                  col("window_start",      "TIMESTAMP", "timestamp", "timestamp", 0),
+                  col("window_end",        "TIMESTAMP", "timestamp", "timestamp", 1),
+                  col("country_code",      "STRING",    "string",    "string",    2),
+                  col("order_count",       "LONG",      "bigint",    "long",      3),
+                  col("total_revenue",     "DOUBLE",    "double",    "double",    4),
+                  col("unique_customers",  "LONG",      "bigint",    "long",      5),
+              ]
+
               TABLES = [
                   {
                       "name": "silver_orders",
@@ -222,6 +231,14 @@ spec:
                       "storage_location": "s3://gold/sdp-warehouse/gold_weekly_growth",
                       "columns": WEEKLY_GROWTH_COLS,
                       "comment": "Week-over-week revenue growth — Weekly Trends SDP (Delta)",
+                  },
+                  {
+                      "name": "streaming_orders",
+                      "catalog_name": CATALOG, "schema_name": SCHEMA,
+                      "table_type": "EXTERNAL", "data_source_format": "DELTA",
+                      "storage_location": "s3://silver/orders/streaming",
+                      "columns": STREAMING_ORDERS_COLS,
+                      "comment": "1-minute streaming order aggregates from Redpanda orders topic (Delta)",
                   },
               ]
 

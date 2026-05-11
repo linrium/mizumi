@@ -3,9 +3,15 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 app_api_namespace := "app-api"
 app_api_image := "mizumi-app-api:0.1.0"
 app_api_manifests := "infra/k8s/app-api"
+app_api_streaming_job_name := "orders-stream"
+app_api_streaming_job_file := "local:///opt/spark/jobs/orders_stream.py"
 
 app_ui_namespace := "app-ui"
 app_ui_image := "mizumi-app-ui:0.1.0"
+
+redpanda_namespace := "redpanda"
+redpanda_manifests := "infra/k8s/redpanda"
+redpanda_default_topic_job := "redpanda-default-topic"
 
 unitycatalog_namespace := "unitycatalog"
 unitycatalog_image := "mizumi-unitycatalog:v0.4.0"
@@ -53,15 +59,17 @@ duckdb_image := "mizumi-duckdb:1.1.3"
 duckdb_namespace := "spark"
 duckdb_query_job := "duckdb-rustfs-query"
 
-deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-simple-deploy daft-distributed-deploy ballista-deploy app-api-deploy
+deploy: rustfs-deploy redpanda-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-simple-deploy daft-distributed-deploy ballista-deploy app-api-deploy
 
-destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy app-api-destroy
+destroy: spark-destroy dagster-destroy unitycatalog-destroy redpanda-destroy rustfs-destroy app-api-destroy
 
 forward:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
     kubectl port-forward -n {{rustfs_namespace}} svc/rustfs-svc 9000:9000 9001:9001 &
+    kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
+    kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     dagster_pod=$(kubectl get pods --namespace {{dagster_namespace}} \
       --field-selector=status.phase=Running \
       -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
@@ -89,6 +97,9 @@ forward:
     fi
     echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
+    echo "Redpanda Kafka:  127.0.0.1:19092"
+    echo "Redpanda Admin:  http://127.0.0.1:9644"
+    echo "Redpanda UI:     http://127.0.0.1:8081"
     echo "Dagster UI:      http://127.0.0.1:8080"
     echo "Dagster GraphQL: http://127.0.0.1:8080/graphql"
     echo "UC API:          http://127.0.0.1:8082"
@@ -114,6 +125,35 @@ rustfs-destroy:
 
 rustfs-forward:
     kubectl port-forward -n {{rustfs_namespace}} svc/rustfs-svc 9000:9000 9001:9001
+
+redpanda-deploy:
+    kubectl create namespace {{redpanda_namespace}} 2>/dev/null || true
+    kubectl apply -f {{redpanda_manifests}}/
+    kubectl rollout status statefulset/redpanda -n {{redpanda_namespace}} --timeout=180s
+    kubectl rollout status deployment/redpanda-console -n {{redpanda_namespace}} --timeout=180s
+    just redpanda-topic-bootstrap
+    kubectl get pods,svc,pvc -n {{redpanda_namespace}}
+
+redpanda-topic-bootstrap:
+    kubectl delete job {{redpanda_default_topic_job}} -n {{redpanda_namespace}} --ignore-not-found
+    kubectl apply -f {{redpanda_manifests}}/topic-job.yaml
+    kubectl wait --for=condition=complete job/{{redpanda_default_topic_job}} -n {{redpanda_namespace}} --timeout=120s
+    kubectl logs job/{{redpanda_default_topic_job}} -n {{redpanda_namespace}}
+
+redpanda-forward:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Redpanda Kafka:  127.0.0.1:19092"
+    echo "Redpanda Admin:  http://127.0.0.1:9644"
+    echo "Redpanda UI:     http://127.0.0.1:8081"
+    trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
+    kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
+    kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
+    wait
+
+redpanda-destroy:
+    kubectl delete -f {{redpanda_manifests}}/ --ignore-not-found || true
+    kubectl delete namespace {{redpanda_namespace}} --ignore-not-found --wait=false
 
 spark-helm-repo:
     helm repo add spark-operator https://kubeflow.github.io/spark-operator 2>/dev/null || true
@@ -446,6 +486,23 @@ app-api-forward:
     echo "App API:          http://127.0.0.1:6000"
     echo "App API Postgres: localhost:5433"
     wait
+
+app-api-streaming-job-create:
+    curl -X POST http://127.0.0.1:6000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"{{app_api_streaming_job_name}}","image":"{{spark_image}}","main_application_file":"{{app_api_streaming_job_file}}"}' | jq
+
+app-api-streaming-job-recreate: spark-image-build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ids=$(curl -fsS http://127.0.0.1:6000/api/streaming/jobs | jq -r '.jobs[] | select(.job.name == "{{app_api_streaming_job_name}}") | .job.id')
+    if [[ -n "${ids:-}" ]]; then
+        while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            curl -fsS -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" >/dev/null
+        done <<< "$ids"
+    fi
+    just app-api-streaming-job-create
 
 app-api-destroy:
     kubectl delete -f {{app_api_manifests}}/ --ignore-not-found || true

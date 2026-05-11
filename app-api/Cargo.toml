@@ -18,3 +18,4 @@ tower-http = { version = "0.6", features = ["cors"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "migrate", "uuid", "chrono", "json"] }
 chrono = { version = "0.4", features = ["serde"] }
+rdkafka = { version = "0.37", features = ["cmake-build", "tokio"] }

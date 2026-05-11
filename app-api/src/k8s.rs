@@ -2,7 +2,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use axum::{Json, extract::{Path, State}, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use k8s_openapi::api::batch::v1::{Job, JobSpec};
 use k8s_openapi::api::core::v1::{Container, EnvVar, Pod, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -31,7 +36,8 @@ pub async fn run_query(Json(req): Json<QueryRequest>) -> Result<Json<QueryRespon
     let job_name = format!("duckdb-query-{}", Uuid::new_v4());
 
     let jobs: Api<Job> = Api::namespaced(client.clone(), NAMESPACE);
-    jobs.create(&PostParams::default(), &build_job(&job_name, &req.sql)).await?;
+    jobs.create(&PostParams::default(), &build_job(&job_name, &req.sql))
+        .await?;
     tracing::info!(job = %job_name, "job created");
 
     let result = wait_for_completion(&client, &job_name).await;
@@ -128,7 +134,10 @@ pub fn new_session_store() -> Arc<SessionStore> {
 fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
     let mut vars = vec![
         env("AWS_DEFAULT_REGION", "us-east-1"),
-        env("AWS_ENDPOINT_URL", "http://rustfs-svc.rustfs.svc.cluster.local:9000"),
+        env(
+            "AWS_ENDPOINT_URL",
+            "http://rustfs-svc.rustfs.svc.cluster.local:9000",
+        ),
         env("AWS_ACCESS_KEY_ID", "rustfsadmin"),
         env("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
     ];
@@ -139,7 +148,11 @@ fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
 }
 
 fn env(name: &str, value: &str) -> EnvVar {
-    EnvVar { name: name.to_string(), value: Some(value.to_string()), ..Default::default() }
+    EnvVar {
+        name: name.to_string(),
+        value: Some(value.to_string()),
+        ..Default::default()
+    }
 }
 
 async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppError> {
@@ -157,7 +170,11 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
                 image: Some(DUCKDB_IMAGE.to_string()),
                 image_pull_policy: Some("IfNotPresent".to_string()),
                 // Keep the pod alive; queries are sent via exec
-                command: Some(vec!["tail".to_string(), "-f".to_string(), "/dev/null".to_string()]),
+                command: Some(vec![
+                    "tail".to_string(),
+                    "-f".to_string(),
+                    "/dev/null".to_string(),
+                ]),
                 env: Some(duckdb_env(None)),
                 ..Default::default()
             }],
@@ -207,10 +224,18 @@ pub async fn create_session(State(store): State<Arc<SessionStore>>) -> impl Into
         return e.into_response();
     }
 
-    store.0.lock().unwrap().insert(session_id.clone(), pod_name.clone());
+    store
+        .0
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), pod_name.clone());
     tracing::info!(session_id = %session_id, pod = %pod_name, "session created");
 
-    (StatusCode::CREATED, Json(json!({ "session_id": session_id, "pod": pod_name }))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({ "session_id": session_id, "pod": pod_name })),
+    )
+        .into_response()
 }
 
 pub async fn list_sessions(State(store): State<Arc<SessionStore>>) -> impl IntoResponse {
@@ -231,7 +256,11 @@ pub async fn delete_session(
     let pod_name = match store.0.lock().unwrap().remove(&id) {
         Some(p) => p,
         None => {
-            return (StatusCode::NOT_FOUND, Json(json!({ "error": "session not found" }))).into_response()
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            )
+                .into_response();
         }
     };
 
@@ -255,7 +284,11 @@ pub async fn session_query(
     let pod_name = match store.0.lock().unwrap().get(&id).cloned() {
         Some(p) => p,
         None => {
-            return (StatusCode::NOT_FOUND, Json(json!({ "error": "session not found" }))).into_response()
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            )
+                .into_response();
         }
     };
 
@@ -268,8 +301,17 @@ pub async fn session_query(
 
     // Pass SQL as $1 so it's never interpolated into the shell command string
     let sql = req.sql.as_str();
-    let cmd = ["sh", "-c", "DUCKDB_QUERY=$1 python /opt/duckdb/query_api.py", "sh", sql];
-    let ap = AttachParams::default().stdout(true).stderr(true).stdin(false);
+    let cmd = [
+        "sh",
+        "-c",
+        "DUCKDB_QUERY=$1 python /opt/duckdb/query_api.py",
+        "sh",
+        sql,
+    ];
+    let ap = AttachParams::default()
+        .stdout(true)
+        .stderr(true)
+        .stdin(false);
 
     let mut proc = match pods.exec(&pod_name, cmd, &ap).await {
         Ok(p) => p,
@@ -327,5 +369,9 @@ fn parse_output(logs: &str) -> Result<Json<QueryResponse>, AppError> {
 
     let row_count = output["row_count"].as_u64().unwrap_or(rows.len() as u64) as usize;
 
-    Ok(Json(QueryResponse { columns, rows, row_count }))
+    Ok(Json(QueryResponse {
+        columns,
+        rows,
+        row_count,
+    }))
 }

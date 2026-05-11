@@ -66,6 +66,8 @@ spec:
                   key: DATABASE_URL
             - name: DAGSTER_BASE_URL
               value: "http://dagster-dagster-webserver.dagster.svc.cluster.local:80"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "redpanda-svc.redpanda.svc.cluster.local:9092"
             - name: RUST_LOG
               value: "info"
           readinessProbe:

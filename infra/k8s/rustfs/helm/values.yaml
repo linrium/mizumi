@@ -28,8 +28,8 @@ ingress:
 
 storageclass:
   # name: standard
-  dataStorageSize: 256Mi
-  logStorageSize: 256Mi
+  dataStorageSize: 512Mi
+  logStorageSize: 512Mi
 
 affinity:
   podAntiAffinity:
@@ -38,7 +38,7 @@ affinity:
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 512Mi
   limits:
     cpu: 500m
-    memory: 512Mi
+    memory: 1Gi

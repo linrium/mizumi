@@ -8,8 +8,8 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use k8s_openapi::api::core::v1::Pod;
-use kube::{Api, Client};
 use kube::api::{ApiResource, DeleteParams, DynamicObject, LogParams, PostParams};
+use kube::{Api, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -126,7 +126,11 @@ async fn get_k8s_status(client: &Client, name: &str, namespace: &str) -> Option<
         .and_then(|u| u.as_str())
         .map(String::from);
 
-    Some(K8sStatus { state, driver_pod, spark_ui_url })
+    Some(K8sStatus {
+        state,
+        driver_pod,
+        spark_ui_url,
+    })
 }
 
 fn build_spark_application(job: &StreamingJob) -> Value {
@@ -138,9 +142,12 @@ fn build_spark_application(job: &StreamingJob) -> Value {
         "spark.hadoop.fs.s3a.access.key": "rustfsadmin",
         "spark.hadoop.fs.s3a.secret.key": "rustfsadmin",
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
-        "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+        "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+        "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+        "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
     });
-    if let (Some(base), Some(overrides)) = (spark_conf.as_object_mut(), job.spark_conf.as_object()) {
+    if let (Some(base), Some(overrides)) = (spark_conf.as_object_mut(), job.spark_conf.as_object())
+    {
         base.extend(overrides.clone());
     }
 
@@ -193,8 +200,8 @@ fn build_spark_application(job: &StreamingJob) -> Value {
 
 async fn apply_spark_application(client: &Client, job: &StreamingJob) -> Result<(), AppError> {
     let manifest = build_spark_application(job);
-    let spark_obj: DynamicObject = serde_json::from_value(manifest)
-        .map_err(|e| AppError::Parse(e.to_string()))?;
+    let spark_obj: DynamicObject =
+        serde_json::from_value(manifest).map_err(|e| AppError::Parse(e.to_string()))?;
     let ar = spark_app_resource();
     let api: Api<DynamicObject> = Api::namespaced_with(client.clone(), &job.namespace, &ar);
     api.create(&PostParams::default(), &spark_obj).await?;
@@ -245,13 +252,25 @@ pub async fn create_streaming_job(
     .bind(req.namespace.as_deref().unwrap_or(DEFAULT_NAMESPACE))
     .bind(&req.image)
     .bind(&req.main_application_file)
-    .bind(req.spark_version.as_deref().unwrap_or(DEFAULT_SPARK_VERSION))
+    .bind(
+        req.spark_version
+            .as_deref()
+            .unwrap_or(DEFAULT_SPARK_VERSION),
+    )
     .bind(req.spark_conf.as_ref().unwrap_or(&json!({})))
     .bind(req.driver_cores.unwrap_or(1))
-    .bind(req.driver_memory.as_deref().unwrap_or(DEFAULT_DRIVER_MEMORY))
+    .bind(
+        req.driver_memory
+            .as_deref()
+            .unwrap_or(DEFAULT_DRIVER_MEMORY),
+    )
     .bind(req.executor_instances.unwrap_or(1))
     .bind(req.executor_cores.unwrap_or(1))
-    .bind(req.executor_memory.as_deref().unwrap_or(DEFAULT_EXECUTOR_MEMORY))
+    .bind(
+        req.executor_memory
+            .as_deref()
+            .unwrap_or(DEFAULT_EXECUTOR_MEMORY),
+    )
     .fetch_one(&state.db)
     .await
     {
@@ -299,19 +318,24 @@ pub async fn create_streaming_job(
     }
 
     tracing::info!(name = %job.name, namespace = %job.namespace, "streaming job created");
-    (StatusCode::CREATED, Json(StreamingJobResponse { job, k8s_status: None })).into_response()
+    (
+        StatusCode::CREATED,
+        Json(StreamingJobResponse {
+            job,
+            k8s_status: None,
+        }),
+    )
+        .into_response()
 }
 
 pub async fn get_streaming_job(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let job = match sqlx::query_as::<_, StreamingJob>(
-        "SELECT * FROM streaming_jobs WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await
+    let job = match sqlx::query_as::<_, StreamingJob>("SELECT * FROM streaming_jobs WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
     {
         Ok(Some(row)) => row,
         Ok(None) => return AppError::NotFound.into_response(),
@@ -330,12 +354,10 @@ pub async fn delete_streaming_job(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let job = match sqlx::query_as::<_, StreamingJob>(
-        "SELECT * FROM streaming_jobs WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await
+    let job = match sqlx::query_as::<_, StreamingJob>("SELECT * FROM streaming_jobs WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
     {
         Ok(Some(row)) => row,
         Ok(None) => return AppError::NotFound.into_response(),
@@ -344,8 +366,7 @@ pub async fn delete_streaming_job(
 
     if let Ok(client) = Client::try_default().await {
         let ar = spark_app_resource();
-        let api: Api<DynamicObject> =
-            Api::namespaced_with(client, &job.namespace, &ar);
+        let api: Api<DynamicObject> = Api::namespaced_with(client, &job.namespace, &ar);
         let _ = api.delete(&job.name, &DeleteParams::background()).await;
         tracing::info!(name = %job.name, "SparkApplication deleted");
     }
@@ -366,12 +387,10 @@ pub async fn get_streaming_job_logs(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let job = match sqlx::query_as::<_, StreamingJob>(
-        "SELECT * FROM streaming_jobs WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await
+    let job = match sqlx::query_as::<_, StreamingJob>("SELECT * FROM streaming_jobs WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
     {
         Ok(Some(row)) => row,
         Ok(None) => return AppError::NotFound.into_response(),
@@ -387,15 +406,13 @@ pub async fn get_streaming_job_logs(
         Some(s) => s,
         None => {
             return AppError::QueryFailed("SparkApplication not found in K8s".into())
-                .into_response()
+                .into_response();
         }
     };
 
     let pod_name = match status.driver_pod {
         Some(p) => p,
-        None => {
-            return AppError::QueryFailed("driver pod not yet assigned".into()).into_response()
-        }
+        None => return AppError::QueryFailed("driver pod not yet assigned".into()).into_response(),
     };
 
     let pods: Api<Pod> = Api::namespaced(client, &job.namespace);
@@ -420,12 +437,10 @@ pub async fn restart_streaming_job(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    let job = match sqlx::query_as::<_, StreamingJob>(
-        "SELECT * FROM streaming_jobs WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_optional(&state.db)
-    .await
+    let job = match sqlx::query_as::<_, StreamingJob>("SELECT * FROM streaming_jobs WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
     {
         Ok(Some(row)) => row,
         Ok(None) => return AppError::NotFound.into_response(),
