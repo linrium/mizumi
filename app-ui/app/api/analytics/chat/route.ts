@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       inputSchema: z.object({
         sql: z.string().describe('SQL query whose result will be charted'),
         title: z.string().describe('Short chart title'),
-        chartType: z.enum(['bar', 'line', 'pie']).describe('bar → categories, line → time-series, pie → proportions ≤8 slices'),
+        chartType: z.enum(['bar', 'line', 'area', 'pie', 'scatter']).describe('bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns'),
         x: z.string().describe('Column name for x-axis labels'),
         y: z.string().describe('Column name for numeric values'),
         explanation: z.string().describe('One sentence describing what this chart shows'),

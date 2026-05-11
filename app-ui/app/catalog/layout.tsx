@@ -113,12 +113,12 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                   type="button"
                   onClick={() => handleCatalog(cat.name)}
                   className={cn(
-                    'flex w-full items-center gap-1.5 pl-2 pr-3 py-1 text-xs hover:bg-accent/50 transition-colors text-left',
+                    'flex w-full items-center gap-1.5 pl-2 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left',
                     catActive && 'bg-accent text-accent-foreground font-medium',
                   )}
                 >
                   <Chevron open={catOpen} />
-                  <HugeiconsIcon icon={Book03Icon} size={13} className="shrink-0 text-muted-foreground" />
+                  <HugeiconsIcon icon={Book03Icon} size={15} className="shrink-0 text-muted-foreground" />
                   <span className="truncate flex-1">{cat.name}</span>
                 </button>
 
@@ -134,12 +134,12 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                         type="button"
                         onClick={() => handleSchema(cat.name, sch.name)}
                         className={cn(
-                          'flex w-full items-center gap-1.5 pl-6 pr-3 py-1 text-xs hover:bg-accent/50 transition-colors text-left',
+                          'flex w-full items-center gap-1.5 pl-6 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left',
                           schActive && 'bg-accent text-accent-foreground font-medium',
                         )}
                       >
                         <Chevron open={schOpen} />
-                        <HugeiconsIcon icon={DatabaseIcon} size={13} className="shrink-0 text-muted-foreground" />
+                        <HugeiconsIcon icon={DatabaseIcon} size={15} className="shrink-0 text-muted-foreground" />
                         <span className="truncate flex-1">{sch.name}</span>
                       </button>
 
@@ -152,11 +152,11 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                             type="button"
                             onClick={() => handleTable(cat.name, sch.name, tbl.name)}
                             className={cn(
-                              'flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-xs hover:bg-accent/50 transition-colors text-left',
+                              'flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left',
                               tblActive && 'bg-accent text-accent-foreground font-medium',
                             )}
                           >
-                            <HugeiconsIcon icon={TableIcon} size={13} className="shrink-0 text-muted-foreground" />
+                            <HugeiconsIcon icon={TableIcon} size={15} className="shrink-0 text-muted-foreground" />
                             <span className="truncate">{tbl.name}</span>
                           </button>
                         )

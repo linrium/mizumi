@@ -37,7 +37,7 @@ type RunQueryOutput = {
 type VisualizeChartOutput = {
   sql: string
   title: string
-  chartType: 'bar' | 'line' | 'pie'
+  chartType: 'bar' | 'line' | 'area' | 'pie' | 'scatter'
   x: string
   y: string
   explanation: string
@@ -137,7 +137,7 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 // ── VisualizationCard ─────────────────────────────────────────────────────────
 
 function buildEChartsOption(
-  chartType: 'bar' | 'line' | 'pie',
+  chartType: 'bar' | 'line' | 'area' | 'pie' | 'scatter',
   keys: string[],
   values: number[],
   title: string,
@@ -155,6 +155,15 @@ function buildEChartsOption(
       }],
     }
   }
+  if (chartType === 'scatter') {
+    return {
+      tooltip: { trigger: 'axis' },
+      grid: { left: 48, right: 16, top: 16, bottom: 40, containLabel: false },
+      xAxis: { type: 'category', data: keys, axisLabel: { fontSize: 11, rotate: keys.length > 6 ? 30 : 0 } },
+      yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+      series: [{ data: values, type: 'scatter', symbolSize: 10 }],
+    }
+  }
   return {
     tooltip: { trigger: 'axis' },
     grid: { left: 48, right: 16, top: 16, bottom: 40, containLabel: false },
@@ -162,9 +171,9 @@ function buildEChartsOption(
     yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
     series: [{
       data: values,
-      type: chartType,
-      smooth: chartType === 'line',
-      areaStyle: chartType === 'line' ? { opacity: 0.15 } : undefined,
+      type: chartType === 'area' ? 'line' : chartType,
+      smooth: chartType === 'line' || chartType === 'area',
+      areaStyle: chartType === 'area' ? { opacity: 0.18 } : undefined,
     }],
   }
 }
@@ -434,7 +443,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
         ) : (
-          <div className="py-4 space-y-1">
+          <div className="py-4 space-y-1 max-w-3xl mx-auto w-full">
             {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
 
             {isLoading && messages.at(-1)?.role === 'user' && (
@@ -449,41 +458,45 @@ export default function AnalyticsPage() {
       </div>
 
       {/* ── Composer ── */}
-      <div className="shrink-0 border-t px-4 py-3 space-y-2">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about your data… (Enter to send, Shift+Enter for new line)"
-          rows={2}
-          disabled={isLoading}
-          className="w-full resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground disabled:opacity-50"
-        />
-        <div className="flex items-center justify-end gap-2">
-          <Select value={modelId} onValueChange={(v) => setModelId(v as ModelId)}>
-            <SelectTrigger className="h-7 w-36 text-xs px-2 gap-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MODELS.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="shrink-0 py-4">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="rounded-2xl border bg-background">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about your data… (Enter to send, Shift+Enter for new line)"
+              rows={2}
+              disabled={isLoading}
+              className="w-full resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground disabled:opacity-50 px-4 pt-3 pb-2"
+            />
+            <div className="flex items-center justify-between px-3 pb-2.5">
+              <Select value={modelId} onValueChange={(v) => setModelId(v as ModelId)}>
+                <SelectTrigger className="h-7 w-36 text-xs px-2 gap-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODELS.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <Button
-            size="sm"
-            disabled={isLoading || !input.trim()}
-            onClick={handleSend}
-            className="h-7 px-3 text-xs"
-          >
-            {isLoading
-              ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
-              : 'Send'}
-          </Button>
+              <Button
+                size="sm"
+                disabled={isLoading || !input.trim()}
+                onClick={handleSend}
+                className="h-7 px-3 text-xs"
+              >
+                {isLoading
+                  ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
+                  : 'Send'}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

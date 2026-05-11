@@ -13,7 +13,7 @@ import { useDataGrid } from '@/hooks/use-data-grid'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, getToolName, isToolUIPart } from 'ai'
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
-import { HugeiconsIcon } from '@hugeicons/react'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import {
   Add01Icon,
   Cancel01Icon,
@@ -28,6 +28,10 @@ import {
   CheckmarkCircle01Icon,
   Refresh01Icon,
   ChartColumnIcon,
+  ChartLineData01Icon,
+  ChartAreaIcon,
+  PieChart01Icon,
+  ChartScatterIcon,
   SparklesIcon,
   ArrowUp01Icon,
 } from '@hugeicons/core-free-icons'
@@ -267,6 +271,16 @@ function PanelCard({ panel, data, editing, selected, onClick, onDelete }: {
   )
 }
 
+// ── Chart type config ─────────────────────────────────────────────────────────
+
+const CHART_TYPE_CONFIG: Record<ChartType, { label: string; icon: IconSvgElement }> = {
+  bar:     { label: 'Bar',        icon: ChartColumnIcon },
+  line:    { label: 'Line',       icon: ChartLineData01Icon },
+  area:    { label: 'Area',       icon: ChartAreaIcon },
+  pie:     { label: 'Pie / Donut', icon: PieChart01Icon },
+  scatter: { label: 'Scatter',    icon: ChartScatterIcon },
+}
+
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
 
 function PanelSidebar({ panel, data, sessionId, onChange, onRun }: {
@@ -308,13 +322,18 @@ function PanelSidebar({ panel, data, sessionId, onChange, onRun }: {
         <div className="grid gap-1.5">
           <Label htmlFor={`${uid}-type`} className="text-xs text-muted-foreground">Chart Type</Label>
           <Select value={panel.chartType} onValueChange={(v) => onChange({ ...panel, chartType: v as ChartType })}>
-            <SelectTrigger id={`${uid}-type`} className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger id={`${uid}-type`} className="h-7 text-xs w-full">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="bar">Bar</SelectItem>
-              <SelectItem value="line">Line</SelectItem>
-              <SelectItem value="area">Area</SelectItem>
-              <SelectItem value="pie">Pie / Donut</SelectItem>
-              <SelectItem value="scatter">Scatter</SelectItem>
+              {(Object.keys(CHART_TYPE_CONFIG) as ChartType[]).map((type) => (
+                <SelectItem key={type} value={type} textValue={CHART_TYPE_CONFIG[type].label}>
+                  <div className="flex items-center gap-1.5">
+                    <HugeiconsIcon icon={CHART_TYPE_CONFIG[type].icon} size={12} className="shrink-0" />
+                    {CHART_TYPE_CONFIG[type].label}
+                  </div>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -322,22 +341,22 @@ function PanelSidebar({ panel, data, sessionId, onChange, onRun }: {
           <Label htmlFor={`${uid}-xcol`} className="text-xs text-muted-foreground">X Column</Label>
           {columns.length > 0 ? (
             <Select value={panel.xCol} onValueChange={(v) => onChange({ ...panel, xCol: v })}>
-              <SelectTrigger id={`${uid}-xcol`} className="h-7 text-xs"><SelectValue placeholder="Select column" /></SelectTrigger>
+              <SelectTrigger id={`${uid}-xcol`} className="h-7 text-xs w-full"><SelectValue placeholder="Select column" /></SelectTrigger>
               <SelectContent>{columns.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
             </Select>
           ) : (
-            <Input id={`${uid}-xcol`} value={panel.xCol} onChange={(e) => onChange({ ...panel, xCol: e.target.value })} placeholder="column name" className="h-7 text-xs font-mono" />
+            <Input id={`${uid}-xcol`} value={panel.xCol} onChange={(e) => onChange({ ...panel, xCol: e.target.value })} placeholder="column name" className="h-7 text-xs font-mono w-full" />
           )}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor={`${uid}-ycol`} className="text-xs text-muted-foreground">Y Column</Label>
           {columns.length > 0 ? (
             <Select value={panel.yCol} onValueChange={(v) => onChange({ ...panel, yCol: v })}>
-              <SelectTrigger id={`${uid}-ycol`} className="h-7 text-xs"><SelectValue placeholder="Select column" /></SelectTrigger>
+              <SelectTrigger id={`${uid}-ycol`} className="h-7 text-xs w-full"><SelectValue placeholder="Select column" /></SelectTrigger>
               <SelectContent>{columns.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
             </Select>
           ) : (
-            <Input id={`${uid}-ycol`} value={panel.yCol} onChange={(e) => onChange({ ...panel, yCol: e.target.value })} placeholder="column name" className="h-7 text-xs font-mono" />
+            <Input id={`${uid}-ycol`} value={panel.yCol} onChange={(e) => onChange({ ...panel, yCol: e.target.value })} placeholder="column name" className="h-7 text-xs font-mono w-full" />
           )}
         </div>
       </div>
@@ -480,14 +499,14 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
       <div className="flex-1 min-h-0 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="p-3 flex flex-col gap-2">
-            <p className="text-[11px] text-muted-foreground">Ask about your data and AI will generate dashboard panels.</p>
+            <p className="text-xs text-muted-foreground">Ask about your data and AI will generate dashboard panels.</p>
             <div className="flex flex-col gap-1.5 mt-1">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => { setInput(s); textareaRef.current?.focus() }}
-                  className="text-left text-[11px] px-2.5 py-1.5 rounded border hover:bg-accent transition-colors text-foreground/80"
+                  className="text-left text-xs px-2.5 py-1.5 rounded border hover:bg-accent transition-colors text-foreground/80"
                 >
                   {s}
                 </button>
@@ -498,7 +517,7 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
           <div className="py-2 space-y-0.5">
             {messages.map((msg) => <ComposerMessage key={msg.id} message={msg} />)}
             {isLoading && messages.at(-1)?.role === 'user' && (
-              <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
                 <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
                 Generating panels…
               </div>
@@ -517,11 +536,11 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
           onKeyDown={handleKeyDown}
           placeholder="Ask about revenue, trends, customers…"
           rows={3}
-          className="w-full resize-none text-[11px] rounded-md border bg-background px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+          className="w-full resize-none text-xs rounded-md border bg-background px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
         />
         <div className="flex items-center gap-2">
           <Select value={modelId} onValueChange={(v) => onModelChange(v as ModelId)}>
-            <SelectTrigger className="h-7 text-[11px] flex-1 border-0 shadow-none bg-transparent px-1">
+            <SelectTrigger className="h-7 text-xs flex-1 shadow-none bg-transparent px-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -553,7 +572,7 @@ function ComposerMessage({ message }: { message: UIMessage }) {
     const text = message.parts.find((p) => p.type === 'text')?.text ?? ''
     return (
       <div className="px-3 py-1.5 flex justify-end">
-        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary text-primary-foreground px-3 py-1.5 text-[11px] whitespace-pre-wrap">
+        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs whitespace-pre-wrap">
           {text}
         </div>
       </div>
@@ -574,7 +593,7 @@ function ComposerMessage({ message }: { message: UIMessage }) {
 function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
   if (part.type === 'text') {
     if (!part.text.trim()) return null
-    return <p className="text-[11px] whitespace-pre-wrap leading-relaxed text-foreground/90">{part.text}</p>
+    return <p className="text-xs whitespace-pre-wrap leading-relaxed text-foreground/90">{part.text}</p>
   }
 
   if (isToolUIPart(part)) {
@@ -584,7 +603,7 @@ function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITool
       if (part.state === 'input-streaming' || part.state === 'input-available') {
         const inp = part.input as { title?: string } | undefined
         return (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
             <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin shrink-0" />
             {inp?.title ? `Creating: ${inp.title}` : 'Creating panel…'}
           </div>
@@ -592,9 +611,9 @@ function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITool
       }
       if (part.state === 'output-available') {
         const out = part.output as CreatePanelOutput
-        if (out.error) return <div className="text-[11px] text-destructive py-0.5">Failed to create "{out.title}": {out.error}</div>
+        if (out.error) return <div className="text-xs text-destructive py-0.5">Failed to create "{out.title}": {out.error}</div>
         return (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
             <HugeiconsIcon icon={Chart01Icon} size={11} className="text-primary shrink-0" />
             <span>Added <strong className="text-foreground">{out.title}</strong></span>
             <span className="ml-auto">{out.row_count ?? 0} rows</span>
@@ -607,7 +626,7 @@ function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITool
       if (part.state === 'input-streaming' || part.state === 'input-available') {
         const inp = part.input as { title?: string } | undefined
         return (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
             <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin shrink-0" />
             {inp?.title ? `Editing: ${inp.title}` : 'Editing panel…'}
           </div>
@@ -615,9 +634,9 @@ function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITool
       }
       if (part.state === 'output-available') {
         const out = part.output as EditPanelOutput
-        if (out.error) return <div className="text-[11px] text-destructive py-0.5">Failed to edit "{out.title}": {out.error}</div>
+        if (out.error) return <div className="text-xs text-destructive py-0.5">Failed to edit "{out.title}": {out.error}</div>
         return (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
             <HugeiconsIcon icon={Edit02Icon} size={11} className="text-primary shrink-0" />
             <span>Updated <strong className="text-foreground">{out.title}</strong></span>
             <span className="ml-auto">{out.row_count ?? 0} rows</span>
