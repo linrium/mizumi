@@ -11,6 +11,13 @@ spec:
         - name: duckdb-query
           image: mizumi-duckdb:1.1.3
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           command: ["python", "/opt/duckdb/query_rustfs.py"]
           env:
             - name: AWS_DEFAULT_REGION

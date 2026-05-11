@@ -226,10 +226,18 @@ unitycatalog-image-build:
     fi
 
 unitycatalog-ui-image-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmpdir=$(mktemp -d)
+    trap "rm -rf $tmpdir" EXIT
+    git clone --depth 1 --branch v0.4.0 --filter=blob:none --sparse \
+      https://github.com/unitycatalog/unitycatalog.git "$tmpdir"
+    git -C "$tmpdir" sparse-checkout set ui
+    cp packages/unitycatalog-ui/Dockerfile "$tmpdir/ui/Dockerfile"
     docker build \
       --build-arg PROXY_HOST=unitycatalog-svc \
       -t {{unitycatalog_ui_image}} \
-      "https://github.com/unitycatalog/unitycatalog.git#v0.4.0:ui"
+      "$tmpdir/ui"
     if kubectl get deployment/unitycatalog-ui -n {{unitycatalog_namespace}} &>/dev/null; then \
       kubectl rollout restart deployment/unitycatalog-ui -n {{unitycatalog_namespace}}; \
       kubectl rollout status deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=120s; \

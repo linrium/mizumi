@@ -2,17 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
-import type { DynamicToolUIPart, UIMessage } from 'ai'
+import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
+import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
 import { BarChart, LineChart, PieChart } from 'reaviz'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { DataGrid } from '@/components/data-grid/data-grid'
 import { useDataGrid } from '@/hooks/use-data-grid'
 import { useSessions } from '@/hooks/use-sessions'
 import { cn } from '@/lib/utils'
+import { MODELS } from '@/app/api/analytics/chat/route'
+import type { ModelId } from '@/app/api/analytics/chat/route'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,10 +30,10 @@ type Visualization = { type: 'bar' | 'line' | 'pie' | 'table'; x: string; y: str
 type RunQueryOutput = {
   sql: string
   explanation: string
+  visualization?: Visualization
   columns?: string[]
   rows?: unknown[][]
   row_count?: number
-  visualization?: Visualization
   error?: string
 }
 
@@ -77,7 +86,9 @@ function ChartView({ queryResult, vis }: { queryResult: QueryResponse; vis: Visu
     const xi = queryResult.columns.indexOf(vis.x)
     const yi = queryResult.columns.indexOf(vis.y)
     if (xi === -1 || yi === -1) return []
-    return queryResult.rows.map((r) => ({ key: String(r[xi] ?? ''), data: Number(r[yi] ?? 0) }))
+    return queryResult.rows
+      .map((r) => ({ key: String(r[xi] ?? ''), data: parseFloat(String(r[yi] ?? '0')) }))
+      .filter((d) => isFinite(d.data))
   }, [queryResult, vis])
 
   if (chartData.length === 0) {
@@ -99,16 +110,15 @@ function ChartView({ queryResult, vis }: { queryResult: QueryResponse; vis: Visu
 function QueryResultCard({ output }: { output: RunQueryOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
   const hasVis = output.visualization && output.visualization.type !== 'table'
-  const [tab, setTab] = useState<'chart' | 'data'>(hasVis ? 'chart' : 'data')
+  const [tab, setTab] = useState<'chart' | 'data'>('data')
 
   const queryResult: QueryResponse | null =
     output.columns && output.rows
-      ? { columns: output.columns, rows: output.rows, row_count: output.row_count ?? 0 }
+      ? { columns: output.columns, rows: output.rows, row_count: output.row_count ?? output.rows.length }
       : null
 
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
-      {/* SQL toggle */}
       <button
         type="button"
         onClick={() => setSqlOpen((v) => !v)}
@@ -136,7 +146,6 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 
       {queryResult && (
         <>
-          {/* Tab bar */}
           <div className="flex items-center border-b px-1">
             {(hasVis ? ['chart', 'data'] as const : ['data'] as const).map((t) => (
               <button
@@ -171,8 +180,8 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 
 // ── Tool part renderer ────────────────────────────────────────────────────────
 
-function ToolPart({ part }: { part: DynamicToolUIPart }) {
-  if (part.toolName !== 'runQuery') return null
+function ToolPart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
+  if (!isToolUIPart(part) || getToolName(part) !== 'runQuery') return null
 
   if (part.state === 'input-streaming' || part.state === 'input-available') {
     const input = part.input as { explanation?: string } | undefined
@@ -226,7 +235,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
             </p>
           )
         }
-        if (part.type === 'dynamic-tool') {
+        if (isToolUIPart(part)) {
           return <ToolPart key={i} part={part} />
         }
         return null
@@ -246,26 +255,28 @@ const SUGGESTIONS = [
 
 export default function AnalyticsPage() {
   const [input, setInput] = useState('')
+  const [modelId, setModelId] = useState<ModelId>('gpt-5.4-mini')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const modelIdRef = useRef<ModelId>(modelId)
 
   const { sessions, activeId, setActiveId, creating, fetchSessions, createSession } = useSessions()
 
   useEffect(() => { fetchSessions() }, [fetchSessions])
 
-  // Keep ref in sync so the transport closure always reads the latest value
   useEffect(() => {
     const id = activeId ?? sessions[0]?.session_id ?? null
     sessionIdRef.current = id
     if (!activeId && sessions[0]) setActiveId(sessions[0].session_id)
   }, [activeId, sessions, setActiveId])
 
-  // Transport created once; reads sessionIdRef dynamically on each request
+  useEffect(() => { modelIdRef.current = modelId }, [modelId])
+
   const transport = useMemo(
     () => new DefaultChatTransport({
       api: '/api/analytics/chat',
-      body: () => ({ sessionId: sessionIdRef.current }),
+      body: () => ({ sessionId: sessionIdRef.current, modelId: modelIdRef.current }),
     }),
     [],
   )
@@ -274,7 +285,6 @@ export default function AnalyticsPage() {
 
   const isLoading = status === 'submitted' || status === 'streaming'
 
-  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -284,7 +294,6 @@ export default function AnalyticsPage() {
     if (!text || isLoading) return
     setInput('')
 
-    // Ensure session exists
     if (!sessionIdRef.current) {
       const s = await createSession()
       sessionIdRef.current = s?.session_id ?? null
@@ -327,7 +336,6 @@ export default function AnalyticsPage() {
           <div className="py-4 space-y-1">
             {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
 
-            {/* Thinking indicator while waiting for the first chunk */}
             {isLoading && messages.at(-1)?.role === 'user' && (
               <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-muted-foreground">
                 <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
@@ -365,16 +373,32 @@ export default function AnalyticsPage() {
               </span>
             )}
           </div>
-          <Button
-            size="sm"
-            disabled={isLoading || !input.trim()}
-            onClick={handleSend}
-            className="h-7 px-3 text-xs"
-          >
-            {isLoading
-              ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
-              : 'Send'}
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <Select value={modelId} onValueChange={(v) => setModelId(v as ModelId)}>
+              <SelectTrigger className="h-7 w-36 text-xs px-2 gap-1.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MODELS.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              disabled={isLoading || !input.trim()}
+              onClick={handleSend}
+              className="h-7 px-3 text-xs"
+            >
+              {isLoading
+                ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
+                : 'Send'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

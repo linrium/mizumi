@@ -12,6 +12,13 @@ spec:
       initContainers:
         - name: cleanup-warehouse
           image: minio/mc:latest
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           command:
             - /bin/sh
             - -ec
@@ -26,6 +33,13 @@ spec:
         - name: submit
           image: mizumi-spark-rustfs:4.1.1
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: 500m
+              memory: 2Gi
           env:
             - name: JAVA_TOOL_OPTIONS
               value: >-

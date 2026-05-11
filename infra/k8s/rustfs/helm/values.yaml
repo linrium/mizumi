@@ -27,10 +27,18 @@ ingress:
   enabled: false
 
 storageclass:
-  name: local-path
+  name: standard
   dataStorageSize: 256Mi
   logStorageSize: 256Mi
 
 affinity:
   podAntiAffinity:
     enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

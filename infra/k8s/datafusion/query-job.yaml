@@ -11,6 +11,13 @@ spec:
         - name: datafusion-query
           image: mizumi-datafusion:50.1.0
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           command: ["python", "/opt/datafusion/query_rustfs.py"]
           env:
             - name: AWS_DEFAULT_REGION

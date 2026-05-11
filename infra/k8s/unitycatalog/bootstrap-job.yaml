@@ -11,6 +11,13 @@ spec:
       initContainers:
         - name: create-bucket
           image: minio/mc:latest
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           command:
             - /bin/sh
             - -ec
@@ -22,6 +29,13 @@ spec:
       containers:
         - name: bootstrap
           image: python:3.11-alpine
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           command:
             - sh
             - -c

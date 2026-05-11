@@ -17,7 +17,7 @@ fn client() -> &'static reqwest::Client {
 
 fn dagster_graphql_url() -> String {
     std::env::var("DAGSTER_BASE_URL").unwrap_or_else(|_| {
-        "http://dagster-dagster-webserver.dagster.svc.cluster.local:80".to_string()
+        "http://localhost:8080".to_string()
     }) + "/graphql"
 }
 

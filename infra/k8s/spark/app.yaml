@@ -24,14 +24,14 @@ spec:
   driver:
     serviceAccount: spark-operator-spark
     cores: 1
-    memory: 1g
+    memory: 512m
     labels:
       app: rustfs-medallion
       version: 4.1.1
   executor:
     instances: 1
     cores: 1
-    memory: 1g
+    memory: 512m
     labels:
       app: rustfs-medallion
       version: 4.1.1

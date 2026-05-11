@@ -98,7 +98,16 @@ export function SqlEditor() {
       setResult(null)
       startRef.current = Date.now()
       try {
-        const url = activeId ? `/api/sessions/${activeId}/query` : '/api/query'
+        let sessionId = activeId
+        if (!sessionId) {
+          const session = await createSession()
+          if (!session) {
+            setResult({ ok: false, error: 'Failed to create session' })
+            return
+          }
+          sessionId = session.session_id
+        }
+        const url = `/api/sessions/${sessionId}/query`
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

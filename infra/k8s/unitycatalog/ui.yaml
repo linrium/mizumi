@@ -17,6 +17,13 @@ spec:
         - name: unitycatalog-ui
           image: mizumi-unitycatalog-ui:v0.4.0
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 200m
+              memory: 1Gi
           ports:
             - containerPort: 3000
           env:

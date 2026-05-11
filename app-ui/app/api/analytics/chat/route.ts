@@ -1,10 +1,19 @@
 import { deepseek } from '@ai-sdk/deepseek'
+import { createOpenAI } from '@ai-sdk/openai'
+import { createOllama } from 'ollama-ai-provider-v2'
 import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
+import type { LanguageModel } from 'ai'
 
 const UC_BASE = process.env.UC_BASE_URL ?? 'http://localhost:8082/api/2.1/unity-catalog'
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:3000'
+
+const ollama = createOllama({ baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/api' })
+const openai = createOpenAI({
+  baseURL: process.env.OPENAI_BASE_URL,
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 type ColumnInfo = { name: string; type_text: string }
 type TableDetail = { name: string; columns: ColumnInfo[] }
@@ -34,6 +43,20 @@ async function fetchSchema(): Promise<string> {
     .join('\n\n')
 }
 
+export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.6:27b'
+
+export const MODELS: { id: ModelId; label: string }[] = [
+  { id: 'deepseek-chat', label: 'DeepSeek Chat' },
+  { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+  { id: 'qwen3.6:27b', label: 'Qwen 3.6 27B' },
+]
+
+function resolveModel(modelId: ModelId): LanguageModel {
+  if (modelId === 'gpt-5.4-mini') return openai('gpt-5.4-mini')
+  if (modelId === 'qwen3.6:27b') return ollama('qwen3.6:27b')
+  return deepseek('deepseek-chat')
+}
+
 const runQueryParameters = z.object({
   sql: z.string().describe('The SQL query to execute'),
   explanation: z.string().describe('One sentence describing what this query returns'),
@@ -48,8 +71,9 @@ const runQueryParameters = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { messages, sessionId } = await req.json()
+  const { messages, sessionId, modelId } = await req.json()
 
+  const model = resolveModel((modelId as ModelId) ?? 'gpt-5.4-mini')
   const schema = await fetchSchema().catch(() => '(schema unavailable)')
 
   const tools = {
@@ -59,31 +83,26 @@ export async function POST(req: NextRequest) {
       inputSchema: runQueryParameters,
       execute: async ({ sql, explanation, visualization }) => {
         try {
-          console.log('sessionId', sessionId)
           const url = sessionId
             ? `${API_BASE}/api/sessions/${sessionId}/query`
             : `${API_BASE}/api/query`
-          console.log('sql', sql)
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sql }),
           })
-          console.log("res", res)
           const data = await res.json()
-          console.log(data)
           if (!res.ok) return { error: data.error ?? `HTTP ${res.status}`, sql, explanation }
           return {
             sql,
             explanation,
+            visualization,
             columns: data.columns as string[],
             rows: data.rows as unknown[][],
             row_count: data.row_count as number,
-            visualization,
           }
         } catch (e) {
           const msg = (e as Error).message
-          console.error('Query API unreachable:', msg)
           return { error: `Query API unreachable: ${msg}`, sql, explanation }
         }
       },
@@ -91,7 +110,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = streamText({
-    model: deepseek('deepseek-chat'),
+    model,
     system: `You are a data analyst for the Mizumi lakehouse platform. You have one tool: runQuery.
 
 ## WHEN TO CALL runQuery — call it immediately, without preamble, when the user:
@@ -119,7 +138,9 @@ ${schema}
 ## Visualization hints:
 - "bar" → categories, "line" → time-series, "pie" → proportions ≤8 slices, "table" → multi-column
 
-After a successful query, briefly interpret the results in 1–2 sentences.`,
+## After a successful query — CRITICAL:
+- NEVER render data as a markdown table or list. The UI already shows the full results in a data grid.
+- Only write 1–2 sentences interpreting the results (e.g. trends, notable values).`,
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: stepCountIs(10),

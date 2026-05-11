@@ -18,7 +18,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: data-pv-claim
 spec:
-  storageClassName: manual
+  storageClassName: standard
   accessModes:
     - ReadWriteOnce
   resources:
