@@ -7,7 +7,7 @@ import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
 import ReactECharts from 'echarts-for-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons'
+import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon, DatabaseIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -171,6 +171,7 @@ function buildEChartsOption(
 
 function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
+  const [tab, setTab] = useState<'chart' | 'data'>('chart')
 
   const { keys, values } = useMemo(() => {
     if (!output.columns || !output.rows) return { keys: [], values: [] }
@@ -188,8 +189,16 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
     [output.chartType, output.title, keys, values],
   )
 
+  const queryResult: QueryResponse | null = useMemo(() =>
+    output.columns && output.rows
+      ? { columns: output.columns, rows: output.rows, row_count: output.rows.length }
+      : null,
+    [output.columns, output.rows],
+  )
+
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
         <HugeiconsIcon icon={Chart01Icon} size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1 truncate">{output.title}</span>
@@ -213,14 +222,44 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
         <div className="px-3 py-2 text-destructive font-mono">{output.error}</div>
       )}
 
-      {keys.length === 0 && !output.error && (
-        <div className="py-6 text-center text-muted-foreground">
-          Cannot map &quot;{output.x}&quot; / &quot;{output.y}&quot; to chart axes
-        </div>
-      )}
+      {!output.error && (
+        <>
+          {/* Tab bar */}
+          <div className="flex items-center border-b px-1">
+            {(['chart', 'data'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1.5 font-medium border-b-2 -mb-px capitalize transition-colors',
+                  tab === t
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <HugeiconsIcon icon={t === 'chart' ? Chart01Icon : DatabaseIcon} size={11} />
+                {t}
+              </button>
+            ))}
+            {queryResult && (
+              <>
+                <div className="flex-1" />
+                <span className="pr-2 text-muted-foreground text-[11px]">
+                  {queryResult.row_count} {queryResult.row_count === 1 ? 'row' : 'rows'}
+                </span>
+              </>
+            )}
+          </div>
 
-      {keys.length > 0 && (
-        <ReactECharts option={option} style={{ height: 260 }} opts={{ renderer: 'svg' }} />
+          {tab === 'chart' && (
+            keys.length === 0
+              ? <div className="py-6 text-center text-muted-foreground">Cannot map &quot;{output.x}&quot; / &quot;{output.y}&quot; to chart axes</div>
+              : <ReactECharts option={option} style={{ height: 260 }} opts={{ renderer: 'svg' }} />
+          )}
+
+          {tab === 'data' && queryResult && <ResultsGrid queryResult={queryResult} />}
+        </>
       )}
 
       {output.explanation && (
