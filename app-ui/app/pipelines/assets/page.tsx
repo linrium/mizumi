@@ -13,6 +13,8 @@ import { toast } from 'sonner'
 
 type LastMaterialization = { timestamp: string; run_id: string }
 
+type RunTag = { key: string; value: string }
+
 type AssetNode = {
   path: string[]
   compute_kind: string | null
@@ -24,7 +26,14 @@ type AssetNode = {
   dependency_keys: string[][]
   depended_by_keys: string[][]
   stale_status: string | null
+  tags: RunTag[]
   last_materialization: LastMaterialization | null
+}
+
+function extractKinds(tags: RunTag[]): string[] {
+  return tags
+    .filter((t) => t.key.startsWith('dagster/kind/'))
+    .map((t) => t.key.replace('dagster/kind/', ''))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,18 +126,31 @@ const COLUMNS: ColumnDef<AssetNode>[] = [
       </Link>
     ),
   },
-  { id: 'group',  header: 'Group',        accessorFn: (n) => n.group_name ?? '—' },
-  { id: 'kind',   header: 'Kind',         accessorFn: (n) => n.compute_kind ?? '—' },
+  { id: 'group', header: 'Group', accessorFn: (n) => n.group_name ?? '—' },
+  {
+    id: 'kind',
+    header: 'Kind',
+    cell: ({ row }) => {
+      const kinds = extractKinds(row.original.tags)
+      if (kinds.length === 0) return <span className="text-muted-foreground">—</span>
+      return (
+        <div className="flex flex-wrap gap-1">
+          {kinds.map((k) => (
+            <Badge key={k} variant="outline" className="capitalize">{k}</Badge>
+          ))}
+        </div>
+      )
+    },
+  },
   {
     id: 'status',
     header: 'Stale Status',
     cell: ({ row }) => <StaleStatusBadge status={row.original.stale_status} />,
   },
   { id: 'last_mat',   header: 'Last Materialized', accessorFn: (n) => fmtTimestamp(n.last_materialization?.timestamp) },
-  { id: 'upstream',   header: 'Upstream',           accessorFn: (n) => n.dependency_keys.length || '—' },
-  { id: 'downstream', header: 'Downstream',         accessorFn: (n) => n.depended_by_keys.length || '—' },
-  { id: 'jobs',       header: 'Jobs',               accessorFn: (n) => n.job_names.join(', ') || '—' },
-  { id: 'actions',    header: '',                   cell: ({ row }) => <MaterializeButton path={row.original.path} /> },
+  { id: 'upstream',   header: 'Upstream',   accessorFn: (n) => n.dependency_keys.length || '—' },
+  { id: 'downstream', header: 'Downstream', accessorFn: (n) => n.depended_by_keys.length || '—' },
+  { id: 'actions',    header: '',           cell: ({ row }) => <MaterializeButton path={row.original.path} /> },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────

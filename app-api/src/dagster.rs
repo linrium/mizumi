@@ -156,6 +156,7 @@ query {
     dependencyKeys { path }
     dependedByKeys { path }
     staleStatus
+    tags { key value }
     assetMaterializations(limit: 1) {
       timestamp
       runId
@@ -250,6 +251,8 @@ struct GqlAssetNode {
     depended_by_keys: Vec<GqlAssetKey>,
     #[serde(rename = "staleStatus")]
     stale_status: Option<String>,
+    #[serde(default)]
+    tags: Vec<RunTag>,
     #[serde(rename = "assetMaterializations")]
     asset_materializations: Vec<GqlLastMaterialization>,
 }
@@ -358,6 +361,7 @@ pub struct AssetNode {
     pub dependency_keys: Vec<Vec<String>>,
     pub depended_by_keys: Vec<Vec<String>>,
     pub stale_status: Option<String>,
+    pub tags: Vec<RunTag>,
     pub last_materialization: Option<LastMaterialization>,
 }
 
@@ -495,6 +499,7 @@ pub async fn list_asset_nodes() -> impl IntoResponse {
                     dependency_keys: n.dependency_keys.into_iter().map(|k| k.path).collect(),
                     depended_by_keys: n.depended_by_keys.into_iter().map(|k| k.path).collect(),
                     stale_status: n.stale_status,
+                    tags: n.tags,
                     last_materialization: n.asset_materializations.into_iter().next().map(|m| {
                         LastMaterialization { timestamp: m.timestamp, run_id: m.run_id }
                     }),
@@ -523,6 +528,7 @@ query ListRuns($filter: RunsFilter, $cursor: String, $limit: Int) {
         endTime
         rootRunId
         parentRunId
+        assetSelection { path }
         stats {
           ... on RunStatsSnapshot {
             stepsSucceeded
@@ -552,6 +558,7 @@ query GetRun($runId: ID!) {
       rootRunId
       parentRunId
       canTerminate
+      assetSelection { path }
       stats {
         ... on RunStatsSnapshot {
           stepsSucceeded
@@ -671,6 +678,8 @@ struct GqlRun {
     parent_run_id: Option<String>,
     #[serde(rename = "canTerminate")]
     can_terminate: Option<bool>,
+    #[serde(rename = "assetSelection", default)]
+    asset_selection: Vec<GqlAssetKey>,
     stats: Option<GqlRunStats>,
 }
 
@@ -710,6 +719,7 @@ pub struct Run {
     pub parent_run_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub can_terminate: Option<bool>,
+    pub asset_selection: Vec<Vec<String>>,
     pub stats: Option<RunStats>,
 }
 
@@ -736,6 +746,7 @@ fn gql_run_to_run(r: GqlRun) -> Run {
         root_run_id: r.root_run_id,
         parent_run_id: r.parent_run_id,
         can_terminate: r.can_terminate,
+        asset_selection: r.asset_selection.into_iter().map(|k| k.path).collect(),
         stats: r.stats.map(|s| RunStats {
             steps_succeeded: s.steps_succeeded,
             steps_failed: s.steps_failed,

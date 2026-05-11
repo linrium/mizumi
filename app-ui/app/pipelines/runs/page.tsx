@@ -23,6 +23,7 @@ type Run = {
   creation_time: number | null
   start_time: number | null
   end_time: number | null
+  asset_selection: string[][]
   stats: RunStats | null
 }
 
@@ -76,11 +77,38 @@ async function apiFetch<T>(path: string, params?: Record<string, string>): Promi
 
 const COLUMNS: ColumnDef<Run>[] = [
   {
+    id: 'run_id',
+    header: 'Run ID',
+    accessorKey: 'run_id',
+    cell: ({ getValue }) => (
+      <span className="font-mono text-muted-foreground">{getValue() as string}</span>
+    ),
+  },
+  {
     id: 'status',
     header: 'Status',
     cell: ({ row }) => <RunStatusBadge status={row.original.status} />,
   },
-  { id: 'job',      header: 'Job',      accessorKey: 'job_name' },
+  {
+    id: 'target',
+    header: 'Target',
+    cell: ({ row }) => {
+      const sel = row.original.asset_selection
+      const visible = sel.length > 0 ? sel.slice(0, 3) : null
+      const overflow = sel.length > 3 ? sel.length - 3 : 0
+      if (!visible) return <Badge variant="outline" className="font-mono">{row.original.job_name}</Badge>
+      return (
+        <div className="flex flex-wrap gap-1">
+          {visible.map((path, i) => (
+            <Badge key={i} variant="outline" className="font-mono">{path[path.length - 1]}</Badge>
+          ))}
+          {overflow > 0 && (
+            <Badge variant="outline" className="text-muted-foreground">+{overflow}</Badge>
+          )}
+        </div>
+      )
+    },
+  },
   { id: 'started',  header: 'Started',  accessorFn: (r) => fmtTimestamp(r.start_time ?? r.creation_time) },
   { id: 'duration', header: 'Duration', accessorFn: (r) => fmtDuration(r.start_time, r.end_time) },
   {
@@ -93,14 +121,6 @@ const COLUMNS: ColumnDef<Run>[] = [
       const total = ok + fail + can
       return total ? `${ok}/${total}` : '—'
     },
-  },
-  {
-    id: 'run_id',
-    header: 'Run ID',
-    accessorKey: 'run_id',
-    cell: ({ getValue }) => (
-      <span className="font-mono text-muted-foreground">{getValue() as string}</span>
-    ),
   },
 ]
 
