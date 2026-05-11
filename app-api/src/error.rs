@@ -15,6 +15,12 @@ pub enum AppError {
     Timeout,
     #[error("failed to parse result: {0}")]
     Parse(String),
+    #[error("database error: {0}")]
+    Sqlx(#[from] sqlx::Error),
+    #[error("not found")]
+    NotFound,
+    #[error("{0}")]
+    Conflict(String),
 }
 
 impl IntoResponse for AppError {
@@ -22,6 +28,8 @@ impl IntoResponse for AppError {
         let status = match &self {
             AppError::Timeout => StatusCode::GATEWAY_TIMEOUT,
             AppError::QueryFailed(_) => StatusCode::BAD_REQUEST,
+            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::Conflict(_) => StatusCode::CONFLICT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, Json(json!({"error": self.to_string()}))).into_response()

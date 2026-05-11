@@ -1,5 +1,9 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+app_api_namespace := "app-api"
+app_api_image := "mizumi-app-api:0.1.0"
+app_api_manifests := "infra/k8s/app-api"
+
 app_ui_namespace := "app-ui"
 app_ui_image := "mizumi-app-ui:0.1.0"
 
@@ -49,9 +53,9 @@ duckdb_image := "mizumi-duckdb:1.1.3"
 duckdb_namespace := "spark"
 duckdb_query_job := "duckdb-rustfs-query"
 
-deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-simple-deploy daft-distributed-deploy ballista-deploy
+deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-simple-deploy daft-distributed-deploy ballista-deploy app-api-deploy
 
-destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy
+destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy app-api-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -76,6 +80,12 @@ forward:
     if kubectl get deployment/app-ui -n {{app_ui_namespace}} &>/dev/null; then
         kubectl port-forward -n {{app_ui_namespace}} svc/app-ui-svc 3002:3000 &
         echo "App UI:          http://127.0.0.1:3002"
+    fi
+    if kubectl get deployment/app-api -n {{app_api_namespace}} &>/dev/null; then
+        kubectl port-forward -n {{app_api_namespace}} svc/app-api-svc 6000:6000 &
+        kubectl port-forward -n {{app_api_namespace}} svc/app-api-postgres-svc 5433:5432 &
+        echo "App API:         http://127.0.0.1:6000"
+        echo "App API Postgres: localhost:5433"
     fi
     echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
@@ -413,3 +423,30 @@ app-ui-forward:
 app-ui-destroy:
     kubectl delete -f infra/k8s/app-ui/ --ignore-not-found || true
     kubectl delete namespace {{app_ui_namespace}} --ignore-not-found --wait=false
+
+app-api-image-build:
+    docker build -t {{app_api_image}} app-api/
+    if kubectl get deployment/app-api -n {{app_api_namespace}} &>/dev/null; then \
+      kubectl rollout restart deployment/app-api -n {{app_api_namespace}}; \
+      kubectl rollout status deployment/app-api -n {{app_api_namespace}} --timeout=120s; \
+    fi
+
+app-api-deploy: app-api-image-build
+    kubectl apply -f {{app_api_manifests}}/
+    kubectl wait --for=condition=Ready pod -l app=app-api-postgres -n {{app_api_namespace}} --timeout=120s
+    kubectl rollout status deployment/app-api -n {{app_api_namespace}} --timeout=120s
+    kubectl get pods,svc -n {{app_api_namespace}}
+
+app-api-forward:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
+    kubectl port-forward -n {{app_api_namespace}} svc/app-api-svc 6000:6000 &
+    kubectl port-forward -n {{app_api_namespace}} svc/app-api-postgres-svc 5433:5432 &
+    echo "App API:          http://127.0.0.1:6000"
+    echo "App API Postgres: localhost:5433"
+    wait
+
+app-api-destroy:
+    kubectl delete -f {{app_api_manifests}}/ --ignore-not-found || true
+    kubectl delete namespace {{app_api_namespace}} --ignore-not-found --wait=false

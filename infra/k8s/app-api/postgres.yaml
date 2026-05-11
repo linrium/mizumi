@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-api
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-api-postgres-secret
+  namespace: app-api
+type: Opaque
+stringData:
+  POSTGRES_DB: app_api
+  POSTGRES_USER: app_api
+  POSTGRES_PASSWORD: app_api_password
+  DATABASE_URL: "postgres://app_api:app_api_password@app-api-postgres-svc.app-api.svc.cluster.local:5432/app_api"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: app-api-postgres
+  namespace: app-api
+spec:
+  serviceName: app-api-postgres-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-api-postgres
+  template:
+    metadata:
+      labels:
+        app: app-api-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: app-api-postgres-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app_api", "-d", "app_api"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-api-postgres-svc
+  namespace: app-api
+spec:
+  selector:
+    app: app-api-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
