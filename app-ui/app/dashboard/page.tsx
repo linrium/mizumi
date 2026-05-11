@@ -53,7 +53,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useSessions } from '@/hooks/use-sessions'
-import type { ModelId } from '@/app/api/dashboard/generate/route'
+import type { ModelId, PanelSummary } from '@/app/api/dashboard/generate/route'
 import { MODELS } from '@/app/api/dashboard/generate/route'
 
 import 'react-grid-layout/css/styles.css'
@@ -93,6 +93,21 @@ type CreatePanelOutput = {
   explanation: string
   width: number
   height: number
+  columns?: string[]
+  rows?: unknown[][]
+  row_count?: number
+  error?: string
+}
+
+// Tool output shape coming back from editPanel
+type EditPanelOutput = {
+  panelId: string
+  title: string
+  sql: string
+  chartType: ChartType
+  xCol: string
+  yCol: string
+  explanation: string
   columns?: string[]
   rows?: unknown[][]
   row_count?: number
@@ -383,54 +398,87 @@ const SUGGESTIONS = [
   'Customer growth over time',
 ]
 
-function AiComposer({ sessionId, modelId, onModelChange, onPanelsCreated }: {
+function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange, onPanelsCreated, onPanelsEdited }: {
   sessionId: string | null
   modelId: ModelId
+  panels: Panel[]
+  selectedPanelId: string | null
   onModelChange: (m: ModelId) => void
   onPanelsCreated: (panels: Panel[], results: Record<string, QueryResult>) => void
+  onPanelsEdited: (updates: Array<{ panel: Panel; result: QueryResult }>) => void
 }) {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sessionIdRef = useRef(sessionId)
   const modelIdRef = useRef(modelId)
+  const panelsRef = useRef(panels)
+  const selectedPanelIdRef = useRef(selectedPanelId)
+  const lastCreatedIdsRef = useRef<string[]>([])
   const onPanelsCreatedRef = useRef(onPanelsCreated)
+  const onPanelsEditedRef = useRef(onPanelsEdited)
 
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
   useEffect(() => { modelIdRef.current = modelId }, [modelId])
+  useEffect(() => { panelsRef.current = panels }, [panels])
+  useEffect(() => { selectedPanelIdRef.current = selectedPanelId }, [selectedPanelId])
   useEffect(() => { onPanelsCreatedRef.current = onPanelsCreated }, [onPanelsCreated])
+  useEffect(() => { onPanelsEditedRef.current = onPanelsEdited }, [onPanelsEdited])
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/dashboard/generate',
-    body: () => ({ sessionId: sessionIdRef.current, modelId: modelIdRef.current }),
+    body: () => ({
+      sessionId: sessionIdRef.current,
+      modelId: modelIdRef.current,
+      panels: panelsRef.current.map<PanelSummary>((p) => ({ id: p.id, title: p.title, chartType: p.chartType, sql: p.sql, xCol: p.xCol, yCol: p.yCol })),
+      selectedPanelId: selectedPanelIdRef.current,
+      lastCreatedIds: lastCreatedIdsRef.current,
+    }),
   }), [])
 
   const { messages, sendMessage, status } = useChat({ transport })
   const isLoading = status === 'submitted' || status === 'streaming'
 
-  // When a createPanel tool call lands with output, add it to the dashboard
+  // When tool calls land, apply creates and edits to the dashboard
   useEffect(() => {
     const last = messages.at(-1)
     if (!last || last.role !== 'assistant') return
 
     const newPanels: Panel[] = []
     const newResults: Record<string, QueryResult> = {}
+    const editedUpdates: Array<{ panel: Panel; result: QueryResult }> = []
 
     for (const part of last.parts) {
       if (!isToolUIPart(part)) continue
-      if (getToolName(part) !== 'createPanel') continue
       if (part.state !== 'output-available') continue
 
-      const out = part.output as CreatePanelOutput
-      if (out.error) continue
-      if (!out.columns || !out.rows) continue
+      const toolName = getToolName(part)
 
-      const id = `ai-${part.toolCallId}`
-      newPanels.push({ id, title: out.title, chartType: out.chartType, sql: out.sql, xCol: out.xCol, yCol: out.yCol })
-      newResults[id] = { columns: out.columns, rows: out.rows, row_count: out.row_count ?? out.rows.length }
+      if (toolName === 'createPanel') {
+        const out = part.output as CreatePanelOutput
+        if (out.error || !out.columns || !out.rows) continue
+        const id = `ai-${part.toolCallId}`
+        newPanels.push({ id, title: out.title, chartType: out.chartType, sql: out.sql, xCol: out.xCol, yCol: out.yCol })
+        newResults[id] = { columns: out.columns, rows: out.rows, row_count: out.row_count ?? out.rows.length }
+      }
+
+      if (toolName === 'editPanel') {
+        const out = part.output as EditPanelOutput
+        if (out.error || !out.columns || !out.rows) continue
+        editedUpdates.push({
+          panel: { id: out.panelId, title: out.title, chartType: out.chartType, sql: out.sql, xCol: out.xCol, yCol: out.yCol },
+          result: { columns: out.columns, rows: out.rows, row_count: out.row_count ?? out.rows.length },
+        })
+      }
     }
 
-    if (newPanels.length > 0) onPanelsCreatedRef.current(newPanels, newResults)
+    if (newPanels.length > 0) {
+      lastCreatedIdsRef.current = newPanels.map((p) => p.id)
+      onPanelsCreatedRef.current(newPanels, newResults)
+    }
+    if (editedUpdates.length > 0) {
+      onPanelsEditedRef.current(editedUpdates)
+    }
   // only fire when message list changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages])
@@ -551,32 +599,53 @@ function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITool
     return <p className="text-[11px] whitespace-pre-wrap leading-relaxed text-foreground/90">{part.text}</p>
   }
 
-  if (isToolUIPart(part) && getToolName(part) === 'createPanel') {
-    if (part.state === 'input-streaming' || part.state === 'input-available') {
-      const input = part.input as { title?: string } | undefined
-      return (
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
-          <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin shrink-0" />
-          {input?.title ? `Creating: ${input.title}` : 'Creating panel…'}
-        </div>
-      )
-    }
-    if (part.state === 'output-available') {
-      const out = part.output as CreatePanelOutput
-      if (out.error) {
+  if (isToolUIPart(part)) {
+    const toolName = getToolName(part)
+
+    if (toolName === 'createPanel') {
+      if (part.state === 'input-streaming' || part.state === 'input-available') {
+        const inp = part.input as { title?: string } | undefined
         return (
-          <div className="text-[11px] text-destructive py-0.5">
-            Failed to create "{out.title}": {out.error}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+            <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin shrink-0" />
+            {inp?.title ? `Creating: ${inp.title}` : 'Creating panel…'}
           </div>
         )
       }
-      return (
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
-          <HugeiconsIcon icon={Chart01Icon} size={11} className="text-primary shrink-0" />
-          <span>Added <strong className="text-foreground">{out.title}</strong></span>
-          <span className="ml-auto">{out.row_count ?? 0} rows</span>
-        </div>
-      )
+      if (part.state === 'output-available') {
+        const out = part.output as CreatePanelOutput
+        if (out.error) return <div className="text-[11px] text-destructive py-0.5">Failed to create "{out.title}": {out.error}</div>
+        return (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+            <HugeiconsIcon icon={Chart01Icon} size={11} className="text-primary shrink-0" />
+            <span>Added <strong className="text-foreground">{out.title}</strong></span>
+            <span className="ml-auto">{out.row_count ?? 0} rows</span>
+          </div>
+        )
+      }
+    }
+
+    if (toolName === 'editPanel') {
+      if (part.state === 'input-streaming' || part.state === 'input-available') {
+        const inp = part.input as { title?: string } | undefined
+        return (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+            <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin shrink-0" />
+            {inp?.title ? `Editing: ${inp.title}` : 'Editing panel…'}
+          </div>
+        )
+      }
+      if (part.state === 'output-available') {
+        const out = part.output as EditPanelOutput
+        if (out.error) return <div className="text-[11px] text-destructive py-0.5">Failed to edit "{out.title}": {out.error}</div>
+        return (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-0.5">
+            <HugeiconsIcon icon={Edit02Icon} size={11} className="text-primary shrink-0" />
+            <span>Updated <strong className="text-foreground">{out.title}</strong></span>
+            <span className="ml-auto">{out.row_count ?? 0} rows</span>
+          </div>
+        )
+      }
     }
   }
 
@@ -662,6 +731,21 @@ export default function DashboardPage() {
     setLayout((prev) => prev.filter((l) => l.i !== id))
     if (selectedId === id) setSelectedId(null)
   }
+
+  // Called by AiComposer when editPanel tool calls complete
+  const handlePanelsEdited = useCallback((updates: Array<{ panel: Panel; result: QueryResult }>) => {
+    setPanels((prev) => prev.map((p) => {
+      const upd = updates.find((u) => u.panel.id === p.id)
+      return upd ? upd.panel : p
+    }))
+    setPanelData((prev) => {
+      const next = { ...prev }
+      for (const { panel, result } of updates) {
+        next[panel.id] = { status: 'ok', result, error: null }
+      }
+      return next
+    })
+  }, [])
 
   // Called by AiComposer when createPanel tool calls complete
   const handlePanelsCreated = useCallback((newPanels: Panel[], results: Record<string, QueryResult>) => {
@@ -755,8 +839,11 @@ export default function DashboardPage() {
             <AiComposer
               sessionId={activeId}
               modelId={modelId}
+              panels={panels}
+              selectedPanelId={selectedId}
               onModelChange={setModelId}
               onPanelsCreated={handlePanelsCreated}
+              onPanelsEdited={handlePanelsEdited}
             />
           </div>
           {/* Composer resize handle (right edge) */}
@@ -767,7 +854,11 @@ export default function DashboardPage() {
         </div>
 
         {/* Center: Grid */}
-        <div ref={containerRef} className="flex-1 min-w-0 overflow-auto p-3">
+        <div
+          ref={containerRef}
+          className="flex-1 min-w-0 overflow-auto p-3"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedId(null) }}
+        >
           {panels.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
               <HugeiconsIcon icon={SparklesIcon} size={36} className="opacity-20" />

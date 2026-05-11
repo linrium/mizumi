@@ -71,47 +71,102 @@ function resolveModel(modelId: ModelId): LanguageModel {
   return deepseek('deepseek-chat')
 }
 
-// Chart type that maps to dashboard Panel type
 const chartTypeEnum = z.enum(['bar', 'line', 'area', 'pie', 'scatter'])
 
-export async function POST(req: NextRequest) {
-  const { messages, sessionId, modelId } = await req.json()
+// Serialisable panel summary sent from the client so the AI can resolve targets
+export type PanelSummary = {
+  id: string
+  title: string
+  chartType: string
+  sql: string
+  xCol: string
+  yCol: string
+}
 
-  const model = resolveModel((modelId as ModelId) ?? 'gpt-5.4-mini')
+export async function POST(req: NextRequest) {
+  const { messages, sessionId, modelId, panels, selectedPanelId, lastCreatedIds } = await req.json() as {
+    messages: unknown
+    sessionId: string | null
+    modelId: ModelId
+    panels: PanelSummary[]
+    selectedPanelId: string | null
+    lastCreatedIds: string[]
+  }
+
+  const model = resolveModel(modelId ?? 'gpt-5.4-mini')
   const schema = await fetchSchema().catch(() => '(schema unavailable)')
+
+  // Build a concise panel list for the system prompt
+  const panelList = (panels ?? []).length > 0
+    ? (panels ?? []).map((p) => `  id=${p.id} title="${p.title}" chartType=${p.chartType} xCol=${p.xCol} yCol=${p.yCol}`).join('\n')
+    : '  (none)'
+
+  const contextHints = [
+    selectedPanelId ? `Selected panel id: ${selectedPanelId}` : null,
+    lastCreatedIds?.length ? `Last created panel ids: ${lastCreatedIds.join(', ')}` : null,
+  ].filter(Boolean).join('\n')
 
   const tools = {
     createPanel: tool({
       description:
-        'Create a dashboard panel with a chart. Call this once per chart/metric the user asks for. For each distinct question or metric, call this tool separately to create one panel.',
+        'Create a new dashboard panel with a chart. Call once per distinct metric or visualization the user asks for.',
       inputSchema: z.object({
-        title: z.string().describe('Short panel title, e.g. "Revenue by Country"'),
-        sql: z.string().describe('SQL query whose result feeds this panel. Use fully qualified names: mizumi.default.<table>'),
-        chartType: chartTypeEnum.describe('bar → categories/comparisons, line/area → time-series trends, pie → proportions ≤8 slices, scatter → correlation'),
-        xCol: z.string().describe('Column name for the x-axis labels or pie slice names'),
-        yCol: z.string().describe('Column name for the numeric metric values'),
+        title: z.string().describe('Short panel title'),
+        sql: z.string().describe('SQL query. Always use fully qualified names: mizumi.default.<table>'),
+        chartType: chartTypeEnum.describe('bar → categories, line/area → time-series, pie → proportions ≤8 slices, scatter → correlation'),
+        xCol: z.string().describe('Column for x-axis labels or pie slice names'),
+        yCol: z.string().describe('Column for numeric values'),
         explanation: z.string().describe('One sentence describing what this panel shows'),
-        width: z.number().int().min(3).max(12).default(6).describe('Panel width in 12-column grid units (3–12). Use 12 for full-width, 6 for half, 4 for third.'),
-        height: z.number().int().min(3).max(8).default(4).describe('Panel height in grid row units (3–8).'),
+        width: z.number().int().min(3).max(12).default(6).describe('Width in 12-col grid units'),
+        height: z.number().int().min(3).max(8).default(4).describe('Height in grid row units'),
       }),
       execute: async ({ sql, title, chartType, xCol, yCol, explanation, width, height }) => {
         try {
           const data = await runSql(sessionId, sql)
+          return { title, sql, chartType, xCol, yCol, explanation, width, height, columns: data.columns, rows: data.rows, row_count: data.row_count }
+        } catch (e) {
+          return { title, sql, chartType, xCol, yCol, explanation, width, height, error: (e as Error).message }
+        }
+      },
+    }),
+
+    editPanel: tool({
+      description:
+        'Edit an existing dashboard panel. Use this when the user asks to change, update, fix, rename, or modify a panel. ' +
+        'To identify the target: use selectedPanelId when the user says "this panel" or "the selected one"; ' +
+        'use lastCreatedIds when the user says "the last one" or "those panels"; ' +
+        'otherwise match by title from the panels list. ' +
+        'Only include fields that need to change — omit unchanged ones.',
+      inputSchema: z.object({
+        panelId: z.string().describe('The id of the panel to edit, from the current panels list'),
+        title: z.string().optional().describe('New title (omit to keep existing)'),
+        sql: z.string().optional().describe('New SQL query (omit to keep existing). Always use mizumi.default.<table>'),
+        chartType: chartTypeEnum.optional().describe('New chart type (omit to keep existing)'),
+        xCol: z.string().optional().describe('New x-axis column (omit to keep existing)'),
+        yCol: z.string().optional().describe('New y-axis column (omit to keep existing)'),
+        explanation: z.string().describe('One sentence describing what changed'),
+      }),
+      execute: async ({ panelId, title, sql, chartType, xCol, yCol, explanation }) => {
+        const target = (panels ?? []).find((p) => p.id === panelId)
+        if (!target) return { panelId, error: `Panel id "${panelId}" not found` }
+
+        const effectiveSql = sql ?? target.sql
+        try {
+          const data = await runSql(sessionId, effectiveSql)
           return {
-            title,
-            sql,
-            chartType,
-            xCol,
-            yCol,
+            panelId,
+            title: title ?? target.title,
+            sql: effectiveSql,
+            chartType: chartType ?? target.chartType,
+            xCol: xCol ?? target.xCol,
+            yCol: yCol ?? target.yCol,
             explanation,
-            width,
-            height,
             columns: data.columns,
             rows: data.rows,
             row_count: data.row_count,
           }
         } catch (e) {
-          return { title, sql, chartType, xCol, yCol, explanation, width, height, error: (e as Error).message }
+          return { panelId, title: title ?? target.title, sql: effectiveSql, chartType: chartType ?? target.chartType, xCol: xCol ?? target.xCol, yCol: yCol ?? target.yCol, explanation, error: (e as Error).message }
         }
       },
     }),
@@ -119,35 +174,40 @@ export async function POST(req: NextRequest) {
 
   const result = streamText({
     model,
-    system: `You are a data analyst building dashboard panels for the Mizumi lakehouse platform.
+    system: `You are a data analyst managing dashboard panels for the Mizumi lakehouse platform.
+You have two tools: createPanel (add new panels) and editPanel (modify existing panels).
 
-## Your job:
-When the user asks questions about data, metrics, or trends, respond by calling createPanel once per distinct chart or metric.
-For each separate question, metric, or visualization, create a separate panel.
+## Current dashboard panels:
+${panelList}
+
+${contextHints ? `## Context:\n${contextHints}` : ''}
+
+## When to use each tool:
+- createPanel: user asks to add, show, visualize, or create something new
+- editPanel: user asks to change, update, rename, fix, switch chart type, or modify an existing panel
+  - "this panel" / "the selected one" → use selectedPanelId
+  - "the last one" / "those panels" / "what you just created" → use lastCreatedIds
+  - by name (e.g. "the revenue chart") → match against the panels list by title
 
 ## Tool call rules:
-- ALWAYS call createPanel immediately when the user mentions anything about data, metrics, revenue, customers, trends, or asks to visualize anything.
-- Call createPanel MULTIPLE TIMES in one response when the user asks for multiple things (e.g. "revenue and customer trends" → 2 panels).
-- Do NOT generate markdown tables or lists of data — always use createPanel.
-- After all tool calls, write 1–3 sentences summarizing what you created.
+- Call tools IMMEDIATELY without preamble.
+- Call createPanel MULTIPLE TIMES for multiple new metrics.
+- Call editPanel MULTIPLE TIMES if editing several panels at once.
+- After tool calls, write 1–2 sentences summarizing what changed.
 
 ## SQL rules:
 - Always fully qualify: mizumi.default.<table>
-- Limit results appropriately (e.g. TOP/LIMIT for large tables)
 - For time-series: ORDER BY the date/time column ascending
 
-## Chart type guidance:
-- bar: comparing values across categories (revenue by country, top customers)
-- line/area: trends over time (weekly revenue, daily orders)
-- pie: proportional breakdown with ≤8 slices (share by segment)
-- scatter: correlations between two numeric columns
+## Chart types:
+- bar: categories/comparisons  · line/area: time-series trends  · pie: proportions ≤8 slices  · scatter: correlation
 
 ## Available tables in mizumi.default:
 ${schema}
 
 ## On error:
-If createPanel returns an error field, acknowledge it briefly and do not retry.`,
-    messages: await convertToModelMessages(messages, { tools }),
+If a tool returns an error field, quote it briefly and stop.`,
+    messages: await convertToModelMessages(messages as Parameters<typeof convertToModelMessages>[0], { tools }),
     tools,
     stopWhen: stepCountIs(15),
   })
