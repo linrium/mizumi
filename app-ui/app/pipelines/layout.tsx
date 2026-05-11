@@ -15,7 +15,7 @@ export default function PipelinesLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-0 border-b shrink-0">
+      <div className="flex items-center gap-0 border-b shrink-0 px-3">
         {TABS.map((t) => (
           <Link
             key={t.href}

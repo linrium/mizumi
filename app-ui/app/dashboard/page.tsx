@@ -52,7 +52,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { useSessions } from '@/hooks/use-sessions'
+import { useSessionContext } from '@/hooks/use-session-context'
 import type { ModelId, PanelSummary } from '@/app/api/dashboard/generate/route'
 import { MODELS } from '@/app/api/dashboard/generate/route'
 
@@ -356,39 +356,6 @@ function PanelSidebar({ panel, data, sessionId, onChange, onRun }: {
   )
 }
 
-// ── SessionPicker ─────────────────────────────────────────────────────────────
-
-function SessionPicker({ sessions, activeId, creating, onSelect, onCreate }: {
-  sessions: ReturnType<typeof useSessions>['sessions']
-  activeId: string | null; creating: boolean
-  onSelect: (id: string) => void; onCreate: () => void
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      {sessions.length > 0 ? (
-        <Select value={activeId ?? ''} onValueChange={onSelect}>
-          <SelectTrigger className="h-7 text-xs w-40 gap-1">
-            <SelectValue placeholder="No session" />
-          </SelectTrigger>
-          <SelectContent>
-            {sessions.map((s) => (
-              <SelectItem key={s.session_id} value={s.session_id}>
-                <span className="font-mono">{s.session_id.slice(0, 8)}</span>
-                <span className="text-muted-foreground ml-1">· {s.pod}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <span className="text-xs text-muted-foreground">No sessions</span>
-      )}
-      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={creating} onClick={onCreate} title="New session">
-        {creating ? <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" /> : <HugeiconsIcon icon={Add01Icon} size={12} />}
-      </Button>
-    </div>
-  )
-}
-
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
@@ -679,8 +646,7 @@ export default function DashboardPage() {
   const composerDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const abortRefs = useRef<Record<string, AbortController>>({})
 
-  const { sessions, activeId, setActiveId, creating, fetchSessions, createSession } = useSessions()
-  useEffect(() => { fetchSessions() }, [fetchSessions])
+  const { activeId, createSession } = useSessionContext()
 
   const runQuery = useCallback(async (panel: Panel, sessionId: string | null) => {
     if (!panel.sql.trim()) return
@@ -808,7 +774,7 @@ export default function DashboardPage() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Full-width toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b shrink-0 gap-4">
-        <SessionPicker sessions={sessions} activeId={activeId} creating={creating} onSelect={setActiveId} onCreate={createSession} />
+        <div></div>
         <div className="flex items-center gap-1.5 shrink-0">
           <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={refreshAll} title="Re-run all panels">
             <HugeiconsIcon icon={Refresh01Icon} size={13} />

@@ -5,19 +5,12 @@ import { useForm } from '@tanstack/react-form'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { PlayIcon, Copy01Icon, SqlIcon, AddCircleIcon, CancelIcon, CpuIcon } from '@hugeicons/core-free-icons'
+import { PlayIcon, Copy01Icon, SqlIcon } from '@hugeicons/core-free-icons'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataGrid } from '@/components/data-grid/data-grid'
 import { useDataGrid } from '@/hooks/use-data-grid'
-import { useSessions } from '@/hooks/use-sessions'
+import { useSessionContext } from '@/hooks/use-session-context'
 
 const schema = z.object({
   sql: z.string().min(1, 'SQL query is required'),
@@ -84,12 +77,33 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 
+const RESULTS_MIN = 80
+const RESULTS_MAX = 800
+const RESULTS_DEFAULT = 300
+
 export function SqlEditor() {
   const [result, setResult] = useState<Result | null>(null)
+  const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
   const startRef = useRef<number>(0)
-  const { sessions, activeId, setActiveId, creating, deleting, fetchSessions, createSession, deleteSession } = useSessions()
+  const { activeId, createSession } = useSessionContext()
 
-  useEffect(() => { fetchSessions() }, [fetchSessions])
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragRef.current = { startY: e.clientY, startH: resultsHeight }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return
+      const delta = dragRef.current.startY - ev.clientY
+      setResultsHeight(Math.min(RESULTS_MAX, Math.max(RESULTS_MIN, dragRef.current.startH + delta)))
+    }
+    const onUp = () => {
+      dragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const form = useForm({
     defaultValues: { sql: 'select * from mizumi.default.gold_country_revenue' },
@@ -140,53 +154,6 @@ export function SqlEditor() {
         <HugeiconsIcon icon={SqlIcon} size={15} className="text-muted-foreground" />
         <span className="text-sm font-medium text-muted-foreground">query.sql</span>
         <div className="flex-1" />
-
-        {/* Session management */}
-        {creating ? (
-          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Starting session…
-          </div>
-        ) : (
-          <div className="flex items-center gap-1">
-            {sessions.length > 0 && (
-              <Select value={activeId ?? ''} onValueChange={setActiveId}>
-                <SelectTrigger className="h-7 w-36 text-xs gap-1.5 px-2">
-                  <HugeiconsIcon icon={CpuIcon} size={11} className="text-green-500 shrink-0" />
-                  <SelectValue placeholder="No session" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sessions.map((s) => (
-                    <SelectItem key={s.session_id} value={s.session_id} className="font-mono text-xs">
-                      {s.session_id.slice(0, 8)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={createSession}
-              className="h-7 w-7 text-muted-foreground"
-              title="New session"
-            >
-              <HugeiconsIcon icon={AddCircleIcon} size={14} />
-            </Button>
-            {activeId && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => deleteSession(activeId)}
-                disabled={deleting === activeId}
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                title="Kill session"
-              >
-                <HugeiconsIcon icon={CancelIcon} size={14} />
-              </Button>
-            )}
-          </div>
-        )}
 
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
@@ -256,7 +223,12 @@ export function SqlEditor() {
       </div>
 
       {/* Results pane */}
-      <div className="h-[300px] shrink-0 border-t flex flex-col">
+      <div className="shrink-0 border-t flex flex-col" style={{ height: resultsHeight }}>
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="h-1 w-full cursor-row-resize hover:bg-primary/30 transition-colors shrink-0"
+        />
         {/* Results toolbar */}
         <div className="flex items-center gap-3 px-4 h-9 border-b bg-muted/20 shrink-0">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

@@ -8,6 +8,17 @@ import { cn } from '@/lib/utils'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
+import {
+  CheckmarkCircle01Icon,
+  Cancel01Icon,
+  Alert01Icon,
+  Loading03Icon,
+  HourglassIcon,
+  MinusSignCircleIcon,
+  QuestionIcon,
+} from '@hugeicons/core-free-icons'
 dayjs.extend(relativeTime)
 
 const LineageGraph = dynamic(
@@ -119,38 +130,34 @@ function extractKinds(tags: RunTag[] | undefined): string[] {
 
 const ACTIVE_STATUSES = new Set(['QUEUED', 'STARTED', 'STARTING', 'CANCELING'])
 
-const RUN_STATUS_LABEL: Record<string, string> = {
-  SUCCESS:  '✓ Success',
-  FAILURE:  '✗ Failed',
-  STARTED:  '▶ Running',
-  STARTING: '▶ Starting',
-  QUEUED:   '· Queued',
-  CANCELING:'⊗ Canceling',
-  CANCELED: '⊘ Canceled',
+type StatusConfig = { label: string; icon: IconSvgElement; bannerCls: string; badgeCls: string }
+
+const RUN_STATUS_CONFIG: Record<string, StatusConfig> = {
+  SUCCESS:  { label: 'Success',   icon: CheckmarkCircle01Icon, bannerCls: 'bg-green-100  text-green-700  dark:bg-green-950  dark:text-green-400',  badgeCls: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800  dark:bg-green-950  dark:text-green-400' },
+  FAILURE:  { label: 'Failed',    icon: Cancel01Icon,          bannerCls: 'bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400',    badgeCls: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
+  STARTED:  { label: 'Running',   icon: Loading03Icon,         bannerCls: 'bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400',   badgeCls: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
+  STARTING: { label: 'Starting',  icon: Loading03Icon,         bannerCls: 'bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400',   badgeCls: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
+  QUEUED:   { label: 'Queued',    icon: HourglassIcon,         bannerCls: 'bg-muted      text-muted-foreground',                                  badgeCls: 'border-border bg-muted text-muted-foreground' },
+  CANCELING:{ label: 'Canceling', icon: Loading03Icon,         bannerCls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400', badgeCls: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
+  CANCELED: { label: 'Canceled',  icon: MinusSignCircleIcon,   bannerCls: 'bg-muted      text-muted-foreground',                                  badgeCls: 'border-border bg-muted text-muted-foreground' },
 }
 
-const RUN_STATUS_CLS: Record<string, string> = {
-  SUCCESS:  'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
-  FAILURE:  'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-  STARTED:  'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
-  STARTING: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
-  QUEUED:   'bg-muted text-muted-foreground',
-  CANCELING:'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
-  CANCELED: 'bg-muted text-muted-foreground',
+const STALE_CONFIG: Record<string, { label: string; icon: IconSvgElement; badgeCls: string }> = {
+  FRESH:   { label: 'Fresh',   icon: CheckmarkCircle01Icon, badgeCls: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800  dark:bg-green-950  dark:text-green-400' },
+  STALE:   { label: 'Stale',   icon: Alert01Icon,           badgeCls: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
+  MISSING: { label: 'Missing', icon: Cancel01Icon,          badgeCls: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
+  UNKNOWN: { label: 'Unknown', icon: QuestionIcon,          badgeCls: 'border-border bg-muted text-muted-foreground' },
 }
 
-const STALE_LABEL: Record<string, string> = {
-  FRESH:   '✓ Fresh',
-  STALE:   '⚠ Stale',
-  MISSING: '✗ Missing',
-  UNKNOWN: '? Unknown',
-}
-
-const STALE_CLS: Record<string, string> = {
-  FRESH:   'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
-  STALE:   'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
-  MISSING: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-  UNKNOWN: 'bg-muted text-muted-foreground',
+function StaleStatusBadge({ status }: { status: string }) {
+  const cfg = STALE_CONFIG[status]
+  if (!cfg) return <Badge variant="outline">{status}</Badge>
+  return (
+    <Badge variant="outline" className={cfg.badgeCls}>
+      <HugeiconsIcon icon={cfg.icon} size={10} />
+      {cfg.label}
+    </Badge>
+  )
 }
 
 // ── useAssetStatus hook ────────────────────────────────────────────────────────
@@ -263,19 +270,17 @@ function CurrentRunBanner({ liveStatus }: { liveStatus: AssetStatus }) {
 
   if (!run) return null
 
-  const cls = RUN_STATUS_CLS[run.status] ?? 'bg-muted text-muted-foreground'
-  const label = RUN_STATUS_LABEL[run.status] ?? run.status
+  const cfg = RUN_STATUS_CONFIG[run.status]
+  const bannerCls = cfg?.bannerCls ?? 'bg-muted text-muted-foreground'
+  const isSpinning = run.status === 'STARTED' || run.status === 'STARTING' || run.status === 'CANCELING'
 
   return (
-    <div className={cn('rounded-md px-3 py-2.5 flex items-center justify-between gap-3', cls)}>
+    <div className={cn('rounded-md px-3 py-2.5 flex items-center justify-between gap-3', bannerCls)}>
       <div className="flex items-center gap-2 min-w-0">
-        {isActive && (
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
-          </span>
+        {cfg && (
+          <HugeiconsIcon icon={cfg.icon} size={12} className={cn('shrink-0', isSpinning && 'animate-spin')} />
         )}
-        <span className="text-xs font-medium">{label}</span>
+        <span className="text-xs font-medium">{cfg?.label ?? run.status}</span>
         <span className="text-[10px] font-mono opacity-70 truncate">{run.run_id.slice(0, 8)}…</span>
       </div>
       <div className="text-[10px] shrink-0 opacity-80">
@@ -377,14 +382,7 @@ export default function AssetDetailPage() {
 
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {detail?.stale_status && (
-            <span
-              className={cn(
-                'text-[10px] font-medium px-2 py-0.5 rounded-full',
-                STALE_CLS[detail.stale_status] ?? STALE_CLS.UNKNOWN,
-              )}
-            >
-              {STALE_LABEL[detail.stale_status] ?? detail.stale_status}
-            </span>
+            <StaleStatusBadge status={detail.stale_status} />
           )}
           {detail?.is_executable && (
             <button

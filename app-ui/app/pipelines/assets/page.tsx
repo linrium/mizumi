@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
+import { CheckmarkCircle01Icon, Alert01Icon, Cancel01Icon, QuestionIcon } from '@hugeicons/core-free-icons'
 import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -32,15 +35,25 @@ function fmtTimestamp(ts: string | number | null | undefined): string {
   return new Date(ms).toLocaleString()
 }
 
-function fmtStaleStatus(s: string | null): string {
-  if (!s) return '—'
-  const map: Record<string, string> = {
-    FRESH:   '✓ Fresh',
-    STALE:   '⚠ Stale',
-    MISSING: '✗ Missing',
-    UNKNOWN: '? Unknown',
+function StaleStatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-muted-foreground">—</span>
+
+  const config: Record<string, { label: string; icon: IconSvgElement; className: string }> = {
+    FRESH:   { label: 'Fresh',   icon: CheckmarkCircle01Icon, className: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800 dark:bg-green-950 dark:text-green-400' },
+    STALE:   { label: 'Stale',   icon: Alert01Icon,           className: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
+    MISSING: { label: 'Missing', icon: Cancel01Icon,          className: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
+    UNKNOWN: { label: 'Unknown', icon: QuestionIcon,          className: 'border-border bg-muted text-muted-foreground' },
   }
-  return map[s] ?? s
+
+  const cfg = config[status]
+  if (!cfg) return <span className="text-muted-foreground">{status}</span>
+
+  return (
+    <Badge variant="outline" className={cfg.className}>
+      <HugeiconsIcon icon={cfg.icon} size={10} />
+      {cfg.label}
+    </Badge>
+  )
 }
 
 async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
@@ -109,15 +122,7 @@ const COLUMNS: ColumnDef<AssetNode>[] = [
   {
     id: 'status',
     header: 'Stale Status',
-    cell: ({ row }) => {
-      const s = row.original.stale_status
-      const cls: Record<string, string> = {
-        FRESH:   'text-green-600 dark:text-green-400',
-        STALE:   'text-yellow-600 dark:text-yellow-400',
-        MISSING: 'text-destructive',
-      }
-      return <span className={cls[s ?? ''] ?? 'text-muted-foreground'}>{fmtStaleStatus(s)}</span>
-    },
+    cell: ({ row }) => <StaleStatusBadge status={row.original.stale_status} />,
   },
   { id: 'last_mat',   header: 'Last Materialized', accessorFn: (n) => fmtTimestamp(n.last_materialization?.timestamp) },
   { id: 'upstream',   header: 'Upstream',           accessorFn: (n) => n.dependency_keys.length || '—' },

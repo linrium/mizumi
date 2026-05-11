@@ -7,7 +7,7 @@ import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
 import ReactECharts from 'echarts-for-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon, DatabaseIcon } from '@hugeicons/core-free-icons'
+import { Chart01Icon, Loading03Icon, ArrowDown01Icon, DatabaseIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { DataGrid } from '@/components/data-grid/data-grid'
 import { useDataGrid } from '@/hooks/use-data-grid'
-import { useSessions } from '@/hooks/use-sessions'
+import { useSessionContext } from '@/hooks/use-session-context'
 import { cn } from '@/lib/utils'
 import { MODELS } from '@/app/api/analytics/chat/route'
 import type { ModelId } from '@/app/api/analytics/chat/route'
@@ -108,7 +108,7 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
         className="flex w-full items-center gap-1.5 px-3 py-1.5 text-muted-foreground hover:bg-accent/40 transition-colors border-b"
       >
         <HugeiconsIcon icon={ArrowDown01Icon} size={11} className={cn('shrink-0 transition-transform', sqlOpen && 'rotate-180')} />
-        <HugeiconsIcon icon={Table01Icon} size={11} className="shrink-0" />
+        <HugeiconsIcon icon={DatabaseIcon} size={11} className="shrink-0" />
         <span className="font-mono truncate flex-1 text-left">
           {output.sql.slice(0, 72)}{output.sql.length > 72 ? '…' : ''}
         </span>
@@ -366,9 +366,7 @@ export default function AnalyticsPage() {
   const sessionIdRef = useRef<string | null>(null)
   const modelIdRef = useRef<ModelId>(modelId)
 
-  const { sessions, activeId, setActiveId, creating, fetchSessions, createSession } = useSessions()
-
-  useEffect(() => { fetchSessions() }, [fetchSessions])
+  const { sessions, activeId, setActiveId, createSession } = useSessionContext()
 
   useEffect(() => {
     const id = activeId ?? sessions[0]?.session_id ?? null
@@ -413,8 +411,6 @@ export default function AnalyticsPage() {
       handleSend()
     }
   }
-
-  const sessionLabel = activeId ?? sessions[0]?.session_id ?? null
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -464,46 +460,30 @@ export default function AnalyticsPage() {
           disabled={isLoading}
           className="w-full resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {creating && (
-              <>
-                <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
-                Starting session…
-              </>
-            )}
-            {!creating && sessionLabel && (
-              <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
-                {sessionLabel.slice(0, 8)}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          <Select value={modelId} onValueChange={(v) => setModelId(v as ModelId)}>
+            <SelectTrigger className="h-7 w-36 text-xs px-2 gap-1.5">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODELS.map((m) => (
+                <SelectItem key={m.id} value={m.id} className="text-xs">
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <div className="flex items-center gap-2">
-            <Select value={modelId} onValueChange={(v) => setModelId(v as ModelId)}>
-              <SelectTrigger className="h-7 w-36 text-xs px-2 gap-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MODELS.map((m) => (
-                  <SelectItem key={m.id} value={m.id} className="text-xs">
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              size="sm"
-              disabled={isLoading || !input.trim()}
-              onClick={handleSend}
-              className="h-7 px-3 text-xs"
-            >
-              {isLoading
-                ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
-                : 'Send'}
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            disabled={isLoading || !input.trim()}
+            onClick={handleSend}
+            className="h-7 px-3 text-xs"
+          >
+            {isLoading
+              ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
+              : 'Send'}
+          </Button>
         </div>
       </div>
     </div>

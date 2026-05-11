@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
+import { CheckmarkCircle01Icon, Cancel01Icon, Loading03Icon, PlayIcon, HourglassIcon, MinusSignCircleIcon } from '@hugeicons/core-free-icons'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,18 +41,26 @@ function fmtDuration(start: number | null, end: number | null): string {
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
-function fmtStatus(status: string): string {
-  const map: Record<string, string> = {
-    SUCCESS:     '✓ Success',
-    FAILURE:     '✗ Failed',
-    STARTED:     '▶ Running',
-    STARTING:    '▶ Starting',
-    QUEUED:      '· Queued',
-    CANCELING:   '⊗ Canceling',
-    CANCELED:    '⊘ Canceled',
-    NOT_STARTED: '· Not started',
+function RunStatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; icon: IconSvgElement; className: string }> = {
+    SUCCESS:     { label: 'Success',     icon: CheckmarkCircle01Icon, className: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800  dark:bg-green-950  dark:text-green-400' },
+    FAILURE:     { label: 'Failed',      icon: Cancel01Icon,          className: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
+    STARTED:     { label: 'Running',     icon: Loading03Icon,         className: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
+    STARTING:    { label: 'Starting',    icon: Loading03Icon,         className: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
+    QUEUED:      { label: 'Queued',      icon: HourglassIcon,         className: 'border-border bg-muted text-muted-foreground' },
+    CANCELING:   { label: 'Canceling',   icon: Loading03Icon,         className: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
+    CANCELED:    { label: 'Canceled',    icon: MinusSignCircleIcon,   className: 'border-border bg-muted text-muted-foreground' },
+    NOT_STARTED: { label: 'Not started', icon: HourglassIcon,         className: 'border-border bg-muted text-muted-foreground' },
   }
-  return map[status] ?? status
+  const cfg = config[status]
+  if (!cfg) return <Badge variant="outline">{status}</Badge>
+  const isSpinning = status === 'STARTED' || status === 'STARTING' || status === 'CANCELING'
+  return (
+    <Badge variant="outline" className={cfg.className}>
+      <HugeiconsIcon icon={cfg.icon} size={10} className={isSpinning ? 'animate-spin' : undefined} />
+      {cfg.label}
+    </Badge>
+  )
 }
 
 async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
@@ -66,16 +77,7 @@ const COLUMNS: ColumnDef<Run>[] = [
   {
     id: 'status',
     header: 'Status',
-    cell: ({ row }) => {
-      const s = row.original.status
-      const cls: Record<string, string> = {
-        SUCCESS:  'text-green-600 dark:text-green-400',
-        FAILURE:  'text-destructive',
-        STARTED:  'text-blue-600 dark:text-blue-400',
-        STARTING: 'text-blue-600 dark:text-blue-400',
-      }
-      return <span className={cls[s] ?? 'text-muted-foreground'}>{fmtStatus(s)}</span>
-    },
+    cell: ({ row }) => <RunStatusBadge status={row.original.status} />,
   },
   { id: 'job',      header: 'Job',      accessorKey: 'job_name' },
   { id: 'started',  header: 'Started',  accessorFn: (r) => fmtTimestamp(r.start_time ?? r.creation_time) },
