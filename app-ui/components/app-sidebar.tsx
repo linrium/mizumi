@@ -19,6 +19,7 @@ import {
   WorkflowCircle01Icon,
   Chart01Icon,
   Setting06Icon,
+  DashboardSquare01Icon,
 } from '@hugeicons/core-free-icons'
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { title: 'SQL Editor', href: '/editor', icon: Database01Icon },
   { title: 'Pipelines', href: '/pipelines', icon: WorkflowCircle01Icon },
   { title: 'Analytics', href: '/analytics', icon: Chart01Icon },
+  { title: 'Dashboard', href: '/dashboard', icon: DashboardSquare01Icon },
   { title: 'Settings', href: '/settings', icon: Setting06Icon },
 ]
 
