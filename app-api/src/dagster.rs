@@ -1223,6 +1223,168 @@ pub async fn materialize_asset(Path(path): Path<String>) -> impl IntoResponse {
     }
 }
 
+// ---- Run events ----
+
+const RUN_EVENTS_QUERY: &str = r#"
+query RunEvents($runId: ID!, $afterCursor: String, $limit: Int) {
+  logsForRun(runId: $runId, afterCursor: $afterCursor, limit: $limit) {
+    __typename
+    ... on EventConnection {
+      cursor
+      hasMore
+      events {
+        __typename
+        ... on MessageEvent {
+          timestamp
+          message
+          level
+          stepKey
+        }
+        ... on ExecutionStepFailureEvent {
+          error { message causes { message } }
+        }
+        ... on MaterializationEvent {
+          timestamp
+          stepKey
+          assetKey { path }
+          label
+          description
+        }
+        ... on AssetMaterializationPlannedEvent {
+          timestamp
+          assetKey { path }
+        }
+      }
+    }
+    ... on RunNotFoundError { message }
+    ... on PythonError { message }
+  }
+}"#;
+
+#[derive(Deserialize)]
+struct RunEventsData {
+    #[serde(rename = "logsForRun")]
+    logs_for_run: GqlLogsForRun,
+}
+
+#[derive(Deserialize)]
+struct GqlLogsForRun {
+    #[serde(rename = "__typename")]
+    typename: String,
+    cursor: Option<String>,
+    #[serde(rename = "hasMore")]
+    has_more: Option<bool>,
+    events: Option<Vec<GqlRunEvent>>,
+    message: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GqlRunEvent {
+    #[serde(rename = "__typename")]
+    typename: String,
+    timestamp: Option<String>,
+    message: Option<String>,
+    level: Option<String>,
+    #[serde(rename = "stepKey")]
+    step_key: Option<String>,
+    error: Option<GqlEventError>,
+    #[serde(rename = "assetKey")]
+    asset_key: Option<GqlAssetKey>,
+    label: Option<String>,
+    description: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GqlEventError {
+    message: String,
+    #[serde(default)]
+    causes: Vec<GqlErrorCause>,
+}
+
+#[derive(Deserialize)]
+struct GqlErrorCause {
+    message: String,
+}
+
+#[derive(Serialize)]
+pub struct RunEventsResponse {
+    pub events: Vec<RunEvent>,
+    pub cursor: Option<String>,
+    pub has_more: bool,
+}
+
+#[derive(Serialize)]
+pub struct RunEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub timestamp: Option<String>,
+    pub message: Option<String>,
+    pub level: Option<String>,
+    pub step_key: Option<String>,
+    pub error: Option<String>,
+    pub asset_key: Option<Vec<String>>,
+    pub label: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct RunEventsParams {
+    pub cursor: Option<String>,
+    pub limit: Option<i32>,
+}
+
+pub async fn get_run_events(
+    Path(run_id): Path<String>,
+    Query(params): Query<RunEventsParams>,
+) -> impl IntoResponse {
+    let vars = json!({
+        "runId": run_id,
+        "afterCursor": params.cursor,
+        "limit": params.limit.unwrap_or(500),
+    });
+
+    match gql_post::<RunEventsData>(RUN_EVENTS_QUERY, vars).await {
+        Ok(data) => {
+            let r = data.logs_for_run;
+            match r.typename.as_str() {
+                "EventConnection" => {
+                    let events = r.events.unwrap_or_default().into_iter().map(|e| {
+                        let error_msg = e.error.map(|err| {
+                            let mut msg = err.message.clone();
+                            for c in &err.causes {
+                                msg.push_str("\nCaused by: ");
+                                msg.push_str(&c.message);
+                            }
+                            msg
+                        });
+                        RunEvent {
+                            event_type: e.typename,
+                            timestamp: e.timestamp,
+                            message: e.message,
+                            level: e.level,
+                            step_key: e.step_key,
+                            error: error_msg,
+                            asset_key: e.asset_key.map(|k| k.path),
+                            label: e.label,
+                            description: e.description,
+                        }
+                    }).collect();
+                    Json(RunEventsResponse {
+                        events,
+                        cursor: r.cursor,
+                        has_more: r.has_more.unwrap_or(false),
+                    }).into_response()
+                }
+                _ => {
+                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
+                }
+            }
+        }
+        Err((status, body)) => (status, Json(body)).into_response(),
+    }
+}
+
 pub async fn list_schedules() -> impl IntoResponse {
     let vars = json!({
         "selector": {

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { CheckmarkCircle01Icon, Cancel01Icon, Loading03Icon, PlayIcon, HourglassIcon, MinusSignCircleIcon } from '@hugeicons/core-free-icons'
+import { CheckmarkCircle01Icon, Cancel01Icon, Loading03Icon, HourglassIcon, MinusSignCircleIcon } from '@hugeicons/core-free-icons'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export default function RunsPage() {
   const [runs, setRuns] = useState<Run[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     apiFetch<{ runs: Run[] }>('runs', { limit: '50' })
@@ -139,7 +141,11 @@ export default function RunsPage() {
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/pipelines/runs/${row.original.run_id}`)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

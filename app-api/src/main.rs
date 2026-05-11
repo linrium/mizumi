@@ -27,6 +27,7 @@ async fn main() {
         .route("/dagster/materialize/{*path}", post(dagster::materialize_asset))
         .route("/dagster/runs", get(dagster::list_runs).post(dagster::launch_run))
         .route("/dagster/runs/{run_id}", get(dagster::get_run).delete(dagster::terminate_run))
+        .route("/dagster/runs/{run_id}/events", get(dagster::get_run_events))
         .route("/dagster/jobs", get(dagster::list_jobs))
         .route("/dagster/schedules", get(dagster::list_schedules))
         // Catalog routes
