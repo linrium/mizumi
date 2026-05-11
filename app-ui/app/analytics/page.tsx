@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, Component } from 'react'
-import type { ReactNode, ErrorInfo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
-import { BarChart, LineChart, PieChart } from 'reaviz'
+import ReactECharts from 'echarts-for-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons'
@@ -91,19 +90,6 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   )
 }
 
-// ── ChartErrorBoundary ────────────────────────────────────────────────────────
-
-class ChartErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(_e: Error, _info: ErrorInfo) { /* handled by getDerivedStateFromError */ }
-  render() {
-    if (this.state.failed)
-      return this.props.fallback ?? <div className="py-6 text-center text-xs text-muted-foreground">Chart unavailable for this data</div>
-    return this.props.children
-  }
-}
-
 // ── QueryResultCard ───────────────────────────────────────────────────────────
 
 function QueryResultCard({ output }: { output: RunQueryOutput }) {
@@ -150,24 +136,60 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 
 // ── VisualizationCard ─────────────────────────────────────────────────────────
 
+function buildEChartsOption(
+  chartType: 'bar' | 'line' | 'pie',
+  keys: string[],
+  values: number[],
+  title: string,
+) {
+  if (chartType === 'pie') {
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: { orient: 'vertical', left: 'left', textStyle: { fontSize: 11 } },
+      series: [{
+        name: title,
+        type: 'pie',
+        radius: ['35%', '65%'],
+        data: keys.map((k, i) => ({ name: k, value: values[i] })),
+        label: { fontSize: 11 },
+      }],
+    }
+  }
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 48, right: 16, top: 16, bottom: 40, containLabel: false },
+    xAxis: { type: 'category', data: keys, axisLabel: { fontSize: 11, rotate: keys.length > 6 ? 30 : 0 } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+    series: [{
+      data: values,
+      type: chartType,
+      smooth: chartType === 'line',
+      areaStyle: chartType === 'line' ? { opacity: 0.15 } : undefined,
+    }],
+  }
+}
+
 function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
 
-  const chartData = useMemo(() => {
-    if (!output.columns || !output.rows) return []
+  const { keys, values } = useMemo(() => {
+    if (!output.columns || !output.rows) return { keys: [], values: [] }
     const xi = output.columns.indexOf(output.x)
     const yi = output.columns.indexOf(output.y)
-    if (xi === -1 || yi === -1) return []
-    return output.rows
-      .map((r) => ({ key: String(r[xi] ?? ''), data: parseFloat(String(r[yi] ?? '0')) }))
-      .filter((d) => isFinite(d.data))
+    if (xi === -1 || yi === -1) return { keys: [], values: [] }
+    const pairs = output.rows
+      .map((r) => ({ k: String(r[xi] ?? ''), v: parseFloat(String(r[yi] ?? '')) }))
+      .filter((d) => isFinite(d.v))
+    return { keys: pairs.map((d) => d.k), values: pairs.map((d) => d.v) }
   }, [output])
 
-  const chartProps = { data: chartData, height: 240 }
+  const option = useMemo(
+    () => buildEChartsOption(output.chartType, keys, values, output.title),
+    [output.chartType, output.title, keys, values],
+  )
 
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
         <HugeiconsIcon icon={Chart01Icon} size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1 truncate">{output.title}</span>
@@ -191,32 +213,14 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
         <div className="px-3 py-2 text-destructive font-mono">{output.error}</div>
       )}
 
-      {chartData.length === 0 && !output.error && (
+      {keys.length === 0 && !output.error && (
         <div className="py-6 text-center text-muted-foreground">
           Cannot map &quot;{output.x}&quot; / &quot;{output.y}&quot; to chart axes
         </div>
       )}
 
-      {chartData.length > 0 && (
-        <>
-          {output.chartType === 'pie' && (
-            <ChartErrorBoundary key="pie">
-              <div className="flex justify-center py-4"><PieChart {...chartProps} /></div>
-            </ChartErrorBoundary>
-          )}
-          {output.chartType === 'line' && (
-            <ChartErrorBoundary key="line" fallback={
-              <div className="px-3 py-4"><BarChart {...chartProps} /></div>
-            }>
-              <div className="px-3 py-4"><LineChart {...chartProps} /></div>
-            </ChartErrorBoundary>
-          )}
-          {output.chartType === 'bar' && (
-            <ChartErrorBoundary key="bar">
-              <div className="px-3 py-4"><BarChart {...chartProps} /></div>
-            </ChartErrorBoundary>
-          )}
-        </>
+      {keys.length > 0 && (
+        <ReactECharts option={option} style={{ height: 260 }} opts={{ renderer: 'svg' }} />
       )}
 
       {output.explanation && (
