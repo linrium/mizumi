@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
+import { Streamdown } from 'streamdown'
 import ReactECharts from 'echarts-for-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -326,7 +327,7 @@ function ToolError({ text }: { text: string }) {
 
 // ── MessageBubble ─────────────────────────────────────────────────────────────
 
-function MessageBubble({ message }: { message: UIMessage }) {
+function MessageBubble({ message, isAnimating }: { message: UIMessage; isAnimating: boolean }) {
   const isUser = message.role === 'user'
 
   if (isUser) {
@@ -346,9 +347,9 @@ function MessageBubble({ message }: { message: UIMessage }) {
         if (part.type === 'text') {
           if (!part.text.trim()) return null
           return (
-            <p key={i} className="text-sm whitespace-pre-wrap leading-relaxed">
+            <Streamdown key={i} animated isAnimating={isAnimating} className="text-sm leading-relaxed">
               {part.text}
-            </p>
+            </Streamdown>
           )
         }
         if (isToolUIPart(part)) return <ToolPart key={i} part={part} />
@@ -444,7 +445,7 @@ export default function AnalyticsPage() {
           </div>
         ) : (
           <div className="py-4 space-y-1 max-w-3xl mx-auto w-full">
-            {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
+            {messages.map((msg) => <MessageBubble key={msg.id} message={msg} isAnimating={isLoading && msg === messages.at(-1)} />)}
 
             {isLoading && messages.at(-1)?.role === 'user' && (
               <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-muted-foreground">

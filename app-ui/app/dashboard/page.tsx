@@ -13,6 +13,7 @@ import { useDataGrid } from '@/hooks/use-data-grid'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, getToolName, isToolUIPart } from 'ai'
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
+import { Streamdown } from 'streamdown'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import {
   Add01Icon,
@@ -515,7 +516,7 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
           </div>
         ) : (
           <div className="py-2 space-y-0.5">
-            {messages.map((msg) => <ComposerMessage key={msg.id} message={msg} />)}
+            {messages.map((msg) => <ComposerMessage key={msg.id} message={msg} isAnimating={isLoading && msg === messages.at(-1)} />)}
             {isLoading && messages.at(-1)?.role === 'user' && (
               <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
                 <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
@@ -565,7 +566,7 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
   )
 }
 
-function ComposerMessage({ message }: { message: UIMessage }) {
+function ComposerMessage({ message, isAnimating }: { message: UIMessage; isAnimating: boolean }) {
   const isUser = message.role === 'user'
 
   if (isUser) {
@@ -583,17 +584,21 @@ function ComposerMessage({ message }: { message: UIMessage }) {
     <div className="px-3 py-1.5">
       <div className="space-y-1">
         {message.parts.map((part, i) => (
-          <ComposerMessagePart key={i} part={part} />
+          <ComposerMessagePart key={i} part={part} isAnimating={isAnimating} />
         ))}
       </div>
     </div>
   )
 }
 
-function ComposerMessagePart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
+function ComposerMessagePart({ part, isAnimating }: { part: UIMessagePart<UIDataTypes, UITools>; isAnimating: boolean }) {
   if (part.type === 'text') {
     if (!part.text.trim()) return null
-    return <p className="text-xs whitespace-pre-wrap leading-relaxed text-foreground/90">{part.text}</p>
+    return (
+      <Streamdown animated isAnimating={isAnimating} className="text-xs leading-relaxed">
+        {part.text}
+      </Streamdown>
+    )
   }
 
   if (isToolUIPart(part)) {
