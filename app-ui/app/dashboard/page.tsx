@@ -385,6 +385,8 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
   const onPanelsCreatedRef = useRef(onPanelsCreated)
   const onPanelsEditedRef = useRef(onPanelsEdited)
 
+  const { fetchSessions, setActiveId } = useSessionContext()
+
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
   useEffect(() => { modelIdRef.current = modelId }, [modelId])
   useEffect(() => { panelsRef.current = panels }, [panels])
@@ -401,7 +403,16 @@ function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange
       selectedPanelId: selectedPanelIdRef.current,
       lastCreatedIds: lastCreatedIdsRef.current,
     }),
-  }), [])
+    fetch: async (input, init) => {
+      const res = await fetch(input, init)
+      const newSessionId = res.headers.get('X-Session-Id')
+      if (newSessionId && newSessionId !== sessionIdRef.current) {
+        await fetchSessions()
+        setActiveId(newSessionId)
+      }
+      return res
+    },
+  }), [fetchSessions, setActiveId])
 
   const { messages, sendMessage, status } = useChat({ transport })
   const isLoading = status === 'submitted' || status === 'streaming'

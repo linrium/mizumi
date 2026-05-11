@@ -57,17 +57,17 @@ async function runSql(sessionId: string | null, sql: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
-export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.6:27b'
+export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.5:9b'
 
 export const MODELS: { id: ModelId; label: string }[] = [
   { id: 'deepseek-chat', label: 'DeepSeek Chat' },
   { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-  { id: 'qwen3.6:27b', label: 'Qwen 3.6 27B' },
+  { id: 'qwen3.5:9b', label: 'Qwen 3.5 9B' },
 ]
 
 function resolveModel(modelId: ModelId): LanguageModel {
   if (modelId === 'gpt-5.4-mini') return openai('gpt-5.4-mini')
-  if (modelId === 'qwen3.6:27b') return ollama('qwen3.6:27b')
+  if (modelId === 'qwen3.5:9b') return ollama('qwen3.5:9b')
   return deepseek('deepseek-chat')
 }
 

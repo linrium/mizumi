@@ -11,6 +11,7 @@ type SessionContextValue = {
   deleting: string | null
   createSession: () => Promise<Session | null>
   deleteSession: (id: string) => Promise<void>
+  fetchSessions: () => Promise<void>
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)

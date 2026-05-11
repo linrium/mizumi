@@ -43,11 +43,16 @@ async function fetchSchema(): Promise<string> {
     .join('\n\n')
 }
 
-async function runSql(sessionId: string | null, sql: string) {
-  const url = sessionId
-    ? `${API_BASE}/api/sessions/${sessionId}/query`
-    : `${API_BASE}/api/query`
-  const res = await fetch(url, {
+async function ensureSession(sessionId: string | null): Promise<string> {
+  if (sessionId) return sessionId
+  const res = await fetch(`${API_BASE}/api/sessions`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to create session: HTTP ${res.status}`)
+  const data = await res.json() as { session_id: string }
+  return data.session_id
+}
+
+async function runSql(sessionId: string, sql: string) {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sql }),
@@ -57,17 +62,17 @@ async function runSql(sessionId: string | null, sql: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
-export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.6:27b'
+export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.5:9b'
 
 export const MODELS: { id: ModelId; label: string }[] = [
   { id: 'deepseek-chat', label: 'DeepSeek Chat' },
   { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-  { id: 'qwen3.6:27b', label: 'Qwen 3.6 27B' },
+  { id: 'qwen3.5:9b', label: 'Qwen 3.5 9B' },
 ]
 
 function resolveModel(modelId: ModelId): LanguageModel {
   if (modelId === 'gpt-5.4-mini') return openai('gpt-5.4-mini')
-  if (modelId === 'qwen3.6:27b') return ollama('qwen3.6:27b')
+  if (modelId === 'qwen3.5:9b') return ollama('qwen3.5:9b')
   return deepseek('deepseek-chat')
 }
 
@@ -94,6 +99,7 @@ export async function POST(req: NextRequest) {
   }
 
   const model = resolveModel(modelId ?? 'gpt-5.4-mini')
+  const resolvedSessionId = await ensureSession(sessionId)
   const schema = await fetchSchema().catch(() => '(schema unavailable)')
 
   // Build a concise panel list for the system prompt
@@ -122,7 +128,7 @@ export async function POST(req: NextRequest) {
       }),
       execute: async ({ sql, title, chartType, xCol, yCol, explanation, width, height }) => {
         try {
-          const data = await runSql(sessionId, sql)
+          const data = await runSql(resolvedSessionId,sql)
           return { title, sql, chartType, xCol, yCol, explanation, width, height, columns: data.columns, rows: data.rows, row_count: data.row_count }
         } catch (e) {
           return { title, sql, chartType, xCol, yCol, explanation, width, height, error: (e as Error).message }
@@ -152,7 +158,7 @@ export async function POST(req: NextRequest) {
 
         const effectiveSql = sql ?? target.sql
         try {
-          const data = await runSql(sessionId, effectiveSql)
+          const data = await runSql(resolvedSessionId,effectiveSql)
           return {
             panelId,
             title: title ?? target.title,
@@ -212,5 +218,7 @@ If a tool returns an error field, quote it briefly and stop.`,
     stopWhen: stepCountIs(15),
   })
 
-  return result.toUIMessageStreamResponse()
+  return result.toUIMessageStreamResponse({
+    headers: { 'X-Session-Id': resolvedSessionId },
+  })
 }
