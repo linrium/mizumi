@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { CheckmarkCircle01Icon, Alert01Icon, Cancel01Icon, QuestionIcon } from '@hugeicons/core-free-icons'
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
 import { toast } from 'sonner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -47,21 +46,21 @@ function fmtTimestamp(ts: string | number | null | undefined): string {
 function StaleStatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>
 
-  const config: Record<string, { label: string; icon: IconSvgElement; className: string }> = {
-    FRESH:   { label: 'Fresh',   icon: CheckmarkCircle01Icon, className: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800 dark:bg-green-950 dark:text-green-400' },
-    STALE:   { label: 'Stale',   icon: Alert01Icon,           className: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
-    MISSING: { label: 'Missing', icon: Cancel01Icon,          className: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
-    UNKNOWN: { label: 'Unknown', icon: QuestionIcon,          className: 'border-border bg-muted text-muted-foreground' },
+  const config: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'default' }> = {
+    FRESH:   { label: 'Fresh',   variant: 'success' },
+    STALE:   { label: 'Stale',   variant: 'warning' },
+    MISSING: { label: 'Missing', variant: 'error' },
+    UNKNOWN: { label: 'Unknown', variant: 'default' },
   }
 
   const cfg = config[status]
   if (!cfg) return <span className="text-muted-foreground">{status}</span>
 
   return (
-    <Badge variant="outline" className={cfg.className}>
-      <HugeiconsIcon icon={cfg.icon} size={10} />
-      {cfg.label}
-    </Badge>
+    <Status variant={cfg.variant}>
+      <StatusIndicator />
+      <StatusLabel>{cfg.label}</StatusLabel>
+    </Status>
   )
 }
 

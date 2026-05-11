@@ -8,14 +8,7 @@ import { cn } from '@/lib/utils'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { Badge } from '@/components/ui/badge'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import {
-  CheckmarkCircle01Icon,
-  Cancel01Icon,
-  Loading03Icon,
-  HourglassIcon,
-  MinusSignCircleIcon,
-} from '@hugeicons/core-free-icons'
+import { Status, StatusIndicator, StatusLabel } from '@/components/ui/status'
 import type { RunEvent } from './StepGraph'
 
 dayjs.extend(relativeTime)
@@ -72,17 +65,25 @@ function fmtDuration(start: number | null, end: number | null): string {
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
-type StatusConfig = { label: string; icon: IconSvgElement; badgeCls: string }
+type StatusConfig = { label: string; variant: 'success' | 'error' | 'info' | 'warning' | 'default' }
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
-  SUCCESS:     { label: 'Success',     icon: CheckmarkCircle01Icon, badgeCls: 'border-green-200  bg-green-50  text-green-700  dark:border-green-800  dark:bg-green-950  dark:text-green-400' },
-  FAILURE:     { label: 'Failed',      icon: Cancel01Icon,          badgeCls: 'border-red-200    bg-red-50    text-red-700    dark:border-red-800    dark:bg-red-950    dark:text-red-400' },
-  STARTED:     { label: 'Running',     icon: Loading03Icon,         badgeCls: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
-  STARTING:    { label: 'Starting',    icon: Loading03Icon,         badgeCls: 'border-blue-200   bg-blue-50   text-blue-700   dark:border-blue-800   dark:bg-blue-950   dark:text-blue-400' },
-  QUEUED:      { label: 'Queued',      icon: HourglassIcon,         badgeCls: 'border-border bg-muted text-muted-foreground' },
-  CANCELING:   { label: 'Canceling',   icon: Loading03Icon,         badgeCls: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
-  CANCELED:    { label: 'Canceled',    icon: MinusSignCircleIcon,   badgeCls: 'border-border bg-muted text-muted-foreground' },
-  NOT_STARTED: { label: 'Not started', icon: HourglassIcon,         badgeCls: 'border-border bg-muted text-muted-foreground' },
+  SUCCESS:     { label: 'Success',     variant: 'success' },
+  FAILURE:     { label: 'Failed',      variant: 'error' },
+  STARTED:     { label: 'Running',     variant: 'info' },
+  STARTING:    { label: 'Starting',    variant: 'info' },
+  QUEUED:      { label: 'Queued',      variant: 'default' },
+  CANCELING:   { label: 'Canceling',   variant: 'warning' },
+  CANCELED:    { label: 'Canceled',    variant: 'default' },
+  NOT_STARTED: { label: 'Not started', variant: 'default' },
+}
+
+const VARIANT_DOT_CLS: Record<string, string> = {
+  success: 'bg-green-600 dark:bg-green-400',
+  error:   'bg-destructive',
+  info:    'bg-blue-600 dark:bg-blue-400',
+  warning: 'bg-orange-600 dark:bg-orange-400',
+  default: 'bg-muted-foreground',
 }
 
 const ACTIVE_STATUSES = new Set(['QUEUED', 'STARTED', 'STARTING', 'CANCELING'])
@@ -90,12 +91,11 @@ const ACTIVE_STATUSES = new Set(['QUEUED', 'STARTED', 'STARTING', 'CANCELING'])
 function RunStatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status]
   if (!cfg) return <Badge variant="outline">{status}</Badge>
-  const spinning = ACTIVE_STATUSES.has(status)
   return (
-    <Badge variant="outline" className={cfg.badgeCls}>
-      <HugeiconsIcon icon={cfg.icon} size={10} className={spinning ? 'animate-spin' : undefined} />
-      {cfg.label}
-    </Badge>
+    <Status variant={cfg.variant}>
+      <StatusIndicator />
+      <StatusLabel>{cfg.label}</StatusLabel>
+    </Status>
   )
 }
 
@@ -252,18 +252,7 @@ function ReExecutions({ rootRunId, runId }: { rootRunId: string | null; runId: s
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
-                {cfg && (
-                  <HugeiconsIcon
-                    icon={cfg.icon}
-                    size={12}
-                    className={cn(
-                      ACTIVE_STATUSES.has(r.status) && 'animate-spin',
-                      cfg.badgeCls.includes('green') ? 'text-green-500' :
-                      cfg.badgeCls.includes('red') ? 'text-red-500' :
-                      cfg.badgeCls.includes('blue') ? 'text-blue-500' : 'text-muted-foreground',
-                    )}
-                  />
-                )}
+                {cfg && <StatusIndicator className={VARIANT_DOT_CLS[cfg.variant]} />}
                 <span className="text-xs font-mono">{r.run_id.slice(0, 8)}</span>
                 {r.root_run_id === null || r.root_run_id === r.run_id ? (
                   <span className="text-[10px] text-muted-foreground">ROOT</span>
@@ -370,10 +359,9 @@ export default function RunDetailPage() {
           Runs
         </Link>
         <span className="text-muted-foreground text-xs">/</span>
-        <span className="text-xs font-mono font-semibold truncate">{runId.slice(0, 8)}…</span>
+        <span className="text-xs font-mono font-semibold">{runId}</span>
         <RunStatusBadge status={run.status} />
         <div className="ml-auto flex items-center gap-3 shrink-0">
-          <span className="text-xs text-muted-foreground">{run.job_name}</span>
           <span className="text-xs text-muted-foreground">{fmtTs(run.start_time ?? run.creation_time)}</span>
           <span className="text-xs text-muted-foreground">{fmtDuration(run.start_time, run.end_time)}</span>
           {totalSteps > 0 && (

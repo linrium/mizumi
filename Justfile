@@ -28,7 +28,6 @@ spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
 spark_app_name := "rustfs-medallion"
 spark_pipeline_job := "rustfs-medallion-pipeline-submit"
-spark_pipeline_app := "rustfs-medallion-pipeline"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 daft_image := "mizumi-daft:0.7.10"
 datafusion_image := "mizumi-datafusion:50.1.0"
@@ -50,7 +49,7 @@ duckdb_image := "mizumi-duckdb:1.1.3"
 duckdb_namespace := "spark"
 duckdb_query_job := "duckdb-rustfs-query"
 
-deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy
+deploy: rustfs-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-simple-deploy daft-distributed-deploy ballista-deploy
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy rustfs-destroy
 
