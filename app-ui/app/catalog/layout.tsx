@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
-  CatalogueIcon,
-  Database01Icon,
-  Table01Icon,
+  Book03Icon,
+  DatabaseIcon,
+  TableIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 
@@ -118,7 +118,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                   )}
                 >
                   <Chevron open={catOpen} />
-                  <HugeiconsIcon icon={CatalogueIcon} size={13} className="shrink-0 text-muted-foreground" />
+                  <HugeiconsIcon icon={Book03Icon} size={13} className="shrink-0 text-muted-foreground" />
                   <span className="truncate flex-1">{cat.name}</span>
                 </button>
 
@@ -139,7 +139,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                         )}
                       >
                         <Chevron open={schOpen} />
-                        <HugeiconsIcon icon={Database01Icon} size={13} className="shrink-0 text-muted-foreground" />
+                        <HugeiconsIcon icon={DatabaseIcon} size={13} className="shrink-0 text-muted-foreground" />
                         <span className="truncate flex-1">{sch.name}</span>
                       </button>
 
@@ -156,7 +156,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
                               tblActive && 'bg-accent text-accent-foreground font-medium',
                             )}
                           >
-                            <HugeiconsIcon icon={Table01Icon} size={13} className="shrink-0 text-muted-foreground" />
+                            <HugeiconsIcon icon={TableIcon} size={13} className="shrink-0 text-muted-foreground" />
                             <span className="truncate">{tbl.name}</span>
                           </button>
                         )

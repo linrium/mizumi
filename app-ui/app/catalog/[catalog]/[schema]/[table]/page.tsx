@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Copy01Icon, Table01Icon } from '@hugeicons/core-free-icons'
+import { Copy01Icon, TableIcon } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
 import { useSessions } from '@/hooks/use-sessions'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -206,7 +206,7 @@ export default function TablePage() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-5 py-4 border-b shrink-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <HugeiconsIcon icon={Table01Icon} size={15} className="text-muted-foreground" />
+          <HugeiconsIcon icon={TableIcon} size={15} className="text-muted-foreground" />
           <h2 className="text-sm font-semibold">{detail.name}</h2>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {detail.table_type}

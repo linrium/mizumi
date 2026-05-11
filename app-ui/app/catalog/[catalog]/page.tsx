@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Database01Icon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon } from '@hugeicons/core-free-icons'
 
 type Schema = { name: string; catalog_name: string; comment?: string }
 
@@ -56,7 +56,7 @@ export default function CatalogPage() {
                       href={`/catalog/${catalog}/${sch.name}`}
                       className="flex items-center gap-1.5 font-mono font-medium hover:underline underline-offset-2 w-fit"
                     >
-                      <HugeiconsIcon icon={Database01Icon} size={13} className="shrink-0 text-muted-foreground" />
+                      <HugeiconsIcon icon={DatabaseIcon} size={13} className="shrink-0 text-muted-foreground" />
                       {sch.name}
                     </Link>
                   </td>
