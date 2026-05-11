@@ -43,6 +43,20 @@ async function fetchSchema(): Promise<string> {
     .join('\n\n')
 }
 
+async function runSql(sessionId: string | null, sql: string) {
+  const url = sessionId
+    ? `${API_BASE}/api/sessions/${sessionId}/query`
+    : `${API_BASE}/api/query`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+  return data as { columns: string[]; rows: unknown[][]; row_count: number }
+}
+
 export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.6:27b'
 
 export const MODELS: { id: ModelId; label: string }[] = [
@@ -57,19 +71,6 @@ function resolveModel(modelId: ModelId): LanguageModel {
   return deepseek('deepseek-chat')
 }
 
-const runQueryParameters = z.object({
-  sql: z.string().describe('The SQL query to execute'),
-  explanation: z.string().describe('One sentence describing what this query returns'),
-  visualization: z
-    .object({
-      type: z.enum(['bar', 'line', 'pie', 'table']),
-      x: z.string().describe('Column for x-axis or labels'),
-      y: z.string().describe('Column for values'),
-    })
-    .optional()
-    .describe('How to visualize the result. Omit for plain text answers.'),
-})
-
 export async function POST(req: NextRequest) {
   const { messages, sessionId, modelId } = await req.json()
 
@@ -79,31 +80,53 @@ export async function POST(req: NextRequest) {
   const tools = {
     runQuery: tool({
       description:
-        'Execute a SQL query and return the results. Call this tool immediately whenever the user asks to see, show, list, fetch, query, or analyze any data — including when they provide a table name directly. Do not narrate what you will do; just call the tool.',
-      inputSchema: runQueryParameters,
-      execute: async ({ sql, explanation, visualization }) => {
+        'Execute a SQL query and display the results in a data grid. Call this whenever the user asks to see, list, fetch, or query data.',
+      inputSchema: z.object({
+        sql: z.string().describe('The SQL query to execute'),
+        explanation: z.string().describe('One sentence describing what this query returns'),
+      }),
+      execute: async ({ sql, explanation }) => {
         try {
-          const url = sessionId
-            ? `${API_BASE}/api/sessions/${sessionId}/query`
-            : `${API_BASE}/api/query`
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sql }),
-          })
-          const data = await res.json()
-          if (!res.ok) return { error: data.error ?? `HTTP ${res.status}`, sql, explanation }
+          const data = await runSql(sessionId, sql)
           return {
             sql,
             explanation,
-            visualization,
-            columns: data.columns as string[],
-            rows: data.rows as unknown[][],
-            row_count: data.row_count as number,
+            columns: data.columns,
+            rows: data.rows,
+            row_count: data.row_count,
           }
         } catch (e) {
-          const msg = (e as Error).message
-          return { error: `Query API unreachable: ${msg}`, sql, explanation }
+          return { sql, explanation, error: (e as Error).message }
+        }
+      },
+    }),
+
+    visualizeChart: tool({
+      description:
+        'Run a SQL query and render the result as a chart. Call this when the user asks to visualize, plot, or chart data, or when a chart would better communicate the answer than a table.',
+      inputSchema: z.object({
+        sql: z.string().describe('SQL query whose result will be charted'),
+        title: z.string().describe('Short chart title'),
+        chartType: z.enum(['bar', 'line', 'pie']).describe('bar → categories, line → time-series, pie → proportions ≤8 slices'),
+        x: z.string().describe('Column name for x-axis labels'),
+        y: z.string().describe('Column name for numeric values'),
+        explanation: z.string().describe('One sentence describing what this chart shows'),
+      }),
+      execute: async ({ sql, title, chartType, x, y, explanation }) => {
+        try {
+          const data = await runSql(sessionId, sql)
+          return {
+            sql,
+            title,
+            chartType,
+            x,
+            y,
+            explanation,
+            columns: data.columns,
+            rows: data.rows,
+          }
+        } catch (e) {
+          return { sql, title, chartType, x, y, explanation, error: (e as Error).message }
         }
       },
     }),
@@ -111,36 +134,36 @@ export async function POST(req: NextRequest) {
 
   const result = streamText({
     model,
-    system: `You are a data analyst for the Mizumi lakehouse platform. You have one tool: runQuery.
+    system: `You are a data analyst for the Mizumi lakehouse platform. You have two tools: runQuery and visualizeChart.
 
-## WHEN TO CALL runQuery — call it immediately, without preamble, when the user:
+## Tool selection:
+- runQuery → user wants to see raw data, run a query, or inspect a table
+- visualizeChart → user asks to visualize, plot, chart, or when a chart communicates the answer better
+
+## CALL A TOOL IMMEDIATELY, without preamble, when the user:
 - asks to show, list, display, get, fetch, or query any table or data
 - mentions a table name (e.g. gold_customer_stats, mizumi.default.xxx)
-- asks for top N, counts, sums, averages, trends, comparisons, or rankings
-- pastes or references a SQL query
+- asks for top N, counts, sums, averages, trends, comparisons, rankings
+- asks to visualize, plot, chart, or graph anything
 
-## WHEN NOT TO CALL runQuery:
+## WHEN NOT TO CALL A TOOL:
 - purely conversational messages ("thanks", "what is Mizumi?")
 - questions about the schema you can answer from the list below
 
 ## SQL rules:
 - Always use fully qualified names: mizumi.default.<table>
-- If the user provides a fully qualified name, use it verbatim — do NOT change it
+- If the user provides a fully qualified name, use it verbatim
 
-## Error handling — IMPORTANT:
-- If runQuery returns an error field, quote it exactly and STOP. Do not retry with a different table or query.
-- If the result is empty (0 rows), say so and STOP. Do not try other tables.
-- Never say "the table may not be accessible" or suggest alternatives on your own.
+## Error handling:
+- If a tool returns an error field, quote it exactly and STOP.
+- If the result is empty (0 rows), say so and STOP.
 
 ## Available tables in mizumi.default:
 ${schema}
 
-## Visualization hints:
-- "bar" → categories, "line" → time-series, "pie" → proportions ≤8 slices, "table" → multi-column
-
-## After a successful query — CRITICAL:
-- NEVER render data as a markdown table or list. The UI already shows the full results in a data grid.
-- Only write 1–2 sentences interpreting the results (e.g. trends, notable values).`,
+## After a successful tool call:
+- NEVER render data as a markdown table or list — the UI renders results automatically.
+- Write 1–2 sentences interpreting the results only.`,
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: stepCountIs(10),

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, Component } from 'react'
+import type { ReactNode, ErrorInfo } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai'
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from 'ai'
@@ -25,22 +26,31 @@ import type { ModelId } from '@/app/api/analytics/chat/route'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Visualization = { type: 'bar' | 'line' | 'pie' | 'table'; x: string; y: string }
-
 type RunQueryOutput = {
   sql: string
   explanation: string
-  visualization?: Visualization
   columns?: string[]
   rows?: unknown[][]
   row_count?: number
   error?: string
 }
 
+type VisualizeChartOutput = {
+  sql: string
+  title: string
+  chartType: 'bar' | 'line' | 'pie'
+  x: string
+  y: string
+  explanation: string
+  columns?: string[]
+  rows?: unknown[][]
+  error?: string
+}
+
 type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>
 
-// ── Shared sub-components ─────────────────────────────────────────────────────
+// ── ResultsGrid ───────────────────────────────────────────────────────────────
 
 function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,36 +91,23 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   )
 }
 
-function ChartView({ queryResult, vis }: { queryResult: QueryResponse; vis: Visualization }) {
-  const chartData = useMemo(() => {
-    const xi = queryResult.columns.indexOf(vis.x)
-    const yi = queryResult.columns.indexOf(vis.y)
-    if (xi === -1 || yi === -1) return []
-    return queryResult.rows
-      .map((r) => ({ key: String(r[xi] ?? ''), data: parseFloat(String(r[yi] ?? '0')) }))
-      .filter((d) => isFinite(d.data))
-  }, [queryResult, vis])
+// ── ChartErrorBoundary ────────────────────────────────────────────────────────
 
-  if (chartData.length === 0) {
-    return (
-      <div className="py-6 text-center text-xs text-muted-foreground">
-        Cannot map &quot;{vis.x}&quot; / &quot;{vis.y}&quot; to chart axes
-      </div>
-    )
+class ChartErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(_e: Error, _info: ErrorInfo) { /* handled by getDerivedStateFromError */ }
+  render() {
+    if (this.state.failed)
+      return this.props.fallback ?? <div className="py-6 text-center text-xs text-muted-foreground">Chart unavailable for this data</div>
+    return this.props.children
   }
-
-  const props = { data: chartData, height: 220 }
-  if (vis.type === 'pie') return <div className="flex justify-center py-3"><PieChart {...props} /></div>
-  if (vis.type === 'line') return <div className="px-3 py-3"><LineChart {...props} /></div>
-  return <div className="px-3 py-3"><BarChart {...props} /></div>
 }
 
-// ── Tool result card ──────────────────────────────────────────────────────────
+// ── QueryResultCard ───────────────────────────────────────────────────────────
 
 function QueryResultCard({ output }: { output: RunQueryOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
-  const hasVis = output.visualization && output.visualization.type !== 'table'
-  const [tab, setTab] = useState<'chart' | 'data'>('data')
 
   const queryResult: QueryResponse | null =
     output.columns && output.rows
@@ -124,14 +121,16 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
         onClick={() => setSqlOpen((v) => !v)}
         className="flex w-full items-center gap-1.5 px-3 py-1.5 text-muted-foreground hover:bg-accent/40 transition-colors border-b"
       >
-        <HugeiconsIcon
-          icon={ArrowDown01Icon}
-          size={11}
-          className={cn('shrink-0 transition-transform', sqlOpen && 'rotate-180')}
-        />
+        <HugeiconsIcon icon={ArrowDown01Icon} size={11} className={cn('shrink-0 transition-transform', sqlOpen && 'rotate-180')} />
+        <HugeiconsIcon icon={Table01Icon} size={11} className="shrink-0" />
         <span className="font-mono truncate flex-1 text-left">
           {output.sql.slice(0, 72)}{output.sql.length > 72 ? '…' : ''}
         </span>
+        {queryResult && (
+          <span className="text-muted-foreground text-[11px] shrink-0">
+            {queryResult.row_count} {queryResult.row_count === 1 ? 'row' : 'rows'}
+          </span>
+        )}
       </button>
 
       {sqlOpen && (
@@ -144,71 +143,136 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
         <div className="px-3 py-2 text-destructive font-mono">{output.error}</div>
       )}
 
-      {queryResult && (
-        <>
-          <div className="flex items-center border-b px-1">
-            {(hasVis ? ['chart', 'data'] as const : ['data'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1.5 font-medium border-b-2 -mb-px capitalize transition-colors',
-                  tab === t
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <HugeiconsIcon icon={t === 'chart' ? Chart01Icon : Table01Icon} size={11} />
-                {t}
-              </button>
-            ))}
-            <div className="flex-1" />
-            <span className="pr-2 text-muted-foreground text-[11px]">
-              {queryResult.row_count} {queryResult.row_count === 1 ? 'row' : 'rows'}
-            </span>
-          </div>
+      {queryResult && <ResultsGrid queryResult={queryResult} />}
+    </div>
+  )
+}
 
-          {tab === 'chart' && output.visualization
-            ? <ChartView queryResult={queryResult} vis={output.visualization} />
-            : <ResultsGrid queryResult={queryResult} />}
+// ── VisualizationCard ─────────────────────────────────────────────────────────
+
+function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
+  const [sqlOpen, setSqlOpen] = useState(false)
+
+  const chartData = useMemo(() => {
+    if (!output.columns || !output.rows) return []
+    const xi = output.columns.indexOf(output.x)
+    const yi = output.columns.indexOf(output.y)
+    if (xi === -1 || yi === -1) return []
+    return output.rows
+      .map((r) => ({ key: String(r[xi] ?? ''), data: parseFloat(String(r[yi] ?? '0')) }))
+      .filter((d) => isFinite(d.data))
+  }, [output])
+
+  const chartProps = { data: chartData, height: 240 }
+
+  return (
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+        <HugeiconsIcon icon={Chart01Icon} size={12} className="text-muted-foreground shrink-0" />
+        <span className="font-medium flex-1 truncate">{output.title}</span>
+        <button
+          type="button"
+          onClick={() => setSqlOpen((v) => !v)}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Toggle SQL"
+        >
+          <HugeiconsIcon icon={ArrowDown01Icon} size={11} className={cn('transition-transform', sqlOpen && 'rotate-180')} />
+        </button>
+      </div>
+
+      {sqlOpen && (
+        <pre className="px-3 py-2 bg-muted/30 whitespace-pre-wrap overflow-x-auto border-b font-mono text-[11px]">
+          {output.sql}
+        </pre>
+      )}
+
+      {output.error && (
+        <div className="px-3 py-2 text-destructive font-mono">{output.error}</div>
+      )}
+
+      {chartData.length === 0 && !output.error && (
+        <div className="py-6 text-center text-muted-foreground">
+          Cannot map &quot;{output.x}&quot; / &quot;{output.y}&quot; to chart axes
+        </div>
+      )}
+
+      {chartData.length > 0 && (
+        <>
+          {output.chartType === 'pie' && (
+            <ChartErrorBoundary key="pie">
+              <div className="flex justify-center py-4"><PieChart {...chartProps} /></div>
+            </ChartErrorBoundary>
+          )}
+          {output.chartType === 'line' && (
+            <ChartErrorBoundary key="line" fallback={
+              <div className="px-3 py-4"><BarChart {...chartProps} /></div>
+            }>
+              <div className="px-3 py-4"><LineChart {...chartProps} /></div>
+            </ChartErrorBoundary>
+          )}
+          {output.chartType === 'bar' && (
+            <ChartErrorBoundary key="bar">
+              <div className="px-3 py-4"><BarChart {...chartProps} /></div>
+            </ChartErrorBoundary>
+          )}
         </>
+      )}
+
+      {output.explanation && (
+        <p className="px-3 py-2 text-[11px] text-muted-foreground border-t">{output.explanation}</p>
       )}
     </div>
   )
 }
 
-// ── Tool part renderer ────────────────────────────────────────────────────────
+// ── ToolPart ──────────────────────────────────────────────────────────────────
 
 function ToolPart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
-  if (!isToolUIPart(part) || getToolName(part) !== 'runQuery') return null
+  if (!isToolUIPart(part)) return null
 
-  if (part.state === 'input-streaming' || part.state === 'input-available') {
-    const input = part.input as { explanation?: string } | undefined
-    return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-        <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
-        {input?.explanation ?? 'Running query…'}
-      </div>
-    )
+  const name = getToolName(part)
+
+  if (name === 'runQuery') {
+    if (part.state === 'input-streaming' || part.state === 'input-available') {
+      const input = part.input as { explanation?: string } | undefined
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          {input?.explanation ?? 'Running query…'}
+        </div>
+      )
+    }
+    if (part.state === 'output-available') return <QueryResultCard output={part.output as RunQueryOutput} />
+    if (part.state === 'output-error') return <ToolError text={part.errorText} />
   }
 
-  if (part.state === 'output-available') {
-    return <QueryResultCard output={part.output as RunQueryOutput} />
-  }
-
-  if (part.state === 'output-error') {
-    return (
-      <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-1">
-        Tool error: {part.errorText}
-      </div>
-    )
+  if (name === 'visualizeChart') {
+    if (part.state === 'input-streaming' || part.state === 'input-available') {
+      const input = part.input as { title?: string } | undefined
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          {input?.title ? `Charting: ${input.title}` : 'Building chart…'}
+        </div>
+      )
+    }
+    if (part.state === 'output-available') return <VisualizationCard output={part.output as VisualizeChartOutput} />
+    if (part.state === 'output-error') return <ToolError text={part.errorText} />
   }
 
   return null
 }
 
-// ── Message bubble ────────────────────────────────────────────────────────────
+function ToolError({ text }: { text: string }) {
+  return (
+    <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-1">
+      {text}
+    </div>
+  )
+}
+
+// ── MessageBubble ─────────────────────────────────────────────────────────────
 
 function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === 'user'
@@ -235,9 +299,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
             </p>
           )
         }
-        if (isToolUIPart(part)) {
-          return <ToolPart key={i} part={part} />
-        }
+        if (isToolUIPart(part)) return <ToolPart key={i} part={part} />
         return null
       })}
     </div>
@@ -250,7 +312,7 @@ const SUGGESTIONS = [
   'Revenue by country',
   'Top 5 customers by sales',
   'Show weekly revenue trend',
-  'Explain the gold_country_revenue table',
+  'Chart daily revenue by country',
 ]
 
 export default function AnalyticsPage() {
