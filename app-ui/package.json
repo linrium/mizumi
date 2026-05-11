@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.34",
+    "@ai-sdk/react": "^3.0.179",
     "@dagrejs/dagre": "^3.0.0",
     "@hugeicons/core-free-icons": "^4.1.2",
     "@hugeicons/react": "^1.1.6",

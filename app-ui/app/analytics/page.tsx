@@ -1,44 +1,46 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport } from 'ai'
+import type { DynamicToolUIPart, UIMessage } from 'ai'
 import { BarChart, LineChart, PieChart } from 'reaviz'
 import type { ColumnDef } from '@tanstack/react-table'
 import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  Chart01Icon,
-  Loading03Icon,
-  Table01Icon,
-  ArrowDown01Icon,
-} from '@hugeicons/core-free-icons'
+import { Chart01Icon, Loading03Icon, Table01Icon, ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { DataGrid } from '@/components/data-grid/data-grid'
 import { useDataGrid } from '@/hooks/use-data-grid'
 import { useSessions } from '@/hooks/use-sessions'
 import { cn } from '@/lib/utils'
-import type { AnalyticsResponse } from '@/app/api/analytics/route'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type QueryResponse = {
-  columns: string[]
-  rows: unknown[][]
-  row_count: number
+type Visualization = { type: 'bar' | 'line' | 'pie' | 'table'; x: string; y: string }
+
+type RunQueryOutput = {
+  sql: string
+  explanation: string
+  columns?: string[]
+  rows?: unknown[][]
+  row_count?: number
+  visualization?: Visualization
+  error?: string
 }
 
+type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>
 
-type ViewTab = 'chart' | 'data'
-
-// ── Data grid ─────────────────────────────────────────────────────────────────
+// ── Shared sub-components ─────────────────────────────────────────────────────
 
 function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState(300)
+  const [height, setHeight] = useState(220)
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver((entries) => setHeight(entries[0].contentRect.height))
+    const ro = new ResizeObserver((e) => setHeight(e[0].contentRect.height))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -64,268 +66,290 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const { table, ...dataGridProps } = useDataGrid<Row>({ data, columns, readOnly: true })
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+    <div ref={containerRef} style={{ height: 220 }} className="overflow-hidden">
       <DataGrid table={table} {...dataGridProps} height={height} />
     </div>
   )
 }
 
-// ── Chart renderer ────────────────────────────────────────────────────────────
-
-function ChartRenderer({
-  queryResult,
-  chartConfig,
-}: {
-  queryResult: QueryResponse
-  chartConfig: AnalyticsResponse['chart']
-}) {
+function ChartView({ queryResult, vis }: { queryResult: QueryResponse; vis: Visualization }) {
   const chartData = useMemo(() => {
-    const xIdx = queryResult.columns.indexOf(chartConfig.x)
-    const yIdx = queryResult.columns.indexOf(chartConfig.y)
-    if (xIdx === -1 || yIdx === -1) return []
-    return queryResult.rows.map((row) => ({
-      key: String(row[xIdx] ?? ''),
-      data: Number(row[yIdx] ?? 0),
-    }))
-  }, [queryResult, chartConfig])
+    const xi = queryResult.columns.indexOf(vis.x)
+    const yi = queryResult.columns.indexOf(vis.y)
+    if (xi === -1 || yi === -1) return []
+    return queryResult.rows.map((r) => ({ key: String(r[xi] ?? ''), data: Number(r[yi] ?? 0) }))
+  }, [queryResult, vis])
 
   if (chartData.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-        Cannot map columns &quot;{chartConfig.x}&quot; / &quot;{chartConfig.y}&quot; to chart data
+      <div className="py-6 text-center text-xs text-muted-foreground">
+        Cannot map &quot;{vis.x}&quot; / &quot;{vis.y}&quot; to chart axes
       </div>
     )
   }
 
-  const commonProps = { data: chartData, height: 320 }
+  const props = { data: chartData, height: 220 }
+  if (vis.type === 'pie') return <div className="flex justify-center py-3"><PieChart {...props} /></div>
+  if (vis.type === 'line') return <div className="px-3 py-3"><LineChart {...props} /></div>
+  return <div className="px-3 py-3"><BarChart {...props} /></div>
+}
 
-  if (chartConfig.type === 'pie') {
-    return (
-      <div className="flex justify-center pt-4">
-        <PieChart {...commonProps} />
-      </div>
-    )
-  }
+// ── Tool result card ──────────────────────────────────────────────────────────
 
-  if (chartConfig.type === 'line') {
-    return (
-      <div className="px-4 pt-4">
-        <LineChart {...commonProps} />
-      </div>
-    )
-  }
+function QueryResultCard({ output }: { output: RunQueryOutput }) {
+  const [sqlOpen, setSqlOpen] = useState(false)
+  const hasVis = output.visualization && output.visualization.type !== 'table'
+  const [tab, setTab] = useState<'chart' | 'data'>(hasVis ? 'chart' : 'data')
 
-  // Default: bar
+  const queryResult: QueryResponse | null =
+    output.columns && output.rows
+      ? { columns: output.columns, rows: output.rows, row_count: output.row_count ?? 0 }
+      : null
+
   return (
-    <div className="px-4 pt-4">
-      <BarChart {...commonProps} />
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      {/* SQL toggle */}
+      <button
+        type="button"
+        onClick={() => setSqlOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-muted-foreground hover:bg-accent/40 transition-colors border-b"
+      >
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          size={11}
+          className={cn('shrink-0 transition-transform', sqlOpen && 'rotate-180')}
+        />
+        <span className="font-mono truncate flex-1 text-left">
+          {output.sql.slice(0, 72)}{output.sql.length > 72 ? '…' : ''}
+        </span>
+      </button>
+
+      {sqlOpen && (
+        <pre className="px-3 py-2 bg-muted/30 whitespace-pre-wrap overflow-x-auto border-b font-mono text-[11px]">
+          {output.sql}
+        </pre>
+      )}
+
+      {output.error && (
+        <div className="px-3 py-2 text-destructive font-mono">{output.error}</div>
+      )}
+
+      {queryResult && (
+        <>
+          {/* Tab bar */}
+          <div className="flex items-center border-b px-1">
+            {(hasVis ? ['chart', 'data'] as const : ['data'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1.5 font-medium border-b-2 -mb-px capitalize transition-colors',
+                  tab === t
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <HugeiconsIcon icon={t === 'chart' ? Chart01Icon : Table01Icon} size={11} />
+                {t}
+              </button>
+            ))}
+            <div className="flex-1" />
+            <span className="pr-2 text-muted-foreground text-[11px]">
+              {queryResult.row_count} {queryResult.row_count === 1 ? 'row' : 'rows'}
+            </span>
+          </div>
+
+          {tab === 'chart' && output.visualization
+            ? <ChartView queryResult={queryResult} vis={output.visualization} />
+            : <ResultsGrid queryResult={queryResult} />}
+        </>
+      )}
     </div>
   )
 }
 
-// ── SQL disclosure ────────────────────────────────────────────────────────────
+// ── Tool part renderer ────────────────────────────────────────────────────────
 
-function SqlDisclosure({ sql }: { sql: string }) {
-  const [open, setOpen] = useState(false)
+function ToolPart({ part }: { part: DynamicToolUIPart }) {
+  if (part.toolName !== 'runQuery') return null
+
+  if (part.state === 'input-streaming' || part.state === 'input-available') {
+    const input = part.input as { explanation?: string } | undefined
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+        <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+        {input?.explanation ?? 'Running query…'}
+      </div>
+    )
+  }
+
+  if (part.state === 'output-available') {
+    return <QueryResultCard output={part.output as RunQueryOutput} />
+  }
+
+  if (part.state === 'output-error') {
+    return (
+      <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-1">
+        Tool error: {part.errorText}
+      </div>
+    )
+  }
+
+  return null
+}
+
+// ── Message bubble ────────────────────────────────────────────────────────────
+
+function MessageBubble({ message }: { message: UIMessage }) {
+  const isUser = message.role === 'user'
+
+  if (isUser) {
+    const text = message.parts.find((p) => p.type === 'text')?.text ?? ''
+    return (
+      <div className="flex justify-end px-4 py-1.5">
+        <div className="max-w-[72%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-4 py-2 text-sm whitespace-pre-wrap">
+          {text}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="border-b">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <HugeiconsIcon
-          icon={ArrowDown01Icon}
-          size={12}
-          className={cn('transition-transform', open && 'rotate-180')}
-        />
-        Generated SQL
-      </button>
-      {open && (
-        <pre className="px-4 pb-3 text-xs font-mono text-foreground/80 whitespace-pre-wrap overflow-x-auto">
-          {sql}
-        </pre>
-      )}
+    <div className="px-4 py-1.5 space-y-1.5 max-w-3xl">
+      {message.parts.map((part, i) => {
+        if (part.type === 'text') {
+          if (!part.text.trim()) return null
+          return (
+            <p key={i} className="text-sm whitespace-pre-wrap leading-relaxed">
+              {part.text}
+            </p>
+          )
+        }
+        if (part.type === 'dynamic-tool') {
+          return <ToolPart key={i} part={part} />
+        }
+        return null
+      })}
     </div>
   )
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const SUGGESTIONS = [
+  'Revenue by country',
+  'Top 5 customers by sales',
+  'Show weekly revenue trend',
+  'Explain the gold_country_revenue table',
+]
+
 export default function AnalyticsPage() {
-  const [question, setQuestion] = useState('')
-  const [aiResponse, setAiResponse] = useState<AnalyticsResponse | null>(null)
-  const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [phase, setPhase] = useState<'idle' | 'ai' | 'query'>('idle')
-  const [viewTab, setViewTab] = useState<ViewTab>('chart')
-  const [explanation, setExplanation] = useState<string | null>(null)
+  const [input, setInput] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sessionIdRef = useRef<string | null>(null)
 
   const { sessions, activeId, setActiveId, creating, fetchSessions, createSession } = useSessions()
 
   useEffect(() => { fetchSessions() }, [fetchSessions])
 
-  const ensureSession = useCallback(async (): Promise<string | null> => {
-    if (activeId) return activeId
-    if (sessions.length > 0) {
-      const id = sessions[0].session_id
-      setActiveId(id)
-      return id
-    }
-    const s = await createSession()
-    return s?.session_id ?? null
-  }, [activeId, sessions, setActiveId, createSession])
+  // Keep ref in sync so the transport closure always reads the latest value
+  useEffect(() => {
+    const id = activeId ?? sessions[0]?.session_id ?? null
+    sessionIdRef.current = id
+    if (!activeId && sessions[0]) setActiveId(sessions[0].session_id)
+  }, [activeId, sessions, setActiveId])
 
-  const handleSubmit = useCallback(async () => {
-    if (!question.trim() || phase !== 'idle') return
-    setError(null)
-    setAiResponse(null)
-    setQueryResult(null)
-    setExplanation(null)
+  // Transport created once; reads sessionIdRef dynamically on each request
+  const transport = useMemo(
+    () => new DefaultChatTransport({
+      api: '/api/analytics/chat',
+      body: () => ({ sessionId: sessionIdRef.current }),
+    }),
+    [],
+  )
 
-    // Step 1: AI generates SQL
-    setPhase('ai')
-    let ai: AnalyticsResponse
-    try {
-      const res = await fetch('/api/analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
-      })
-      const body = await res.json()
-      if (!res.ok) {
-        setError(body.error ?? `HTTP ${res.status}`)
-        setPhase('idle')
-        return
-      }
-      ai = body as AnalyticsResponse
-      setAiResponse(ai)
-      setExplanation(ai.explanation ?? null)
-    } catch (e) {
-      setError((e as Error).message)
-      setPhase('idle')
-      return
+  const { messages, sendMessage, status } = useChat({ transport })
+
+  const isLoading = status === 'submitted' || status === 'streaming'
+
+  // Auto-scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || isLoading) return
+    setInput('')
+
+    // Ensure session exists
+    if (!sessionIdRef.current) {
+      const s = await createSession()
+      sessionIdRef.current = s?.session_id ?? null
     }
 
-    // Step 2: Run SQL
-    setPhase('query')
-    try {
-      const sessionId = await ensureSession()
-      const url = sessionId ? `/api/sessions/${sessionId}/query` : '/api/query'
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql: ai.sql }),
-      })
-      const body = await res.json()
-      if (!res.ok) {
-        setError(body.error ?? `HTTP ${res.status}`)
-      } else {
-        setQueryResult(body as QueryResponse)
-        setViewTab(ai.chart.type === 'table' ? 'data' : 'chart')
-      }
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setPhase('idle')
-    }
-  }, [question, phase, ensureSession])
+    await sendMessage({ text })
+  }
 
-  const isLoading = phase !== 'idle'
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const sessionLabel = activeId ?? sessions[0]?.session_id ?? null
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Results area */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* Explanation */}
-        {explanation && (
-          <div className="px-4 py-2 text-xs text-muted-foreground italic border-b shrink-0">
-            {explanation}
-          </div>
-        )}
-
-        {/* SQL disclosure */}
-        {aiResponse && <SqlDisclosure sql={aiResponse.sql} />}
-
-        {/* Error */}
-        {error && (
-          <div className="mx-4 mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive font-mono whitespace-pre-wrap shrink-0">
-            {error}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && !queryResult && !error && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <HugeiconsIcon icon={Chart01Icon} size={36} className="opacity-20" />
-            <p className="text-sm">Ask a question to visualize your data</p>
-            <p className="text-xs opacity-60">e.g. "Show me revenue by country" or "Top 5 customers by sales"</p>
-          </div>
-        )}
-
-        {/* Loading placeholder */}
-        {isLoading && !queryResult && (
-          <div className="flex-1 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
-            {phase === 'ai' ? 'Generating SQL…' : 'Executing query…'}
-          </div>
-        )}
-
-        {/* Results */}
-        {queryResult && (
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {/* Tab bar */}
-            <div className="flex items-center gap-0 px-4 border-b shrink-0">
-              {(['chart', 'data'] as ViewTab[]).map((tab) => (
+      {/* ── Message list ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground px-6">
+            <HugeiconsIcon icon={Chart01Icon} size={40} className="opacity-15" />
+            <p className="text-sm font-medium">Ask anything about your data</p>
+            <div className="flex flex-wrap justify-center gap-2 max-w-md">
+              {SUGGESTIONS.map((s) => (
                 <button
-                  key={tab}
+                  key={s}
                   type="button"
-                  onClick={() => setViewTab(tab)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors capitalize',
-                    viewTab === tab
-                      ? 'border-foreground text-foreground'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
+                  onClick={() => { setInput(s); textareaRef.current?.focus() }}
+                  className="px-3 py-1 text-xs rounded-full border hover:bg-accent transition-colors"
                 >
-                  <HugeiconsIcon icon={tab === 'chart' ? Chart01Icon : Table01Icon} size={12} />
-                  {tab}
+                  {s}
                 </button>
               ))}
-              <div className="flex-1" />
-              <span className="text-xs text-muted-foreground">
-                {queryResult.row_count} {queryResult.row_count === 1 ? 'row' : 'rows'}
-              </span>
             </div>
+          </div>
+        ) : (
+          <div className="py-4 space-y-1">
+            {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
 
-            {/* Chart view */}
-            {viewTab === 'chart' && aiResponse && (
-              aiResponse.chart.type === 'table' ? (
-                <ResultsGrid queryResult={queryResult} />
-              ) : (
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <ChartRenderer queryResult={queryResult} chartConfig={aiResponse.chart} />
-                </div>
-              )
+            {/* Thinking indicator while waiting for the first chunk */}
+            {isLoading && messages.at(-1)?.role === 'user' && (
+              <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-muted-foreground">
+                <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                Thinking…
+              </div>
             )}
-
-            {/* Data grid view */}
-            {viewTab === 'data' && <ResultsGrid queryResult={queryResult} />}
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
-      {/* Composer */}
+      {/* ── Composer ── */}
       <div className="shrink-0 border-t px-4 py-3 space-y-2">
         <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
-          }}
-          placeholder="Ask a question about your data… (⌘+Enter to submit)"
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask about your data… (Enter to send, Shift+Enter for new line)"
           rows={2}
-          className="w-full resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+          disabled={isLoading}
+          className="w-full resize-none text-sm bg-transparent outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -335,26 +359,21 @@ export default function AnalyticsPage() {
                 Starting session…
               </>
             )}
-            {!creating && activeId && (
+            {!creating && sessionLabel && (
               <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
-                session {activeId.slice(0, 8)}
+                {sessionLabel.slice(0, 8)}
               </span>
             )}
           </div>
           <Button
             size="sm"
-            disabled={isLoading || !question.trim()}
-            onClick={handleSubmit}
-            className="gap-1.5 h-7 px-3 text-xs"
+            disabled={isLoading || !input.trim()}
+            onClick={handleSend}
+            className="h-7 px-3 text-xs"
           >
-            {isLoading ? (
-              <>
-                <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
-                {phase === 'ai' ? 'Thinking…' : 'Running…'}
-              </>
-            ) : (
-              'Ask AI'
-            )}
+            {isLoading
+              ? <><HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin mr-1.5" />Running</>
+              : 'Send'}
           </Button>
         </div>
       </div>
