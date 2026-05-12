@@ -132,6 +132,9 @@ async fn main() {
         )
         .route("/dagster/jobs", get(dagster::list_jobs))
         .route("/dagster/schedules", get(dagster::list_schedules))
+        .route("/dagster/schedule-assets", get(dagster::list_schedule_asset_selections))
+        .route("/dagster/schedule-assets/{name}", get(dagster::get_schedule_asset_selection))
+        .route("/dagster/schedules/{name}/ticks", get(dagster::get_schedule_tick_history))
         // Unity Catalog routes
         .route(
             "/uc/catalogs",

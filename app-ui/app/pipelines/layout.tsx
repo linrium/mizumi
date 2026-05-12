@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 const TABS = [
   { label: 'Assets',    href: '/pipelines/assets' },
   { label: 'Runs',      href: '/pipelines/runs' },
+  { label: 'Schedules', href: '/pipelines/schedules' },
   { label: 'Streaming', href: '/pipelines/streaming' },
   { label: 'Lineage',   href: '/pipelines/lineage' },
 ]
