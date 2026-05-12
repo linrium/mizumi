@@ -3,30 +3,27 @@ mod error;
 mod k8s;
 mod models;
 mod streaming;
+mod tests;
 mod uc;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use axum::{
-    Json, Router,
-    extract::{FromRef, State},
+    Router,
+    extract::FromRef,
     http::StatusCode,
     routing::{delete, get, post},
 };
-use chrono::{DateTime, Utc};
 use rdkafka::{
     ClientConfig,
-    producer::{FutureProducer, FutureRecord},
-    util::Timeout,
+    producer::FutureProducer,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
-use tracing::info;
 
 use error::AppError;
 use k8s::SessionStore;
+use tests::publish_banking_event;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -43,61 +40,6 @@ impl FromRef<AppState> for Arc<SessionStore> {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct PublishOrderEventRequest {
-    order_id: i64,
-    customer_id: i64,
-    country_code: String,
-    status: String,
-    amount: f64,
-    timestamp: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Serialize)]
-struct PublishOrderEventResponse {
-    topic: String,
-    key: String,
-    timestamp: DateTime<Utc>,
-}
-
-async fn publish_order_event(
-    State(state): State<AppState>,
-    Json(req): Json<PublishOrderEventRequest>,
-) -> Result<(StatusCode, Json<PublishOrderEventResponse>), AppError> {
-    let timestamp = req.timestamp.unwrap_or_else(Utc::now);
-    let key = req.order_id.to_string();
-    let payload = json!({
-        "timestamp": timestamp,
-        "order_id": req.order_id,
-        "customer_id": req.customer_id,
-        "country_code": req.country_code,
-        "status": req.status,
-        "amount": req.amount,
-    })
-    .to_string();
-
-    state
-        .kafka_producer
-        .send(
-            FutureRecord::to(&state.kafka_topic)
-                .key(&key)
-                .payload(&payload),
-            Timeout::After(Duration::from_secs(10)),
-        )
-        .await
-        .map_err(|(e, _)| AppError::Kafka(e.to_string()))?;
-
-    info!(topic = %state.kafka_topic, key = %key, "streaming event published");
-
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(PublishOrderEventResponse {
-            topic: state.kafka_topic,
-            key,
-            timestamp,
-        }),
-    ))
-}
 
 #[tokio::main]
 async fn main() {
@@ -112,7 +54,7 @@ async fn main() {
 
     let kafka_bootstrap_servers = std::env::var("KAFKA_BOOTSTRAP_SERVERS")
         .unwrap_or("redpanda-svc.redpanda.svc.cluster.local:9092".to_string());
-    let kafka_topic = std::env::var("KAFKA_TOPIC").unwrap_or("mizumi-orders".to_string());
+    let kafka_topic = std::env::var("KAFKA_TOPIC").unwrap_or("banking-transactions".to_string());
     let kafka_producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_bootstrap_servers)
         .set("message.timeout.ms", "10000")
@@ -142,7 +84,7 @@ async fn main() {
         )
         .route("/api/sessions/{id}", delete(k8s::delete_session))
         .route("/api/sessions/{id}/query", post(k8s::session_query))
-        .route("/api/streaming/events", post(publish_order_event))
+        .route("/api/tests/banking/events", post(publish_banking_event))
         // Streaming job routes
         .route(
             "/api/streaming/jobs",
