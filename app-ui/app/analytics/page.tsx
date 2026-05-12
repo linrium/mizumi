@@ -362,10 +362,12 @@ function MessageBubble({ message, isAnimating }: { message: UIMessage; isAnimati
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  'Revenue by country',
-  'Top 5 customers by sales',
-  'Show weekly revenue trend',
-  'Chart daily revenue by country',
+  'Daily transaction volume by country',
+  'Monthly revenue by merchant category',
+  'Customer risk tier distribution',
+  'Channel usage breakdown',
+  'AML structuring alerts over time',
+  'Account balance trends',
 ]
 
 export default function AnalyticsPage() {

@@ -5,8 +5,8 @@ import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import type { LanguageModel } from 'ai'
+import { fetchSchema } from '@/app/api/_lib/fetch-schema'
 
-const UC_BASE = process.env.UC_BASE_URL ?? 'http://localhost:8082/api/2.1/unity-catalog'
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:3000'
 
 const ollama = createOllama({ baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/api' })
@@ -14,34 +14,6 @@ const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-type ColumnInfo = { name: string; type_text: string }
-type TableDetail = { name: string; columns: ColumnInfo[] }
-
-async function fetchSchema(): Promise<string> {
-  const tablesRes = await fetch(
-    `${UC_BASE}/tables?catalog_name=mizumi&schema_name=default&max_results=100`,
-    { cache: 'no-store' },
-  )
-  if (!tablesRes.ok) return '(schema unavailable)'
-  const { tables }: { tables: { name: string }[] } = await tablesRes.json()
-
-  const details = await Promise.all(
-    (tables ?? []).map(async (t) => {
-      const r = await fetch(`${UC_BASE}/tables/mizumi.default.${t.name}`, { cache: 'no-store' })
-      if (!r.ok) return null
-      return r.json() as Promise<TableDetail>
-    }),
-  )
-
-  return details
-    .filter(Boolean)
-    .map((t) => {
-      const cols = (t!.columns ?? []).map((c) => `  ${c.name} ${c.type_text}`).join(',\n')
-      return `TABLE mizumi.default.${t!.name}:\n${cols}`
-    })
-    .join('\n\n')
-}
 
 async function runSql(sessionId: string | null, sql: string) {
   const url = sessionId
@@ -142,7 +114,7 @@ export async function POST(req: NextRequest) {
 
 ## CALL A TOOL IMMEDIATELY, without preamble, when the user:
 - asks to show, list, display, get, fetch, or query any table or data
-- mentions a table name (e.g. gold_customer_stats, mizumi.default.xxx)
+- mentions a table name (e.g. gold_customer_stats, banking.transactions.silver_transactions)
 - asks for top N, counts, sums, averages, trends, comparisons, rankings
 - asks to visualize, plot, chart, or graph anything
 
@@ -151,14 +123,14 @@ export async function POST(req: NextRequest) {
 - questions about the schema you can answer from the list below
 
 ## SQL rules:
-- Always use fully qualified names: mizumi.default.<table>
+- Always use fully qualified names: <catalog>.<schema>.<table>
 - If the user provides a fully qualified name, use it verbatim
 
 ## Error handling:
 - If a tool returns an error field, quote it exactly and STOP.
 - If the result is empty (0 rows), say so and STOP.
 
-## Available tables in mizumi.default:
+## Available tables:
 ${schema}
 
 ## After a successful tool call:

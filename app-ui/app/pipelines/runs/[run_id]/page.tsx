@@ -326,6 +326,25 @@ export default function RunDetailPage() {
   const { run, events, loading, error } = useRunDetail(runId)
   const [selectedStep, setSelectedStep] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'events' | 'config'>('events')
+  const [graphHeight, setGraphHeight] = useState(208)
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+
+  function onDividerMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    dragRef.current = { startY: e.clientY, startH: graphHeight }
+    function onMove(ev: MouseEvent) {
+      if (!dragRef.current) return
+      const delta = ev.clientY - dragRef.current.startY
+      setGraphHeight(Math.max(80, Math.min(600, dragRef.current.startH + delta)))
+    }
+    function onUp() {
+      dragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const filteredEvents = selectedStep
     ? events.filter((e) => !e.step_key || e.step_key === selectedStep)
@@ -379,7 +398,7 @@ export default function RunDetailPage() {
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
           {/* Step graph */}
-          <div className="h-52 border-b shrink-0 relative">
+          <div className="shrink-0 relative" style={{ height: graphHeight }}>
             <StepGraph
               events={events}
               selectedKey={selectedStep}
@@ -395,6 +414,12 @@ export default function RunDetailPage() {
               </button>
             )}
           </div>
+
+          {/* Resize handle */}
+          <div
+            onMouseDown={onDividerMouseDown}
+            className="h-1.5 shrink-0 cursor-row-resize border-b hover:bg-muted/60 active:bg-muted transition-colors"
+          />
 
           {/* Tabs: Events / Config */}
           <div className="flex items-center border-b px-4 gap-4 shrink-0">

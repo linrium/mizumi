@@ -106,7 +106,7 @@ export function SqlEditor() {
   }
 
   const form = useForm({
-    defaultValues: { sql: 'select * from mizumi.default.gold_country_revenue' },
+    defaultValues: { sql: 'select * from banking.transactions.silver_transactions' },
     validators: { onSubmit: schema },
     onSubmit: async ({ value }) => {
       setResult(null)

@@ -33,7 +33,11 @@ def _uc_table_location(full_name: str) -> str | None:
 
 
 def resolve_uc_tables(sql: str) -> str:
-    """Replace catalog.schema.table references with delta_scan(storage_location)."""
+    """Replace all catalog.schema.table references with delta_scan(storage_location).
+
+    Loops until the SQL stabilises so that any three-part names introduced by a
+    prior substitution (e.g. via CTEs or deeply nested subqueries) are also resolved.
+    """
     cache: dict[str, str | None] = {}
 
     def replace(m: re.Match) -> str:
@@ -43,7 +47,11 @@ def resolve_uc_tables(sql: str) -> str:
         location = cache[full_name]
         return f"delta_scan('{location}')" if location else full_name
 
-    return _THREE_PART_RE.sub(replace, sql)
+    while True:
+        next_sql = _THREE_PART_RE.sub(replace, sql)
+        if next_sql == sql:
+            return sql
+        sql = next_sql
 
 
 def main() -> None:

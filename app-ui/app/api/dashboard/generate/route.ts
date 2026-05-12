@@ -5,8 +5,8 @@ import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import type { LanguageModel } from 'ai'
+import { fetchSchema } from '@/app/api/_lib/fetch-schema'
 
-const UC_BASE = process.env.UC_BASE_URL ?? 'http://localhost:8082/api/2.1/unity-catalog'
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:3000'
 
 const ollama = createOllama({ baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/api' })
@@ -14,34 +14,6 @@ const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-type ColumnInfo = { name: string; type_text: string }
-type TableDetail = { name: string; columns: ColumnInfo[] }
-
-async function fetchSchema(): Promise<string> {
-  const tablesRes = await fetch(
-    `${UC_BASE}/tables?catalog_name=mizumi&schema_name=default&max_results=100`,
-    { cache: 'no-store' },
-  )
-  if (!tablesRes.ok) return '(schema unavailable)'
-  const { tables }: { tables: { name: string }[] } = await tablesRes.json()
-
-  const details = await Promise.all(
-    (tables ?? []).map(async (t) => {
-      const r = await fetch(`${UC_BASE}/tables/mizumi.default.${t.name}`, { cache: 'no-store' })
-      if (!r.ok) return null
-      return r.json() as Promise<TableDetail>
-    }),
-  )
-
-  return details
-    .filter(Boolean)
-    .map((t) => {
-      const cols = (t!.columns ?? []).map((c) => `  ${c.name} ${c.type_text}`).join(',\n')
-      return `TABLE mizumi.default.${t!.name}:\n${cols}`
-    })
-    .join('\n\n')
-}
 
 async function ensureSession(sessionId: string | null): Promise<string> {
   if (sessionId) return sessionId
@@ -118,7 +90,7 @@ export async function POST(req: NextRequest) {
         'Create a new dashboard panel with a chart. Call once per distinct metric or visualization the user asks for.',
       inputSchema: z.object({
         title: z.string().describe('Short panel title'),
-        sql: z.string().describe('SQL query. Always use fully qualified names: mizumi.default.<table>'),
+        sql: z.string().describe('SQL query. Always use fully qualified names: <catalog>.<schema>.<table>'),
         chartType: chartTypeEnum.describe('bar → categories, line/area → time-series, pie → proportions ≤8 slices, scatter → correlation'),
         xCol: z.string().describe('Column for x-axis labels or pie slice names'),
         yCol: z.string().describe('Column for numeric values'),
@@ -146,7 +118,7 @@ export async function POST(req: NextRequest) {
       inputSchema: z.object({
         panelId: z.string().describe('The id of the panel to edit, from the current panels list'),
         title: z.string().optional().describe('New title (omit to keep existing)'),
-        sql: z.string().optional().describe('New SQL query (omit to keep existing). Always use mizumi.default.<table>'),
+        sql: z.string().optional().describe('New SQL query (omit to keep existing). Always use fully qualified names: <catalog>.<schema>.<table>'),
         chartType: chartTypeEnum.optional().describe('New chart type (omit to keep existing)'),
         xCol: z.string().optional().describe('New x-axis column (omit to keep existing)'),
         yCol: z.string().optional().describe('New y-axis column (omit to keep existing)'),
@@ -202,13 +174,13 @@ ${contextHints ? `## Context:\n${contextHints}` : ''}
 - After tool calls, write 1–2 sentences summarizing what changed.
 
 ## SQL rules:
-- Always fully qualify: mizumi.default.<table>
+- Always use fully qualified names: <catalog>.<schema>.<table>
 - For time-series: ORDER BY the date/time column ascending
 
 ## Chart types:
 - bar: categories/comparisons  · line/area: time-series trends  · pie: proportions ≤8 slices  · scatter: correlation
 
-## Available tables in mizumi.default:
+## Available tables:
 ${schema}
 
 ## On error:

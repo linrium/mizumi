@@ -163,9 +163,9 @@ function buildOption(chartType: ChartType, result: QueryResult, xCol: string, yC
 // ── Default panel ─────────────────────────────────────────────────────────────
 
 const DEFAULT_PANELS: Panel[] = [{
-  id: 'p1', title: 'Customer Stats', chartType: 'bar',
-  sql: 'select * from mizumi.default.gold_customer_stats',
-  xCol: 'country_code', yCol: 'total_spend',
+  id: 'p1', title: 'Daily Transactions by Country', chartType: 'bar',
+  sql: 'select country_code, sum(transaction_count) as transaction_count from banking.transactions.gold_daily_transaction_summary group by country_code order by transaction_count desc',
+  xCol: 'country_code', yCol: 'transaction_count',
 }]
 const DEFAULT_LAYOUT: Layout = [{ i: 'p1', x: 0, y: 0, w: 6, h: 4 }]
 
@@ -379,10 +379,12 @@ function PanelSidebar({ panel, data, sessionId, onChange, onRun }: {
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  'Show revenue by country',
-  'Weekly revenue trend',
-  'Top customers by spend',
-  'Customer growth over time',
+  'Daily transaction volume by country',
+  'Monthly revenue by merchant category',
+  'Customer risk tier distribution',
+  'Channel usage breakdown',
+  'AML structuring alerts over time',
+  'Account balance trends',
 ]
 
 function AiComposer({ sessionId, modelId, panels, selectedPanelId, onModelChange, onPanelsCreated, onPanelsEdited }: {
