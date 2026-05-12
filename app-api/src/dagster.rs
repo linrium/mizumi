@@ -51,11 +51,16 @@ async fn gql_post<T: for<'de> Deserialize<'de>>(
             (StatusCode::BAD_GATEWAY, json!({ "error": e.to_string() }))
         })?;
 
-    let gql: GqlResponse<T> = resp.json().await.map_err(|e| {
-        tracing::error!("Failed to parse Dagster response: {e}");
+    let body = resp.text().await.map_err(|e| {
+        tracing::error!("Failed to read Dagster response body: {e}");
+        (StatusCode::BAD_GATEWAY, json!({ "error": e.to_string() }))
+    })?;
+
+    let gql: GqlResponse<T> = serde_json::from_str(&body).map_err(|e| {
+        tracing::error!("Failed to parse Dagster response: {e}\nBody: {body}");
         (
             StatusCode::BAD_GATEWAY,
-            json!({ "error": "invalid response from Dagster" }),
+            json!({ "error": format!("invalid response from Dagster: {e}") }),
         )
     })?;
 
@@ -754,9 +759,10 @@ struct GqlRunOrError {
 struct GqlRun {
     #[serde(rename = "runId")]
     run_id: String,
-    #[serde(rename = "jobName")]
-    job_name: String,
-    status: String,
+    #[serde(rename = "jobName", default)]
+    job_name: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
     #[serde(default)]
     tags: Vec<RunTag>,
     #[serde(rename = "creationTime")]
@@ -773,8 +779,8 @@ struct GqlRun {
     parent_run_id: Option<String>,
     #[serde(rename = "canTerminate")]
     can_terminate: Option<bool>,
-    #[serde(rename = "assetSelection", default)]
-    asset_selection: Vec<GqlAssetKey>,
+    #[serde(rename = "assetSelection")]
+    asset_selection: Option<Vec<GqlAssetKey>>,
     stats: Option<GqlRunStats>,
 }
 
@@ -831,8 +837,8 @@ pub struct RunStats {
 fn gql_run_to_run(r: GqlRun) -> Run {
     Run {
         run_id: r.run_id,
-        job_name: r.job_name,
-        status: r.status,
+        job_name: r.job_name.unwrap_or_default(),
+        status: r.status.unwrap_or_default(),
         tags: r.tags,
         creation_time: r.creation_time,
         start_time: r.start_time,
@@ -841,7 +847,7 @@ fn gql_run_to_run(r: GqlRun) -> Run {
         root_run_id: r.root_run_id,
         parent_run_id: r.parent_run_id,
         can_terminate: r.can_terminate,
-        asset_selection: r.asset_selection.into_iter().map(|k| k.path).collect(),
+        asset_selection: r.asset_selection.unwrap_or_default().into_iter().map(|k| k.path).collect(),
         stats: r.stats.map(|s| RunStats {
             steps_succeeded: s.steps_succeeded,
             steps_failed: s.steps_failed,
