@@ -55,16 +55,18 @@ forward:
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
     kubectl port-forward -n app-api svc/app-api-postgres-svc 5433:5432 &
-    echo "RustFS console:  http://127.0.0.1:9001"
-    echo "RustFS S3 API:   http://127.0.0.1:9000"
-    echo "Redpanda Kafka:  127.0.0.1:19092"
-    echo "Redpanda Admin:  http://127.0.0.1:9644"
-    echo "Redpanda UI:     http://127.0.0.1:8081"
-    echo "Dagster UI:      http://127.0.0.1:8080"
-    echo "Dagster GraphQL: http://127.0.0.1:8080/graphql"
-    echo "UC API:          http://127.0.0.1:8082"
-    echo "UC UI:           http://127.0.0.1:3001"
+    kubectl port-forward -n daft svc/daft-distributed-quickstart-head 8265:8265 &
+    echo "RustFS console:   http://127.0.0.1:9001"
+    echo "RustFS S3 API:    http://127.0.0.1:9000"
+    echo "Redpanda Kafka:   127.0.0.1:19092"
+    echo "Redpanda Admin:   http://127.0.0.1:9644"
+    echo "Redpanda UI:      http://127.0.0.1:8081"
+    echo "Dagster UI:       http://127.0.0.1:8080"
+    echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
+    echo "UC API:           http://127.0.0.1:8082"
+    echo "UC UI:            http://127.0.0.1:3001"
     echo "App API Postgres: localhost:5433"
+    echo "Daft UI:          http://127.0.0.1:8265"
     wait
 
 rustfs-helm-repo:

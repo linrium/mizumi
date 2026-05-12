@@ -1,6 +1,5 @@
 import { deepseek } from '@ai-sdk/deepseek'
 import { createOpenAI } from '@ai-sdk/openai'
-import { createOllama } from 'ollama-ai-provider-v2'
 import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
@@ -9,7 +8,9 @@ import { fetchSchema } from '@/app/api/_lib/fetch-schema'
 
 const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:3000'
 
-const ollama = createOllama({ baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434/api' })
+const omlx = createOpenAI({
+  baseURL: "http://localhost:3333/v1",
+})
 const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
@@ -34,17 +35,17 @@ async function runSql(sessionId: string, sql: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
-export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'qwen3.5:9b'
+export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'mlx-community/Qwen3.5-9B-MLX-4bit'
 
 export const MODELS: { id: ModelId; label: string }[] = [
   { id: 'deepseek-chat', label: 'DeepSeek Chat' },
   { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-  { id: 'qwen3.5:9b', label: 'Qwen 3.5 9B' },
+  { id: 'mlx-community/Qwen3.5-9B-MLX-4bit', label: 'Qwen 3.5 9B MLX 4bit' },
 ]
 
 function resolveModel(modelId: ModelId): LanguageModel {
   if (modelId === 'gpt-5.4-mini') return openai('gpt-5.4-mini')
-  if (modelId === 'qwen3.5:9b') return ollama('qwen3.5:9b')
+  if (modelId === 'mlx-community/Qwen3.5-9B-MLX-4bit') return omlx('mlx-community/Qwen3.5-9B-MLX-4bit')
   return deepseek('deepseek-chat')
 }
 
