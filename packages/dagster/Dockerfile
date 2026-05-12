@@ -67,9 +67,9 @@ ENV PYTHONWARNINGS="ignore::UserWarning:pyspark.sql.connect.conf"
 ENV SPARK_CONF_DIR=/opt/spark/conf
 RUN mkdir -p /opt/spark/conf /opt/spark/pipelines
 COPY packages/dagster/conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
-COPY packages/spark/pipelines/medallion_pipeline/ /opt/spark/pipelines/medallion_pipeline/
-COPY packages/spark/pipelines/customer_pipeline/ /opt/spark/pipelines/customer_pipeline/
-COPY packages/spark/pipelines/weekly_pipeline/ /opt/spark/pipelines/weekly_pipeline/
+COPY packages/spark/pipelines/banking_transactions_pipeline/ /opt/spark/pipelines/banking_transactions_pipeline/
+COPY packages/spark/pipelines/banking_risk_pipeline/ /opt/spark/pipelines/banking_risk_pipeline/
+COPY packages/spark/pipelines/banking_customer_pipeline/ /opt/spark/pipelines/banking_customer_pipeline/
 
 COPY packages/dagster/definitions.py /app/definitions.py
 COPY packages/dagster/defs_pkg/ /app/defs_pkg/

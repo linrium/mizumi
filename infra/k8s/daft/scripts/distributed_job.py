@@ -5,7 +5,7 @@ import daft
 import ray
 from daft.io import IOConfig, S3Config
 
-SILVER_ORDERS = "s3://silver/orders/silver_orders"
+SILVER_TRANSACTIONS = "s3://silver/banking/transactions"
 
 IO_CONFIG = IOConfig(
     s3=S3Config(
@@ -20,8 +20,12 @@ IO_CONFIG = IOConfig(
 def main() -> None:
     ray.init(runtime_env={"pip": ["daft[deltalake]"]})
     daft.set_runner_ray()
-    df = daft.read_deltalake(SILVER_ORDERS, io_config=IO_CONFIG)
-    print(df.select("order_id", "customer_id", "country_code", "gross_amount", "order_date").limit(10).collect())
+    df = daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
+    print(
+        df.select("transaction_id", "account_id", "customer_id", "amount", "country_code", "channel")
+        .limit(10)
+        .collect()
+    )
 
 
 if __name__ == "__main__":
