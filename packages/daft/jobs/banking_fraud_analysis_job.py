@@ -5,12 +5,21 @@ import argparse
 
 import daft
 import daft.expressions as col
+import deltalake
 import ray
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
 SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
 TARGET_PATH = "s3://gold/banking/fraud_pattern_analysis"
+
+S3_STORAGE_OPTIONS = {
+    "endpoint_url": "http://rustfs-svc.rustfs.svc.cluster.local:9000",
+    "aws_access_key_id": "rustfsadmin",
+    "aws_secret_access_key": "rustfsadmin",
+    "aws_allow_http": "true",
+    "allow_unsafe_rename": "true",
+}
 
 IO_CONFIG = IOConfig(
     s3=S3Config(
@@ -80,7 +89,14 @@ def main() -> None:
         row_count = combined.count_rows()
         preview = combined.limit(5).to_pydict()
 
-        combined.write_parquet(TARGET_PATH, io_config=IO_CONFIG)
+        # Collect to PyArrow and write via deltalake directly to avoid daft 0.7.10 AddAction.size bug
+        arrow_table = combined.to_arrow()
+        deltalake.write_deltalake(
+            TARGET_PATH,
+            arrow_table,
+            storage_options=S3_STORAGE_OPTIONS,
+            mode="overwrite",
+        )
 
         pipes.report_asset_materialization(
             metadata={

@@ -78,6 +78,9 @@ def banking_risk_sdp(
     purge_objects(
         context,
         "gold",
+        "banking/sdp-warehouse/gold_aml_structuring_alerts",
+        "banking/sdp-warehouse/gold_aml_rapid_sequences",
+        "banking/sdp-warehouse/gold_monthly_revenue_by_category",
         "banking/pipeline-risk/",
     )
     spark_pipelines.run_and_observe(
@@ -114,6 +117,8 @@ def banking_customer_sdp(
     purge_objects(
         context,
         "gold",
+        "banking/sdp-warehouse/gold_customer_banking_profile",
+        "banking/sdp-warehouse/gold_customer_channel_usage",
         "banking/pipeline-customer/",
     )
     spark_pipelines.run_and_observe(

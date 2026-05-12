@@ -3,11 +3,20 @@
 # ///
 import daft
 import daft.expressions as col
+import deltalake
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
 SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
 TARGET_PATH = "s3://gold/banking/customer_risk_scores"
+
+S3_STORAGE_OPTIONS = {
+    "endpoint_url": "http://rustfs-svc.rustfs.svc.cluster.local:9000",
+    "aws_access_key_id": "rustfsadmin",
+    "aws_secret_access_key": "rustfsadmin",
+    "aws_allow_http": "true",
+    "allow_unsafe_rename": "true",
+}
 
 IO_CONFIG = IOConfig(
     s3=S3Config(
@@ -23,7 +32,6 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         df = daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
 
-        # Transaction velocity and cross-border ratio per customer
         per_customer = (
             df.groupby("customer_id")
             .agg(
@@ -35,19 +43,16 @@ def main() -> None:
             )
         )
 
-        # Assign risk tier: high velocity + multi-country = higher risk
         risk_scored = per_customer.with_column(
             "risk_tier",
-            (
-                daft.col("total_volume").apply(
-                    lambda v: (
-                        "CRITICAL" if v >= 500_000
-                        else "HIGH" if v >= 100_000
-                        else "MEDIUM" if v >= 10_000
-                        else "LOW"
-                    ),
-                    return_dtype=daft.DataType.string(),
-                )
+            daft.col("total_volume").apply(
+                lambda v: (
+                    "CRITICAL" if v >= 500_000
+                    else "HIGH" if v >= 100_000
+                    else "MEDIUM" if v >= 10_000
+                    else "LOW"
+                ),
+                return_dtype=daft.DataType.string(),
             ),
         )
 
@@ -58,7 +63,14 @@ def main() -> None:
             .to_pydict()
         )
 
-        risk_scored.write_parquet(TARGET_PATH, io_config=IO_CONFIG)
+        # Collect to PyArrow and write via deltalake directly to avoid daft 0.7.10 AddAction.size bug
+        arrow_table = risk_scored.to_arrow()
+        deltalake.write_deltalake(
+            TARGET_PATH,
+            arrow_table,
+            storage_options=S3_STORAGE_OPTIONS,
+            mode="overwrite",
+        )
 
         pipes.report_asset_materialization(
             metadata={
