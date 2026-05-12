@@ -11,6 +11,14 @@ MEDALLION_DIR = f"{PIPELINE_DIR}/medallion_pipeline"
 CUSTOMER_DIR = f"{PIPELINE_DIR}/customer_pipeline"
 WEEKLY_DIR = f"{PIPELINE_DIR}/weekly_pipeline"
 
+BANKING_TRANSACTIONS_SPEC = f"{PIPELINE_DIR}/banking_transactions_pipeline/spark-pipeline.yaml"
+BANKING_RISK_SPEC = f"{PIPELINE_DIR}/banking_risk_pipeline/spark-pipeline.yaml"
+BANKING_CUSTOMER_SPEC = f"{PIPELINE_DIR}/banking_customer_pipeline/spark-pipeline.yaml"
+
+BANKING_TRANSACTIONS_DIR = f"{PIPELINE_DIR}/banking_transactions_pipeline"
+BANKING_RISK_DIR = f"{PIPELINE_DIR}/banking_risk_pipeline"
+BANKING_CUSTOMER_DIR = f"{PIPELINE_DIR}/banking_customer_pipeline"
+
 S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
 S3A_ACCESS_KEY = "rustfsadmin"
 S3A_SECRET_KEY = "rustfsadmin"
