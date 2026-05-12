@@ -14,3 +14,5 @@ configuration:
   spark.hadoop.fs.s3a.secret.key: rustfsadmin
   spark.hadoop.fs.s3a.connection.ssl.enabled: "false"
   spark.hadoop.fs.s3a.aws.credentials.provider: org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
+  spark.databricks.delta.schema.autoMerge.enabled: "true"
+  spark.databricks.delta.overwriteSchema.enabled: "true"

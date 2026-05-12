@@ -4,7 +4,7 @@ dagster-user-deployments:
       image:
         repository: mizumi-dagster
         tag: "1.13.4"
-        pullPolicy: IfNotPresent
+        pullPolicy: Always
       dagsterApiGrpcArgs:
         - "--python-file"
         - "/app/definitions.py"
@@ -12,10 +12,10 @@ dagster-user-deployments:
       resources:
         requests:
           cpu: 500m
-          memory: 1Gi
-        limits:
-          cpu: 1000m
           memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
 
 dagsterWebserver:
   replicaCount: 1
@@ -36,3 +36,15 @@ dagsterDaemon:
     limits:
       cpu: 500m
       memory: 1Gi
+
+runLauncher:
+  type: K8sRunLauncher
+  config:
+    k8sRunLauncher:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi

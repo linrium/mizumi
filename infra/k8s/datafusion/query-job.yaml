@@ -10,7 +10,7 @@ spec:
       containers:
         - name: datafusion-query
           image: mizumi-datafusion:50.1.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: 100m

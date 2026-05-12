@@ -7,10 +7,13 @@ banking_daily_batch = dg.define_asset_job(
     name="banking_daily_batch",
     selection=dg.AssetSelection.assets(
         "bronze_transactions",
-        "banking_silver_transactions",
-        "banking_transactions_sdp",
-        "banking_risk_sdp",
-        "banking_customer_sdp",
+        "banking_sdp_silver_transactions",
+        "banking_sdp_gold_daily_summary",
+        "banking_sdp_gold_aml_structuring",
+        "banking_sdp_gold_aml_rapid_sequences",
+        "banking_sdp_gold_monthly_revenue",
+        "banking_sdp_gold_customer_profile",
+        "banking_sdp_gold_customer_channel_usage",
         "banking_gold_account_balance_trends",
     ),
 )
@@ -30,6 +33,7 @@ banking_hourly_risk = dg.define_asset_job(
         "banking_gold_fraud_pattern_analysis",
     ),
 )
+
 
 banking_hourly_schedule = dg.ScheduleDefinition(
     name="banking_hourly_schedule",

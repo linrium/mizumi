@@ -9,8 +9,7 @@ import ray
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
-SILVER_TRANSACTIONS = "s3://silver/banking/transactions"
-STREAMING_TRANSACTIONS = "s3://silver/banking/streaming"
+SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
 TARGET_PATH = "s3://gold/banking/fraud_pattern_analysis"
 
 IO_CONFIG = IOConfig(
@@ -32,11 +31,10 @@ def main() -> None:
         ray.init(args.ray_address, runtime_env={"pip": ["daft[deltalake]==0.7.10"]})
         daft.set_runner_ray(args.ray_address)
 
-        batch = daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
-        streaming = daft.read_deltalake(STREAMING_TRANSACTIONS, io_config=IO_CONFIG)
-
-        # Combine batch + streaming for full transaction history
-        all_txns = batch.concat(streaming)
+        all_txns = (
+            daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
+            .with_column("transaction_date", daft.col("timestamp").cast(daft.DataType.date()))
+        )
 
         # Detect structuring: customers with multiple transactions just below $10k threshold in same day
         structuring = (
@@ -82,7 +80,7 @@ def main() -> None:
         row_count = combined.count_rows()
         preview = combined.limit(5).to_pydict()
 
-        combined.write_deltalake(TARGET_PATH, io_config=IO_CONFIG, mode="overwrite")
+        combined.write_parquet(TARGET_PATH, io_config=IO_CONFIG)
 
         pipes.report_asset_materialization(
             metadata={

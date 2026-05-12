@@ -10,20 +10,29 @@ type SendResult =
   | { ok: true; status: number; data: unknown }
   | { ok: false; status?: number; error: string }
 
-function randomOrderEvent() {
+function randomTransactionEvent() {
   const countries = ['US', 'DE', 'GB', 'FR', 'JP', 'CA', 'AU', 'BR', 'IN', 'SG']
-  const statuses = ['pending', 'completed', 'cancelled', 'refunded']
+  const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'BRL', 'INR', 'SGD']
+  const categories = ['RETAIL', 'GROCERY', 'TRAVEL', 'DINING', 'ENTERTAINMENT', 'HEALTHCARE', 'UTILITIES', 'ATM']
+  const types = ['DEBIT', 'CREDIT', 'TRANSFER']
+  const statuses = ['COMPLETED', 'PENDING']
+  const channels = ['POS', 'ATM', 'ONLINE', 'MOBILE']
   return {
-    order_id: Math.floor(Math.random() * 1_000_000),
+    transaction_id: Math.floor(Math.random() * 10_000_000),
+    account_id: Math.floor(Math.random() * 1_000_000),
     customer_id: Math.floor(Math.random() * 100_000),
+    amount: Math.round(Math.random() * 9900 + 1) / 100,
+    currency: currencies[Math.floor(Math.random() * currencies.length)],
+    merchant_category: categories[Math.floor(Math.random() * categories.length)],
     country_code: countries[Math.floor(Math.random() * countries.length)],
+    transaction_type: types[Math.floor(Math.random() * types.length)],
     status: statuses[Math.floor(Math.random() * statuses.length)],
-    amount: Math.round(Math.random() * 99900 + 100) / 100,
+    channel: channels[Math.floor(Math.random() * channels.length)],
     timestamp: new Date().toISOString(),
   }
 }
 
-const DEFAULT_VALUE = JSON.stringify(randomOrderEvent(), null, 2)
+const DEFAULT_VALUE = JSON.stringify(randomTransactionEvent(), null, 2)
 
 export function StreamingTestEditor() {
   const [value, setValue] = useState(DEFAULT_VALUE)
@@ -31,7 +40,7 @@ export function StreamingTestEditor() {
   const [result, setResult] = useState<SendResult | null>(null)
 
   const handleGenerate = () => {
-    setValue(JSON.stringify(randomOrderEvent(), null, 2))
+    setValue(JSON.stringify(randomTransactionEvent(), null, 2))
     setResult(null)
   }
 
@@ -47,7 +56,7 @@ export function StreamingTestEditor() {
     setSending(true)
     setResult(null)
     try {
-      const res = await fetch('/api/streaming/events', {
+      const res = await fetch('/api/tests/banking/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed),

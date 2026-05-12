@@ -16,7 +16,7 @@ spec:
       containers:
         - name: console
           image: docker.redpanda.com/redpandadata/console:v2.8.3
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
             - name: KAFKA_BROKERS
               value: "redpanda-svc.redpanda.svc.cluster.local:9092"

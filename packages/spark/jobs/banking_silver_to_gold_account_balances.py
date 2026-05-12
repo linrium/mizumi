@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession, functions as F, Window
 from dagster_pipes import open_dagster_pipes
 
-SOURCE_PATH = "s3a://silver/banking/transactions"
+SOURCE_PATH = "s3a://silver/banking/streaming"
 TARGET_PATH = "s3a://gold/banking/account_balance_trends"
 
 
@@ -22,7 +22,10 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         spark = build_session()
 
-        silver_df = spark.read.format("delta").load(SOURCE_PATH)
+        silver_df = (
+            spark.read.format("delta").load(SOURCE_PATH)
+            .withColumn("transaction_date", F.to_date("timestamp"))
+        )
 
         # Daily net flow: credits add to balance, debits/transfers subtract
         daily = (

@@ -168,7 +168,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "pythonVersion": "3",
             "mode": "cluster",
             "image": job.image,
-            "imagePullPolicy": "IfNotPresent",
+            "imagePullPolicy": "Always",
             "mainApplicationFile": job.main_application_file,
             "sparkVersion": job.spark_version,
             "restartPolicy": {

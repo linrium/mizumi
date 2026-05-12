@@ -1,26 +1,27 @@
+-- Source: streaming transactions landing in silver from Kafka
 CREATE TEMPORARY VIEW bronze_transactions_raw
 AS
-SELECT *
-FROM json.`s3a://bronze/banking/transactions/raw/transactions.jsonl`;
+SELECT
+  transaction_id,
+  account_id,
+  customer_id,
+  amount,
+  currency,
+  merchant_category,
+  country_code,
+  timestamp,
+  transaction_type,
+  status,
+  channel,
+  TO_DATE(timestamp) AS transaction_date
+FROM delta.`s3a://silver/banking/streaming`;
 
 CREATE TEMPORARY VIEW silver_transactions_cleaned_base
 AS
-SELECT
-  CAST(transaction_id AS BIGINT)     AS transaction_id,
-  CAST(account_id AS BIGINT)         AS account_id,
-  CAST(customer_id AS BIGINT)        AS customer_id,
-  ROUND(CAST(amount AS DOUBLE), 2)   AS amount,
-  UPPER(currency)                    AS currency,
-  UPPER(merchant_category)           AS merchant_category,
-  UPPER(country_code)                AS country_code,
-  TO_TIMESTAMP(timestamp)            AS timestamp,
-  UPPER(transaction_type)            AS transaction_type,
-  UPPER(status)                      AS status,
-  UPPER(channel)                     AS channel,
-  TO_DATE(TO_TIMESTAMP(timestamp))   AS transaction_date
+SELECT *
 FROM bronze_transactions_raw
-WHERE UPPER(status) IN ('COMPLETED', 'PENDING')
-  AND CAST(amount AS DOUBLE) > 0;
+WHERE status IN ('COMPLETED', 'PENDING')
+  AND amount > 0;
 
 CREATE MATERIALIZED VIEW silver_transactions
 USING delta

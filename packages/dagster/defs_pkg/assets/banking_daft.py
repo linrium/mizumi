@@ -16,6 +16,7 @@ def banking_gold_customer_risk_scores(
     return pipes_k8s_client.run(
         context=context,
         image=DAFT_IMAGE,
+        base_pod_spec={"containers": [{"name": "dagster-pipes-execution", "imagePullPolicy": "Always"}]},
         command=["python", "/opt/daft/jobs/banking_risk_score_job.py"],
     ).get_materialize_result()
 
@@ -32,6 +33,7 @@ def banking_gold_fraud_pattern_analysis(
     return pipes_k8s_client.run(
         context=context,
         image=DAFT_IMAGE,
+        base_pod_spec={"containers": [{"name": "dagster-pipes-execution", "imagePullPolicy": "Always"}]},
         command=[
             "python",
             "/opt/daft/jobs/banking_fraud_analysis_job.py",

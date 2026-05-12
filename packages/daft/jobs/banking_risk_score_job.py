@@ -6,7 +6,7 @@ import daft.expressions as col
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
-SILVER_TRANSACTIONS = "s3://silver/banking/transactions"
+SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
 TARGET_PATH = "s3://gold/banking/customer_risk_scores"
 
 IO_CONFIG = IOConfig(
@@ -58,7 +58,7 @@ def main() -> None:
             .to_pydict()
         )
 
-        risk_scored.write_deltalake(TARGET_PATH, io_config=IO_CONFIG, mode="overwrite")
+        risk_scored.write_parquet(TARGET_PATH, io_config=IO_CONFIG)
 
         pipes.report_asset_materialization(
             metadata={

@@ -3,10 +3,7 @@ from dagster_k8s import PipesK8sClient
 from dagster_spark import SparkPipelinesResource
 
 from .assets.banking_bronze import bronze_transactions
-from .assets.banking_spark_jobs import (
-    banking_silver_transactions,
-    banking_gold_account_balance_trends,
-)
+from .assets.banking_spark_jobs import banking_gold_account_balance_trends
 from .assets.banking_sdp import (
     banking_transactions_sdp,
     banking_risk_sdp,
@@ -25,7 +22,6 @@ from .assets.banking_schedules import (
 defs = dg.Definitions(
     assets=[
         bronze_transactions,
-        banking_silver_transactions,
         banking_transactions_sdp,
         banking_risk_sdp,
         banking_customer_sdp,

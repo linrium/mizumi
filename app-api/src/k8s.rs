@@ -62,7 +62,7 @@ fn build_job(name: &str, sql: &str) -> Job {
                     containers: vec![Container {
                         name: "duckdb-query".to_string(),
                         image: Some(DUCKDB_IMAGE.to_string()),
-                        image_pull_policy: Some("IfNotPresent".to_string()),
+                        image_pull_policy: Some("Always".to_string()),
                         command: Some(vec![
                             "python".to_string(),
                             "/opt/duckdb/query_api.py".to_string(),
@@ -168,7 +168,7 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
             containers: vec![Container {
                 name: "duckdb".to_string(),
                 image: Some(DUCKDB_IMAGE.to_string()),
-                image_pull_policy: Some("IfNotPresent".to_string()),
+                image_pull_policy: Some("Always".to_string()),
                 // Keep the pod alive; queries are sent via exec
                 command: Some(vec![
                     "tail".to_string(),

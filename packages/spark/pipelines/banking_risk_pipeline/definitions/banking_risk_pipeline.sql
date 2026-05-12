@@ -1,4 +1,4 @@
--- Source from silver layer
+-- Source from silver layer (written by banking_transactions_pipeline)
 CREATE TEMPORARY VIEW silver_transactions
 AS
 SELECT *

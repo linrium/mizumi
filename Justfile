@@ -54,6 +54,7 @@ forward:
     kubectl --namespace {{dagster_namespace}} port-forward "$dagster_pod" 8080:80 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
+    kubectl port-forward -n app-api svc/app-api-postgres-svc 5433:5432 &
     echo "RustFS console:  http://127.0.0.1:9001"
     echo "RustFS S3 API:   http://127.0.0.1:9000"
     echo "Redpanda Kafka:  127.0.0.1:19092"
@@ -63,6 +64,7 @@ forward:
     echo "Dagster GraphQL: http://127.0.0.1:8080/graphql"
     echo "UC API:          http://127.0.0.1:8082"
     echo "UC UI:           http://127.0.0.1:3001"
+    echo "App API Postgres: localhost:5433"
     wait
 
 rustfs-helm-repo:
@@ -188,15 +190,38 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     just banking-bootstrap
     kubectl get pods,svc -n {{unitycatalog_namespace}}
 
+unitycatalog-destroy:
+    kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
+    kubectl delete namespace {{unitycatalog_namespace}} --ignore-not-found --wait=false
+
 banking-bootstrap:
     kubectl delete job unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}} --ignore-not-found
     kubectl apply -f infra/k8s/unitycatalog/banking-bootstrap-job.yaml
     kubectl wait --for=condition=complete job/unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
     kubectl logs job/unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}}
 
-unitycatalog-destroy:
-    kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
-    kubectl delete namespace {{unitycatalog_namespace}} --ignore-not-found --wait=false
+banking-stream-create:
+    curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"banking-transactions-stream","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/banking_transactions_stream.py"}' \
+      | jq
+
+banking-stream-delete:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
+      | jq -r '.jobs[] | select(.job.name == "banking-transactions-stream") | .job.id')
+    [[ -z "$id" ]] && { echo "job not found"; exit 1; }
+    curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
+
+app-api-postgres-deploy:
+    kubectl apply -f infra/k8s/app-api/postgres.yaml
+    kubectl wait --for=condition=Ready pod -l app=app-api-postgres -n app-api --timeout=120s
+    kubectl get pods,svc -n app-api
+
+app-api-postgres-destroy:
+    kubectl delete -f infra/k8s/app-api/postgres.yaml --ignore-not-found || true
+    kubectl delete namespace app-api --ignore-not-found --wait=false
 
 daft-distributed-deploy:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true

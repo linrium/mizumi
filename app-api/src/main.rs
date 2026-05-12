@@ -53,7 +53,7 @@ async fn main() {
         .expect("failed to connect to postgres");
 
     let kafka_bootstrap_servers = std::env::var("KAFKA_BOOTSTRAP_SERVERS")
-        .unwrap_or("redpanda-svc.redpanda.svc.cluster.local:9092".to_string());
+        .unwrap_or("127.0.0.1:19092".to_string());
     let kafka_topic = std::env::var("KAFKA_TOPIC").unwrap_or("banking-transactions".to_string());
     let kafka_producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_bootstrap_servers)
