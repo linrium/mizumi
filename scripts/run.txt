@@ -1,0 +1,10 @@
+INSTALL unity_catalog;
+LOAD unity_catalog;
+
+CREATE SECRET (
+    TYPE unity_catalog,
+    TOKEN 'not-used',
+    ENDPOINT 'http://127.0.0.1:8082',
+    AWS_REGION 'us-east-2'
+);
+ATTACH 'hdbank' AS hdbank (TYPE unity_catalog, DEFAULT_SCHEMA 'hdbank_payments_prod_bronze');
