@@ -29,12 +29,12 @@ spec:
           env:
             - name: NODE_ENV
               value: production
-            - name: KEYCLOAK_REALM
-              value: mizumi
+            - name: KEYCLOAK_REALMS
+              value: vietjetair,hdbank
             - name: KEYCLOAK_CLIENT_ID
-              value: mizumi-client
+              value: app-ui
             - name: KEYCLOAK_CLIENT_SECRET
-              value: mizumi-client-secret
+              value: app-ui-secret
             - name: KEYCLOAK_PUBLIC_BASE_URL
               value: http://127.0.0.1:8083
             - name: KEYCLOAK_INTERNAL_BASE_URL

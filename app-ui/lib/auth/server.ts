@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createStateCookie,
   getAuthLoginUrl,
+  getAvailableRealms,
   getClientId,
   getClientSecret,
+  getDefaultRealm,
   getDefaultLoginUrl,
   getInternalRealmBaseUrl,
   getLogoutUrl,
+  isAllowedRealm,
   getSessionCookieName,
   getStateCookieName,
   readSessionFromCookieValue,
@@ -29,8 +32,11 @@ type TokenResponse = {
 
 export {
   createStateCookie,
+  getAvailableRealms,
+  getDefaultRealm,
   getSessionCookieName,
   getStateCookieName,
+  isAllowedRealm,
   readSessionFromCookieValue,
   readStateCookie,
   readTokenClaims,
@@ -78,20 +84,29 @@ export function getDefaultLoginUrlForRequest(request: NextRequest) {
   return getDefaultLoginUrl(request.nextUrl.origin);
 }
 
-export function getAuthLoginUrlForRequest(request: NextRequest, state: string) {
-  return getAuthLoginUrl(request.nextUrl.origin, state);
+export function getAuthLoginUrlForRequest(
+  request: NextRequest,
+  realm: string,
+  state: string,
+) {
+  return getAuthLoginUrl(request.nextUrl.origin, realm, state);
 }
 
-export function getLogoutUrlForRequest(request: NextRequest, idToken?: string) {
-  return getLogoutUrl(request.nextUrl.origin, idToken);
+export function getLogoutUrlForRequest(
+  request: NextRequest,
+  realm: string,
+  idToken?: string,
+) {
+  return getLogoutUrl(request.nextUrl.origin, realm, idToken);
 }
 
 export async function exchangeAuthorizationCode(
   request: NextRequest,
+  realm: string,
   code: string,
 ) {
   const response = await fetch(
-    `${getInternalRealmBaseUrl()}/protocol/openid-connect/token`,
+    `${getInternalRealmBaseUrl(realm)}/protocol/openid-connect/token`,
     {
       method: "POST",
       headers: {

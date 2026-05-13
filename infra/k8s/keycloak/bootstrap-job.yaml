@@ -5,9 +5,9 @@ metadata:
   namespace: keycloak
 type: Opaque
 stringData:
-  KEYCLOAK_REALM: mizumi
-  KEYCLOAK_CLIENT_ID: mizumi-client
-  KEYCLOAK_CLIENT_SECRET: mizumi-client-secret
+  KEYCLOAK_REALMS: '["vietjetair","hdbank"]'
+  KEYCLOAK_CLIENT_ID: app-ui
+  KEYCLOAK_CLIENT_SECRET: app-ui-secret
   KEYCLOAK_USER_PASSWORD: "123"
   KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/*","http://127.0.0.1:3000/*","http://localhost:3002/*","http://127.0.0.1:3002/*"]'
   KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3002","http://127.0.0.1:3002"]'
@@ -40,11 +40,11 @@ spec:
                 secretKeyRef:
                   name: keycloak-secret
                   key: KEYCLOAK_ADMIN_PASSWORD
-            - name: KEYCLOAK_REALM
+            - name: KEYCLOAK_REALMS
               valueFrom:
                 secretKeyRef:
                   name: keycloak-bootstrap-secret
-                  key: KEYCLOAK_REALM
+                  key: KEYCLOAK_REALMS
             - name: KEYCLOAK_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -94,29 +94,35 @@ spec:
               login
 
               ensure_realm() {
-                if /opt/keycloak/bin/kcadm.sh get "realms/$KEYCLOAK_REALM" >/dev/null 2>&1; then
-                  echo "Realm $KEYCLOAK_REALM already exists"
+                local realm_name="$1"
+
+                if /opt/keycloak/bin/kcadm.sh get "realms/$realm_name" >/dev/null 2>&1; then
+                  echo "Realm $realm_name already exists"
                 else
                   /opt/keycloak/bin/kcadm.sh create realms \
-                    -s realm="$KEYCLOAK_REALM" \
+                    -s realm="$realm_name" \
                     -s enabled=true
-                  echo "Created realm $KEYCLOAK_REALM"
+                  echo "Created realm $realm_name"
                 fi
               }
 
               get_user_id() {
-                /opt/keycloak/bin/kcadm.sh get users -r "$KEYCLOAK_REALM" -q username="$1" \
+                local realm_name="$1"
+                local username="$2"
+
+                /opt/keycloak/bin/kcadm.sh get users -r "$realm_name" -q username="$username" \
                   | sed -n 's/.*"id" : "\([^"]*\)".*/\1/p' \
                   | head -n1
               }
 
               ensure_user() {
-                local username="$1"
+                local realm_name="$1"
+                local username="$2"
                 local user_id
-                user_id=$(get_user_id "$username")
+                user_id=$(get_user_id "$realm_name" "$username")
 
                 if [[ -z "$user_id" ]]; then
-                  user_id=$(/opt/keycloak/bin/kcadm.sh create users -r "$KEYCLOAK_REALM" \
+                  user_id=$(/opt/keycloak/bin/kcadm.sh create users -r "$realm_name" \
                     -s username="$username" \
                     -s email="$username" \
                     -s enabled=true \
@@ -125,7 +131,7 @@ spec:
                     -i)
                   echo "Created user $username"
                 else
-                  /opt/keycloak/bin/kcadm.sh update "users/$user_id" -r "$KEYCLOAK_REALM" \
+                  /opt/keycloak/bin/kcadm.sh update "users/$user_id" -r "$realm_name" \
                     -s email="$username" \
                     -s enabled=true \
                     -s emailVerified=true \
@@ -133,21 +139,24 @@ spec:
                   echo "Updated user $username"
                 fi
 
-                /opt/keycloak/bin/kcadm.sh set-password -r "$KEYCLOAK_REALM" \
+                /opt/keycloak/bin/kcadm.sh set-password -r "$realm_name" \
                   --userid "$user_id" \
                   --new-password "$KEYCLOAK_USER_PASSWORD" \
                   --temporary=false
               }
 
               get_client_id() {
-                /opt/keycloak/bin/kcadm.sh get clients -r "$KEYCLOAK_REALM" -q clientId="$KEYCLOAK_CLIENT_ID" \
+                local realm_name="$1"
+
+                /opt/keycloak/bin/kcadm.sh get clients -r "$realm_name" -q clientId="$KEYCLOAK_CLIENT_ID" \
                   | sed -n 's/.*"id" : "\([^"]*\)".*/\1/p' \
                   | head -n1
               }
 
               ensure_client() {
+                local realm_name="$1"
                 local client_uuid
-                client_uuid=$(get_client_id)
+                client_uuid=$(get_client_id "$realm_name")
 
                 cat > /tmp/keycloak-client.json <<EOF
               {
@@ -171,19 +180,21 @@ spec:
               EOF
 
                 if [[ -z "$client_uuid" ]]; then
-                  client_uuid=$(/opt/keycloak/bin/kcadm.sh create clients -r "$KEYCLOAK_REALM" -f /tmp/keycloak-client.json -i)
-                  echo "Created client $KEYCLOAK_CLIENT_ID"
+                  client_uuid=$(/opt/keycloak/bin/kcadm.sh create clients -r "$realm_name" -f /tmp/keycloak-client.json -i)
+                  echo "Created client $KEYCLOAK_CLIENT_ID in realm $realm_name"
                 else
-                  /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" -r "$KEYCLOAK_REALM" -f /tmp/keycloak-client.json
-                  echo "Updated client $KEYCLOAK_CLIENT_ID"
+                  /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" -r "$realm_name" -f /tmp/keycloak-client.json
+                  echo "Updated client $KEYCLOAK_CLIENT_ID in realm $realm_name"
                 fi
               }
 
-              ensure_realm
-              ensure_user "rikki@gmail.com"
-              ensure_user "linh@gmail.com"
-              ensure_user "khaosoi@gmail.com"
-              ensure_user "khaopad@gmail.com"
-              ensure_client
+              for realm_name in $(echo "$KEYCLOAK_REALMS" | tr -d '[]"' | tr ',' ' '); do
+                ensure_realm "$realm_name"
+                ensure_user "$realm_name" "rikki@gmail.com"
+                ensure_user "$realm_name" "linh@gmail.com"
+                ensure_user "$realm_name" "khaosoi@gmail.com"
+                ensure_user "$realm_name" "khaopad@gmail.com"
+                ensure_client "$realm_name"
+              done
 
               echo "Keycloak bootstrap complete."

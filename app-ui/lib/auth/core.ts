@@ -9,6 +9,7 @@ const STATE_COOKIE_NAME = "mizumi_auth_state";
 const DEFAULT_AUTH_SECRET = "mizumi-app-ui-dev-auth-secret";
 
 export type AppSession = {
+  realm: string;
   sub?: string;
   email?: string;
   preferredUsername?: string;
@@ -18,6 +19,7 @@ export type AppSession = {
 };
 
 type AuthState = {
+  realm: string;
   state: string;
   next: string;
   expiresAt: number;
@@ -35,16 +37,23 @@ function getAuthSecret() {
   return process.env.AUTH_SECRET ?? DEFAULT_AUTH_SECRET;
 }
 
-export function getRealm() {
-  return process.env.KEYCLOAK_REALM ?? "mizumi";
+export function getAvailableRealms() {
+  return (process.env.KEYCLOAK_REALMS ?? "vietjetair,hdbank")
+    .split(",")
+    .map((realm) => realm.trim())
+    .filter(Boolean);
+}
+
+export function getDefaultRealm() {
+  return getAvailableRealms()[0] ?? "vietjetair";
 }
 
 export function getClientId() {
-  return process.env.KEYCLOAK_CLIENT_ID ?? "mizumi-client";
+  return process.env.KEYCLOAK_CLIENT_ID ?? "app-ui";
 }
 
 export function getClientSecret() {
-  return process.env.KEYCLOAK_CLIENT_SECRET ?? "mizumi-client-secret";
+  return process.env.KEYCLOAK_CLIENT_SECRET ?? "app-ui-secret";
 }
 
 export function getPublicBaseUrl() {
@@ -59,12 +68,16 @@ export function getInternalBaseUrl() {
   );
 }
 
-export function getPublicRealmBaseUrl() {
-  return `${getPublicBaseUrl()}/realms/${getRealm()}`;
+export function isAllowedRealm(realm: string) {
+  return getAvailableRealms().includes(realm);
 }
 
-export function getInternalRealmBaseUrl() {
-  return `${getInternalBaseUrl()}/realms/${getRealm()}`;
+export function getPublicRealmBaseUrl(realm: string) {
+  return `${getPublicBaseUrl()}/realms/${realm}`;
+}
+
+export function getInternalRealmBaseUrl(realm: string) {
+  return `${getInternalBaseUrl()}/realms/${realm}`;
 }
 
 function toBase64Url(bytes: Uint8Array) {
@@ -155,13 +168,16 @@ export async function sealSessionCookie(session: AppSession) {
 }
 
 export async function createStateCookie({
+  realm,
   state,
   next,
 }: {
+  realm: string;
   state: string;
   next: string;
 }) {
   return seal<AuthState>({
+    realm,
     state,
     next,
     expiresAt: Math.floor(Date.now() / 1000) + stateTtlSeconds,
@@ -190,9 +206,9 @@ export function getDefaultLoginUrl(origin: string) {
   return new URL("/login", origin);
 }
 
-export function getAuthLoginUrl(origin: string, state: string) {
+export function getAuthLoginUrl(origin: string, realm: string, state: string) {
   const url = new URL(
-    `${getPublicRealmBaseUrl()}/protocol/openid-connect/auth`,
+    `${getPublicRealmBaseUrl(realm)}/protocol/openid-connect/auth`,
   );
   url.searchParams.set("client_id", getClientId());
   url.searchParams.set("redirect_uri", `${origin}/auth/callback`);
@@ -202,11 +218,12 @@ export function getAuthLoginUrl(origin: string, state: string) {
   return url;
 }
 
-export function getLogoutUrl(origin: string, idToken?: string) {
+export function getLogoutUrl(origin: string, realm: string, idToken?: string) {
   const url = new URL(
-    `${getPublicRealmBaseUrl()}/protocol/openid-connect/logout`,
+    `${getPublicRealmBaseUrl(realm)}/protocol/openid-connect/logout`,
   );
   url.searchParams.set("post_logout_redirect_uri", `${origin}/login`);
+  url.searchParams.set("client_id", getClientId());
   if (idToken) {
     url.searchParams.set("id_token_hint", idToken);
   }

@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:6000";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
+  devIndicators: false,
   async rewrites() {
     return [
       // dagster routes have no /api/ prefix on the server

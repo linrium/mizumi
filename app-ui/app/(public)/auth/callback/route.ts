@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tokens = await exchangeAuthorizationCode(request, code);
+    const tokens = await exchangeAuthorizationCode(
+      request,
+      pendingState.realm,
+      code,
+    );
     const claims = readTokenClaims(tokens.id_token);
     const response = NextResponse.redirect(
       new URL(pendingState.next, request.nextUrl.origin),
@@ -41,6 +45,7 @@ export async function GET(request: NextRequest) {
     response.cookies.set({
       name: getSessionCookieName(),
       value: await sealSessionCookie({
+        realm: pendingState.realm,
         email: claims.email,
         preferredUsername: claims.preferred_username,
         name: claims.name,

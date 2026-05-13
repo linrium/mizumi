@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   clearSessionCookie,
+  getDefaultRealm,
   getLogoutUrlForRequest,
   getSessionCookieName,
   readSessionFromCookieValue,
@@ -12,7 +13,11 @@ export async function GET(request: NextRequest) {
     ? await readSessionFromCookieValue(sessionCookie)
     : null;
   const response = NextResponse.redirect(
-    getLogoutUrlForRequest(request, session?.idToken),
+    getLogoutUrlForRequest(
+      request,
+      session?.realm ?? getDefaultRealm(),
+      session?.idToken,
+    ),
   );
 
   clearSessionCookie(response);
