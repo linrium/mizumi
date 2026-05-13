@@ -847,7 +847,12 @@ fn gql_run_to_run(r: GqlRun) -> Run {
         root_run_id: r.root_run_id,
         parent_run_id: r.parent_run_id,
         can_terminate: r.can_terminate,
-        asset_selection: r.asset_selection.unwrap_or_default().into_iter().map(|k| k.path).collect(),
+        asset_selection: r
+            .asset_selection
+            .unwrap_or_default()
+            .into_iter()
+            .map(|k| k.path)
+            .collect(),
         stats: r.stats.map(|s| RunStats {
             steps_succeeded: s.steps_succeeded,
             steps_failed: s.steps_failed,
@@ -1689,7 +1694,10 @@ pub async fn list_schedules() -> impl IntoResponse {
                     execution_timezone: s.execution_timezone,
                     default_status: s.default_status,
                     job_name: s.job_name,
-                    next_tick: s.future_ticks.and_then(|ft| ft.results.into_iter().next()).map(|t| t.timestamp),
+                    next_tick: s
+                        .future_ticks
+                        .and_then(|ft| ft.results.into_iter().next())
+                        .map(|t| t.timestamp),
                     status: s.schedule_state.as_ref().map(|st| st.status.clone()),
                     last_tick: s.schedule_state.and_then(|st| {
                         st.ticks.into_iter().next().map(|t| ScheduleTick {
@@ -1829,7 +1837,11 @@ async fn fetch_schedule_asset_selection(
             Ok(ScheduleAssetSelectionResponse {
                 schedule_name: r.name.unwrap_or_else(|| schedule_name.to_string()),
                 asset_selection_string: sel.asset_selection_string,
-                assets: sel.assets.into_iter().map(gql_schedule_asset_to_schedule_asset).collect(),
+                assets: sel
+                    .assets
+                    .into_iter()
+                    .map(gql_schedule_asset_to_schedule_asset)
+                    .collect(),
             })
         }
         "ScheduleNotFoundError" => Err((
@@ -1847,20 +1859,32 @@ pub async fn list_schedule_asset_selections(
     Query(params): Query<ListScheduleAssetSelectionsParams>,
 ) -> impl IntoResponse {
     let names = match &params.names {
-        Some(s) if !s.is_empty() => s.split(',').map(str::trim).map(str::to_string).collect::<Vec<_>>(),
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({ "error": "names query param required" }))).into_response(),
+        Some(s) if !s.is_empty() => s
+            .split(',')
+            .map(str::trim)
+            .map(str::to_string)
+            .collect::<Vec<_>>(),
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "names query param required" })),
+            )
+                .into_response();
+        }
     };
 
-    let results = futures::future::join_all(
-        names.iter().map(|n| fetch_schedule_asset_selection(n))
-    ).await;
+    let results =
+        futures::future::join_all(names.iter().map(|n| fetch_schedule_asset_selection(n))).await;
 
     let mut schedules = Vec::with_capacity(names.len());
     for (name, result) in names.iter().zip(results) {
         match result {
             Ok(r) => schedules.push(r),
             Err((_, body)) => {
-                let msg = body.get("error").and_then(|v| v.as_str()).unwrap_or("unknown error");
+                let msg = body
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown error");
                 tracing::warn!("Failed to fetch asset selection for schedule {name}: {msg}");
             }
         }
@@ -2087,36 +2111,59 @@ pub async fn get_schedule_tick_history(
             let r = data.instigation_state_or_error;
             match r.typename.as_str() {
                 "InstigationState" => {
-                    let ticks = r.ticks.unwrap_or_default().into_iter().map(|t| HistoryTick {
-                        id: t.id,
-                        tick_id: t.tick_id,
-                        status: t.status,
-                        timestamp: t.timestamp,
-                        end_timestamp: t.end_timestamp,
-                        cursor: t.cursor,
-                        instigation_type: t.instigation_type,
-                        skip_reason: t.skip_reason,
-                        requested_asset_materialization_count: t.requested_asset_materialization_count,
-                        run_ids: t.run_ids,
-                        runs: t.runs.into_iter().map(|r| TickRun { id: r.id, status: r.status }).collect(),
-                        origin_run_ids: t.origin_run_ids,
-                        error: t.error.map(|e| TickError { message: e.message, stack: e.stack }),
-                        log_key: t.log_key,
-                        dynamic_partitions_request_results: t.dynamic_partitions_request_results.into_iter().map(|d| DynamicPartitionsResult {
-                            partitions_def_name: d.partitions_def_name,
-                            partition_keys: d.partition_keys,
-                            skipped_partition_keys: d.skipped_partition_keys,
-                            result_type: d.result_type,
-                        }).collect(),
-                    }).collect();
+                    let ticks = r
+                        .ticks
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|t| HistoryTick {
+                            id: t.id,
+                            tick_id: t.tick_id,
+                            status: t.status,
+                            timestamp: t.timestamp,
+                            end_timestamp: t.end_timestamp,
+                            cursor: t.cursor,
+                            instigation_type: t.instigation_type,
+                            skip_reason: t.skip_reason,
+                            requested_asset_materialization_count: t
+                                .requested_asset_materialization_count,
+                            run_ids: t.run_ids,
+                            runs: t
+                                .runs
+                                .into_iter()
+                                .map(|r| TickRun {
+                                    id: r.id,
+                                    status: r.status,
+                                })
+                                .collect(),
+                            origin_run_ids: t.origin_run_ids,
+                            error: t.error.map(|e| TickError {
+                                message: e.message,
+                                stack: e.stack,
+                            }),
+                            log_key: t.log_key,
+                            dynamic_partitions_request_results: t
+                                .dynamic_partitions_request_results
+                                .into_iter()
+                                .map(|d| DynamicPartitionsResult {
+                                    partitions_def_name: d.partitions_def_name,
+                                    partition_keys: d.partition_keys,
+                                    skipped_partition_keys: d.skipped_partition_keys,
+                                    result_type: d.result_type,
+                                })
+                                .collect(),
+                        })
+                        .collect();
                     Json(TickHistoryResponse {
                         id: r.id.unwrap_or_default(),
                         instigation_type: r.instigation_type,
                         ticks,
-                    }).into_response()
+                    })
+                    .into_response()
                 }
                 _ => {
-                    let msg = r.message.unwrap_or_else(|| format!("unexpected type: {}", r.typename));
+                    let msg = r
+                        .message
+                        .unwrap_or_else(|| format!("unexpected type: {}", r.typename));
                     (StatusCode::BAD_GATEWAY, Json(json!({ "error": msg }))).into_response()
                 }
             }

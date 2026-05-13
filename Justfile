@@ -217,18 +217,18 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s
     kubectl wait --for=condition=Available deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=300s
-    just banking-bootstrap
+    just unitycatalog-bootstrap
     kubectl get pods,svc -n {{unitycatalog_namespace}}
 
 unitycatalog-destroy:
     kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
     kubectl delete namespace {{unitycatalog_namespace}} --ignore-not-found --wait=false
 
-banking-bootstrap:
-    kubectl delete job unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}} --ignore-not-found
-    kubectl apply -f infra/k8s/unitycatalog/banking-bootstrap-job.yaml
-    kubectl wait --for=condition=complete job/unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
-    kubectl logs job/unitycatalog-banking-bootstrap -n {{unitycatalog_namespace}}
+unitycatalog-bootstrap:
+    kubectl delete job unitycatalog-bootstrap -n {{unitycatalog_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/unitycatalog/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
+    kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
 banking-stream-create:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \

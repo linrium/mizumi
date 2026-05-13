@@ -16,8 +16,19 @@ spec:
             - /bin/bash
             - -ec
             - |
-              rpk topic create banking-transactions \
-                --brokers redpanda-svc.redpanda.svc.cluster.local:9092 \
-                --partitions 1 \
-                --replicas 1 \
-                || rpk topic describe banking-transactions --brokers redpanda-svc.redpanda.svc.cluster.local:9092
+              brokers="redpanda-svc.redpanda.svc.cluster.local:9092"
+
+              create_topic() {
+                local topic="$1"
+                rpk topic create "$topic" \
+                  --brokers "$brokers" \
+                  --partitions 1 \
+                  --replicas 1 \
+                  || rpk topic describe "$topic" --brokers "$brokers"
+              }
+
+              create_topic "hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1"
+              create_topic "hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1"
+              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1"
+              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1"
+              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1"
