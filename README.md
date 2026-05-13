@@ -98,6 +98,7 @@ Deploys the core platform stack:
 
 - RustFS
 - Redpanda
+- Keycloak
 - Unity Catalog
 - Spark operator and Spark jobs/pipelines
 - Dagster
@@ -122,6 +123,7 @@ Starts the common port-forwards and prints local endpoints for:
 - Redpanda Kafka on `127.0.0.1:19092`
 - Redpanda Admin API on `http://127.0.0.1:9644`
 - Redpanda Console on `http://127.0.0.1:8081`
+- Keycloak on `http://127.0.0.1:8083`
 - Dagster UI on `http://127.0.0.1:8080`
 - Unity Catalog API on `http://127.0.0.1:8082`
 - Unity Catalog UI on `http://127.0.0.1:3001`
@@ -191,6 +193,16 @@ just unitycatalog-destroy
 ```
 
 `unitycatalog-deploy` provisions the backing Postgres instance, the catalog server, the UI, and runs bootstrap initialization.
+
+### Keycloak
+
+```bash
+just keycloak-deploy
+just keycloak-bootstrap
+just keycloak-destroy
+```
+
+`keycloak-deploy` installs Keycloak with an in-cluster PostgreSQL database using plain Kubernetes manifests, then runs a bootstrap job that seeds the `mizumi` realm, creates the users `rikki@gmail.com`, `linh@gmail.com`, `khaosoi@gmail.com`, and `khaopad@gmail.com`, and provisions the confidential client `mizumi-client` with direct access grants and service accounts enabled. When `just forward` is running, the admin console is available at `http://127.0.0.1:8083` with the default credentials `admin` / `admin`.
 
 ### Query Engines
 

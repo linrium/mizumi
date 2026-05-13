@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-bootstrap-secret
+  namespace: keycloak
+type: Opaque
+stringData:
+  KEYCLOAK_REALM: mizumi
+  KEYCLOAK_CLIENT_ID: mizumi-client
+  KEYCLOAK_CLIENT_SECRET: mizumi-client-secret
+  KEYCLOAK_USER_PASSWORD: Password123!
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-bootstrap
+  namespace: keycloak
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: quay.io/keycloak/keycloak:26.3.3
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KEYCLOAK_URL
+              value: http://keycloak-svc:8080
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_CLIENT_ID
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_CLIENT_SECRET
+            - name: KEYCLOAK_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_USER_PASSWORD
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              set -euo pipefail
+
+              login() {
+                /opt/keycloak/bin/kcadm.sh config credentials \
+                  --server "$KEYCLOAK_URL" \
+                  --realm master \
+                  --user "$KEYCLOAK_ADMIN" \
+                  --password "$KEYCLOAK_ADMIN_PASSWORD"
+              }
+
+              for _ in $(seq 1 60); do
+                if login >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 5
+              done
+
+              login
+
+              ensure_realm() {
+                if /opt/keycloak/bin/kcadm.sh get "realms/$KEYCLOAK_REALM" >/dev/null 2>&1; then
+                  echo "Realm $KEYCLOAK_REALM already exists"
+                else
+                  /opt/keycloak/bin/kcadm.sh create realms \
+                    -s realm="$KEYCLOAK_REALM" \
+                    -s enabled=true
+                  echo "Created realm $KEYCLOAK_REALM"
+                fi
+              }
+
+              get_user_id() {
+                /opt/keycloak/bin/kcadm.sh get users -r "$KEYCLOAK_REALM" -q username="$1" \
+                  | sed -n 's/.*"id" : "\([^"]*\)".*/\1/p' \
+                  | head -n1
+              }
+
+              ensure_user() {
+                local username="$1"
+                local user_id
+                user_id=$(get_user_id "$username")
+
+                if [[ -z "$user_id" ]]; then
+                  user_id=$(/opt/keycloak/bin/kcadm.sh create users -r "$KEYCLOAK_REALM" \
+                    -s username="$username" \
+                    -s email="$username" \
+                    -s enabled=true \
+                    -s emailVerified=true \
+                    -i)
+                  echo "Created user $username"
+                else
+                  /opt/keycloak/bin/kcadm.sh update "users/$user_id" -r "$KEYCLOAK_REALM" \
+                    -s email="$username" \
+                    -s enabled=true \
+                    -s emailVerified=true
+                  echo "Updated user $username"
+                fi
+
+                /opt/keycloak/bin/kcadm.sh set-password -r "$KEYCLOAK_REALM" \
+                  --userid "$user_id" \
+                  --new-password "$KEYCLOAK_USER_PASSWORD" \
+                  --temporary=false
+              }
+
+              get_client_id() {
+                /opt/keycloak/bin/kcadm.sh get clients -r "$KEYCLOAK_REALM" -q clientId="$KEYCLOAK_CLIENT_ID" \
+                  | sed -n 's/.*"id" : "\([^"]*\)".*/\1/p' \
+                  | head -n1
+              }
+
+              ensure_client() {
+                local client_uuid
+                client_uuid=$(get_client_id)
+
+                if [[ -z "$client_uuid" ]]; then
+                  client_uuid=$(/opt/keycloak/bin/kcadm.sh create clients -r "$KEYCLOAK_REALM" \
+                    -s clientId="$KEYCLOAK_CLIENT_ID" \
+                    -s enabled=true \
+                    -s protocol=openid-connect \
+                    -s publicClient=false \
+                    -s bearerOnly=false \
+                    -s standardFlowEnabled=true \
+                    -s directAccessGrantsEnabled=true \
+                    -s serviceAccountsEnabled=true \
+                    -s clientAuthenticatorType=client-secret \
+                    -s secret="$KEYCLOAK_CLIENT_SECRET" \
+                    -i)
+                  echo "Created client $KEYCLOAK_CLIENT_ID"
+                else
+                  /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+                    -s enabled=true \
+                    -s protocol=openid-connect \
+                    -s publicClient=false \
+                    -s bearerOnly=false \
+                    -s standardFlowEnabled=true \
+                    -s directAccessGrantsEnabled=true \
+                    -s serviceAccountsEnabled=true \
+                    -s clientAuthenticatorType=client-secret \
+                    -s secret="$KEYCLOAK_CLIENT_SECRET"
+                  echo "Updated client $KEYCLOAK_CLIENT_ID"
+                fi
+              }
+
+              ensure_realm
+              ensure_user "rikki@gmail.com"
+              ensure_user "linh@gmail.com"
+              ensure_user "khaosoi@gmail.com"
+              ensure_user "khaopad@gmail.com"
+              ensure_client
+
+              echo "Keycloak bootstrap complete."

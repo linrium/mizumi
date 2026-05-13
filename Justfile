@@ -17,6 +17,9 @@ rustfs_chart := "rustfs/rustfs"
 rustfs_chart_version := "0.1.0"
 rustfs_values := "infra/k8s/rustfs/helm/values.yaml"
 
+keycloak_namespace := "keycloak"
+keycloak_manifests := "infra/k8s/keycloak"
+
 spark_operator_namespace := "spark-operator"
 spark_namespace := "spark"
 spark_operator_release := "spark-operator"
@@ -39,9 +42,9 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy redpanda-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build daft-distributed-deploy
+deploy: rustfs-deploy redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build daft-distributed-deploy
 
-destroy: spark-destroy dagster-destroy unitycatalog-destroy redpanda-destroy rustfs-destroy daft-destroy
+destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy daft-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -50,6 +53,7 @@ forward:
     kubectl port-forward -n {{rustfs_namespace}} svc/rustfs-svc 9000:9000 9001:9001 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
+    kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
     dagster_pod=$(kubectl get pods --namespace {{dagster_namespace}} \
       --field-selector=status.phase=Running \
       -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
@@ -64,6 +68,7 @@ forward:
     echo "Redpanda Kafka:   127.0.0.1:19092"
     echo "Redpanda Admin:   http://127.0.0.1:9644"
     echo "Redpanda UI:      http://127.0.0.1:8081"
+    echo "Keycloak:         http://127.0.0.1:8083"
     echo "Dagster UI:       http://127.0.0.1:8080"
     echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
     echo "UC API:           http://127.0.0.1:8082"
@@ -88,6 +93,26 @@ rustfs-deploy: rustfs-helm-repo
 rustfs-destroy:
     helm uninstall {{rustfs_release}} --namespace {{rustfs_namespace}} || true
     kubectl delete namespace {{rustfs_namespace}} --ignore-not-found --wait=false
+
+keycloak-deploy:
+    kubectl create namespace {{keycloak_namespace}} 2>/dev/null || true
+    kubectl apply -f {{keycloak_manifests}}/postgres.yaml
+    kubectl rollout status statefulset/keycloak-postgres -n {{keycloak_namespace}} --timeout=300s
+    kubectl apply -f {{keycloak_manifests}}/keycloak.yaml
+    kubectl rollout status deployment/keycloak -n {{keycloak_namespace}} --timeout=300s
+    just keycloak-bootstrap
+    kubectl get pods,svc,secret -n {{keycloak_namespace}}
+
+keycloak-bootstrap:
+    kubectl delete job keycloak-bootstrap -n {{keycloak_namespace}} --ignore-not-found
+    kubectl apply -f {{keycloak_manifests}}/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/keycloak-bootstrap -n {{keycloak_namespace}} --timeout=180s
+    kubectl logs job/keycloak-bootstrap -n {{keycloak_namespace}}
+
+keycloak-destroy:
+    helm uninstall keycloak --namespace {{keycloak_namespace}} || true
+    kubectl delete -f {{keycloak_manifests}}/ --ignore-not-found || true
+    kubectl delete namespace {{keycloak_namespace}} --ignore-not-found --wait=false
 
 redpanda-deploy:
     kubectl create namespace {{redpanda_namespace}} 2>/dev/null || true
