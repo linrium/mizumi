@@ -8,7 +8,9 @@ stringData:
   KEYCLOAK_REALM: mizumi
   KEYCLOAK_CLIENT_ID: mizumi-client
   KEYCLOAK_CLIENT_SECRET: mizumi-client-secret
-  KEYCLOAK_USER_PASSWORD: Password123!
+  KEYCLOAK_USER_PASSWORD: "123"
+  KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/*","http://127.0.0.1:3000/*","http://localhost:3002/*","http://127.0.0.1:3002/*"]'
+  KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3002","http://127.0.0.1:3002"]'
 ---
 apiVersion: batch/v1
 kind: Job
@@ -58,6 +60,16 @@ spec:
                 secretKeyRef:
                   name: keycloak-bootstrap-secret
                   key: KEYCLOAK_USER_PASSWORD
+            - name: KEYCLOAK_CLIENT_REDIRECT_URIS
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_CLIENT_REDIRECT_URIS
+            - name: KEYCLOAK_CLIENT_WEB_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_CLIENT_WEB_ORIGINS
           command:
             - /bin/bash
             - -ec
@@ -109,13 +121,15 @@ spec:
                     -s email="$username" \
                     -s enabled=true \
                     -s emailVerified=true \
+                    -s requiredActions=[] \
                     -i)
                   echo "Created user $username"
                 else
                   /opt/keycloak/bin/kcadm.sh update "users/$user_id" -r "$KEYCLOAK_REALM" \
                     -s email="$username" \
                     -s enabled=true \
-                    -s emailVerified=true
+                    -s emailVerified=true \
+                    -s requiredActions=[]
                   echo "Updated user $username"
                 fi
 
@@ -135,31 +149,32 @@ spec:
                 local client_uuid
                 client_uuid=$(get_client_id)
 
+                cat > /tmp/keycloak-client.json <<EOF
+              {
+                "clientId": "$KEYCLOAK_CLIENT_ID",
+                "enabled": true,
+                "protocol": "openid-connect",
+                "publicClient": false,
+                "bearerOnly": false,
+                "standardFlowEnabled": true,
+                "directAccessGrantsEnabled": true,
+                "serviceAccountsEnabled": true,
+                "clientAuthenticatorType": "client-secret",
+                "secret": "$KEYCLOAK_CLIENT_SECRET",
+                "redirectUris": $KEYCLOAK_CLIENT_REDIRECT_URIS,
+                "webOrigins": $KEYCLOAK_CLIENT_WEB_ORIGINS,
+                "attributes": {
+                  "post.logout.redirect.uris": "+",
+                  "logout.confirmation.screen": "false"
+                }
+              }
+              EOF
+
                 if [[ -z "$client_uuid" ]]; then
-                  client_uuid=$(/opt/keycloak/bin/kcadm.sh create clients -r "$KEYCLOAK_REALM" \
-                    -s clientId="$KEYCLOAK_CLIENT_ID" \
-                    -s enabled=true \
-                    -s protocol=openid-connect \
-                    -s publicClient=false \
-                    -s bearerOnly=false \
-                    -s standardFlowEnabled=true \
-                    -s directAccessGrantsEnabled=true \
-                    -s serviceAccountsEnabled=true \
-                    -s clientAuthenticatorType=client-secret \
-                    -s secret="$KEYCLOAK_CLIENT_SECRET" \
-                    -i)
+                  client_uuid=$(/opt/keycloak/bin/kcadm.sh create clients -r "$KEYCLOAK_REALM" -f /tmp/keycloak-client.json -i)
                   echo "Created client $KEYCLOAK_CLIENT_ID"
                 else
-                  /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
-                    -s enabled=true \
-                    -s protocol=openid-connect \
-                    -s publicClient=false \
-                    -s bearerOnly=false \
-                    -s standardFlowEnabled=true \
-                    -s directAccessGrantsEnabled=true \
-                    -s serviceAccountsEnabled=true \
-                    -s clientAuthenticatorType=client-secret \
-                    -s secret="$KEYCLOAK_CLIENT_SECRET"
+                  /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" -r "$KEYCLOAK_REALM" -f /tmp/keycloak-client.json
                   echo "Updated client $KEYCLOAK_CLIENT_ID"
                 fi
               }

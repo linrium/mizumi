@@ -29,6 +29,18 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: KEYCLOAK_REALM
+              value: mizumi
+            - name: KEYCLOAK_CLIENT_ID
+              value: mizumi-client
+            - name: KEYCLOAK_CLIENT_SECRET
+              value: mizumi-client-secret
+            - name: KEYCLOAK_PUBLIC_BASE_URL
+              value: http://127.0.0.1:8083
+            - name: KEYCLOAK_INTERNAL_BASE_URL
+              value: http://keycloak-svc.keycloak.svc.cluster.local:8080
+            - name: AUTH_SECRET
+              value: mizumi-app-ui-dev-auth-secret
           readinessProbe:
             httpGet:
               path: /
