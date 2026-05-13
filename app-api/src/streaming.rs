@@ -172,7 +172,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "mainApplicationFile": job.main_application_file,
             "sparkVersion": job.spark_version,
             "restartPolicy": {
-                "type": "IfNotPresent",
+                "type": "Always",
                 "onFailureRetries": 3,
                 "onFailureRetryInterval": 10,
                 "onSubmissionFailureRetries": 5,

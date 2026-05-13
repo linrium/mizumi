@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Book03Icon,
   DatabaseIcon,
   TableIcon,
 } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ async function apiFetch<T>(params: Record<string, string>): Promise<T> {
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg
+      aria-hidden="true"
       width="10"
       height="10"
       viewBox="0 0 10 10"
@@ -149,6 +150,10 @@ export default function CatalogLayout({
     window.addEventListener("mouseup", onMouseUp);
   }
 
+  function resizeBy(delta: number) {
+    setSidebarWidth((current) => Math.min(640, Math.max(300, current + delta)));
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Tree panel ── */}
@@ -252,12 +257,22 @@ export default function CatalogLayout({
             );
           })}
         </div>
-        <div
-          role="separator"
-          aria-orientation="vertical"
+        <button
+          type="button"
           aria-label="Resize catalog sidebar"
           onMouseDown={startResize}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              resizeBy(-16);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              resizeBy(16);
+            }
+          }}
           className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent transition-colors hover:bg-border"
+          title="Resize catalog sidebar"
         />
       </div>
 

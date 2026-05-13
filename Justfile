@@ -230,17 +230,17 @@ unitycatalog-bootstrap:
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
-banking-stream-create:
+jobs-sumit-hdbank-redpanda-to-bronze:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
-      -d '{"name":"banking-transactions-stream","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/banking_transactions_stream.py"}' \
+      -d '{"name":"hdbank-redpanda-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/redpanda_to_bronze.py"}' \
       | jq
 
-banking-stream-delete:
+jobs-delete-hdbank-redpanda-to-bronze:
     #!/usr/bin/env bash
     set -euo pipefail
     id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
-      | jq -r '.jobs[] | select(.job.name == "banking-transactions-stream") | .job.id')
+      | jq -r '.jobs[] | select(.job.name == "hdbank-redpanda-to-bronze") | .job.id')
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
     curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
 

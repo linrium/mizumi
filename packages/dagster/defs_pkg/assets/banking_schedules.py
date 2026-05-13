@@ -1,20 +1,14 @@
 import dagster as dg
 
-
-# Runs at 02:00 UTC daily — ingests bronze, cleans to silver, runs all SDP pipelines,
-# and computes account balance trends
+# Runs at 02:00 UTC daily — refreshes the silver layer and Spark gold marts.
 banking_daily_batch = dg.define_asset_job(
     name="banking_daily_batch",
     selection=dg.AssetSelection.assets(
         "bronze_transactions",
-        "banking_sdp_silver_transactions",
-        "banking_sdp_gold_daily_summary",
-        "banking_sdp_gold_aml_structuring",
-        "banking_sdp_gold_aml_rapid_sequences",
-        "banking_sdp_gold_monthly_revenue",
-        "banking_sdp_gold_customer_profile",
-        "banking_sdp_gold_customer_channel_usage",
-        "banking_gold_account_balance_trends",
+        "banking_silver_card_payment_events",
+        "banking_gold_risk_detection",
+        "banking_gold_merchant_revenue",
+        "banking_gold_user_spend",
     ),
 )
 

@@ -38,8 +38,7 @@ RUN chmod 644 \
     /opt/spark/jars/commons-pool2-2.12.0.jar
 
 RUN pip install --no-cache-dir \
-    "pyspark[pipelines]==4.1.1" \
-    "pyspark-connect==4.1.1" \
+    "pyspark==4.1.1" \
     "grpcio>=1.48.1" \
     "grpcio-status>=1.48.1" \
     "pandas>=2.2.0" \
@@ -49,9 +48,8 @@ RUN pip install --no-cache-dir \
     "dagster-pipes"
 
 COPY jobs /opt/spark/jobs
-COPY pipelines /opt/spark/pipelines
 COPY conf/log4j2.properties /opt/spark/conf/log4j2.properties
 COPY conf/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
-RUN chown -R spark:spark /opt/spark/jobs /opt/spark/pipelines /opt/spark/conf/log4j2.properties /opt/spark/conf/spark-defaults.conf
+RUN chown -R spark:spark /opt/spark/jobs /opt/spark/conf/log4j2.properties /opt/spark/conf/spark-defaults.conf
 
 USER spark

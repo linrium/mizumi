@@ -6,7 +6,7 @@ from ..config import DAFT_IMAGE, DAFT_RAY_ADDRESS
 
 @dg.asset(
     group_name="banking_gold",
-    deps=["banking_sdp_silver_transactions"],
+    deps=["banking_silver_card_payment_events"],
     kinds={"daft", "k8s"},
 )
 def banking_gold_customer_risk_scores(
@@ -23,7 +23,7 @@ def banking_gold_customer_risk_scores(
 
 @dg.asset(
     group_name="banking_gold",
-    deps=["banking_sdp_silver_transactions"],
+    deps=["banking_silver_card_payment_events"],
     kinds={"daft", "k8s", "ray"},
 )
 def banking_gold_fraud_pattern_analysis(

@@ -1,16 +1,5 @@
 import os
 
-
-PIPELINE_DIR = "/opt/spark/pipelines"
-
-BANKING_TRANSACTIONS_SPEC = f"{PIPELINE_DIR}/banking_transactions_pipeline/spark-pipeline.yaml"
-BANKING_RISK_SPEC = f"{PIPELINE_DIR}/banking_risk_pipeline/spark-pipeline.yaml"
-BANKING_CUSTOMER_SPEC = f"{PIPELINE_DIR}/banking_customer_pipeline/spark-pipeline.yaml"
-
-BANKING_TRANSACTIONS_DIR = f"{PIPELINE_DIR}/banking_transactions_pipeline"
-BANKING_RISK_DIR = f"{PIPELINE_DIR}/banking_risk_pipeline"
-BANKING_CUSTOMER_DIR = f"{PIPELINE_DIR}/banking_customer_pipeline"
-
 S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
 S3A_ACCESS_KEY = "rustfsadmin"
 S3A_SECRET_KEY = "rustfsadmin"
@@ -37,4 +26,8 @@ S3A_CONF = [
     "spark.hadoop.fs.s3a.connection.ssl.enabled=false",
     "--conf",
     "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+    "--conf",
+    "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension",
+    "--conf",
+    "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog",
 ]
