@@ -214,9 +214,9 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
     kubectl rollout status statefulset/unitycatalog-postgres -n {{unitycatalog_namespace}} --timeout=120s
     kubectl apply -f infra/k8s/unitycatalog/server.yaml
-    kubectl apply -f infra/k8s/unitycatalog/ui.yaml
+    # kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s
-    kubectl wait --for=condition=Available deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=300s
+    # kubectl wait --for=condition=Available deployment/unitycatalog-ui -n {{unitycatalog_namespace}} --timeout=300s
     just unitycatalog-bootstrap
     kubectl get pods,svc -n {{unitycatalog_namespace}}
 

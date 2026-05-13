@@ -66,13 +66,6 @@ spec:
                   return {
                       "name": name,
                       "type_name": type_name,
-                      "type_text": type_text,
-                      "type_json": json.dumps({
-                          "name": name,
-                          "type": json_type,
-                          "nullable": nullable,
-                          "metadata": {},
-                      }),
                       "position": pos,
                       "nullable": nullable,
                   }
