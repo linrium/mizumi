@@ -1,4 +1,5 @@
 distributed: false
+fullnameOverride: daft-local-job
 
 job:
   resources:

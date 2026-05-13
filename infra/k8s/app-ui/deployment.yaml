@@ -16,7 +16,7 @@ spec:
       containers:
         - name: app-ui
           image: mizumi-app-ui:0.1.0
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           resources:

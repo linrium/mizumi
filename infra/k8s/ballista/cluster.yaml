@@ -31,7 +31,7 @@ spec:
       containers:
         - name: ballista-scheduler
           image: ghcr.io/apache/datafusion-ballista-scheduler:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args:
             - "--bind-port=50050"
           ports:
@@ -63,7 +63,7 @@ spec:
       containers:
         - name: ballista-executor
           image: ghcr.io/apache/datafusion-ballista-executor:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args:
             - "--bind-port=50051"
             - "--scheduler-host=ballista-scheduler"

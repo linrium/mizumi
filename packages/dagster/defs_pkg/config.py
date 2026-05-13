@@ -19,7 +19,7 @@ SPARK_IMAGE = "mizumi-spark-rustfs:4.1.1"
 DAFT_IMAGE = "mizumi-daft:0.7.10"
 DAFT_RAY_ADDRESS = os.getenv(
     "DAFT_RAY_ADDRESS",
-    "ray://daft-distributed-quickstart-head.daft.svc.cluster.local:10001",
+    "ray://daft-ray-cluster-head.daft.svc.cluster.local:10001",
 )
 
 S3A_CONF = [

@@ -12,7 +12,7 @@ def banking_gold_account_balance_trends(
     return pipes_k8s_client.run(
         context=context,
         image=SPARK_IMAGE,
-        base_pod_spec={"containers": [{"name": "dagster-pipes-execution", "imagePullPolicy": "Always"}]},
+        base_pod_spec={"containers": [{"name": "dagster-pipes-execution", "imagePullPolicy": "IfNotPresent"}]},
         command=[
             "spark-submit",
             "--master",

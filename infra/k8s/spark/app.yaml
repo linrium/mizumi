@@ -8,7 +8,7 @@ spec:
   pythonVersion: "3"
   mode: cluster
   image: mizumi-spark-rustfs:4.1.1
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
   mainApplicationFile: local:///opt/spark/jobs/bronze_to_silver.py
   sparkVersion: 4.1.1
   restartPolicy:

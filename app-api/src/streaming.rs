@@ -168,11 +168,11 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "pythonVersion": "3",
             "mode": "cluster",
             "image": job.image,
-            "imagePullPolicy": "Always",
+            "imagePullPolicy": "IfNotPresent",
             "mainApplicationFile": job.main_application_file,
             "sparkVersion": job.spark_version,
             "restartPolicy": {
-                "type": "Always",
+                "type": "IfNotPresent",
                 "onFailureRetries": 3,
                 "onFailureRetryInterval": 10,
                 "onSubmissionFailureRetries": 5,

@@ -31,12 +31,15 @@ daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
 daft_distributed_release := "daft-distributed"
 daft_distributed_values := "infra/k8s/daft/helm/distributed-values.yaml"
 daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
+daft_simple_release := "daft-simple"
+daft_simple_values := "infra/k8s/daft/helm/simple-values.yaml"
+daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
 
 redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy redpanda-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-distributed-deploy
+deploy: rustfs-deploy redpanda-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build daft-distributed-deploy
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy redpanda-destroy rustfs-destroy daft-destroy
 
@@ -55,7 +58,7 @@ forward:
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
     kubectl port-forward -n app-api svc/app-api-postgres-svc 5433:5432 &
-    kubectl port-forward -n daft svc/daft-distributed-quickstart-head 8265:8265 &
+    kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -230,11 +233,36 @@ daft-distributed-deploy:
     helm upgrade --install {{daft_distributed_release}} {{daft_chart}} \
       --namespace {{daft_namespace}} \
       --create-namespace \
+      --values {{daft_distributed_values}}
+
+daft-distributed-deploy-with-job:
+    kubectl create namespace {{daft_namespace}} 2>/dev/null || true
+    helm upgrade --install {{daft_distributed_release}} {{daft_chart}} \
+      --namespace {{daft_namespace}} \
+      --create-namespace \
       --values {{daft_distributed_values}} \
       --set-file job.script={{daft_distributed_script}}
+
+daft-simple-deploy:
+    kubectl create namespace {{daft_namespace}} 2>/dev/null || true
+    helm upgrade --install {{daft_simple_release}} {{daft_chart}} \
+      --namespace {{daft_namespace}} \
+      --create-namespace \
+      --values {{daft_simple_values}}
+
+daft-simple-deploy-with-job:
+    kubectl create namespace {{daft_namespace}} 2>/dev/null || true
+    helm upgrade --install {{daft_simple_release}} {{daft_chart}} \
+      --namespace {{daft_namespace}} \
+      --create-namespace \
+      --values {{daft_simple_values}} \
+      --set-file job.script={{daft_simple_script}}
 
 daft-distributed-destroy:
     helm uninstall {{daft_distributed_release}} --namespace {{daft_namespace}} || true
 
-daft-destroy: daft-distributed-destroy
+daft-simple-destroy:
+    helm uninstall {{daft_simple_release}} --namespace {{daft_namespace}} || true
+
+daft-destroy: daft-distributed-destroy daft-simple-destroy
     kubectl delete namespace {{daft_namespace}} --ignore-not-found --wait=false
