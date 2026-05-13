@@ -4,8 +4,10 @@ import dagster as dg
 banking_daily_batch = dg.define_asset_job(
     name="banking_daily_batch",
     selection=dg.AssetSelection.assets(
-        "bronze_transactions",
+        "banking_bronze_raw_card_payment_events",
+        "banking_bronze_raw_customer_profile_events",
         "banking_silver_card_payment_events",
+        "banking_silver_customer_profiles",
         "banking_gold_risk_detection",
         "banking_gold_merchant_revenue",
         "banking_gold_user_spend",

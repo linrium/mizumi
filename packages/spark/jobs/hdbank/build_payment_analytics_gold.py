@@ -3,8 +3,11 @@ from pyspark.sql import SparkSession
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
-SOURCE_PATH = (
+PAYMENT_EVENTS_SOURCE_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_payments_prod_silver/card_payment_events_v1"
+)
+CUSTOMERS_SOURCE_PATH = (
+    "s3a://unitycatalog/hdbank/hdbank_payments_prod_silver/customers_v1"
 )
 RISK_TARGET_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_payments_prod_gold/risk_detection_v1"
@@ -20,7 +23,7 @@ RISK_MODEL_VERSION = "spark-gold-v1"
 
 def build_session() -> SparkSession:
     return (
-        SparkSession.builder.appName("hdbank-silver-to-gold")
+        SparkSession.builder.appName("hdbank-build-payment-analytics-gold")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -35,14 +38,15 @@ def main() -> None:
     with open_dagster_pipes() as pipes:
         spark = build_session()
 
-        silver_df = (
-            spark.read.format("delta").load(SOURCE_PATH).withColumn(
-                "business_date", F.to_date("payment_timestamp")
-            )
+        payment_events_df = (
+            spark.read.format("delta")
+            .load(PAYMENT_EVENTS_SOURCE_PATH)
+            .withColumn("business_date", F.to_date("payment_timestamp"))
         )
+        customer_profiles_df = spark.read.format("delta").load(CUSTOMERS_SOURCE_PATH)
 
         merchant_revenue_df = (
-            silver_df.groupBy(
+            payment_events_df.groupBy(
                 "business_date",
                 "merchant_name",
                 "merchant_category",
@@ -62,7 +66,7 @@ def main() -> None:
             "business_date", "customer_id", "account_id", "currency"
         ).orderBy(F.desc("category_tx_count"), F.asc("merchant_category"))
         top_categories_df = (
-            silver_df.groupBy(
+            payment_events_df.groupBy(
                 "business_date",
                 "customer_id",
                 "account_id",
@@ -82,7 +86,7 @@ def main() -> None:
         )
 
         user_spend_df = (
-            silver_df.groupBy(
+            payment_events_df.groupBy(
                 "business_date",
                 "customer_id",
                 "account_id",
@@ -108,21 +112,30 @@ def main() -> None:
                 F.lit("flagged_keywords"),
             ).otherwise(F.lit("clear"))
         )
-        risk_score = (
-            F.when(F.col("amount") >= 5000, F.lit(0.9))
-            .when(F.col("amount") >= 2500, F.lit(0.7))
-            .when(note_signal == "flagged_keywords", F.lit(0.75))
-            .otherwise(F.lit(0.2))
+        customer_segment_multiplier = (
+            F.when(F.col("segment_name") == "HIGH_NET_WORTH", F.lit(0.1))
+            .when(F.col("segment_name") == "SME", F.lit(0.05))
+            .otherwise(F.lit(0.0))
         )
         risk_detection_df = (
-            silver_df.select(
-                F.col("business_date").alias("detection_date"),
-                "payment_event_id",
-                "customer_id",
-                "account_id",
-                risk_score.alias("risk_score"),
+            payment_events_df.alias("payments")
+            .join(customer_profiles_df.alias("customers"), on="customer_id", how="left")
+            .select(
+                F.col("payments.business_date").alias("detection_date"),
+                F.col("payments.payment_event_id").alias("payment_event_id"),
+                F.col("payments.customer_id").alias("customer_id"),
+                F.col("payments.account_id").alias("account_id"),
+                (
+                    F.when(F.col("payments.amount") >= 5000, F.lit(0.9))
+                    .when(F.col("payments.amount") >= 2500, F.lit(0.7))
+                    .when(note_signal == "flagged_keywords", F.lit(0.75))
+                    .otherwise(F.lit(0.2))
+                    + customer_segment_multiplier
+                ).alias("risk_score_raw"),
                 note_signal.alias("note_signal"),
             )
+            .withColumn("risk_score", F.round(F.least(F.col("risk_score_raw"), F.lit(0.99)), 2))
+            .drop("risk_score_raw")
             .withColumn(
                 "risk_label",
                 F.when(F.col("risk_score") >= 0.8, F.lit("high"))
@@ -142,6 +155,8 @@ def main() -> None:
             RISK_TARGET_PATH
         )
 
+        payment_event_rows = payment_events_df.count()
+        customer_profile_rows = customer_profiles_df.count()
         merchant_rows = merchant_revenue_df.count()
         user_spend_rows = user_spend_df.count()
         risk_rows = risk_detection_df.count()
@@ -149,10 +164,11 @@ def main() -> None:
 
         pipes.report_asset_materialization(
             metadata={
+                "payment_event_rows": payment_event_rows,
+                "customer_profile_rows": customer_profile_rows,
                 "merchant_rows": merchant_rows,
                 "user_spend_rows": user_spend_rows,
                 "risk_rows": risk_rows,
-                "source": SOURCE_PATH,
             }
         )
 

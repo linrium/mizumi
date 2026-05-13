@@ -31,7 +31,7 @@ RAW_EVENT_SCHEMA = T.StructType(
 
 def build_session() -> SparkSession:
     return (
-        SparkSession.builder.appName("hdbank-bronze-to-silver")
+        SparkSession.builder.appName("hdbank-build-card-payment-events-silver")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -84,6 +84,7 @@ def main() -> None:
             .where(F.col("payment_timestamp").isNotNull())
             .where(F.col("status").isin("COMPLETED", "SETTLED"))
             .dropDuplicates(["payment_event_id"])
+            .drop("status")
         )
 
         silver_df.write.format("delta").mode("overwrite").save(TARGET_PATH)

@@ -14,7 +14,7 @@ TARGET_PATH = os.getenv(
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "KAFKA_BOOTSTRAP_SERVERS",
     "redpanda-svc.redpanda.svc.cluster.local:9092",
-)   
+)
 KAFKA_TOPIC = os.getenv(
     "KAFKA_TOPIC",
     "hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
@@ -24,7 +24,7 @@ STARTING_OFFSETS = os.getenv("KAFKA_STARTING_OFFSETS", "latest")
 
 def build_session() -> SparkSession:
     return (
-        SparkSession.builder.appName("hdbank-redpanda-to-bronze")
+        SparkSession.builder.appName("hdbank-stream-raw-card-payment-events-to-bronze")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(

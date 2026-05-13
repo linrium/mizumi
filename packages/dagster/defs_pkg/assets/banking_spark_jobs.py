@@ -30,7 +30,11 @@ def _run_spark_job(
     ).get_materialize_result()
 
 
-@dg.asset(group_name="banking_silver", deps=["bronze_transactions"], kinds={"spark", "k8s"})
+@dg.asset(
+    group_name="banking_silver",
+    deps=["banking_bronze_raw_card_payment_events"],
+    kinds={"spark", "k8s"},
+)
 def banking_silver_card_payment_events(
     context: dg.AssetExecutionContext,
     pipes_k8s_client: PipesK8sClient,
@@ -38,7 +42,23 @@ def banking_silver_card_payment_events(
     return _run_spark_job(
         context,
         pipes_k8s_client,
-        "/opt/spark/jobs/hdbank/bronze_to_silver.py",
+        "/opt/spark/jobs/hdbank/build_card_payment_events_silver.py",
+    )
+
+
+@dg.asset(
+    group_name="banking_silver",
+    deps=["banking_bronze_raw_customer_profile_events"],
+    kinds={"spark", "k8s"},
+)
+def banking_silver_customer_profiles(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return _run_spark_job(
+        context,
+        pipes_k8s_client,
+        "/opt/spark/jobs/hdbank/build_customer_profiles_silver.py",
     )
 
 
@@ -47,7 +67,7 @@ def banking_silver_card_payment_events(
         dg.AssetSpec(
             "banking_gold_risk_detection",
             group_name="banking_gold",
-            deps=["banking_silver_card_payment_events"],
+            deps=["banking_silver_card_payment_events", "banking_silver_customer_profiles"],
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
@@ -71,7 +91,7 @@ def banking_gold_marts(
     _run_spark_job(
         context,
         pipes_k8s_client,
-        "/opt/spark/jobs/hdbank/silver_to_gold.py",
+        "/opt/spark/jobs/hdbank/build_payment_analytics_gold.py",
     )
     yield dg.MaterializeResult(asset_key="banking_gold_risk_detection")
     yield dg.MaterializeResult(asset_key="banking_gold_merchant_revenue")

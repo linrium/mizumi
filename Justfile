@@ -230,17 +230,35 @@ unitycatalog-bootstrap:
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
-jobs-sumit-hdbank-redpanda-to-bronze:
+jobs-submit-all:
+    just jobs-sumit-hdbank-card-payments-bronze-stream
+    just jobs-sumit-hdbank-customer-profiles-bronze-stream
+
+jobs-sumit-hdbank-card-payments-bronze-stream:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
-      -d '{"name":"hdbank-redpanda-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/redpanda_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-raw-card-payment-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
       | jq
 
-jobs-delete-hdbank-redpanda-to-bronze:
+jobs-delete-hdbank-card-payments-bronze-stream:
     #!/usr/bin/env bash
     set -euo pipefail
     id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
-      | jq -r '.jobs[] | select(.job.name == "hdbank-redpanda-to-bronze") | .job.id')
+      | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-card-payment-events-to-bronze") | .job.id')
+    [[ -z "$id" ]] && { echo "job not found"; exit 1; }
+    curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
+
+jobs-sumit-hdbank-customer-profiles-bronze-stream:
+    curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
+      | jq
+
+jobs-delete-hdbank-customer-profiles-bronze-stream:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
+      | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-customer-profile-events-to-bronze") | .job.id')
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
     curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
 
