@@ -1,0 +1,99 @@
+# Unity Catalog Server Configuration
+# All values can be overridden via environment variables using the UC__ prefix
+# and __ as the hierarchy separator.
+# Example: UC__SERVER__PORT=9090  overrides server.port
+#          UC__DATABASE__URL=...  overrides database.url
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+[server]
+# Runtime environment label ("dev" | "staging" | "prod")
+env = "dev"
+host = "localhost"
+port = 8080
+
+# Set to "enable" to require JWT bearer-token authorization on all requests.
+# Set to "disable" to allow unauthenticated access (development only).
+authorization = "enable"
+
+# OAuth2 / OpenID Connect endpoints (required when authorization = "enable")
+ authorization_url = "http://localhost:8083/realms/sovico/protocol/openid-connect/auth"
+ token_url         = "http://localhost:8083/realms/sovico/protocol/openid-connect/token"
+ client_id         = "app-ui"
+ client_secret     = "app-ui-secret"
+
+# Local port used for the OAuth2 redirect callback
+ redirect_port = 58278
+
+# Comma-separated list of accepted JWT issuers (exact match).
+# Tokens from issuers not listed here will be rejected.
+# Examples:
+#   Google:           "https://accounts.google.com"
+#   Microsoft Entra:  "https://login.microsoftonline.com/{tenant-id}/v2.0"
+#   Keycloak:         "http://localhost:8083/realms/sovico"
+allowed_issuers = ["http://localhost:8083/realms/sovico"]
+
+# Accepted JWT audiences. Typically your application client ID or API identifier.
+audiences = ["app-ui"]
+
+# Session cookie lifetime (ISO-8601 duration).
+# P5D = 5 days | PT5H = 5 hours | PT5M = 5 minutes | PT5S = 5 seconds
+cookie_timeout = "P5D"
+
+# ---------------------------------------------------------------------------
+# Experimental feature flags
+# ---------------------------------------------------------------------------
+[server.managed_table]
+# Enable experimental MANAGED table support.
+enabled = false
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+[database]
+url             = "postgres://ucuser:ucpassword@localhost:5432/ucdb"
+max_connections = 20
+
+# ---------------------------------------------------------------------------
+# AWS global credentials
+# The Unity Catalog server uses these credentials to assume per-request roles.
+# Leave blank to fall back to the DefaultCredentialsProvider chain
+# (instance profile, environment variables, ~/.aws/credentials, etc.).
+# ---------------------------------------------------------------------------
+[aws]
+# master_role_arn = "arn:aws:iam::123456789012:role/UnityCatalogRole"
+# access_key      = ""
+# secret_key      = ""
+# region          = "us-east-1"
+
+# ---------------------------------------------------------------------------
+# Per-bucket S3 credential configuration (legacy; prefer [aws] above).
+# Add one [[s3]] section per bucket path.
+# ---------------------------------------------------------------------------
+# [[s3]]
+# bucket_path   = "s3://my-bucket/"
+# region        = "us-east-1"
+# aws_role_arn  = "arn:aws:iam::123456789012:role/MyRole"
+# access_key    = ""
+# secret_key    = ""
+# session_token = ""   # test-only: skips downscoping when set
+
+# ---------------------------------------------------------------------------
+# Azure Data Lake Storage (ADLS) credential configuration.
+# Add one [[adls]] section per storage account.
+# ---------------------------------------------------------------------------
+# [[adls]]
+# storage_account_name = "mystorageaccount"
+# tenant_id            = "00000000-0000-0000-0000-000000000000"
+# client_id            = "00000000-0000-0000-0000-000000000000"
+# client_secret        = "my-client-secret"
+
+# ---------------------------------------------------------------------------
+# GCS credential configuration.
+# Add one [[gcs]] section per bucket.
+# ---------------------------------------------------------------------------
+# [[gcs]]
+# bucket_path         = "gs://my-bucket/"
+# json_key_file_path  = "/path/to/service-account-key.json"
+# Leave json_key_file_path unset to use Application Default Credentials.

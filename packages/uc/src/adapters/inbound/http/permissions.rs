@@ -1,0 +1,43 @@
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Extension,
+    Json,
+};
+use std::sync::Arc;
+use crate::{
+    adapters::inbound::http::error::AppError,
+    domain::{error::DomainError, permissions::UpdatePermissions},
+    infrastructure::server::AppState,
+};
+
+pub async fn get_permissions(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<String>,
+    Path((securable_type_str, full_name)): Path<(String, String)>,
+) -> Result<impl IntoResponse, AppError> {
+    let securable_type = securable_type_str
+        .parse()
+        .map_err(|e: String| AppError::from(DomainError::InvalidArgument(e)))?;
+    let result = state
+        .permission_service
+        .get_permissions(&principal, securable_type, &full_name)
+        .await?;
+    Ok(Json(result))
+}
+
+pub async fn update_permissions(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<String>,
+    Path((securable_type_str, full_name)): Path<(String, String)>,
+    Json(body): Json<UpdatePermissions>,
+) -> Result<impl IntoResponse, AppError> {
+    let securable_type = securable_type_str
+        .parse()
+        .map_err(|e: String| AppError::from(DomainError::InvalidArgument(e)))?;
+    let result = state
+        .permission_service
+        .update_permissions(&principal, securable_type, &full_name, body)
+        .await?;
+    Ok(Json(result))
+}

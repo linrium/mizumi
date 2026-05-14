@@ -206,6 +206,8 @@ unitycatalog-ui-image-build:
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl create namespace {{unitycatalog_namespace}} 2>/dev/null || true
+    kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
+    kubectl rollout status statefulset/unitycatalog-postgres -n {{unitycatalog_namespace}} --timeout=120s
     kubectl apply -f infra/k8s/unitycatalog/server.yaml
     # kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s
