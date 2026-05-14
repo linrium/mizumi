@@ -54,11 +54,6 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
-    dagster_pod=$(kubectl get pods --namespace {{dagster_namespace}} \
-      --field-selector=status.phase=Running \
-      -l "app.kubernetes.io/name=dagster,app.kubernetes.io/instance=dagster,component=dagster-webserver" \
-      -o jsonpath="{.items[0].metadata.name}")
-    kubectl --namespace {{dagster_namespace}} port-forward "$dagster_pod" 8080:80 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
     kubectl port-forward -n app-api svc/app-api-postgres-svc 5433:5432 &
@@ -211,8 +206,6 @@ unitycatalog-ui-image-build:
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl create namespace {{unitycatalog_namespace}} 2>/dev/null || true
-    kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
-    kubectl rollout status statefulset/unitycatalog-postgres -n {{unitycatalog_namespace}} --timeout=120s
     kubectl apply -f infra/k8s/unitycatalog/server.yaml
     # kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=180s

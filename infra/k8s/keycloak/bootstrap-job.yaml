@@ -5,7 +5,8 @@ metadata:
   namespace: keycloak
 type: Opaque
 stringData:
-  KEYCLOAK_REALMS: '["vietjetair","hdbank"]'
+  KEYCLOAK_REALM: sovico
+  KEYCLOAK_COMPANY_GROUPS: '["vietjetair","hdbank"]'
   KEYCLOAK_CLIENT_ID: app-ui
   KEYCLOAK_CLIENT_SECRET: app-ui-secret
   KEYCLOAK_USER_PASSWORD: "123"
@@ -40,11 +41,16 @@ spec:
                 secretKeyRef:
                   name: keycloak-secret
                   key: KEYCLOAK_ADMIN_PASSWORD
-            - name: KEYCLOAK_REALMS
+            - name: KEYCLOAK_REALM
               valueFrom:
                 secretKeyRef:
                   name: keycloak-bootstrap-secret
-                  key: KEYCLOAK_REALMS
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_COMPANY_GROUPS
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_COMPANY_GROUPS
             - name: KEYCLOAK_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -103,6 +109,20 @@ spec:
                     -s realm="$realm_name" \
                     -s enabled=true
                   echo "Created realm $realm_name"
+                fi
+              }
+
+              ensure_group() {
+                local realm_name="$1"
+                local group_name="$2"
+
+                if /opt/keycloak/bin/kcadm.sh get groups -r "$realm_name" -q search="$group_name" \
+                  | grep -q "\"name\" : \"$group_name\""; then
+                  echo "Group $group_name already exists in realm $realm_name"
+                else
+                  /opt/keycloak/bin/kcadm.sh create groups -r "$realm_name" \
+                    -s name="$group_name"
+                  echo "Created group $group_name in realm $realm_name"
                 fi
               }
 
@@ -188,13 +208,16 @@ spec:
                 fi
               }
 
-              for realm_name in $(echo "$KEYCLOAK_REALMS" | tr -d '[]"' | tr ',' ' '); do
-                ensure_realm "$realm_name"
-                ensure_user "$realm_name" "rikki@gmail.com"
-                ensure_user "$realm_name" "linh@gmail.com"
-                ensure_user "$realm_name" "khaosoi@gmail.com"
-                ensure_user "$realm_name" "khaopad@gmail.com"
-                ensure_client "$realm_name"
+              ensure_realm "$KEYCLOAK_REALM"
+
+              for group_name in $(echo "$KEYCLOAK_COMPANY_GROUPS" | tr -d '[]"' | tr ',' ' '); do
+                ensure_group "$KEYCLOAK_REALM" "$group_name"
               done
+
+              ensure_user "$KEYCLOAK_REALM" "rikki@gmail.com"
+              ensure_user "$KEYCLOAK_REALM" "linh@gmail.com"
+              ensure_user "$KEYCLOAK_REALM" "khaosoi@gmail.com"
+              ensure_user "$KEYCLOAK_REALM" "khaopad@gmail.com"
+              ensure_client "$KEYCLOAK_REALM"
 
               echo "Keycloak bootstrap complete."

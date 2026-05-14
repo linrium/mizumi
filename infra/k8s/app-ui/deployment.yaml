@@ -30,7 +30,7 @@ spec:
             - name: NODE_ENV
               value: production
             - name: KEYCLOAK_REALMS
-              value: vietjetair,hdbank
+              value: sovico
             - name: KEYCLOAK_CLIENT_ID
               value: app-ui
             - name: KEYCLOAK_CLIENT_SECRET

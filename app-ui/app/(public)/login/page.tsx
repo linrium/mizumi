@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status";
-import { getAvailableRealms, getServerSession } from "@/lib/auth/server";
+import { getServerSession } from "@/lib/auth/server";
 
 type LoginPageProps = {
 	searchParams: Promise<{
@@ -13,13 +12,16 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
 	const session = await getServerSession();
-	const realms = getAvailableRealms();
+	const realm = "sovico";
 
 	if (session) {
 		redirect("/");
 	}
 
 	const { next } = await searchParams;
+	const loginHref = next
+		? `/auth/login?realm=${encodeURIComponent(realm)}&next=${encodeURIComponent(next)}`
+		: `/auth/login?realm=${encodeURIComponent(realm)}`;
 
 	return (
 		<div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,oklch(0.97_0.11_126)_0%,transparent_28%),linear-gradient(180deg,oklch(0.995_0.01_120)_0%,oklch(0.98_0.02_130)_45%,oklch(0.955_0.03_135)_100%)] px-6 py-16">
@@ -50,27 +52,17 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 							className="border-emerald-900/10 bg-white/40 text-emerald-800"
 						>
 							<StatusIndicator />
-							<StatusLabel>
-								Select a Keycloak realm for local sign-in
-							</StatusLabel>
+							<StatusLabel>Sign in through the Sovico realm</StatusLabel>
 						</Status>
 					</div>
 					<div className="grid gap-3">
-						{realms.map((realm) => {
-							const loginHref = next
-								? `/auth/login?realm=${encodeURIComponent(realm)}&next=${encodeURIComponent(next)}`
-								: `/auth/login?realm=${encodeURIComponent(realm)}`;
-
-							return (
-								<Button key={realm} size="lg" asChild className="w-full">
-									<a href={loginHref}>Continue with {realm}</a>
-								</Button>
-							);
-						})}
+						<Button size="lg" asChild className="w-full">
+							<a href={loginHref}>Continue with {realm}</a>
+						</Button>
 					</div>
 					<p className="text-center text-[11px] text-muted-foreground">
 						Authentication is handled by the local Keycloak instance and routed
-						back into Mizumi after sign-in for the selected realm.
+						back into Mizumi after sign-in through the shared Sovico realm.
 					</p>
 				</div>
 			</div>

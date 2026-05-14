@@ -1,3 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: unitycatalog-bootstrap-sa
+  namespace: unitycatalog
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: unitycatalog-bootstrap-role
+  namespace: unitycatalog
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: unitycatalog-bootstrap-rb
+  namespace: unitycatalog
+subjects:
+  - kind: ServiceAccount
+    name: unitycatalog-bootstrap-sa
+    namespace: unitycatalog
+roleRef:
+  kind: Role
+  name: unitycatalog-bootstrap-role
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -8,7 +41,27 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      serviceAccountName: unitycatalog-bootstrap-sa
       initContainers:
+        - name: fetch-token
+          image: bitnami/kubectl:latest
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          command:
+            - sh
+            - -c
+            - |
+              POD=$(kubectl get pod -n unitycatalog -l app=unitycatalog -o jsonpath='{.items[0].metadata.name}')
+              kubectl exec -n unitycatalog "$POD" -- cat ./etc/conf/token.txt > /token/uc-token
+              echo "Token fetched."
+          volumeMounts:
+            - name: token
+              mountPath: /token
         - name: create-buckets
           image: minio/mc:latest
           resources:
@@ -41,15 +94,24 @@ spec:
             - -c
             - |
               cat > /tmp/bootstrap.py << 'PYEOF'
-              import json, time, sys, urllib.request, urllib.error
+              import json, os, time, sys, urllib.request, urllib.error
 
               UC = "http://unitycatalog-svc:8080/api/2.1/unity-catalog"
+              TOKEN = os.environ.get("UC_TOKEN", "")
+
+              def _headers(extra=None):
+                  h = {}
+                  if TOKEN:
+                      h["Authorization"] = f"Bearer {TOKEN}"
+                  if extra:
+                      h.update(extra)
+                  return h
 
               def post(path, data):
                   req = urllib.request.Request(
                       f"{UC}/{path}",
                       data=json.dumps(data).encode(),
-                      headers={"Content-Type": "application/json"},
+                      headers=_headers({"Content-Type": "application/json"}),
                       method="POST",
                   )
                   try:
@@ -371,7 +433,7 @@ spec:
               print("Waiting for UC server...")
               for _ in range(60):
                   try:
-                      urllib.request.urlopen(f"{UC}/catalogs")
+                      urllib.request.urlopen(urllib.request.Request(f"{UC}/catalogs", headers=_headers()))
                       print("UC server ready")
                       break
                   except:
@@ -404,10 +466,19 @@ spec:
               for catalog_name, catalog in CATALOGS.items():
                   for schema_name in catalog["schemas"]:
                       with urllib.request.urlopen(
-                          f"{UC}/tables?catalog_name={catalog_name}&schema_name={schema_name}"
+                          urllib.request.Request(
+                              f"{UC}/tables?catalog_name={catalog_name}&schema_name={schema_name}",
+                              headers=_headers(),
+                          )
                       ) as r:
                           data = json.loads(r.read())
                           names = [t.get("name") for t in data.get("tables", [])]
                           print(f"  {catalog_name}.{schema_name}: {names}")
               PYEOF
-              python3 /tmp/bootstrap.py
+              UC_TOKEN=$(cat /token/uc-token) python3 /tmp/bootstrap.py
+          volumeMounts:
+            - name: token
+              mountPath: /token
+      volumes:
+        - name: token
+          emptyDir: {}

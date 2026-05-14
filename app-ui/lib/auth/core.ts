@@ -38,14 +38,14 @@ function getAuthSecret() {
 }
 
 export function getAvailableRealms() {
-  return (process.env.KEYCLOAK_REALMS ?? "vietjetair,hdbank")
+  return (process.env.KEYCLOAK_REALMS ?? "sovico")
     .split(",")
     .map((realm) => realm.trim())
     .filter(Boolean);
 }
 
 export function getDefaultRealm() {
-  return getAvailableRealms()[0] ?? "vietjetair";
+  return getAvailableRealms()[0] ?? "sovico";
 }
 
 export function getClientId() {
