@@ -1,18 +1,19 @@
 import { cookies } from "next/headers"
-import { NextRequest, NextResponse } from "next/server"
+import type { NextRequest, NextResponse } from "next/server"
+import type { AppSession } from "@/lib/auth/core"
 import {
   createStateCookie,
   getAuthLoginUrl,
   getAvailableRealms,
   getClientId,
   getClientSecret,
-  getDefaultRealm,
   getDefaultLoginUrl,
+  getDefaultRealm,
   getInternalRealmBaseUrl,
   getLogoutUrl,
-  isAllowedRealm,
   getSessionCookieName,
   getStateCookieName,
+  isAllowedRealm,
   readSessionFromCookieValue,
   readStateCookie,
   readTokenClaims,
@@ -45,15 +46,28 @@ export {
   stateTtlSeconds,
 }
 
-export async function getServerSession() {
-  const cookieStore = await cookies()
-  const value = cookieStore.get(getSessionCookieName())?.value
+function buildSessionFromTokenResponse(
+  realm: string,
+  tokens: TokenResponse,
+  refreshToken?: string,
+): AppSession {
+  const claims = readTokenClaims(tokens.id_token)
 
-  if (!value) {
-    return null
+  return {
+    realm,
+    email: claims.email,
+    preferredUsername: claims.preferred_username,
+    name: claims.name,
+    sub: claims.sub,
+    idToken: tokens.id_token,
+    refreshToken: tokens.refresh_token ?? refreshToken,
+    expiresAt: claims.exp,
   }
+}
 
-  return readSessionFromCookieValue(value)
+export async function getServerSession() {
+  const result = await getServerSessionResult()
+  return result.session
 }
 
 export function clearSessionCookie(response: NextResponse) {
@@ -128,4 +142,73 @@ export async function exchangeAuthorizationCode(
   }
 
   return (await response.json()) as TokenResponse
+}
+
+export async function refreshSessionTokens(
+  realm: string,
+  refreshToken: string,
+) {
+  const response = await fetch(
+    `${getInternalRealmBaseUrl(realm)}/protocol/openid-connect/token`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: getClientId(),
+        client_secret: getClientSecret(),
+        refresh_token: refreshToken,
+      }),
+      cache: "no-store",
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error("Token refresh failed")
+  }
+
+  return (await response.json()) as TokenResponse
+}
+
+export async function getServerSessionResult() {
+  const cookieStore = await cookies()
+  const value = cookieStore.get(getSessionCookieName())?.value
+
+  if (!value) {
+    return { session: null, sealedValue: null as string | null }
+  }
+
+  const session = await readSessionFromCookieValue(value)
+  if (session) {
+    return { session, sealedValue: null as string | null }
+  }
+
+  const expiredSession = await readSessionFromCookieValue(value, {
+    allowExpired: true,
+  })
+
+  if (!expiredSession?.refreshToken) {
+    return { session: null, sealedValue: null as string | null }
+  }
+
+  try {
+    const refreshedTokens = await refreshSessionTokens(
+      expiredSession.realm,
+      expiredSession.refreshToken,
+    )
+    const refreshedSession = buildSessionFromTokenResponse(
+      expiredSession.realm,
+      refreshedTokens,
+      expiredSession.refreshToken,
+    )
+
+    return {
+      session: refreshedSession,
+      sealedValue: await sealSessionCookie(refreshedSession),
+    }
+  } catch {
+    return { session: null, sealedValue: null as string | null }
+  }
 }

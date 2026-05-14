@@ -38,11 +38,7 @@ export async function GET(request: NextRequest) {
       code,
     )
     const claims = readTokenClaims(tokens.id_token)
-    const redirectUrl = new URL("/login", request.nextUrl.origin)
-    redirectUrl.searchParams.set("next", pendingState.next)
-    console.log("tokens.id_token")
-    console.log(tokens.id_token)
-    redirectUrl.searchParams.set("idToken", tokens.id_token)
+    const redirectUrl = new URL(pendingState.next, request.nextUrl.origin)
     const response = NextResponse.redirect(redirectUrl)
 
     response.cookies.set({
@@ -54,6 +50,7 @@ export async function GET(request: NextRequest) {
         name: claims.name,
         sub: claims.sub,
         idToken: tokens.id_token,
+        refreshToken: tokens.refresh_token,
         expiresAt: claims.exp,
       }),
       httpOnly: true,

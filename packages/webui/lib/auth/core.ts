@@ -15,6 +15,7 @@ export type AppSession = {
   preferredUsername?: string
   name?: string
   idToken: string
+  refreshToken?: string
   expiresAt: number
 }
 
@@ -180,9 +181,12 @@ export async function createStateCookie({
   })
 }
 
-export async function readSessionFromCookieValue(value: string) {
+export async function readSessionFromCookieValue(
+  value: string,
+  options?: { allowExpired?: boolean },
+) {
   const session = await unseal<AppSession>(value)
-  if (!session || isExpired(session.expiresAt)) {
+  if (!session || (!options?.allowExpired && isExpired(session.expiresAt))) {
     return null
   }
 

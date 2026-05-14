@@ -77,19 +77,19 @@ data:
     request(
         "PATCH",
         "/api/2.1/unity-catalog/permissions/catalog/hdbank",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_CATALOG"], "remove": []}]},
+        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []}]},
     )
 
     request(
         "PATCH",
         "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_bronze",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_SCHEMA"], "remove": []}]},
+        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []}]},
     )
 
     request(
         "PATCH",
         "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["SELECT"], "remove": []}]},
+        {"changes": [{"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []}]},
     )
     PY
 ---

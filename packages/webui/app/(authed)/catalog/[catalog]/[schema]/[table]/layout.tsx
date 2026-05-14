@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams, usePathname, useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { Copy01Icon, SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Copy01Icon, TableIcon } from "@hugeicons/core-free-icons"
+import { useParams, usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { TableContext, type TableDetail } from "./table-context"
 
@@ -15,7 +15,7 @@ async function apiFetch<T>(params: Record<string, string>): Promise<T> {
   return json as T
 }
 
-type Tab = "schema" | "preview"
+type Tab = "schema" | "preview" | "permissions"
 
 export default function TableLayout({
   children,
@@ -32,7 +32,11 @@ export default function TableLayout({
   const [detail, setDetail] = useState<TableDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const activeTab: Tab = pathname.endsWith("/preview") ? "preview" : "schema"
+  const activeTab: Tab = pathname.endsWith("/preview")
+    ? "preview"
+    : pathname.endsWith("/permissions")
+      ? "permissions"
+      : "schema"
 
   useEffect(() => {
     setDetail(null)
@@ -55,7 +59,13 @@ export default function TableLayout({
   const basePath = `/catalog/${catalog}/${schema}/${table}`
 
   function navigate(tab: Tab) {
-    router.push(tab === "schema" ? basePath : `${basePath}/preview`)
+    router.push(
+      tab === "schema"
+        ? basePath
+        : tab === "preview"
+          ? `${basePath}/preview`
+          : `${basePath}/permissions`,
+    )
   }
 
   return (
@@ -96,19 +106,30 @@ export default function TableLayout({
         </div>
 
         <div className="flex items-center gap-0 px-5 border-b shrink-0">
-          {(["schema", "preview"] as Tab[]).map((tab) => (
+          {(
+            [
+              { key: "schema", label: "schema" },
+              { key: "preview", label: "preview" },
+              { key: "permissions", label: "permissions" },
+            ] satisfies { key: Tab; label: string }[]
+          ).map((tab) => (
             <button
-              key={tab}
+              key={tab.key}
               type="button"
-              onClick={() => navigate(tab)}
+              onClick={() => navigate(tab.key)}
               className={cn(
                 "px-3 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors",
-                activeTab === tab
+                activeTab === tab.key
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
-              {tab}
+              <span className="flex items-center gap-1.5">
+                {tab.key === "permissions" && (
+                  <HugeiconsIcon icon={SecurityIcon} size={12} />
+                )}
+                {tab.label}
+              </span>
             </button>
           ))}
         </div>

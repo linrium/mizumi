@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
+import { DatabaseIcon, SecurityIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { DatabaseIcon } from "@hugeicons/core-free-icons"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { CatalogTabs } from "../catalog-tabs"
 
 type Schema = { name: string; catalog_name: string; comment?: string }
 
@@ -38,6 +39,21 @@ export default function CatalogPage() {
         <p className="text-xs text-muted-foreground mt-0.5">
           {schemas.length} schema{schemas.length !== 1 ? "s" : ""}
         </p>
+        <CatalogTabs
+          tabs={[
+            {
+              href: `/catalog/${catalog}`,
+              label: "schemas",
+              active: true,
+            },
+            {
+              href: `/catalog/${catalog}/permissions`,
+              label: "permissions",
+              active: false,
+              icon: SecurityIcon,
+            },
+          ]}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">

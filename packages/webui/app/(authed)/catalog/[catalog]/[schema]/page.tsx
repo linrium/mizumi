@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
+import { SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { TableIcon } from "@hugeicons/core-free-icons"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { CatalogTabs } from "../../catalog-tabs"
 
 type TableSummary = {
   name: string
@@ -51,6 +52,21 @@ export default function SchemaPage() {
         <p className="text-xs text-muted-foreground mt-0.5">
           {tables.length} table{tables.length !== 1 ? "s" : ""}
         </p>
+        <CatalogTabs
+          tabs={[
+            {
+              href: `/catalog/${catalog}/${schema}`,
+              label: "tables",
+              active: true,
+            },
+            {
+              href: `/catalog/${catalog}/${schema}/permissions`,
+              label: "permissions",
+              active: false,
+              icon: SecurityIcon,
+            },
+          ]}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">
