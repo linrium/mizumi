@@ -1,33 +1,29 @@
-"use client";
+"use client"
 
-import {
-  Book03Icon,
-  DatabaseIcon,
-  TableIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { Book03Icon, DatabaseIcon, TableIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Catalog = { name: string; comment?: string };
-type Schema = { name: string; catalog_name: string; comment?: string };
+type Catalog = { name: string; comment?: string }
+type Schema = { name: string; catalog_name: string; comment?: string }
 type TableSummary = {
-  name: string;
-  catalog_name: string;
-  schema_name: string;
-  table_type: string;
-};
+  name: string
+  catalog_name: string
+  schema_name: string
+  table_type: string
+}
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(params: Record<string, string>): Promise<T> {
-  const res = await fetch(`/api/catalog?${new URLSearchParams(params)}`);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-  return json as T;
+  const res = await fetch(`/api/catalog?${new URLSearchParams(params)}`)
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  return json as T
 }
 
 // ── Chevron ───────────────────────────────────────────────────────────────────
@@ -53,7 +49,7 @@ function Chevron({ open }: { open: boolean }) {
         strokeLinejoin="round"
       />
     </svg>
-  );
+  )
 }
 
 // ── Tree ──────────────────────────────────────────────────────────────────────
@@ -61,97 +57,97 @@ function Chevron({ open }: { open: boolean }) {
 export default function CatalogLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const sidebarRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter()
+  const pathname = usePathname()
+  const sidebarRef = useRef<HTMLDivElement | null>(null)
 
-  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
-  const [schemas, setSchemas] = useState<Record<string, Schema[]>>({});
-  const [tables, setTables] = useState<Record<string, TableSummary[]>>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(360);
+  const [catalogs, setCatalogs] = useState<Catalog[]>([])
+  const [schemas, setSchemas] = useState<Record<string, Schema[]>>({})
+  const [tables, setTables] = useState<Record<string, TableSummary[]>>({})
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(360)
 
   useEffect(() => {
     apiFetch<{ catalogs: Catalog[] }>({ type: "catalogs" })
       .then((d) => setCatalogs(d.catalogs ?? []))
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLoading(false))
+  }, [])
 
   function toggle(key: string) {
     setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
   }
 
   async function handleCatalog(cat: string) {
-    toggle(cat);
-    router.push(`/catalog/${cat}`);
+    toggle(cat)
+    router.push(`/catalog/${cat}`)
     if (!schemas[cat]) {
       const d = await apiFetch<{ schemas: Schema[] }>({
         type: "schemas",
         catalog: cat,
-      });
-      setSchemas((prev) => ({ ...prev, [cat]: d.schemas ?? [] }));
+      })
+      setSchemas((prev) => ({ ...prev, [cat]: d.schemas ?? [] }))
     }
   }
 
   async function handleSchema(cat: string, sch: string) {
-    const key = `${cat}.${sch}`;
-    toggle(key);
-    router.push(`/catalog/${cat}/${sch}`);
+    const key = `${cat}.${sch}`
+    toggle(key)
+    router.push(`/catalog/${cat}/${sch}`)
     if (!tables[key]) {
       const d = await apiFetch<{ tables: TableSummary[] }>({
         type: "tables",
         catalog: cat,
         schema: sch,
-      });
-      setTables((prev) => ({ ...prev, [key]: d.tables ?? [] }));
+      })
+      setTables((prev) => ({ ...prev, [key]: d.tables ?? [] }))
     }
   }
 
   function handleTable(cat: string, sch: string, tbl: string) {
-    router.push(`/catalog/${cat}/${sch}/${tbl}`);
+    router.push(`/catalog/${cat}/${sch}/${tbl}`)
   }
 
   // Derive active segments from pathname: /catalog/[cat]/[sch]/[tbl]
-  const parts = pathname.split("/").filter(Boolean); // ['catalog', cat, sch, tbl]
-  const activeCat = parts[1];
-  const activeSch = parts[2];
-  const activeTbl = parts[3];
+  const parts = pathname.split("/").filter(Boolean) // ['catalog', cat, sch, tbl]
+  const activeCat = parts[1]
+  const activeSch = parts[2]
+  const activeTbl = parts[3]
 
   function startResize(event: React.MouseEvent<HTMLDivElement>) {
-    event.preventDefault();
+    event.preventDefault()
 
-    const minWidth = 300;
-    const maxWidth = 640;
+    const minWidth = 300
+    const maxWidth = 640
 
     function onMouseMove(moveEvent: MouseEvent) {
       const nextWidth = sidebarRef.current
         ? moveEvent.clientX - sidebarRef.current.getBoundingClientRect().left
-        : moveEvent.clientX;
-      setSidebarWidth(Math.min(maxWidth, Math.max(minWidth, nextWidth)));
+        : moveEvent.clientX
+      setSidebarWidth(Math.min(maxWidth, Math.max(minWidth, nextWidth)))
     }
 
     function onMouseUp() {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
     }
 
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
   }
 
   function resizeBy(delta: number) {
-    setSidebarWidth((current) => Math.min(640, Math.max(300, current + delta)));
+    setSidebarWidth((current) => Math.min(640, Math.max(300, current + delta)))
   }
 
   return (
@@ -168,8 +164,8 @@ export default function CatalogLayout({
           )}
 
           {catalogs.map((cat) => {
-            const catOpen = expanded.has(cat.name);
-            const catActive = activeCat === cat.name && !activeSch;
+            const catOpen = expanded.has(cat.name)
+            const catActive = activeCat === cat.name && !activeSch
 
             return (
               <div key={cat.name}>
@@ -193,12 +189,12 @@ export default function CatalogLayout({
 
                 {catOpen &&
                   (schemas[cat.name] ?? []).map((sch) => {
-                    const schKey = `${cat.name}.${sch.name}`;
-                    const schOpen = expanded.has(schKey);
+                    const schKey = `${cat.name}.${sch.name}`
+                    const schOpen = expanded.has(schKey)
                     const schActive =
                       activeCat === cat.name &&
                       activeSch === sch.name &&
-                      !activeTbl;
+                      !activeTbl
 
                     return (
                       <div key={schKey}>
@@ -226,7 +222,7 @@ export default function CatalogLayout({
                             const tblActive =
                               activeCat === cat.name &&
                               activeSch === sch.name &&
-                              activeTbl === tbl.name;
+                              activeTbl === tbl.name
 
                             return (
                               <button
@@ -248,13 +244,13 @@ export default function CatalogLayout({
                                 />
                                 <span className="truncate">{tbl.name}</span>
                               </button>
-                            );
+                            )
                           })}
                       </div>
-                    );
+                    )
                   })}
               </div>
-            );
+            )
           })}
         </div>
         <button
@@ -263,12 +259,12 @@ export default function CatalogLayout({
           onMouseDown={startResize}
           onKeyDown={(event) => {
             if (event.key === "ArrowLeft") {
-              event.preventDefault();
-              resizeBy(-16);
+              event.preventDefault()
+              resizeBy(-16)
             }
             if (event.key === "ArrowRight") {
-              event.preventDefault();
-              resizeBy(16);
+              event.preventDefault()
+              resizeBy(16)
             }
           }}
           className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent transition-colors hover:bg-border"
@@ -279,5 +275,5 @@ export default function CatalogLayout({
       {/* ── Detail panel ── */}
       <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
     </div>
-  );
+  )
 }

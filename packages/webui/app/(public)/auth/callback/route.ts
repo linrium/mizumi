@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
 import {
   clearSessionCookie,
   clearStateCookie,
@@ -10,25 +10,25 @@ import {
   readTokenClaims,
   sealSessionCookie,
   sessionTtlSeconds,
-} from "@/lib/auth/server";
+} from "@/lib/auth/server"
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
-  const state = request.nextUrl.searchParams.get("state");
-  const loginUrl = getDefaultLoginUrlForRequest(request);
+  const code = request.nextUrl.searchParams.get("code")
+  const state = request.nextUrl.searchParams.get("state")
+  const loginUrl = getDefaultLoginUrlForRequest(request)
 
   if (!code || !state) {
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(loginUrl)
   }
 
-  const stateCookie = request.cookies.get(getStateCookieName())?.value;
-  const pendingState = stateCookie ? await readStateCookie(stateCookie) : null;
+  const stateCookie = request.cookies.get(getStateCookieName())?.value
+  const pendingState = stateCookie ? await readStateCookie(stateCookie) : null
 
   if (!pendingState || pendingState.state !== state) {
-    const response = NextResponse.redirect(loginUrl);
-    clearStateCookie(response);
-    clearSessionCookie(response);
-    return response;
+    const response = NextResponse.redirect(loginUrl)
+    clearStateCookie(response)
+    clearSessionCookie(response)
+    return response
   }
 
   try {
@@ -36,11 +36,14 @@ export async function GET(request: NextRequest) {
       request,
       pendingState.realm,
       code,
-    );
-    const claims = readTokenClaims(tokens.id_token);
-    const response = NextResponse.redirect(
-      new URL(pendingState.next, request.nextUrl.origin),
-    );
+    )
+    const claims = readTokenClaims(tokens.id_token)
+    const redirectUrl = new URL("/login", request.nextUrl.origin)
+    redirectUrl.searchParams.set("next", pendingState.next)
+    console.log("tokens.id_token")
+    console.log(tokens.id_token)
+    redirectUrl.searchParams.set("idToken", tokens.id_token)
+    const response = NextResponse.redirect(redirectUrl)
 
     response.cookies.set({
       name: getSessionCookieName(),
@@ -58,13 +61,13 @@ export async function GET(request: NextRequest) {
       secure: request.nextUrl.protocol === "https:",
       path: "/",
       maxAge: sessionTtlSeconds,
-    });
-    clearStateCookie(response);
-    return response;
+    })
+    clearStateCookie(response)
+    return response
   } catch {
-    const response = NextResponse.redirect(loginUrl);
-    clearStateCookie(response);
-    clearSessionCookie(response);
-    return response;
+    const response = NextResponse.redirect(loginUrl)
+    clearStateCookie(response)
+    clearSessionCookie(response)
+    return response
   }
 }

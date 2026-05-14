@@ -1,6 +1,6 @@
-'use client'
+"use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from "react"
 import {
   ReactFlow,
   Background,
@@ -14,13 +14,13 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
-} from '@xyflow/react'
-import dagre from '@dagrejs/dagre'
-import '@xyflow/react/dist/style.css'
-import { cn } from '@/lib/utils'
-import Link from 'next/link'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
+} from "@xyflow/react"
+import dagre from "@dagrejs/dagre"
+import "@xyflow/react/dist/style.css"
+import { cn } from "@/lib/utils"
+import Link from "next/link"
+import dayjs from "dayjs"
+import relativeTime from "dayjs/plugin/relativeTime"
 dayjs.extend(relativeTime)
 
 // ── API types ─────────────────────────────────────────────────────────────────
@@ -64,12 +64,12 @@ function toDayjs(ts: string | null | undefined) {
 
 function fmtRelTime(ts: string | null | undefined): string {
   const d = toDayjs(ts)
-  return d ? d.fromNow() : '—'
+  return d ? d.fromNow() : "—"
 }
 
 function fmtDate(ts: string | null | undefined): string {
   const d = toDayjs(ts)
-  return d ? d.format('MMM D, h:mm A') : '—'
+  return d ? d.format("MMM D, h:mm A") : "—"
 }
 
 // ── Custom node: asset card ───────────────────────────────────────────────────
@@ -79,10 +79,10 @@ function AssetNodeCard({ data }: { data: AssetNodeData }) {
   return (
     <div
       className={cn(
-        'bg-white dark:bg-zinc-900 rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none',
+        "bg-white dark:bg-zinc-900 rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none",
         data.is_current
-          ? 'border-blue-500'
-          : 'border-zinc-200 dark:border-zinc-700',
+          ? "border-blue-500"
+          : "border-zinc-200 dark:border-zinc-700",
       )}
     >
       <Handle
@@ -98,7 +98,7 @@ function AssetNodeCard({ data }: { data: AssetNodeData }) {
 
       {/* Name row */}
       <Link
-        href={`/pipelines/assets/${data.path.join('/')}`}
+        href={`/pipelines/assets/${data.path.join("/")}`}
         className="flex items-center gap-1.5 px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
       >
         <span className="text-zinc-400">▤</span>
@@ -109,7 +109,7 @@ function AssetNodeCard({ data }: { data: AssetNodeData }) {
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
         <div className="flex justify-between items-center px-3 py-1.5">
           <span className="text-zinc-500">Latest event</span>
-          <span className={mat ? 'text-blue-500 font-medium' : 'text-zinc-400'}>
+          <span className={mat ? "text-blue-500 font-medium" : "text-zinc-400"}>
             {fmtRelTime(mat?.timestamp)}
           </span>
         </div>
@@ -127,14 +127,16 @@ function AssetNodeCard({ data }: { data: AssetNodeData }) {
         </div>
         <div
           className={cn(
-            'flex justify-between items-center px-3 py-1.5',
-            mat ? 'bg-green-50 dark:bg-green-950/20' : '',
+            "flex justify-between items-center px-3 py-1.5",
+            mat ? "bg-green-50 dark:bg-green-950/20" : "",
           )}
         >
-          <span className={mat ? 'text-green-600 font-medium' : 'text-zinc-500'}>
-            {mat ? 'Materialized' : 'Never materialized'}
+          <span
+            className={mat ? "text-green-600 font-medium" : "text-zinc-500"}
+          >
+            {mat ? "Materialized" : "Never materialized"}
           </span>
-          <span className={mat ? 'text-green-600' : 'text-zinc-400'}>
+          <span className={mat ? "text-green-600" : "text-zinc-400"}>
             {fmtDate(mat?.timestamp)}
           </span>
         </div>
@@ -173,7 +175,7 @@ const nodeTypes: NodeTypes = {
 // ── Layout constants ──────────────────────────────────────────────────────────
 
 const CARD_W = 280
-const CARD_H = 200   // approximate rendered height
+const CARD_H = 200 // approximate rendered height
 const CARD_GAP = 16
 const GROUP_PAD = 20
 const GROUP_HEADER = 48
@@ -194,12 +196,12 @@ function buildLayout(
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
   if (apiNodes.length === 0) return { rfNodes: [], rfEdges: [] }
 
-  const pathIndex = new Set(apiNodes.map((n) => n.path.join('/')))
+  const pathIndex = new Set(apiNodes.map((n) => n.path.join("/")))
 
   // Collect groups and build asset-to-group map
   const groups = new Map<string, ApiAssetNode[]>()
   for (const n of apiNodes) {
-    const g = n.group_name ?? 'default'
+    const g = n.group_name ?? "default"
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g)!.push(n)
   }
@@ -207,12 +209,12 @@ function buildLayout(
   // Build group-level dependency edges (for dagre rank assignment)
   const groupEdgePairs = new Set<string>()
   for (const n of apiNodes) {
-    const srcGroup = n.group_name ?? 'default'
+    const srcGroup = n.group_name ?? "default"
     for (const dep of n.depended_by_keys) {
-      const tgtKey = dep.join('/')
+      const tgtKey = dep.join("/")
       if (!pathIndex.has(tgtKey)) continue
-      const tgt = apiNodes.find((x) => x.path.join('/') === tgtKey)
-      const tgtGroup = tgt?.group_name ?? 'default'
+      const tgt = apiNodes.find((x) => x.path.join("/") === tgtKey)
+      const tgtGroup = tgt?.group_name ?? "default"
       if (srcGroup !== tgtGroup) {
         groupEdgePairs.add(`${srcGroup}||${tgtGroup}`)
       }
@@ -222,13 +224,16 @@ function buildLayout(
   // Dagre layout on groups
   const gg = new dagre.graphlib.Graph()
   gg.setDefaultEdgeLabel(() => ({}))
-  gg.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 100 })
+  gg.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 100 })
 
   for (const [gName, gnodes] of groups) {
-    gg.setNode(gName, { width: groupWidth(), height: groupHeight(gnodes.length) })
+    gg.setNode(gName, {
+      width: groupWidth(),
+      height: groupHeight(gnodes.length),
+    })
   }
   for (const pair of groupEdgePairs) {
-    const [src, tgt] = pair.split('||')
+    const [src, tgt] = pair.split("||")
     gg.setEdge(src, tgt)
   }
   dagre.layout(gg)
@@ -252,9 +257,13 @@ function buildLayout(
     // Group container (z-index behind assets)
     rfNodes.push({
       id: `group:${gName}`,
-      type: 'groupContainer',
+      type: "groupContainer",
       position: gp,
-      style: { width: groupWidth(), height: groupHeight(gnodes.length), zIndex: -1 },
+      style: {
+        width: groupWidth(),
+        height: groupHeight(gnodes.length),
+        zIndex: -1,
+      },
       data: { label: gName } satisfies GroupNodeData,
       selectable: false,
       draggable: false,
@@ -263,14 +272,14 @@ function buildLayout(
     // Asset nodes stacked inside the group
     for (let i = 0; i < gnodes.length; i++) {
       const n = gnodes[i]
-      const key = n.path.join('/')
+      const key = n.path.join("/")
       const ax = gp.x + GROUP_PAD
       const ay = gp.y + GROUP_HEADER + GROUP_PAD + i * (CARD_H + CARD_GAP)
       assetPos.set(key, { x: ax, y: ay })
 
       rfNodes.push({
         id: key,
-        type: 'assetCard',
+        type: "assetCard",
         position: { x: ax, y: ay },
         style: { width: CARD_W },
         data: {
@@ -289,22 +298,22 @@ function buildLayout(
   // Build edges between individual assets
   const rfEdges: Edge[] = []
   for (const n of apiNodes) {
-    const src = n.path.join('/')
+    const src = n.path.join("/")
     for (const dep of n.depended_by_keys) {
-      const tgt = dep.join('/')
+      const tgt = dep.join("/")
       if (!pathIndex.has(tgt)) continue
       rfEdges.push({
         id: `${src}->${tgt}`,
         source: src,
         target: tgt,
-        type: 'default',
+        type: "default",
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 14,
           height: 14,
-          color: '#94a3b8',
+          color: "#94a3b8",
         },
-        style: { stroke: '#94a3b8', strokeWidth: 1.5 },
+        style: { stroke: "#94a3b8", strokeWidth: 1.5 },
       })
     }
   }
@@ -321,14 +330,14 @@ export function LineageGraph({
   currentPath?: string[]
   neighborhoodOnly?: boolean
 }) {
-  const currentPathStr = currentPath?.join('/') ?? ''
+  const currentPathStr = currentPath?.join("/") ?? ""
 
   const [apiNodes, setApiNodes] = useState<ApiAssetNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/dagster/asset-nodes', { cache: 'no-store' })
+    fetch("/api/dagster/asset-nodes", { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
@@ -341,14 +350,14 @@ export function LineageGraph({
 
   const visibleNodes = useMemo(() => {
     if (!neighborhoodOnly || !currentPathStr) return apiNodes
-    const current = apiNodes.find((n) => n.path.join('/') === currentPathStr)
+    const current = apiNodes.find((n) => n.path.join("/") === currentPathStr)
     if (!current) return apiNodes
     const neighborKeys = new Set<string>([
       currentPathStr,
-      ...current.dependency_keys.map((k) => k.join('/')),
-      ...current.depended_by_keys.map((k) => k.join('/')),
+      ...current.dependency_keys.map((k) => k.join("/")),
+      ...current.depended_by_keys.map((k) => k.join("/")),
     ])
-    return apiNodes.filter((n) => neighborKeys.has(n.path.join('/')))
+    return apiNodes.filter((n) => neighborKeys.has(n.path.join("/")))
   }, [apiNodes, currentPathStr, neighborhoodOnly])
 
   const { rfNodes, rfEdges } = useMemo(
@@ -360,8 +369,12 @@ export function LineageGraph({
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges)
 
   // Sync when layout changes after data loads
-  useEffect(() => { setNodes(rfNodes) }, [rfNodes, setNodes])
-  useEffect(() => { setEdges(rfEdges) }, [rfEdges, setEdges])
+  useEffect(() => {
+    setNodes(rfNodes)
+  }, [rfNodes, setNodes])
+  useEffect(() => {
+    setEdges(rfEdges)
+  }, [rfEdges, setEdges])
 
   if (loading) {
     return (

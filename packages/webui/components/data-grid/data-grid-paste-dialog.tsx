@@ -1,8 +1,8 @@
-"use client";
+"use client"
 
-import type { TableMeta } from "@tanstack/react-table";
-import * as React from "react";
-import { Button } from "@/components/ui/button";
+import type { TableMeta } from "@tanstack/react-table"
+import * as React from "react"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -10,24 +10,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useAsRef } from "@/hooks/use-as-ref";
-import { cn } from "@/lib/utils";
-import type { PasteDialogState } from "@/components/data-grid/data-grid";
+} from "@/components/ui/dialog"
+import { useAsRef } from "@/hooks/use-as-ref"
+import { cn } from "@/lib/utils"
+import type { PasteDialogState } from "@/components/data-grid/data-grid"
 
 interface DataGridPasteDialogProps<TData> {
-  tableMeta: TableMeta<TData>;
-  pasteDialog: PasteDialogState;
+  tableMeta: TableMeta<TData>
+  pasteDialog: PasteDialogState
 }
 
 export function DataGridPasteDialog<TData>({
   tableMeta,
   pasteDialog,
 }: DataGridPasteDialogProps<TData>) {
-  const onPasteDialogOpenChange = tableMeta?.onPasteDialogOpenChange;
-  const onCellsPaste = tableMeta?.onCellsPaste;
+  const onPasteDialogOpenChange = tableMeta?.onPasteDialogOpenChange
+  const onCellsPaste = tableMeta?.onCellsPaste
 
-  if (!pasteDialog.open) return null;
+  if (!pasteDialog.open) return null
 
   return (
     <PasteDialog
@@ -35,7 +35,7 @@ export function DataGridPasteDialog<TData>({
       onPasteDialogOpenChange={onPasteDialogOpenChange}
       onCellsPaste={onCellsPaste}
     />
-  );
+  )
 }
 
 interface PasteDialogProps
@@ -43,12 +43,12 @@ interface PasteDialogProps
     Required<Pick<TableMeta<unknown>, "pasteDialog">> {}
 
 const PasteDialog = React.memo(PasteDialogImpl, (prev, next) => {
-  if (prev.pasteDialog.open !== next.pasteDialog.open) return false;
-  if (!next.pasteDialog.open) return true;
-  if (prev.pasteDialog.rowsNeeded !== next.pasteDialog.rowsNeeded) return false;
+  if (prev.pasteDialog.open !== next.pasteDialog.open) return false
+  if (!next.pasteDialog.open) return true
+  if (prev.pasteDialog.rowsNeeded !== next.pasteDialog.rowsNeeded) return false
 
-  return true;
-});
+  return true
+})
 
 function PasteDialogImpl({
   pasteDialog,
@@ -58,24 +58,24 @@ function PasteDialogImpl({
   const propsRef = useAsRef({
     onPasteDialogOpenChange,
     onCellsPaste,
-  });
+  })
 
-  const expandRadioRef = React.useRef<HTMLInputElement | null>(null);
+  const expandRadioRef = React.useRef<HTMLInputElement | null>(null)
 
   const onOpenChange = React.useCallback(
     (open: boolean) => {
-      propsRef.current.onPasteDialogOpenChange?.(open);
+      propsRef.current.onPasteDialogOpenChange?.(open)
     },
     [propsRef],
-  );
+  )
 
   const onCancel = React.useCallback(() => {
-    propsRef.current.onPasteDialogOpenChange?.(false);
-  }, [propsRef]);
+    propsRef.current.onPasteDialogOpenChange?.(false)
+  }, [propsRef])
 
   const onContinue = React.useCallback(() => {
-    propsRef.current.onCellsPaste?.(expandRadioRef.current?.checked ?? false);
-  }, [propsRef]);
+    propsRef.current.onCellsPaste?.(expandRadioRef.current?.checked ?? false)
+  }, [propsRef])
 
   return (
     <Dialog open={pasteDialog.open} onOpenChange={onOpenChange}>
@@ -127,7 +127,7 @@ function PasteDialogImpl({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 function RadioItem({ className, ...props }: React.ComponentProps<"input">) {
@@ -144,5 +144,5 @@ function RadioItem({ className, ...props }: React.ComponentProps<"input">) {
       )}
       {...props}
     />
-  );
+  )
 }

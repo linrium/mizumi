@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
-import { useSessions, type Session } from '@/hooks/use-sessions'
+import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { useSessions, type Session } from "@/hooks/use-sessions"
 
 type SessionContextValue = {
   sessions: Session[]
@@ -19,17 +19,18 @@ const SessionContext = createContext<SessionContextValue | null>(null)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useSessions()
 
-  useEffect(() => { value.fetchSessions() }, [value.fetchSessions])
+  useEffect(() => {
+    value.fetchSessions()
+  }, [value.fetchSessions])
 
   return (
-    <SessionContext.Provider value={value}>
-      {children}
-    </SessionContext.Provider>
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   )
 }
 
 export function useSessionContext(): SessionContextValue {
   const ctx = useContext(SessionContext)
-  if (!ctx) throw new Error('useSessionContext must be used inside SessionProvider')
+  if (!ctx)
+    throw new Error("useSessionContext must be used inside SessionProvider")
   return ctx
 }

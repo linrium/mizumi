@@ -1,19 +1,19 @@
-'use client'
+"use client"
 
-import Editor from '@monaco-editor/react'
-import { useForm } from '@tanstack/react-form'
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { z } from 'zod'
-import { Button } from '@/components/ui/button'
-import { HugeiconsIcon } from '@hugeicons/react'
-import { PlayIcon, Copy01Icon, SqlIcon } from '@hugeicons/core-free-icons'
-import type { ColumnDef } from '@tanstack/react-table'
-import { DataGrid } from '@/components/data-grid/data-grid'
-import { useDataGrid } from '@/hooks/use-data-grid'
-import { useSessionContext } from '@/hooks/use-session-context'
+import Editor from "@monaco-editor/react"
+import { useForm } from "@tanstack/react-form"
+import { useState, useRef, useEffect, useMemo } from "react"
+import { z } from "zod"
+import { Button } from "@/components/ui/button"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { PlayIcon, Copy01Icon, SqlIcon } from "@hugeicons/core-free-icons"
+import type { ColumnDef } from "@tanstack/react-table"
+import { DataGrid } from "@/components/data-grid/data-grid"
+import { useDataGrid } from "@/hooks/use-data-grid"
+import { useSessionContext } from "@/hooks/use-session-context"
 
 const schema = z.object({
-  sql: z.string().min(1, 'SQL query is required'),
+  sql: z.string().min(1, "SQL query is required"),
 })
 
 type QueryResponse = {
@@ -45,20 +45,22 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   }, [])
 
   const data = useMemo<Row[]>(
-    () => queryResult.rows.map((row) =>
-      Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
-    ),
+    () =>
+      queryResult.rows.map((row) =>
+        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]])),
+      ),
     [queryResult],
   )
 
   const columns = useMemo<ColumnDef<Row>[]>(
-    () => queryResult.columns.map((col) => ({
-      id: col,
-      accessorKey: col,
-      header: col,
-      size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
-      meta: { cell: { variant: 'short-text' as const } },
-    })),
+    () =>
+      queryResult.columns.map((col) => ({
+        id: col,
+        accessorKey: col,
+        header: col,
+        size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+        meta: { cell: { variant: "short-text" as const } },
+      })),
     [queryResult],
   )
 
@@ -94,19 +96,26 @@ export function SqlEditor() {
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return
       const delta = dragRef.current.startY - ev.clientY
-      setResultsHeight(Math.min(RESULTS_MAX, Math.max(RESULTS_MIN, dragRef.current.startH + delta)))
+      setResultsHeight(
+        Math.min(
+          RESULTS_MAX,
+          Math.max(RESULTS_MIN, dragRef.current.startH + delta),
+        ),
+      )
     }
     const onUp = () => {
       dragRef.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
   }
 
   const form = useForm({
-    defaultValues: { sql: 'select * from banking.transactions.silver_transactions' },
+    defaultValues: {
+      sql: "select * from banking.transactions.silver_transactions",
+    },
     validators: { onSubmit: schema },
     onSubmit: async ({ value }) => {
       setResult(null)
@@ -116,15 +125,15 @@ export function SqlEditor() {
         if (!sessionId) {
           const session = await createSession()
           if (!session) {
-            setResult({ ok: false, error: 'Failed to create session' })
+            setResult({ ok: false, error: "Failed to create session" })
             return
           }
           sessionId = session.session_id
         }
         const url = `/api/sessions/${sessionId}/query`
         const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sql: value.sql }),
         })
         const elapsed = Date.now() - startRef.current
@@ -142,8 +151,10 @@ export function SqlEditor() {
 
   const copyResults = () => {
     if (!result?.ok) return
-    const header = result.data.columns.join('\t')
-    const rows = result.data.rows.map((r) => r.map(String).join('\t')).join('\n')
+    const header = result.data.columns.join("\t")
+    const rows = result.data.rows
+      .map((r) => r.map(String).join("\t"))
+      .join("\n")
     navigator.clipboard.writeText(`${header}\n${rows}`)
   }
 
@@ -151,8 +162,14 @@ export function SqlEditor() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
-        <HugeiconsIcon icon={SqlIcon} size={15} className="text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">query.sql</span>
+        <HugeiconsIcon
+          icon={SqlIcon}
+          size={15}
+          className="text-muted-foreground"
+        />
+        <span className="text-sm font-medium text-muted-foreground">
+          query.sql
+        </span>
         <div className="flex-1" />
 
         <form.Subscribe selector={(s) => s.isSubmitting}>
@@ -164,7 +181,7 @@ export function SqlEditor() {
               className="gap-1.5 h-7 px-3 text-xs"
             >
               <HugeiconsIcon icon={PlayIcon} size={12} />
-              {isSubmitting ? 'Running…' : 'Run'}
+              {isSubmitting ? "Running…" : "Run"}
             </Button>
           )}
         </form.Subscribe>
@@ -187,7 +204,7 @@ export function SqlEditor() {
                   language="sql"
                   theme="vs"
                   value={field.state.value}
-                  onChange={(v) => field.handleChange(v ?? '')}
+                  onChange={(v) => field.handleChange(v ?? "")}
                   onMount={(editor, monaco) => {
                     editor.onDidBlurEditorWidget(() => field.handleBlur())
                     editor.addCommand(
@@ -198,13 +215,13 @@ export function SqlEditor() {
                   options={{
                     minimap: { enabled: false },
                     fontSize: 13,
-                    lineNumbers: 'on',
+                    lineNumbers: "on",
                     scrollBeyondLastLine: false,
-                    wordWrap: 'on',
+                    wordWrap: "on",
                     overviewRulerLanes: 0,
-                    renderLineHighlight: 'line',
+                    renderLineHighlight: "line",
                     padding: { top: 12, bottom: 12 },
-                    fontFamily: 'var(--font-geist-mono)',
+                    fontFamily: "var(--font-geist-mono)",
                     lineHeight: 1.6,
                   }}
                 />
@@ -223,7 +240,10 @@ export function SqlEditor() {
       </div>
 
       {/* Results pane */}
-      <div className="shrink-0 border-t flex flex-col" style={{ height: resultsHeight }}>
+      <div
+        className="shrink-0 border-t flex flex-col"
+        style={{ height: resultsHeight }}
+      >
         {/* Resize handle */}
         <div
           onMouseDown={handleResizeMouseDown}
@@ -237,10 +257,13 @@ export function SqlEditor() {
           {result?.ok && (
             <>
               <span className="text-xs text-muted-foreground">
-                {result.data.row_count} {result.data.row_count === 1 ? 'row' : 'rows'}
+                {result.data.row_count}{" "}
+                {result.data.row_count === 1 ? "row" : "rows"}
               </span>
               <span className="text-xs text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground">{result.elapsed}ms</span>
+              <span className="text-xs text-muted-foreground">
+                {result.elapsed}ms
+              </span>
               <div className="flex-1" />
               <button
                 type="button"

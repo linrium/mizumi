@@ -1,18 +1,22 @@
-'use client'
+"use client"
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 const TABS = [
-  { label: 'Assets',    href: '/pipelines/assets' },
-  { label: 'Runs',      href: '/pipelines/runs' },
-  { label: 'Schedules', href: '/pipelines/schedules' },
-  { label: 'Streaming', href: '/pipelines/streaming' },
-  { label: 'Lineage',   href: '/pipelines/lineage' },
+  { label: "Assets", href: "/pipelines/assets" },
+  { label: "Runs", href: "/pipelines/runs" },
+  { label: "Schedules", href: "/pipelines/schedules" },
+  { label: "Streaming", href: "/pipelines/streaming" },
+  { label: "Lineage", href: "/pipelines/lineage" },
 ]
 
-export default function PipelinesLayout({ children }: { children: React.ReactNode }) {
+export default function PipelinesLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const pathname = usePathname()
 
   return (
@@ -23,10 +27,10 @@ export default function PipelinesLayout({ children }: { children: React.ReactNod
             key={t.href}
             href={t.href}
             className={cn(
-              'px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors',
-              pathname === t.href || pathname.startsWith(t.href + '/')
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+              "px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+              pathname === t.href || pathname.startsWith(t.href + "/")
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {t.label}

@@ -1,19 +1,27 @@
-'use client'
+"use client"
 
-import { HugeiconsIcon } from '@hugeicons/react'
-import { CpuIcon, Add01Icon, CancelIcon } from '@hugeicons/core-free-icons'
-import { Button } from '@/components/ui/button'
+import { HugeiconsIcon } from "@hugeicons/react"
+import { CpuIcon, Add01Icon, CancelIcon } from "@hugeicons/core-free-icons"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { useSessionContext } from '@/hooks/use-session-context'
+} from "@/components/ui/select"
+import { useSessionContext } from "@/hooks/use-session-context"
 
 export function SessionSelector() {
-  const { sessions, activeId, setActiveId, creating, deleting, createSession, deleteSession } = useSessionContext()
+  const {
+    sessions,
+    activeId,
+    setActiveId,
+    creating,
+    deleting,
+    createSession,
+    deleteSession,
+  } = useSessionContext()
 
   return (
     <div className="flex items-center gap-1">
@@ -25,14 +33,22 @@ export function SessionSelector() {
       ) : (
         <>
           {sessions.length > 0 && (
-            <Select value={activeId ?? ''} onValueChange={setActiveId}>
+            <Select value={activeId ?? ""} onValueChange={setActiveId}>
               <SelectTrigger className="h-7 w-36 text-xs gap-1.5 px-2">
-                <HugeiconsIcon icon={CpuIcon} size={11} className="text-green-500 shrink-0" />
+                <HugeiconsIcon
+                  icon={CpuIcon}
+                  size={11}
+                  className="text-green-500 shrink-0"
+                />
                 <SelectValue placeholder="No session" />
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((s) => (
-                  <SelectItem key={s.session_id} value={s.session_id} className="font-mono text-xs">
+                  <SelectItem
+                    key={s.session_id}
+                    value={s.session_id}
+                    className="font-mono text-xs"
+                  >
                     {s.session_id.slice(0, 8)}
                   </SelectItem>
                 ))}

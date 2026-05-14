@@ -1,33 +1,33 @@
-"use client";
+"use client"
 
-import { Plus } from "lucide-react";
-import * as React from "react";
-import { DataGridColumnHeader } from "@/components/data-grid/data-grid-column-header";
-import { DataGridContextMenu } from "@/components/data-grid/data-grid-context-menu";
-import { DataGridPasteDialog } from "@/components/data-grid/data-grid-paste-dialog";
-import { DataGridRow } from "@/components/data-grid/data-grid-row";
-import { DataGridSearch } from "@/components/data-grid/data-grid-search";
-import { useAsRef } from "@/hooks/use-as-ref";
-import type { useDataGrid } from "@/hooks/use-data-grid";
+import { Plus } from "lucide-react"
+import * as React from "react"
+import { DataGridColumnHeader } from "@/components/data-grid/data-grid-column-header"
+import { DataGridContextMenu } from "@/components/data-grid/data-grid-context-menu"
+import { DataGridPasteDialog } from "@/components/data-grid/data-grid-paste-dialog"
+import { DataGridRow } from "@/components/data-grid/data-grid-row"
+import { DataGridSearch } from "@/components/data-grid/data-grid-search"
+import { useAsRef } from "@/hooks/use-as-ref"
+import type { useDataGrid } from "@/hooks/use-data-grid"
 import {
   flexRender,
   getColumnBorderVisibility,
   getColumnPinningStyle,
-} from "@/lib/data-grid";
-import { cn } from "@/lib/utils";
-import type { Direction } from "@/types/data-grid";
+} from "@/lib/data-grid"
+import { cn } from "@/lib/utils"
+import type { Direction } from "@/types/data-grid"
 
-export * from "@/lib/data-grid";
-export type * from "@/types/data-grid";
+export * from "@/lib/data-grid"
+export type * from "@/types/data-grid"
 
-const EMPTY_CELL_SELECTION_SET = new Set<string>();
+const EMPTY_CELL_SELECTION_SET = new Set<string>()
 
 interface DataGridProps<TData>
   extends Omit<ReturnType<typeof useDataGrid<TData>>, "dir">,
     Omit<React.ComponentProps<"div">, "contextMenu"> {
-  dir?: Direction;
-  height?: number;
-  stretchColumns?: boolean;
+  dir?: Direction
+  height?: number
+  stretchColumns?: boolean
 }
 
 export function DataGrid<TData>({
@@ -59,38 +59,38 @@ export function DataGrid<TData>({
   className,
   ...props
 }: DataGridProps<TData>) {
-  const rows = table.getRowModel().rows;
-  const readOnly = tableMeta?.readOnly ?? false;
-  const columnVisibility = table.getState().columnVisibility;
-  const columnPinning = table.getState().columnPinning;
+  const rows = table.getRowModel().rows
+  const readOnly = tableMeta?.readOnly ?? false
+  const columnVisibility = table.getState().columnVisibility
+  const columnPinning = table.getState().columnPinning
 
-  const onRowAddRef = useAsRef(onRowAddProp);
+  const onRowAddRef = useAsRef(onRowAddProp)
 
   const onRowAdd = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      onRowAddRef.current?.(event);
+      onRowAddRef.current?.(event)
     },
     [onRowAddRef],
-  );
+  )
 
   const onDataGridContextMenu = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      event.preventDefault();
+      event.preventDefault()
     },
     [],
-  );
+  )
 
   const onFooterCellKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!onRowAddRef.current) return;
+      if (!onRowAddRef.current) return
 
       if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        onRowAddRef.current();
+        event.preventDefault()
+        onRowAddRef.current()
       }
     },
     [onRowAddRef],
-  );
+  )
 
   return (
     <div
@@ -137,22 +137,21 @@ export function DataGrid<TData>({
               className="flex w-full"
             >
               {headerGroup.headers.map((header, colIndex) => {
-                const sorting = table.getState().sorting;
+                const sorting = table.getState().sorting
                 const currentSort = sorting.find(
                   (sort) => sort.id === header.column.id,
-                );
-                const isSortable = header.column.getCanSort();
+                )
+                const isSortable = header.column.getCanSort()
 
-                const nextHeader = headerGroup.headers[colIndex + 1];
-                const isLastColumn =
-                  colIndex === headerGroup.headers.length - 1;
+                const nextHeader = headerGroup.headers[colIndex + 1]
+                const isLastColumn = colIndex === headerGroup.headers.length - 1
 
                 const { showEndBorder, showStartBorder } =
                   getColumnBorderVisibility({
                     column: header.column,
                     nextColumn: nextHeader?.column,
                     isLastColumn,
-                  });
+                  })
 
                 return (
                   <div
@@ -194,7 +193,7 @@ export function DataGrid<TData>({
                       <DataGridColumnHeader header={header} table={table} />
                     )}
                   </div>
-                );
+                )
               })}
             </div>
           ))}
@@ -209,17 +208,17 @@ export function DataGrid<TData>({
           }}
         >
           {virtualItems.map((virtualItem) => {
-            const row = rows[virtualItem.index];
-            if (!row) return null;
+            const row = rows[virtualItem.index]
+            if (!row) return null
 
             const cellSelectionKeys =
               cellSelectionMap?.get(virtualItem.index) ??
-              EMPTY_CELL_SELECTION_SET;
+              EMPTY_CELL_SELECTION_SET
 
             const searchMatchColumns =
-              searchMatchesByRow?.get(virtualItem.index) ?? null;
+              searchMatchesByRow?.get(virtualItem.index) ?? null
             const isActiveSearchRow =
-              activeSearchMatch?.rowIndex === virtualItem.index;
+              activeSearchMatch?.rowIndex === virtualItem.index
 
             return (
               <DataGridRow
@@ -242,7 +241,7 @@ export function DataGrid<TData>({
                 stretchColumns={stretchColumns}
                 readOnly={readOnly}
               />
-            );
+            )
           })}
         </div>
         {!readOnly && onRowAdd && (
@@ -280,5 +279,5 @@ export function DataGrid<TData>({
         )}
       </div>
     </div>
-  );
+  )
 }

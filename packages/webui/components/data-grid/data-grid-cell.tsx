@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import * as React from "react";
+import * as React from "react"
 
 import {
   CheckboxCell,
@@ -12,38 +12,38 @@ import {
   SelectCell,
   ShortTextCell,
   UrlCell,
-} from "@/components/data-grid/data-grid-cell-variants";
-import type { DataGridCellProps } from "@/components/data-grid/data-grid";
+} from "@/components/data-grid/data-grid-cell-variants"
+import type { DataGridCellProps } from "@/components/data-grid/data-grid"
 
 export const DataGridCell = React.memo(DataGridCellImpl, (prev, next) => {
   // Fast path: check stable primitive props first
-  if (prev.isFocused !== next.isFocused) return false;
-  if (prev.isEditing !== next.isEditing) return false;
-  if (prev.isSelected !== next.isSelected) return false;
-  if (prev.isSearchMatch !== next.isSearchMatch) return false;
-  if (prev.isActiveSearchMatch !== next.isActiveSearchMatch) return false;
-  if (prev.readOnly !== next.readOnly) return false;
-  if (prev.rowIndex !== next.rowIndex) return false;
-  if (prev.columnId !== next.columnId) return false;
-  if (prev.rowHeight !== next.rowHeight) return false;
+  if (prev.isFocused !== next.isFocused) return false
+  if (prev.isEditing !== next.isEditing) return false
+  if (prev.isSelected !== next.isSelected) return false
+  if (prev.isSearchMatch !== next.isSearchMatch) return false
+  if (prev.isActiveSearchMatch !== next.isActiveSearchMatch) return false
+  if (prev.readOnly !== next.readOnly) return false
+  if (prev.rowIndex !== next.rowIndex) return false
+  if (prev.columnId !== next.columnId) return false
+  if (prev.rowHeight !== next.rowHeight) return false
 
   // Check cell value using row.original instead of getValue() for stability
   // getValue() is unstable and recreates on every render, breaking memoization
   const prevValue = (prev.cell.row.original as Record<string, unknown>)[
     prev.columnId
-  ];
+  ]
   const nextValue = (next.cell.row.original as Record<string, unknown>)[
     next.columnId
-  ];
+  ]
   if (prevValue !== nextValue) {
-    return false;
+    return false
   }
 
   // Check cell/row identity
-  if (prev.cell.row.id !== next.cell.row.id) return false;
+  if (prev.cell.row.id !== next.cell.row.id) return false
 
-  return true;
-}) as typeof DataGridCellImpl;
+  return true
+}) as typeof DataGridCellImpl
 
 function DataGridCellImpl<TData>({
   cell,
@@ -58,43 +58,43 @@ function DataGridCellImpl<TData>({
   readOnly,
   rowHeight,
 }: DataGridCellProps<TData>) {
-  const cellOpts = cell.column.columnDef.meta?.cell;
-  const variant = cellOpts?.variant ?? "text";
+  const cellOpts = cell.column.columnDef.meta?.cell
+  const variant = cellOpts?.variant ?? "text"
 
-  let Comp: React.ComponentType<DataGridCellProps<TData>>;
+  let Comp: React.ComponentType<DataGridCellProps<TData>>
 
   switch (variant) {
     case "short-text":
-      Comp = ShortTextCell;
-      break;
+      Comp = ShortTextCell
+      break
     case "long-text":
-      Comp = LongTextCell;
-      break;
+      Comp = LongTextCell
+      break
     case "number":
-      Comp = NumberCell;
-      break;
+      Comp = NumberCell
+      break
     case "url":
-      Comp = UrlCell;
-      break;
+      Comp = UrlCell
+      break
     case "checkbox":
-      Comp = CheckboxCell;
-      break;
+      Comp = CheckboxCell
+      break
     case "select":
-      Comp = SelectCell;
-      break;
+      Comp = SelectCell
+      break
     case "multi-select":
-      Comp = MultiSelectCell;
-      break;
+      Comp = MultiSelectCell
+      break
     case "date":
-      Comp = DateCell;
-      break;
+      Comp = DateCell
+      break
     case "file":
-      Comp = FileCell;
-      break;
+      Comp = FileCell
+      break
 
     default:
-      Comp = ShortTextCell;
-      break;
+      Comp = ShortTextCell
+      break
   }
 
   return (
@@ -111,5 +111,5 @@ function DataGridCellImpl<TData>({
       isActiveSearchMatch={isActiveSearchMatch}
       readOnly={readOnly}
     />
-  );
+  )
 }

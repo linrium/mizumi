@@ -1,25 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server"
 import {
   clearSessionCookie,
   getDefaultRealm,
   getLogoutUrlForRequest,
   getSessionCookieName,
   readSessionFromCookieValue,
-} from "@/lib/auth/server";
+} from "@/lib/auth/server"
 
 export async function GET(request: NextRequest) {
-  const sessionCookie = request.cookies.get(getSessionCookieName())?.value;
+  const sessionCookie = request.cookies.get(getSessionCookieName())?.value
   const session = sessionCookie
     ? await readSessionFromCookieValue(sessionCookie)
-    : null;
+    : null
   const response = NextResponse.redirect(
     getLogoutUrlForRequest(
       request,
       session?.realm ?? getDefaultRealm(),
       session?.idToken,
     ),
-  );
+  )
 
-  clearSessionCookie(response);
-  return response;
+  clearSessionCookie(response)
+  return response
 }

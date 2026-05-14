@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { type EventOption, EventPublisher } from "@/components/event-publisher";
+import { type EventOption, EventPublisher } from "@/components/event-publisher"
 
 function uuid() {
-  return crypto.randomUUID();
+  return crypto.randomUUID()
 }
 
 const hdbankOptions: EventOption[] = [
@@ -37,7 +37,7 @@ const hdbankOptions: EventOption[] = [
       updated_at: new Date().toISOString(),
     }),
   },
-];
+]
 
 export default function HdbankPage() {
   return (
@@ -48,5 +48,5 @@ export default function HdbankPage() {
         options={hdbankOptions}
       />
     </div>
-  );
+  )
 }

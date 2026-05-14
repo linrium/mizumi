@@ -1,7 +1,7 @@
-import { cva, type VariantProps } from "class-variance-authority";
-import { Slot as SlotPrimitive } from "radix-ui";
-import type * as React from "react";
-import { cn } from "@/lib/utils";
+import { cva, type VariantProps } from "class-variance-authority"
+import { Slot as SlotPrimitive } from "radix-ui"
+import type * as React from "react"
+import { cn } from "@/lib/utils"
 
 const statusVariants = cva(
   "inline-flex w-fit shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full border px-2.5 py-1 font-medium text-xs transition-colors",
@@ -23,18 +23,18 @@ const statusVariants = cva(
       variant: "default",
     },
   },
-);
+)
 
 interface StatusProps
   extends VariantProps<typeof statusVariants>,
     React.ComponentProps<"div"> {
-  asChild?: boolean;
+  asChild?: boolean
 }
 
 function Status(props: StatusProps) {
-  const { className, variant = "default", asChild, ...rootProps } = props;
+  const { className, variant = "default", asChild, ...rootProps } = props
 
-  const RootPrimitive = asChild ? SlotPrimitive.Slot : "div";
+  const RootPrimitive = asChild ? SlotPrimitive.Slot : "div"
 
   return (
     <RootPrimitive
@@ -43,11 +43,11 @@ function Status(props: StatusProps) {
       {...rootProps}
       className={cn(statusVariants({ variant }), className)}
     />
-  );
+  )
 }
 
 function StatusIndicator(props: React.ComponentProps<"div">) {
-  const { className, ...indicatorProps } = props;
+  const { className, ...indicatorProps } = props
 
   return (
     <div
@@ -60,11 +60,11 @@ function StatusIndicator(props: React.ComponentProps<"div">) {
         className,
       )}
     />
-  );
+  )
 }
 
 function StatusLabel(props: React.ComponentProps<"div">) {
-  const { className, ...labelProps } = props;
+  const { className, ...labelProps } = props
 
   return (
     <div
@@ -72,7 +72,7 @@ function StatusLabel(props: React.ComponentProps<"div">) {
       {...labelProps}
       className={cn("leading-none", className)}
     />
-  );
+  )
 }
 
-export { Status, StatusIndicator, StatusLabel, statusVariants };
+export { Status, StatusIndicator, StatusLabel, statusVariants }

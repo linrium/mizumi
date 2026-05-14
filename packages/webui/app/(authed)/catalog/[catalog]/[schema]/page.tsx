@@ -1,17 +1,17 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { TableIcon } from "@hugeicons/core-free-icons";
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+import Link from "next/link"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { TableIcon } from "@hugeicons/core-free-icons"
 
 type TableSummary = {
-  name: string;
-  catalog_name: string;
-  schema_name: string;
-  table_type: string;
-};
+  name: string
+  catalog_name: string
+  schema_name: string
+  table_type: string
+}
 
 async function fetchTables(
   catalog: string,
@@ -19,25 +19,25 @@ async function fetchTables(
 ): Promise<TableSummary[]> {
   const res = await fetch(
     `/api/catalog?${new URLSearchParams({ type: "tables", catalog, schema })}`,
-  );
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-  return json.tables ?? [];
+  )
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  return json.tables ?? []
 }
 
 export default function SchemaPage() {
-  const { catalog, schema } = useParams<{ catalog: string; schema: string }>();
-  const [tables, setTables] = useState<TableSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { catalog, schema } = useParams<{ catalog: string; schema: string }>()
+  const [tables, setTables] = useState<TableSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setLoading(true);
+    setLoading(true)
     fetchTables(catalog, schema)
       .then(setTables)
       .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [catalog, schema]);
+      .finally(() => setLoading(false))
+  }, [catalog, schema])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -114,5 +114,5 @@ export default function SchemaPage() {
         )}
       </div>
     </div>
-  );
+  )
 }

@@ -41,8 +41,6 @@ pub async fn proxy(request: Request) -> Response {
 
     let mut req_builder = client().request(req_method, &uc_url);
 
-    req_builder = req_builder.header("Authorization", "Bearer eyJraWQiOiI2YWQ2NmE1ZjU2NmJjYWUzZDBjYTk2YjE1ZjJhY2VhNTZlYzAyMDc0MDRlZTMzMjFmMGZiYmNlMzM3NjIwNjM5IiwiYWxnIjoiUlM1MTIiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImludGVybmFsIiwiaWF0IjoxNzc4NzM5NzU1LCJqdGkiOiIzNGE4NmQ1MS1iODY5LTQyYzctYjk4Ny1hM2VmNzBhODAwMmYiLCJ0eXBlIjoiU0VSVklDRSJ9.GnygoQb3bTQPj42w56vBO5YT83mKwTgKg40P6vv3PVfROItO0JJo9b4MJFr_fDE00IkNZ62dKn0_7sRHk5jZ7kldC3X6V6CiKcx1mSukt9SukY_eKKMPzIeteiHbMVDt4NshJpnZGX6PVoIkOoNRd34M__D8iphrIbLiuHUtW8dstN3QZVrHwVPa2Nk8icFKCVrTCoayBWm0i0MU046aOCiAufpqRZlnw8oGEOBBjksFU4Gba7c1wP1jpWRgUySPqu9hKLuzzkUHsttLQ603oDwCdwTsnuXgrEe4waIszmPZgQlmicgdqslJHhqiguLIwS62XuM50mdDXLChFQdxXg");
-
     for name in ["authorization", "content-type", "accept"] {
         if let Some(value) = headers.get(name) {
             req_builder = req_builder.header(name, value);

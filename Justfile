@@ -55,7 +55,6 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
-    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -67,7 +66,6 @@ forward:
     echo "Dagster UI:       http://127.0.0.1:8080"
     echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
     echo "UC API:           http://127.0.0.1:8082"
-    echo "UC UI:            http://127.0.0.1:3001"
     echo "Controlplane Postgres: localhost:5433"
     echo "Daft UI:          http://127.0.0.1:8265"
     wait
@@ -243,13 +241,13 @@ jobs-delete-hdbank-card-payments-bronze-stream:
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
     curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
 
-jobs-sumit-hdbank-customer-profiles-bronze-stream:
+jobs-sumit-hdbank:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
       | jq
 
-jobs-delete-hdbank-customer-profiles-bronze-stream:
+jobs-delete-hdbank:
     #!/usr/bin/env bash
     set -euo pipefail
     id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
@@ -257,12 +255,12 @@ jobs-delete-hdbank-customer-profiles-bronze-stream:
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
     curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
 
-controlplane-postgres-deploy:
+controlplane-deploy:
     kubectl apply -f infra/k8s/controlplane/postgres.yaml
     kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n controlplane --timeout=120s
     kubectl get pods,svc -n controlplane
 
-controlplane-postgres-destroy:
+controlplane-destroy:
     kubectl delete -f infra/k8s/controlplane/postgres.yaml --ignore-not-found || true
     kubectl delete namespace controlplane --ignore-not-found --wait=false
 

@@ -1,12 +1,12 @@
-import { deepseek } from '@ai-sdk/deepseek'
-import { createOpenAI } from '@ai-sdk/openai'
-import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai'
-import { NextRequest } from 'next/server'
-import { z } from 'zod'
-import type { LanguageModel } from 'ai'
-import { fetchSchema } from '@/app/api/_lib/fetch-schema'
+import { deepseek } from "@ai-sdk/deepseek"
+import { createOpenAI } from "@ai-sdk/openai"
+import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
+import { NextRequest } from "next/server"
+import { z } from "zod"
+import type { LanguageModel } from "ai"
+import { fetchSchema } from "@/app/api/_lib/fetch-schema"
 
-const API_BASE = process.env.API_BASE_URL ?? 'http://localhost:3000'
+const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"
 
 const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",
@@ -16,14 +16,13 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-
 async function runSql(sessionId: string | null, sql: string) {
   const url = sessionId
     ? `${API_BASE}/api/sessions/${sessionId}/query`
     : `${API_BASE}/api/query`
   const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql }),
   })
   const data = await res.json()
@@ -31,35 +30,43 @@ async function runSql(sessionId: string | null, sql: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
-export type ModelId = 'deepseek-chat' | 'gpt-5.4-mini' | 'mlx-community/Qwen3.5-9B-MLX-4bit' | 'mlx-community/Qwen3.6-35B-A3B-4bit'
+export type ModelId =
+  | "deepseek-chat"
+  | "gpt-5.4-mini"
+  | "mlx-community/Qwen3.5-9B-MLX-4bit"
+  | "mlx-community/Qwen3.6-35B-A3B-4bit"
 
 export const MODELS: { id: ModelId; label: string }[] = [
-  { id: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-  { id: 'mlx-community/Qwen3.5-9B-MLX-4bit', label: 'Qwen 3.5 9B MLX 4bit' },
-  { id: 'mlx-community/Qwen3.6-35B-A3B-4bit', label: 'Qwen 3.6 35B A3B 4bit' },
+  { id: "deepseek-chat", label: "DeepSeek Chat" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { id: "mlx-community/Qwen3.5-9B-MLX-4bit", label: "Qwen 3.5 9B MLX 4bit" },
+  { id: "mlx-community/Qwen3.6-35B-A3B-4bit", label: "Qwen 3.6 35B A3B 4bit" },
 ]
 
 function resolveModel(modelId: ModelId): LanguageModel {
-  if (modelId === 'gpt-5.4-mini') return openai('gpt-5.4-mini')
-  if (modelId === 'mlx-community/Qwen3.5-9B-MLX-4bit') return omlx('mlx-community/Qwen3.5-9B-MLX-4bit')
-  if (modelId === 'mlx-community/Qwen3.6-35B-A3B-4bit') return omlx('mlx-community/Qwen3.6-35B-A3B-4bit')
-  return deepseek('deepseek-chat')
+  if (modelId === "gpt-5.4-mini") return openai("gpt-5.4-mini")
+  if (modelId === "mlx-community/Qwen3.5-9B-MLX-4bit")
+    return omlx("mlx-community/Qwen3.5-9B-MLX-4bit")
+  if (modelId === "mlx-community/Qwen3.6-35B-A3B-4bit")
+    return omlx("mlx-community/Qwen3.6-35B-A3B-4bit")
+  return deepseek("deepseek-chat")
 }
 
 export async function POST(req: NextRequest) {
   const { messages, sessionId, modelId } = await req.json()
 
-  const model = resolveModel((modelId as ModelId) ?? 'gpt-5.4-mini')
-  const schema = await fetchSchema().catch(() => '(schema unavailable)')
+  const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-mini")
+  const schema = await fetchSchema().catch(() => "(schema unavailable)")
 
   const tools = {
     runQuery: tool({
       description:
-        'Execute a SQL query and display the results in a data grid. Call this whenever the user asks to see, list, fetch, or query data.',
+        "Execute a SQL query and display the results in a data grid. Call this whenever the user asks to see, list, fetch, or query data.",
       inputSchema: z.object({
-        sql: z.string().describe('The SQL query to execute'),
-        explanation: z.string().describe('One sentence describing what this query returns'),
+        sql: z.string().describe("The SQL query to execute"),
+        explanation: z
+          .string()
+          .describe("One sentence describing what this query returns"),
       }),
       execute: async ({ sql, explanation }) => {
         try {
@@ -79,14 +86,20 @@ export async function POST(req: NextRequest) {
 
     visualizeChart: tool({
       description:
-        'Run a SQL query and render the result as a chart. Call this when the user asks to visualize, plot, or chart data, or when a chart would better communicate the answer than a table.',
+        "Run a SQL query and render the result as a chart. Call this when the user asks to visualize, plot, or chart data, or when a chart would better communicate the answer than a table.",
       inputSchema: z.object({
-        sql: z.string().describe('SQL query whose result will be charted'),
-        title: z.string().describe('Short chart title'),
-        chartType: z.enum(['bar', 'line', 'area', 'pie', 'scatter']).describe('bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns'),
-        x: z.string().describe('Column name for x-axis labels'),
-        y: z.string().describe('Column name for numeric values'),
-        explanation: z.string().describe('One sentence describing what this chart shows'),
+        sql: z.string().describe("SQL query whose result will be charted"),
+        title: z.string().describe("Short chart title"),
+        chartType: z
+          .enum(["bar", "line", "area", "pie", "scatter"])
+          .describe(
+            "bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns",
+          ),
+        x: z.string().describe("Column name for x-axis labels"),
+        y: z.string().describe("Column name for numeric values"),
+        explanation: z
+          .string()
+          .describe("One sentence describing what this chart shows"),
       }),
       execute: async ({ sql, title, chartType, x, y, explanation }) => {
         try {
@@ -102,7 +115,15 @@ export async function POST(req: NextRequest) {
             rows: data.rows,
           }
         } catch (e) {
-          return { sql, title, chartType, x, y, explanation, error: (e as Error).message }
+          return {
+            sql,
+            title,
+            chartType,
+            x,
+            y,
+            explanation,
+            error: (e as Error).message,
+          }
         }
       },
     }),

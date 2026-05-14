@@ -1,9 +1,9 @@
-'use client'
+"use client"
 
-import dynamic from 'next/dynamic'
+import dynamic from "next/dynamic"
 
 const LineageGraph = dynamic(
-  () => import('../assets/[...path]/LineageGraph').then((m) => m.LineageGraph),
+  () => import("../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
   { ssr: false },
 )
 

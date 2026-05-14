@@ -1,35 +1,35 @@
-"use client";
+"use client"
 
 import {
   DiceFaces04Icon,
   LiveStreaming01Icon,
   MailSend02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import Editor from "@monaco-editor/react";
-import { useState } from "react";
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import Editor from "@monaco-editor/react"
+import { useState } from "react"
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 
 type SendResult =
   | { ok: true; status: number; data: unknown }
-  | { ok: false; status?: number; error: string };
+  | { ok: false; status?: number; error: string }
 
 export type EventOption = {
-  id: string;
-  label: string;
-  endpoint: string;
-  createSample: () => Record<string, unknown>;
-};
+  id: string
+  label: string
+  endpoint: string
+  createSample: () => Record<string, unknown>
+}
 
 type EventPublisherProps = {
-  title: string;
-  subtitle: string;
-  options: EventOption[];
-};
+  title: string
+  subtitle: string
+  options: EventOption[]
+}
 
 function prettyJson(value: Record<string, unknown>) {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(value, null, 2)
 }
 
 export function EventPublisher({
@@ -41,24 +41,24 @@ export function EventPublisher({
     Object.fromEntries(
       options.map((option) => [option.id, prettyJson(option.createSample())]),
     ),
-  );
-  const [sending, setSending] = useState<Record<string, boolean>>({});
-  const [results, setResults] = useState<Record<string, SendResult | null>>({});
+  )
+  const [sending, setSending] = useState<Record<string, boolean>>({})
+  const [results, setResults] = useState<Record<string, SendResult | null>>({})
 
   const handleGenerate = (option: EventOption) => {
     setValues((current) => ({
       ...current,
       [option.id]: prettyJson(option.createSample()),
-    }));
-    setResults((current) => ({ ...current, [option.id]: null }));
-  };
+    }))
+    setResults((current) => ({ ...current, [option.id]: null }))
+  }
 
   const handleSend = async (option: EventOption) => {
-    const value = values[option.id] ?? "";
+    const value = values[option.id] ?? ""
 
-    let parsed: unknown;
+    let parsed: unknown
     try {
-      parsed = JSON.parse(value);
+      parsed = JSON.parse(value)
     } catch {
       setResults((current) => ({
         ...current,
@@ -66,25 +66,25 @@ export function EventPublisher({
           ok: false,
           error: "Invalid JSON. Fix the payload before sending.",
         },
-      }));
-      return;
+      }))
+      return
     }
 
-    setSending((current) => ({ ...current, [option.id]: true }));
-    setResults((current) => ({ ...current, [option.id]: null }));
+    setSending((current) => ({ ...current, [option.id]: true }))
+    setResults((current) => ({ ...current, [option.id]: null }))
 
     try {
       const res = await fetch(option.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed),
-      });
-      const body = await res.json().catch(() => null);
+      })
+      const body = await res.json().catch(() => null)
       if (res.ok) {
         setResults((current) => ({
           ...current,
           [option.id]: { ok: true, status: res.status, data: body },
-        }));
+        }))
       } else {
         setResults((current) => ({
           ...current,
@@ -93,17 +93,17 @@ export function EventPublisher({
             status: res.status,
             error: (body as { error?: string })?.error ?? `HTTP ${res.status}`,
           },
-        }));
+        }))
       }
     } catch (error) {
       setResults((current) => ({
         ...current,
         [option.id]: { ok: false, error: (error as Error).message },
-      }));
+      }))
     } finally {
-      setSending((current) => ({ ...current, [option.id]: false }));
+      setSending((current) => ({ ...current, [option.id]: false }))
     }
-  };
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -127,8 +127,8 @@ export function EventPublisher({
           }}
         >
           {options.map((option, index) => {
-            const result = results[option.id] ?? null;
-            const isSending = sending[option.id] ?? false;
+            const result = results[option.id] ?? null
+            const isSending = sending[option.id] ?? false
 
             return (
               <section
@@ -178,11 +178,11 @@ export function EventPublisher({
                       setValues((current) => ({
                         ...current,
                         [option.id]: nextValue ?? "",
-                      }));
+                      }))
                       setResults((current) => ({
                         ...current,
                         [option.id]: null,
-                      }));
+                      }))
                     }}
                     options={{
                       minimap: { enabled: false },
@@ -240,10 +240,10 @@ export function EventPublisher({
                   </div>
                 </div>
               </section>
-            );
+            )
           })}
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,24 +1,24 @@
-import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SessionSelector } from "@/components/session-selector";
+import { redirect } from "next/navigation"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SessionSelector } from "@/components/session-selector"
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { SessionProvider } from "@/hooks/use-session-context";
-import { getServerSession } from "@/lib/auth/server";
+} from "@/components/ui/sidebar"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { SessionProvider } from "@/hooks/use-session-context"
+import { getServerSession } from "@/lib/auth/server"
 
 export default async function AuthedLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
-  const session = await getServerSession();
+  const session = await getServerSession()
 
   if (!session) {
-    redirect("/login");
+    redirect("/login")
   }
 
   return (
@@ -37,5 +37,5 @@ export default async function AuthedLayout({
         </SidebarProvider>
       </SessionProvider>
     </TooltipProvider>
-  );
+  )
 }

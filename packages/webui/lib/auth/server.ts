@@ -1,5 +1,5 @@
-import { cookies } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers"
+import { NextRequest, NextResponse } from "next/server"
 import {
   createStateCookie,
   getAuthLoginUrl,
@@ -19,16 +19,16 @@ import {
   sealSessionCookie,
   sessionTtlSeconds,
   stateTtlSeconds,
-} from "@/lib/auth/core";
+} from "@/lib/auth/core"
 
 type TokenResponse = {
-  access_token: string;
-  expires_in: number;
-  id_token: string;
-  refresh_expires_in?: number;
-  refresh_token?: string;
-  token_type: string;
-};
+  access_token: string
+  expires_in: number
+  id_token: string
+  refresh_expires_in?: number
+  refresh_token?: string
+  token_type: string
+}
 
 export {
   createStateCookie,
@@ -43,17 +43,17 @@ export {
   sealSessionCookie,
   sessionTtlSeconds,
   stateTtlSeconds,
-};
+}
 
 export async function getServerSession() {
-  const cookieStore = await cookies();
-  const value = cookieStore.get(getSessionCookieName())?.value;
+  const cookieStore = await cookies()
+  const value = cookieStore.get(getSessionCookieName())?.value
 
   if (!value) {
-    return null;
+    return null
   }
 
-  return readSessionFromCookieValue(value);
+  return readSessionFromCookieValue(value)
 }
 
 export function clearSessionCookie(response: NextResponse) {
@@ -65,7 +65,7 @@ export function clearSessionCookie(response: NextResponse) {
     secure: false,
     path: "/",
     maxAge: 0,
-  });
+  })
 }
 
 export function clearStateCookie(response: NextResponse) {
@@ -77,11 +77,11 @@ export function clearStateCookie(response: NextResponse) {
     secure: false,
     path: "/",
     maxAge: 0,
-  });
+  })
 }
 
 export function getDefaultLoginUrlForRequest(request: NextRequest) {
-  return getDefaultLoginUrl(request.nextUrl.origin);
+  return getDefaultLoginUrl(request.nextUrl.origin)
 }
 
 export function getAuthLoginUrlForRequest(
@@ -89,7 +89,7 @@ export function getAuthLoginUrlForRequest(
   realm: string,
   state: string,
 ) {
-  return getAuthLoginUrl(request.nextUrl.origin, realm, state);
+  return getAuthLoginUrl(request.nextUrl.origin, realm, state)
 }
 
 export function getLogoutUrlForRequest(
@@ -97,7 +97,7 @@ export function getLogoutUrlForRequest(
   realm: string,
   idToken?: string,
 ) {
-  return getLogoutUrl(request.nextUrl.origin, realm, idToken);
+  return getLogoutUrl(request.nextUrl.origin, realm, idToken)
 }
 
 export async function exchangeAuthorizationCode(
@@ -121,11 +121,11 @@ export async function exchangeAuthorizationCode(
       }),
       cache: "no-store",
     },
-  );
+  )
 
   if (!response.ok) {
-    throw new Error("Token exchange failed");
+    throw new Error("Token exchange failed")
   }
 
-  return (await response.json()) as TokenResponse;
+  return (await response.json()) as TokenResponse
 }

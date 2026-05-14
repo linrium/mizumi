@@ -1,6 +1,6 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:6000";
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:6000"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -17,8 +17,8 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${API_BASE_URL}/api/:path*`,
       },
-    ];
+    ]
   },
-};
+}
 
-export default nextConfig;
+export default nextConfig

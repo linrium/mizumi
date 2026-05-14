@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { type EventOption, EventPublisher } from "@/components/event-publisher";
+import { type EventOption, EventPublisher } from "@/components/event-publisher"
 
 function uuid() {
-  return crypto.randomUUID();
+  return crypto.randomUUID()
 }
 
 const vietjetairOptions: EventOption[] = [
@@ -51,7 +51,7 @@ const vietjetairOptions: EventOption[] = [
       booking_timestamp: new Date().toISOString(),
     }),
   },
-];
+]
 
 export default function VietjetairBookingPage() {
   return (
@@ -62,5 +62,5 @@ export default function VietjetairBookingPage() {
         options={vietjetairOptions}
       />
     </div>
-  );
+  )
 }
