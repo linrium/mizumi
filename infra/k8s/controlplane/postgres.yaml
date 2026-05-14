@@ -1,35 +1,35 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: app-api
+  name: controlplane
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: app-api-postgres-secret
-  namespace: app-api
+  name: controlplane-postgres-secret
+  namespace: controlplane
 type: Opaque
 stringData:
-  POSTGRES_DB: app_api
-  POSTGRES_USER: app_api
-  POSTGRES_PASSWORD: app_api_password
-  DATABASE_URL: "postgres://app_api:app_api_password@app-api-postgres-svc.app-api.svc.cluster.local:5432/app_api"
+  POSTGRES_DB: controlplane
+  POSTGRES_USER: controlplane
+  POSTGRES_PASSWORD: controlplane_password
+  DATABASE_URL: "postgres://controlplane:controlplane_password@controlplane-postgres-svc.controlplane.svc.cluster.local:5432/controlplane"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: app-api-postgres
-  namespace: app-api
+  name: controlplane-postgres
+  namespace: controlplane
 spec:
-  serviceName: app-api-postgres-svc
+  serviceName: controlplane-postgres-svc
   replicas: 1
   selector:
     matchLabels:
-      app: app-api-postgres
+      app: controlplane-postgres
   template:
     metadata:
       labels:
-        app: app-api-postgres
+        app: controlplane-postgres
     spec:
       containers:
         - name: postgres
@@ -38,13 +38,13 @@ spec:
             - containerPort: 5432
           envFrom:
             - secretRef:
-                name: app-api-postgres-secret
+                name: controlplane-postgres-secret
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "app_api", "-d", "app_api"]
+              command: ["pg_isready", "-U", "controlplane", "-d", "controlplane"]
             initialDelaySeconds: 5
             periodSeconds: 5
   volumeClaimTemplates:
@@ -59,11 +59,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: app-api-postgres-svc
-  namespace: app-api
+  name: controlplane-postgres-svc
+  namespace: controlplane
 spec:
   selector:
-    app: app-api-postgres
+    app: controlplane-postgres
   ports:
     - port: 5432
       targetPort: 5432

@@ -56,7 +56,7 @@ forward:
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-ui-svc 3001:3000 &
-    kubectl port-forward -n app-api svc/app-api-postgres-svc 5433:5432 &
+    kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
@@ -68,7 +68,7 @@ forward:
     echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "UC UI:            http://127.0.0.1:3001"
-    echo "App API Postgres: localhost:5433"
+    echo "Controlplane Postgres: localhost:5433"
     echo "Daft UI:          http://127.0.0.1:8265"
     wait
 
@@ -257,14 +257,14 @@ jobs-delete-hdbank-customer-profiles-bronze-stream:
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
     curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
 
-app-api-postgres-deploy:
-    kubectl apply -f infra/k8s/app-api/postgres.yaml
-    kubectl wait --for=condition=Ready pod -l app=app-api-postgres -n app-api --timeout=120s
-    kubectl get pods,svc -n app-api
+controlplane-postgres-deploy:
+    kubectl apply -f infra/k8s/controlplane/postgres.yaml
+    kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n controlplane --timeout=120s
+    kubectl get pods,svc -n controlplane
 
-app-api-postgres-destroy:
-    kubectl delete -f infra/k8s/app-api/postgres.yaml --ignore-not-found || true
-    kubectl delete namespace app-api --ignore-not-found --wait=false
+controlplane-postgres-destroy:
+    kubectl delete -f infra/k8s/controlplane/postgres.yaml --ignore-not-found || true
+    kubectl delete namespace controlplane --ignore-not-found --wait=false
 
 daft-distributed-deploy:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true

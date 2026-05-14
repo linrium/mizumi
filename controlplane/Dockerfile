@@ -8,6 +8,6 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /build/target/release/app-api /usr/local/bin/app-api
+COPY --from=builder /build/target/release/controlplane /usr/local/bin/controlplane
 EXPOSE 6000
-CMD ["app-api"]
+CMD ["controlplane"]

@@ -8,20 +8,20 @@ The repository is organized as infrastructure plus a small application layer:
 - `packages/dagster`: Dagster asset definitions that orchestrate jobs on Kubernetes.
 - `packages/duckdb`, `packages/datafusion`, `packages/daft`: query and compute workloads packaged as container jobs.
 - `packages/unitycatalog`: Unity Catalog container build context.
-- `app-api`: Rust API that launches ad hoc DuckDB query jobs in Kubernetes.
+- `controlplane`: Rust API that launches ad hoc DuckDB query jobs in Kubernetes.
 - `app-ui`: Next.js UI.
 - `infra/k8s`: Kubernetes manifests and Helm values.
 - `Justfile`: operational entrypoint for deploy, destroy, forward, and query commands.
 
 ## Architecture
 
-Mizumi uses RustFS as the S3-compatible storage layer. Spark reads bronze data from RustFS, writes silver and gold outputs back to RustFS, and Spark Declarative Pipelines produce additional managed datasets. Dagster acts as the control plane and triggers Spark, DuckDB, DataFusion, and Daft workloads as Kubernetes jobs. Unity Catalog provides metadata and catalog services. The Rust API exposes an HTTP endpoint that runs one-off DuckDB queries in cluster jobs, and the Next.js UI is the intended frontend surface.
+Mizumi uses RustFS as the S3-compatible storage layer. Spark reads bronze data from RustFS, writes silver and gold outputs back to RustFS, and Spark Declarative Pipelines produce additional managed datasets. Dagster acts as the orchestration layer and triggers Spark, DuckDB, DataFusion, and Daft workloads as Kubernetes jobs. Unity Catalog provides metadata and catalog services. The Rust API exposes an HTTP endpoint that runs one-off DuckDB queries in cluster jobs, and the Next.js UI is the intended frontend surface.
 
 ### Data Flow
 
 ```mermaid
 flowchart LR
-    UI["app-ui<br/>Next.js"] --> API["app-api<br/>Axum API"]
+    UI["app-ui<br/>Next.js"] --> API["controlplane<br/>Axum API"]
     API --> K8S["Kubernetes Jobs"]
     K8S --> DDB["DuckDB query container"]
 
@@ -54,14 +54,14 @@ flowchart LR
 - `DataFusion`: runs Arrow/DataFusion queries as Kubernetes jobs.
 - `Daft`: supports both simple and distributed jobs, with the distributed mode backed by Ray.
 - `Unity Catalog`: supplies catalog services for the Spark-side data platform setup.
-- `app-api`: exposes `/api/query` and creates short-lived DuckDB Kubernetes jobs.
+- `controlplane`: exposes `/api/query` and creates short-lived DuckDB Kubernetes jobs.
 - `app-ui`: lightweight Next.js frontend deployed separately.
 
 ## Repository Layout
 
 ```text
 .
-├── app-api/                  # Rust API for ad hoc query execution
+├── controlplane/             # Rust API for ad hoc query execution
 ├── app-ui/                   # Next.js frontend
 ├── infra/k8s/                # Kubernetes manifests and Helm values
 ├── packages/
@@ -102,7 +102,7 @@ Deploys the core platform stack:
 - Unity Catalog
 - Spark operator and Spark jobs/pipelines
 - Dagster
-- App API
+- Controlplane
 
 ```bash
 just destroy
@@ -128,7 +128,7 @@ Starts the common port-forwards and prints local endpoints for:
 - Unity Catalog API on `http://127.0.0.1:8082`
 - Unity Catalog UI on `http://127.0.0.1:3001`
 - App UI on `http://127.0.0.1:3002` when deployed
-- App API on `http://127.0.0.1:6000` when deployed
+- Controlplane on `http://127.0.0.1:6000` when deployed
 
 You can also forward individual services:
 
@@ -141,23 +141,24 @@ just spark-pipeline-forward
 just unitycatalog-forward
 just unitycatalog-ui-forward
 just app-ui-forward
-just app-api-forward
+just forward
 just daft-distributed-forward
 just ballista-forward
 ```
 
 `redpanda-deploy` also runs a bootstrap job that creates the default `mizumi-orders` topic.
 
-To create the example Spark streaming job through `app-api` after `just app-api-forward`:
+To create the example Spark streaming job through `controlplane` after `just forward`:
 
 ```bash
-just app-api-streaming-job-create
+just jobs-submit-all
 ```
 
-To rebuild the Spark image and recreate that streaming job cleanly:
+To rebuild the Spark image and recreate those streaming jobs cleanly, rebuild Spark and resubmit them:
 
 ```bash
-just app-api-streaming-job-recreate
+just spark-image-build
+just jobs-submit-all
 ```
 
 ### Spark and Pipeline Workloads
@@ -269,7 +270,7 @@ npm run format
 The Rust API can run locally or inside the Kubernetes stack. To run it locally:
 
 ```bash
-cd app-api
+cd controlplane
 cargo run
 ```
 
@@ -310,4 +311,4 @@ At a high level:
 
 - The root `README.md` was previously empty, while `app-ui/README.md` still contains the default Next.js scaffold text.
 - `app-ui` currently contains a minimal placeholder page.
-- `app-api` has Kubernetes manifests under `infra/k8s/app-api`.
+- `controlplane` has Kubernetes manifests under `infra/k8s/controlplane`.

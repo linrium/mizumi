@@ -44,7 +44,10 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or("postgres://app_api:app_api_password@localhost:5433/app_api".to_string());
+        .unwrap_or(
+            "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
+                .to_string(),
+        );
 
     let db = PgPool::connect(&database_url)
         .await
