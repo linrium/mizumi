@@ -1,6 +1,6 @@
 import json, os, time, sys, urllib.request, urllib.error
 
-UC = "http://localhost:8080/api/2.1/unity-catalog"
+UC = "http://localhost:8082/api/2.1/unity-catalog"
 TOKEN = os.environ.get("UC_TOKEN", "")
 
 def _headers(extra=None):

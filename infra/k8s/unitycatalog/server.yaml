@@ -32,7 +32,7 @@ data:
     server.token-url=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/token
     server.client-id=app-ui
     server.client-secret=app-ui-secret
-    server.redirect-port=
+    server.redirect-port=54875
     server.allowed-issuers=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico
     server.audiences=app-ui
     server.cookie-timeout=P5D
@@ -41,6 +41,37 @@ data:
     s3.region.0=us-east-1
     s3.accessKey.0=rustfsadmin
     s3.secretKey.0=rustfsadmin
+  server.log4j2.properties: |
+    status = warn
+    appenders = rollingFile
+
+    appender.rollingFile.type = RollingFile
+    appender.rollingFile.name = RollingFile
+    appender.rollingFile.fileName = etc/logs/server.log
+    appender.rollingFile.filePattern = etc/logs/server-%d{MM-dd-yyyy-HH-mm-ss}-%i.log.gz
+    appender.rollingFile.layout.type = PatternLayout
+    appender.rollingFile.layout.pattern = %d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n
+
+    appender.rollingFile.policies.type = Policies
+    appender.rollingFile.policies.time.type = TimeBasedTriggeringPolicy
+    appender.rollingFile.policies.time.interval = 1
+    appender.rollingFile.policies.size.type = SizeBasedTriggeringPolicy
+    appender.rollingFile.policies.size.size = 10MB
+
+    appender.rollingFile.strategy.type = DefaultRolloverStrategy
+    appender.rollingFile.strategy.max = 5
+    appender.rollingFile.strategy.fileIndex = max
+
+    appender.rollingFile.strategy.action.type = Delete
+    appender.rollingFile.strategy.action.basePath = etc/logs
+    appender.rollingFile.strategy.action.condition.type = IfFileName
+    appender.rollingFile.strategy.action.condition.glob = server-*.log.gz
+    appender.rollingFile.strategy.action.ifAny.type = IfAccumulatedFileCount
+    appender.rollingFile.strategy.action.ifAny.exceeds = 5
+
+    rootLogger.level = debug
+    rootLogger.appenderRefs = rollingFile
+    rootLogger.appenderRef.rollingFile.ref = RollingFile
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,6 +111,9 @@ spec:
             - name: config
               mountPath: /home/unitycatalog/etc/conf/server.properties
               subPath: server.properties
+            - name: config
+              mountPath: /home/unitycatalog/etc/conf/server.log4j2.properties
+              subPath: server.log4j2.properties
             - name: h2-data
               mountPath: /data
       volumes:

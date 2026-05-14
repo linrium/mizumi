@@ -12,7 +12,7 @@ use axum::{
     Router,
     extract::FromRef,
     http::StatusCode,
-    routing::{delete, get, post},
+    routing::{any, delete, get, post},
 };
 use rdkafka::{ClientConfig, producer::FutureProducer};
 use sqlx::PgPool;
@@ -159,29 +159,8 @@ async fn main() {
             "/dagster/schedules/{name}/ticks",
             get(dagster::get_schedule_tick_history),
         )
-        // Unity Catalog routes
-        .route(
-            "/uc/catalogs",
-            get(uc::list_catalogs).post(uc::create_catalog),
-        )
-        .route(
-            "/uc/catalogs/{name}",
-            get(uc::get_catalog)
-                .patch(uc::update_catalog)
-                .delete(uc::delete_catalog),
-        )
-        .route("/uc/schemas", get(uc::list_schemas).post(uc::create_schema))
-        .route(
-            "/uc/schemas/{full_name}",
-            get(uc::get_schema)
-                .patch(uc::update_schema)
-                .delete(uc::delete_schema),
-        )
-        .route("/uc/tables", get(uc::list_tables).post(uc::create_table))
-        .route(
-            "/uc/tables/{full_name}",
-            get(uc::get_table).delete(uc::delete_table),
-        )
+        // Unity Catalog — transparent proxy
+        .route("/uc/{*path}", any(uc::proxy))
         .with_state(state)
         .layer(CorsLayer::permissive());
 

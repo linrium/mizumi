@@ -9,3 +9,5 @@ ATTACH 'vietjetair' AS vietjetair (TYPE unity_catalog, DEFAULT_SCHEMA 'vietjetai
 SHOW ALL TABLES;
 
      ATTACH 'unity' AS unity (TYPE unity_catalog, DEFAULT_SCHEMA 'default');
+
+
