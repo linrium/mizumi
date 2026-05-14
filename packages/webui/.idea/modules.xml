@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/app-ui.iml" filepath="$PROJECT_DIR$/.idea/app-ui.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/webui.iml" filepath="$PROJECT_DIR$/.idea/webui.iml" />
     </modules>
   </component>
 </project>

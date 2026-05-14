@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app-ui
-  namespace: app-ui
+  name: webui
+  namespace: webui
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: app-ui
+      app: webui
   template:
     metadata:
       labels:
-        app: app-ui
+        app: webui
     spec:
       containers:
-        - name: app-ui
-          image: mizumi-app-ui:0.1.0
+        - name: webui
+          image: mizumi-webui:0.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -32,15 +32,15 @@ spec:
             - name: KEYCLOAK_REALMS
               value: sovico
             - name: KEYCLOAK_CLIENT_ID
-              value: app-ui
+              value: webui
             - name: KEYCLOAK_CLIENT_SECRET
-              value: app-ui-secret
+              value: webui-secret
             - name: KEYCLOAK_PUBLIC_BASE_URL
               value: http://127.0.0.1:8083
             - name: KEYCLOAK_INTERNAL_BASE_URL
               value: http://keycloak-svc.keycloak.svc.cluster.local:8080
             - name: AUTH_SECRET
-              value: mizumi-app-ui-dev-auth-secret
+              value: mizumi-webui-dev-auth-secret
           readinessProbe:
             httpGet:
               path: /
@@ -57,11 +57,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: app-ui-svc
-  namespace: app-ui
+  name: webui-svc
+  namespace: webui
 spec:
   selector:
-    app: app-ui
+    app: webui
   ports:
     - port: 3000
       targetPort: 3000

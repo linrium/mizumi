@@ -9,7 +9,7 @@ The repository is organized as infrastructure plus a small application layer:
 - `packages/duckdb`, `packages/datafusion`, `packages/daft`: query and compute workloads packaged as container jobs.
 - `packages/unitycatalog`: Unity Catalog container build context.
 - `controlplane`: Rust API that launches ad hoc DuckDB query jobs in Kubernetes.
-- `app-ui`: Next.js UI.
+- `webui`: Next.js UI.
 - `infra/k8s`: Kubernetes manifests and Helm values.
 - `Justfile`: operational entrypoint for deploy, destroy, forward, and query commands.
 
@@ -21,7 +21,7 @@ Mizumi uses RustFS as the S3-compatible storage layer. Spark reads bronze data f
 
 ```mermaid
 flowchart LR
-    UI["app-ui<br/>Next.js"] --> API["controlplane<br/>Axum API"]
+    UI["webui<br/>Next.js"] --> API["controlplane<br/>Axum API"]
     API --> K8S["Kubernetes Jobs"]
     K8S --> DDB["DuckDB query container"]
 
@@ -55,14 +55,14 @@ flowchart LR
 - `Daft`: supports both simple and distributed jobs, with the distributed mode backed by Ray.
 - `Unity Catalog`: supplies catalog services for the Spark-side data platform setup.
 - `controlplane`: exposes `/api/query` and creates short-lived DuckDB Kubernetes jobs.
-- `app-ui`: lightweight Next.js frontend deployed separately.
+- `webui`: lightweight Next.js frontend deployed separately.
 
 ## Repository Layout
 
 ```text
 .
 ├── controlplane/             # Rust API for ad hoc query execution
-├── app-ui/                   # Next.js frontend
+├── webui/                    # Next.js frontend
 ├── infra/k8s/                # Kubernetes manifests and Helm values
 ├── packages/
 │   ├── dagster/              # Dagster definitions and assets
@@ -127,7 +127,7 @@ Starts the common port-forwards and prints local endpoints for:
 - Dagster UI on `http://127.0.0.1:8080`
 - Unity Catalog API on `http://127.0.0.1:8082`
 - Unity Catalog UI on `http://127.0.0.1:3001`
-- App UI on `http://127.0.0.1:3002` when deployed
+- Web UI on `http://127.0.0.1:3002` when deployed
 - Controlplane on `http://127.0.0.1:6000` when deployed
 
 You can also forward individual services:
@@ -140,7 +140,7 @@ just spark-forward
 just spark-pipeline-forward
 just unitycatalog-forward
 just unitycatalog-ui-forward
-just app-ui-forward
+just forward
 just forward
 just daft-distributed-forward
 just ballista-forward
@@ -250,7 +250,7 @@ Manages the Ballista cluster manifests under `infra/k8s/ballista`.
 For local frontend development:
 
 ```bash
-cd app-ui
+cd webui
 npm install
 npm run dev
 ```
@@ -258,7 +258,7 @@ npm run dev
 Other frontend commands:
 
 ```bash
-cd app-ui
+cd webui
 npm run build
 npm run start
 npm run lint
@@ -309,6 +309,6 @@ At a high level:
 
 ## Notes
 
-- The root `README.md` was previously empty, while `app-ui/README.md` still contains the default Next.js scaffold text.
-- `app-ui` currently contains a minimal placeholder page.
+- The root `README.md` was previously empty, while `webui/README.md` still contains the default Next.js scaffold text.
+- `webui` currently contains a minimal placeholder page.
 - `controlplane` has Kubernetes manifests under `infra/k8s/controlplane`.

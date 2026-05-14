@@ -6,7 +6,7 @@ export const stateTtlSeconds = 60 * 10;
 
 const SESSION_COOKIE_NAME = "mizumi_session";
 const STATE_COOKIE_NAME = "mizumi_auth_state";
-const DEFAULT_AUTH_SECRET = "mizumi-app-ui-dev-auth-secret";
+const DEFAULT_AUTH_SECRET = "mizumi-webui-dev-auth-secret";
 
 export type AppSession = {
   realm: string;
@@ -49,11 +49,11 @@ export function getDefaultRealm() {
 }
 
 export function getClientId() {
-  return process.env.KEYCLOAK_CLIENT_ID ?? "app-ui";
+  return process.env.KEYCLOAK_CLIENT_ID ?? "webui";
 }
 
 export function getClientSecret() {
-  return process.env.KEYCLOAK_CLIENT_SECRET ?? "app-ui-secret";
+  return process.env.KEYCLOAK_CLIENT_SECRET ?? "webui-secret";
 }
 
 export function getPublicBaseUrl() {

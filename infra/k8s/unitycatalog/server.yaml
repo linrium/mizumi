@@ -33,11 +33,11 @@ data:
     server.authorization=enable
     server.authorization-url=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/auth
     server.token-url=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/token
-    server.client-id=app-ui
-    server.client-secret=app-ui-secret
+    server.client-id=webui
+    server.client-secret=webui-secret
     server.redirect-port=54875
     server.allowed-issuers=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico
-    server.audiences=app-ui
+    server.audiences=webui
     server.cookie-timeout=P5D
     server.managed-table.enabled=true
     s3.bucketPath.0=s3://unitycatalog/

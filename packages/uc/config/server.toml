@@ -20,8 +20,8 @@ authorization = "enable"
 # OAuth2 / OpenID Connect endpoints (required when authorization = "enable")
  authorization_url = "http://localhost:8083/realms/sovico/protocol/openid-connect/auth"
  token_url         = "http://localhost:8083/realms/sovico/protocol/openid-connect/token"
- client_id         = "app-ui"
- client_secret     = "app-ui-secret"
+ client_id         = "webui"
+ client_secret     = "webui-secret"
 
 # Local port used for the OAuth2 redirect callback
  redirect_port = 58278
@@ -35,7 +35,7 @@ authorization = "enable"
 allowed_issuers = ["http://localhost:8083/realms/sovico"]
 
 # Accepted JWT audiences. Typically your application client ID or API identifier.
-audiences = ["app-ui"]
+audiences = ["webui"]
 
 # Session cookie lifetime (ISO-8601 duration).
 # P5D = 5 days | PT5H = 5 hours | PT5M = 5 minutes | PT5S = 5 seconds
