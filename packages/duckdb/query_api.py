@@ -1,57 +1,19 @@
 import json
 import os
-import re
 import sys
-import urllib.error
-import urllib.request
 
 import duckdb
 
-ENDPOINT = os.getenv("AWS_ENDPOINT_URL", "http://rustfs-svc.rustfs.svc.cluster.local:9000")
-ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
-SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
 SQL = os.getenv("DUCKDB_QUERY", "")
-UC_BASE_URL = os.getenv(
-    "UC_BASE_URL",
-    "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/api/2.1/unity-catalog",
+UC_ENDPOINT = os.getenv(
+    "DUCKDB_UC_ENDPOINT",
+    "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080",
 )
-
-# Matches three-part identifiers: catalog.schema.table
-_THREE_PART_RE = re.compile(
-    r'\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b'
-)
+UC_TOKEN = os.getenv("DUCKDB_UC_TOKEN", "")
 
 
-def _uc_table_location(full_name: str) -> str | None:
-    url = f"{UC_BASE_URL}/tables/{full_name}"
-    try:
-        with urllib.request.urlopen(url, timeout=5) as resp:
-            data = json.loads(resp.read())
-            return data.get("storage_location")
-    except (urllib.error.HTTPError, urllib.error.URLError, Exception):
-        return None
-
-
-def resolve_uc_tables(sql: str) -> str:
-    """Replace all catalog.schema.table references with delta_scan(storage_location).
-
-    Loops until the SQL stabilises so that any three-part names introduced by a
-    prior substitution (e.g. via CTEs or deeply nested subqueries) are also resolved.
-    """
-    cache: dict[str, str | None] = {}
-
-    def replace(m: re.Match) -> str:
-        full_name = m.group(0)
-        if full_name not in cache:
-            cache[full_name] = _uc_table_location(full_name)
-        location = cache[full_name]
-        return f"delta_scan('{location}')" if location else full_name
-
-    while True:
-        next_sql = _THREE_PART_RE.sub(replace, sql)
-        if next_sql == sql:
-            return sql
-        sql = next_sql
+def sql_quote(value: str) -> str:
+    return value.replace("'", "''")
 
 
 def main() -> None:
@@ -59,25 +21,39 @@ def main() -> None:
         print(json.dumps({"error": "DUCKDB_QUERY environment variable not set"}))
         sys.exit(1)
 
-    resolved_sql = resolve_uc_tables(SQL)
+    if not UC_TOKEN:
+        print(json.dumps({"error": "DUCKDB_UC_TOKEN environment variable not set"}))
+        sys.exit(1)
 
     con = duckdb.connect()
-    con.execute("LOAD httpfs; LOAD delta;")
-
-    endpoint_host = ENDPOINT.replace("http://", "").replace("https://", "")
-    con.execute(f"""
-        CREATE SECRET rustfs (
-            TYPE S3,
-            KEY_ID '{ACCESS_KEY}',
-            SECRET '{SECRET_KEY}',
-            ENDPOINT '{endpoint_host}',
-            USE_SSL false,
-            URL_STYLE 'path',
-            REGION 'us-east-1'
+    con.execute("LOAD httpfs; LOAD delta; LOAD unity_catalog;")
+    con.execute(
+        f"""
+        CREATE SECRET (
+            TYPE unity_catalog,
+            TOKEN '{sql_quote(UC_TOKEN)}',
+            ENDPOINT '{sql_quote(UC_ENDPOINT)}'
         )
-    """)
+        """
+    )
+    con.execute(
+        """
+        ATTACH 'hdbank' AS hdbank (
+            TYPE unity_catalog,
+            DEFAULT_SCHEMA 'hdbank_payments_prod_bronze'
+        )
+        """
+    )
+    con.execute(
+        """
+        ATTACH 'vietjetair' AS vietjetair (
+            TYPE unity_catalog,
+            DEFAULT_SCHEMA 'vietjetair_bookings_prod_bronze'
+        )
+        """
+    )
 
-    result = con.execute(resolved_sql).fetchdf()
+    result = con.execute(SQL).fetchdf()
 
     output = {
         "columns": list(result.columns),

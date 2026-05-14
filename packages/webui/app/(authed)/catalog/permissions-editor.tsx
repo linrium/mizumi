@@ -395,7 +395,7 @@ export function PermissionsEditor({
     return (
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="w-[320px] shrink-0 border-r overflow-y-auto">
-          <div className="flex min-h-[56px] items-center border-b px-5 py-2.5">
+          <div className="flex min-h-[56px] items-center border-b px-5">
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Current assignments
@@ -413,7 +413,7 @@ export function PermissionsEditor({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b px-5 py-2.5">
+          <div className="flex min-h-[56px] items-center justify-between gap-3 border-b px-5">
             <div>
               <h3 className="text-sm font-semibold">{title}</h3>
               <p className="mt-1 text-xs text-muted-foreground font-mono">
@@ -448,7 +448,7 @@ export function PermissionsEditor({
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
       <div className="w-[320px] shrink-0 border-r overflow-y-auto">
-        <div className="flex min-h-[56px] items-center border-b px-5 py-2.5">
+        <div className="flex min-h-[56px] items-center border-b px-5">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Current assignments
@@ -525,7 +525,7 @@ export function PermissionsEditor({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="flex min-h-[56px] items-center justify-between gap-3 border-b px-5 py-2.5">
+        <div className="flex min-h-[56px] items-center justify-between gap-3 border-b px-5">
           <div>
             <h3 className="text-sm font-semibold">{title}</h3>
             <p className="mt-1 text-xs text-muted-foreground font-mono">

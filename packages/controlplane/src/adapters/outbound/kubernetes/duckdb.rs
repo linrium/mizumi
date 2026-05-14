@@ -161,6 +161,12 @@ fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
         env("AWS_ACCESS_KEY_ID", "rustfsadmin"),
         env("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
     ];
+    if let Ok(token) = std::env::var("DUCKDB_UC_TOKEN") {
+        vars.push(env("DUCKDB_UC_TOKEN", &token));
+    }
+    if let Ok(endpoint) = std::env::var("DUCKDB_UC_ENDPOINT") {
+        vars.push(env("DUCKDB_UC_ENDPOINT", &endpoint));
+    }
     if let Some(sql) = sql {
         vars.push(env("DUCKDB_QUERY", sql));
     }
