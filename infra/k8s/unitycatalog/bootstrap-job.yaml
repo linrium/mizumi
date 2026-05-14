@@ -62,12 +62,24 @@ spec:
                       else:
                           print(f"  ERROR {e.code}: {msg[:300]}", file=sys.stderr)
 
-              def col(name, type_name, type_text, json_type, pos, nullable=True):
+              def col(name, type_name, type_text, json_type, pos, nullable=True, partition_index=-1):
                   return {
                       "name": name,
+                      "type_text": type_text,
+                      "type_json": json.dumps({
+                          "name": name,
+                          "type": json_type,
+                          "nullable": nullable,
+                          "metadata": {},
+                      }, separators=(",", ":")),
                       "type_name": type_name,
+                      "type_precision": 0,
+                      "type_scale": 0,
+                      "type_interval_type": "",
                       "position": pos,
+                      "comment": "",
                       "nullable": nullable,
+                      "partition_index": partition_index,
                   }
 
               def build_cols(specs):

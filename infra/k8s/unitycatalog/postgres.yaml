@@ -28,6 +28,7 @@ spec:
       containers:
         - name: postgres
           image: postgres:16
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
           envFrom:
@@ -36,6 +37,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -43,7 +51,7 @@ spec:
         accessModes: [ReadWriteOnce]
         resources:
           requests:
-            storage: 2Gi
+            storage: 1Gi
 ---
 apiVersion: v1
 kind: Service
