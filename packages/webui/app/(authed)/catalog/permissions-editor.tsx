@@ -32,6 +32,7 @@ const DEFAULT_PRINCIPALS = [
 
 const PRIVILEGES = [
   "OWNER",
+  "BROWSE",
   "CREATE_CATALOG",
   "USE_CATALOG",
   "CREATE_SCHEMA",
@@ -55,6 +56,52 @@ const PRIVILEGES = [
 
 type Privilege = (typeof PRIVILEGES)[number]
 type ResourceType = "catalog" | "schema" | "table"
+
+const PRIVILEGE_GROUPS: ReadonlyArray<{
+  label: string
+  privileges: readonly Privilege[]
+}> = [
+  {
+    label: "General",
+    privileges: ["OWNER", "BROWSE"],
+  },
+  {
+    label: "Catalog",
+    privileges: ["CREATE_CATALOG", "USE_CATALOG"],
+  },
+  {
+    label: "Schema",
+    privileges: ["CREATE_SCHEMA", "USE_SCHEMA"],
+  },
+  {
+    label: "Table",
+    privileges: ["CREATE_TABLE", "SELECT", "MODIFY", "CREATE_EXTERNAL_TABLE"],
+  },
+  {
+    label: "Function",
+    privileges: ["CREATE_FUNCTION", "EXECUTE"],
+  },
+  {
+    label: "Volume",
+    privileges: ["CREATE_VOLUME", "READ_VOLUME", "CREATE_EXTERNAL_VOLUME"],
+  },
+  {
+    label: "Files",
+    privileges: ["READ_FILES", "WRITE_FILES"],
+  },
+  {
+    label: "Storage",
+    privileges: [
+      "CREATE_EXTERNAL_LOCATION",
+      "CREATE_MANAGED_STORAGE",
+      "CREATE_STORAGE_CREDENTIAL",
+    ],
+  },
+  {
+    label: "Model",
+    privileges: ["CREATE_MODEL"],
+  },
+]
 
 type PermissionAssignment = {
   principal: string
@@ -581,33 +628,47 @@ export function PermissionsEditor({
             </div>
           )}
 
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {PRIVILEGES.map((privilege) => {
-              const checked = selected.has(privilege)
-              return (
-                <div
-                  key={privilege}
-                  className={cn(
-                    "flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                    checked
-                      ? "border-primary/30 bg-primary/5"
-                      : "border-border hover:bg-accent/20",
-                  )}
-                >
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={(value) =>
-                      togglePrivilege(privilege, value === true)
-                    }
-                    disabled={saving}
-                    className="mt-0.5"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium font-mono">{privilege}</p>
-                  </div>
+          <div className="space-y-6">
+            {PRIVILEGE_GROUPS.map((group) => (
+              <section key={group.label}>
+                <div className="mb-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {group.label}
+                  </h4>
                 </div>
-              )
-            })}
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {group.privileges.map((privilege) => {
+                    const checked = selected.has(privilege)
+                    return (
+                      <div
+                        key={privilege}
+                        className={cn(
+                          "flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                          checked
+                            ? "border-primary/30 bg-primary/5"
+                            : "border-border hover:bg-accent/20",
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) =>
+                            togglePrivilege(privilege, value === true)
+                          }
+                          disabled={saving}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium font-mono">
+                            {privilege}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-4 border-b" />
+              </section>
+            ))}
           </div>
 
           <div className="rounded-lg border bg-muted/20 px-4 py-3">
