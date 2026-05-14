@@ -68,7 +68,14 @@ async fn main() -> anyhow::Result<()> {
 
         let validator = Arc::new(JwtValidator::new(issuer, audiences));
 
-        let public_url = format!("http://{}:{}", config.server.host, config.server.port);
+        let public_port = config.server.redirect_port.unwrap_or(config.server.port);
+        let public_url = config.server.public_url.clone().unwrap_or_else(|| {
+            let public_host = match config.server.host.as_str() {
+                "0.0.0.0" | "::" => "localhost",
+                host => host,
+            };
+            format!("http://{}:{}", public_host, public_port)
+        });
         let redirect_uri = format!("{}/auth/callback", public_url);
 
         let oauth2 = OAuth2Config {

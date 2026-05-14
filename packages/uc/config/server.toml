@@ -12,6 +12,7 @@
 env = "dev"
 host = "localhost"
 port = 8080
+public_url = "http://localhost:8080"
 
 # Set to "enable" to require JWT bearer-token authorization on all requests.
 # Set to "disable" to allow unauthenticated access (development only).
@@ -23,7 +24,7 @@ authorization = "enable"
  client_id         = "webui"
  client_secret     = "webui-secret"
 
-# Local port used for the OAuth2 redirect callback
+# Public port used for the OAuth2 redirect callback when `public_url` is not set.
  redirect_port = 58278
 
 # Comma-separated list of accepted JWT issuers (exact match).

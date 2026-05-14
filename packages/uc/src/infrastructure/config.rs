@@ -29,6 +29,9 @@ pub struct ServerConfig {
     /// Bind port.
     #[serde(default = "defaults::port")]
     pub port: u16,
+    /// Publicly reachable base URL of this server, used for OAuth2 redirect callbacks.
+    /// Example: `http://localhost:8082` when accessed via `kubectl port-forward`.
+    pub public_url: Option<String>,
     /// Set to "enable" to require JWT authorization on all requests.
     #[serde(default = "defaults::authorization")]
     pub authorization: String,

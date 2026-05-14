@@ -10,8 +10,8 @@ stringData:
   KEYCLOAK_CLIENT_ID: webui
   KEYCLOAK_CLIENT_SECRET: webui-secret
   KEYCLOAK_USER_PASSWORD: "123"
-  KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/*","http://127.0.0.1:3000/*","http://localhost:3002/*","http://127.0.0.1:3002/*"]'
-  KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3002","http://127.0.0.1:3002"]'
+  KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/auth/callback", "http://localhost:8082/auth/callback"]'
+  KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://localhost:8082"]'
 ---
 apiVersion: batch/v1
 kind: Job

@@ -1,7 +1,7 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 unitycatalog_namespace := "unitycatalog"
-unitycatalog_image := "mizumi-unitycatalog:v0.4.0"
+unitycatalog_image := "mizumi-uc:0.1.0"
 unitycatalog_ui_image := "mizumi-unitycatalog-ui:v0.4.0"
 
 dagster_namespace := "dagster"
@@ -180,7 +180,7 @@ dagster-destroy:
     kubectl delete namespace {{dagster_namespace}} --ignore-not-found --wait=false
 
 unitycatalog-image-build:
-    docker build -t {{unitycatalog_image}} packages/unitycatalog
+    docker build -t {{unitycatalog_image}} packages/uc
     if kubectl get deployment/unitycatalog -n {{unitycatalog_namespace}} &>/dev/null; then \
       kubectl rollout restart deployment/unitycatalog -n {{unitycatalog_namespace}}; \
       kubectl rollout status deployment/unitycatalog -n {{unitycatalog_namespace}} --timeout=120s; \

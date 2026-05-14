@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use async_trait::async_trait;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 use crate::domain::{
@@ -27,8 +27,8 @@ struct UserRow {
     external_id: Option<String>,
     state: String,
     picture_url: Option<String>,
-    created_at: NaiveDateTime,
-    updated_at: Option<NaiveDateTime>,
+    created_at: DateTime<Utc>,
+    updated_at: Option<DateTime<Utc>>,
 }
 
 impl UserRow {
@@ -40,8 +40,8 @@ impl UserRow {
             external_id: self.external_id,
             state: self.state.parse().unwrap_or(UserState::Enabled),
             picture_url: self.picture_url,
-            created_at: self.created_at.and_utc().timestamp_millis(),
-            updated_at: self.updated_at.map(|t| t.and_utc().timestamp_millis()),
+            created_at: self.created_at.timestamp_millis(),
+            updated_at: self.updated_at.map(|t| t.timestamp_millis()),
         }
     }
 }

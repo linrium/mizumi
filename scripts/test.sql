@@ -1,13 +1,16 @@
 LOAD unity_catalog;
 CREATE SECRET (
-     TYPE     unity_catalog,
-     TOKEN    'not-used',
-     ENDPOINT 'http://localhost:8082'
+     TYPE unity_catalog,
+     TOKEN 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJCTTNIdFJmRGhBQVQ4cDhOdHRNVmN2Ym5xNUNtNnB2RUp4Q1hZVUhXYW1nIn0.eyJleHAiOjE3Nzg3Njg2OTUsImlhdCI6MTc3ODc2ODM5NSwiYXV0aF90aW1lIjoxNzc4NzY4Mzc0LCJqdGkiOiJmYmYyYWE0Mi1lYjVkLTRiMmQtZTkwMS02OGE3N2IyODU1YzMiLCJpc3MiOiJodHRwOi8va2V5Y2xvYWstc3ZjLmtleWNsb2FrLnN2Yy5jbHVzdGVyLmxvY2FsOjgwODAvcmVhbG1zL3NvdmljbyIsImF1ZCI6IndlYnVpIiwic3ViIjoiYjNjZDQyOTQtZjYwNS00NTlkLTg5N2MtNmM1NWY2MGU4MjIyIiwidHlwIjoiSUQiLCJhenAiOiJ3ZWJ1aSIsInNpZCI6ImEyZTA2NDhjLTg3YWItNGU1YS04ZjM0LTlhZmNmNzU1NGI0ZCIsImF0X2hhc2giOiJIaUlMYVVVRTBvSHVnSXpvQV9pODBBIiwiYWNyIjoiMSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiTGluaCBUcmFuIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibGluaEBnbWFpbC5jb20iLCJnaXZlbl9uYW1lIjoiTGluaCIsImZhbWlseV9uYW1lIjoiVHJhbiIsImVtYWlsIjoibGluaEBnbWFpbC5jb20ifQ.Wg348eXfv9BuuDGs2cPyJMeuq382mXtOu9U1nfdpcORcVz2GxNbQZ2HG6ftS-obnLnWvBigoliaj6zHu4uyu1J0-bofGxC1uWwIuGnCLBhJo19bSLnyf6e5EkFOyLjJZPc2P7dqj5fxCLkyAeAu09aVXaDwGa7QeYemfPHo79lBKCL9eT401EF1haTZ3cBwKfPUs7bFLelthVKWKomRUNmEiWrgBi2qAxqNG-_rBoxHdILIx1GvULqDTZmuBP7f3-ThQmygfWReQelkdku-822CeviDw0nVm9BLJTV9gYpeTDNTRGObGiBaOoHucTdskmR7Ee_M3DVr2Wbd0xJIPLA',
+     ENDPOINT 'http://localhost:8080'
 );
-ATTACH 'hdbank' AS hdbank (TYPE unity_catalog, DEFAULT_SCHEMA 'hdbank_payments_prod_bronze');
-ATTACH 'vietjetair' AS vietjetair (TYPE unity_catalog, DEFAULT_SCHEMA 'vietjetair_bookings_prod_bronze');
+ATTACH 'hdbank' AS hdbank (
+     TYPE unity_catalog,
+     DEFAULT_SCHEMA 'hdbank_payments_prod_bronze'
+);
+ATTACH 'vietjetair' AS vietjetair (
+     TYPE unity_catalog,
+     DEFAULT_SCHEMA 'vietjetair_bookings_prod_bronze'
+);
 SHOW ALL TABLES;
-
-     ATTACH 'unity' AS unity (TYPE unity_catalog, DEFAULT_SCHEMA 'default');
-
-
+ATTACH 'unity' AS unity (TYPE unity_catalog, DEFAULT_SCHEMA 'default');

@@ -1,80 +1,37 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: unitycatalog-h2-pvc
-  namespace: unitycatalog
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: unitycatalog-config
   namespace: unitycatalog
 data:
-  hibernate.properties: |
-    hibernate.connection.driver_class=org.postgresql.Driver
-    hibernate.connection.url=jdbc:postgresql://unitycatalog-postgres-svc:5432/ucdb
-    hibernate.connection.user=ucuser
-    hibernate.connection.password=ucpassword
-    hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-    hibernate.hbm2ddl.auto=update
-    hibernate.show_sql=false
-    hibernate.archive.autodetection=class
-    hibernate.use_sql_comments=true
-    org.hibernate.SQL=INFO
-    org.hibernate.type.descriptor.sql.BasicBinder=TRACE
-  server.properties: |
-    server.env=dev
-    server.authorization=enable
-    server.authorization-url=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/auth
-    server.token-url=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/token
-    server.client-id=webui
-    server.client-secret=webui-secret
-    server.redirect-port=54875
-    server.allowed-issuers=http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico
-    server.audiences=webui
-    server.cookie-timeout=P5D
-    server.managed-table.enabled=true
-    s3.bucketPath.0=s3://unitycatalog/
-    s3.region.0=us-east-1
-    s3.accessKey.0=rustfsadmin
-    s3.secretKey.0=rustfsadmin
-  server.log4j2.properties: |
-    status = warn
-    appenders = rollingFile
+  server.toml: |
+    [server]
+    env = "dev"
+    host = "0.0.0.0"
+    port = 8080
+    public_url = "http://localhost:8082"
+    authorization = "enable"
+    authorization_url = "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/auth"
+    token_url = "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico/protocol/openid-connect/token"
+    client_id = "webui"
+    client_secret = "webui-secret"
+    redirect_port = 8082
+    allowed_issuers = ["http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico"]
+    audiences = ["webui"]
+    cookie_timeout = "P5D"
 
-    appender.rollingFile.type = RollingFile
-    appender.rollingFile.name = RollingFile
-    appender.rollingFile.fileName = etc/logs/server.log
-    appender.rollingFile.filePattern = etc/logs/server-%d{MM-dd-yyyy-HH-mm-ss}-%i.log.gz
-    appender.rollingFile.layout.type = PatternLayout
-    appender.rollingFile.layout.pattern = %d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n
+    [server.managed_table]
+    enabled = true
 
-    appender.rollingFile.policies.type = Policies
-    appender.rollingFile.policies.time.type = TimeBasedTriggeringPolicy
-    appender.rollingFile.policies.time.interval = 1
-    appender.rollingFile.policies.size.type = SizeBasedTriggeringPolicy
-    appender.rollingFile.policies.size.size = 10MB
+    [database]
+    url = "postgres://ucuser:ucpassword@unitycatalog-postgres-svc:5432/ucdb"
+    max_connections = 20
 
-    appender.rollingFile.strategy.type = DefaultRolloverStrategy
-    appender.rollingFile.strategy.max = 5
-    appender.rollingFile.strategy.fileIndex = max
-
-    appender.rollingFile.strategy.action.type = Delete
-    appender.rollingFile.strategy.action.basePath = etc/logs
-    appender.rollingFile.strategy.action.condition.type = IfFileName
-    appender.rollingFile.strategy.action.condition.glob = server-*.log.gz
-    appender.rollingFile.strategy.action.ifAny.type = IfAccumulatedFileCount
-    appender.rollingFile.strategy.action.ifAny.exceeds = 5
-
-    rootLogger.level = debug
-    rootLogger.appenderRefs = rollingFile
-    rootLogger.appenderRef.rollingFile.ref = RollingFile
+    [[s3]]
+    bucket_path = "s3://unitycatalog/"
+    region = "us-east-1"
+    access_key = "rustfsadmin"
+    secret_key = "rustfsadmin"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -93,7 +50,7 @@ spec:
     spec:
       containers:
         - name: unitycatalog
-          image: mizumi-unitycatalog:v0.4.0
+          image: mizumi-uc:0.1.0
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -105,27 +62,14 @@ spec:
           ports:
             - containerPort: 8080
               name: rest
-            - containerPort: 8081
-              name: grpc
           volumeMounts:
             - name: config
-              mountPath: /home/unitycatalog/etc/conf/hibernate.properties
-              subPath: hibernate.properties
-            - name: config
-              mountPath: /home/unitycatalog/etc/conf/server.properties
-              subPath: server.properties
-            - name: config
-              mountPath: /home/unitycatalog/etc/conf/server.log4j2.properties
-              subPath: server.log4j2.properties
-            - name: h2-data
-              mountPath: /data
+              mountPath: /app/config/server.toml
+              subPath: server.toml
       volumes:
         - name: config
           configMap:
             name: unitycatalog-config
-        - name: h2-data
-          persistentVolumeClaim:
-            claimName: unitycatalog-h2-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -139,6 +83,3 @@ spec:
     - name: rest
       port: 8080
       targetPort: 8080
-    - name: grpc
-      port: 8081
-      targetPort: 8081
