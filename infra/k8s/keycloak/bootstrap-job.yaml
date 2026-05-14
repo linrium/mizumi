@@ -12,6 +12,7 @@ stringData:
   KEYCLOAK_USER_PASSWORD: "123"
   KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/auth/callback", "http://localhost:8082/auth/callback"]'
   KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://localhost:8082"]'
+  KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS: '["http://localhost:3000/login"]'
 ---
 apiVersion: batch/v1
 kind: Job
@@ -76,6 +77,11 @@ spec:
                 secretKeyRef:
                   name: keycloak-bootstrap-secret
                   key: KEYCLOAK_CLIENT_WEB_ORIGINS
+            - name: KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS
           command:
             - /bin/bash
             - -ec
@@ -193,7 +199,7 @@ spec:
                 "redirectUris": $KEYCLOAK_CLIENT_REDIRECT_URIS,
                 "webOrigins": $KEYCLOAK_CLIENT_WEB_ORIGINS,
                 "attributes": {
-                  "post.logout.redirect.uris": "+",
+                  "post.logout.redirect.uris": $KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS,
                   "logout.confirmation.screen": "false"
                 }
               }

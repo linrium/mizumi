@@ -19,13 +19,13 @@ public_url = "http://localhost:8080"
 authorization = "enable"
 
 # OAuth2 / OpenID Connect endpoints (required when authorization = "enable")
- authorization_url = "http://localhost:8083/realms/sovico/protocol/openid-connect/auth"
- token_url         = "http://localhost:8083/realms/sovico/protocol/openid-connect/token"
- client_id         = "webui"
- client_secret     = "webui-secret"
+authorization_url = "http://localhost:8083/realms/sovico/protocol/openid-connect/auth"
+token_url = "http://localhost:8083/realms/sovico/protocol/openid-connect/token"
+client_id = "webui"
+client_secret = "webui-secret"
 
 # Public port used for the OAuth2 redirect callback when `public_url` is not set.
- redirect_port = 58278
+redirect_port = 8080
 
 # Comma-separated list of accepted JWT issuers (exact match).
 # Tokens from issuers not listed here will be rejected.
@@ -53,7 +53,7 @@ enabled = false
 # Database
 # ---------------------------------------------------------------------------
 [database]
-url             = "postgres://ucuser:ucpassword@localhost:5432/ucdb"
+url = "postgres://ucuser:ucpassword@localhost:5432/ucdb"
 max_connections = 20
 
 # ---------------------------------------------------------------------------
