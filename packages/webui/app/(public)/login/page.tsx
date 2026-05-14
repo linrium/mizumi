@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { getServerSession } from "@/lib/auth/server"
+import { getServerSessionResult } from "@/lib/auth/server"
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -11,11 +11,11 @@ type LoginPageProps = {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await getServerSession()
+  const { session, sealedValue } = await getServerSessionResult()
   const realm = "sovico"
   const { next } = await searchParams
 
-  if (session) {
+  if (session && !sealedValue) {
     redirect("/")
   }
 

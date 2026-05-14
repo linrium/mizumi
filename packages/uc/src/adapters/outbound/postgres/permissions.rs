@@ -61,8 +61,13 @@ impl AuthorizerPort for PgAuthorizer {
             return Ok(true);
         }
 
-        // Walk ancestors and check OWNER on any ancestor
-        let ancestor_owned: Option<bool> = sqlx::query_scalar(
+        // Walk ancestors and check inheritable privileges there.
+        let inherited_privileges = if privilege.is_inheritable() {
+            vec!["OWNER", priv_str]
+        } else {
+            vec!["OWNER"]
+        };
+        let ancestor_allowed: Option<bool> = sqlx::query_scalar(
             r#"
             WITH RECURSIVE ancestors AS (
                 SELECT parent_type, parent_id
@@ -76,18 +81,19 @@ impl AuthorizerPort for PgAuthorizer {
             SELECT EXISTS(
                 SELECT 1 FROM uc_grants g
                 JOIN ancestors a ON g.securable_type = a.parent_type AND g.securable_id = a.parent_id
-                WHERE g.principal = $3 AND g.privilege = 'OWNER'
+                WHERE g.principal = $3 AND g.privilege = ANY($4)
             )
             "#,
         )
         .bind(stype)
         .bind(object_id)
         .bind(principal)
+        .bind(inherited_privileges)
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        Ok(ancestor_owned.unwrap_or(false))
+        Ok(ancestor_allowed.unwrap_or(false))
     }
 
     async fn is_authorized_any(

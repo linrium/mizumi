@@ -60,11 +60,14 @@ data:
             raise
 
 
-    for display_name, email in [
+    users = [
         ("Linh Tran", "linh@gmail.com"),
         ("Khao Soi", "khaosoi@gmail.com"),
         ("Khao Pad", "khaopad@gmail.com"),
-    ]:
+        ("Rikki Tarczaly", "rikki@gmail.com"),
+    ]
+
+    for display_name, email in users:
         request(
             "POST",
             "/api/1.0/unity-control/scim2/Users",
@@ -74,23 +77,225 @@ data:
             },
         )
 
-    request(
-        "PATCH",
-        "/api/2.1/unity-catalog/permissions/catalog/hdbank",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []}]},
-    )
+    catalog_permissions = [
+        (
+            "/api/2.1/unity-catalog/permissions/catalog/hdbank",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                    {"principal": "rikki@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/catalog/vietjetair",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                ]
+            },
+        ),
+    ]
 
-    request(
-        "PATCH",
-        "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_bronze",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []}]},
-    )
+    schema_permissions = [
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_bronze",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                    {"principal": "rikki@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_silver",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_gold",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_bronze",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_silver",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_gold",
+            {
+                "changes": [
+                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
+                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                ]
+            },
+        ),
+    ]
 
-    request(
-        "PATCH",
-        "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
-        {"changes": [{"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []}]},
-    )
+    table_permissions = [
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.card_payment_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.customers_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.risk_detection_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.merchant_revenue_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.user_spend_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.ticket_bookings_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.customers_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.flights_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.booking_revenue_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.customer_spend_v1",
+            {"changes": [
+                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ]},
+        ),
+    ]
+
+    for path, payload in catalog_permissions:
+        request("PATCH", path, payload)
+
+    for path, payload in schema_permissions:
+        request("PATCH", path, payload)
+
+    for path, payload in table_permissions:
+        request("PATCH", path, payload)
     PY
 ---
 apiVersion: rbac.authorization.k8s.io/v1

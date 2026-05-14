@@ -76,7 +76,12 @@ impl TableUseCase for TableService {
                 true
             } else {
                 self.authorizer
-                    .is_authorized_any(principal, SecurableType::Table, &table.full_name, &[Privilege::Owner, Privilege::Select, Privilege::Modify])
+                    .is_authorized_any(
+                        principal,
+                        SecurableType::Table,
+                        &table.full_name,
+                        &[Privilege::Owner, Privilege::Browse, Privilege::Select, Privilege::Modify],
+                    )
                     .await
                     .unwrap_or(false)
             };
@@ -92,7 +97,12 @@ impl TableUseCase for TableService {
 
     async fn get_table(&self, principal: &str, full_name: &str) -> Result<TableInfo, DomainError> {
         let allowed = self.authorizer
-            .is_authorized_any(principal, SecurableType::Table, full_name, &[Privilege::Owner, Privilege::Select, Privilege::Modify])
+            .is_authorized_any(
+                principal,
+                SecurableType::Table,
+                full_name,
+                &[Privilege::Owner, Privilege::Browse, Privilege::Select, Privilege::Modify],
+            )
             .await?;
         if !allowed {
             return Err(DomainError::Forbidden(format!(

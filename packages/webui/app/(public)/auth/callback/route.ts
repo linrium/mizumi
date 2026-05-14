@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       pendingState.realm,
       code,
     )
+    console.log("tokens.id_token", tokens.id_token)
     const claims = readTokenClaims(tokens.id_token)
     const redirectUrl = new URL(pendingState.next, request.nextUrl.origin)
     const response = NextResponse.redirect(redirectUrl)
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
         email: claims.email,
         preferredUsername: claims.preferred_username,
         name: claims.name,
+        groups: claims.groups,
         sub: claims.sub,
         idToken: tokens.id_token,
         refreshToken: tokens.refresh_token,

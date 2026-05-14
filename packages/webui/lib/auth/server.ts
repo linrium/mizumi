@@ -58,6 +58,7 @@ function buildSessionFromTokenResponse(
     email: claims.email,
     preferredUsername: claims.preferred_username,
     name: claims.name,
+    groups: claims.groups,
     sub: claims.sub,
     idToken: tokens.id_token,
     refreshToken: tokens.refresh_token ?? refreshToken,

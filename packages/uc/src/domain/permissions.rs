@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Privilege {
     Owner,
+    Browse,
     CreateCatalog,
     UseCatalog,
     CreateSchema,
@@ -29,6 +30,7 @@ impl Privilege {
     pub fn as_str(&self) -> &'static str {
         match self {
             Privilege::Owner => "OWNER",
+            Privilege::Browse => "BROWSE",
             Privilege::CreateCatalog => "CREATE_CATALOG",
             Privilege::UseCatalog => "USE_CATALOG",
             Privilege::CreateSchema => "CREATE_SCHEMA",
@@ -50,6 +52,10 @@ impl Privilege {
             Privilege::CreateStorageCredential => "CREATE_STORAGE_CREDENTIAL",
         }
     }
+
+    pub fn is_inheritable(&self) -> bool {
+        matches!(self, Privilege::Owner | Privilege::Browse)
+    }
 }
 
 impl std::fmt::Display for Privilege {
@@ -63,6 +69,7 @@ impl std::str::FromStr for Privilege {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "OWNER" => Ok(Privilege::Owner),
+            "BROWSE" => Ok(Privilege::Browse),
             "CREATE_CATALOG" => Ok(Privilege::CreateCatalog),
             "USE_CATALOG" => Ok(Privilege::UseCatalog),
             "CREATE_SCHEMA" => Ok(Privilege::CreateSchema),

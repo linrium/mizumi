@@ -45,7 +45,12 @@ impl CatalogUseCase for CatalogService {
         let mut allowed_catalogs = Vec::new();
         for catalog in response.catalogs {
             let ok = self.authorizer
-                .is_authorized_any(principal, SecurableType::Catalog, &catalog.name, &[Privilege::Owner, Privilege::UseCatalog])
+                .is_authorized_any(
+                    principal,
+                    SecurableType::Catalog,
+                    &catalog.name,
+                    &[Privilege::Owner, Privilege::UseCatalog, Privilege::Browse],
+                )
                 .await
                 .unwrap_or(false);
             if ok {
@@ -63,7 +68,12 @@ impl CatalogUseCase for CatalogService {
             .is_authorized(principal, SecurableType::Metastore, "metastore", Privilege::Owner)
             .await?;
         let catalog_ok = self.authorizer
-            .is_authorized_any(principal, SecurableType::Catalog, name, &[Privilege::Owner, Privilege::UseCatalog])
+            .is_authorized_any(
+                principal,
+                SecurableType::Catalog,
+                name,
+                &[Privilege::Owner, Privilege::UseCatalog, Privilege::Browse],
+            )
             .await?;
         if !metastore_owner && !catalog_ok {
             return Err(DomainError::Forbidden(format!(

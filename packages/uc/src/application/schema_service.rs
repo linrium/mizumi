@@ -62,7 +62,12 @@ impl SchemaUseCase for SchemaService {
                 true
             } else {
                 self.authorizer
-                    .is_authorized_any(principal, SecurableType::Schema, &schema.full_name, &[Privilege::Owner, Privilege::UseSchema])
+                    .is_authorized_any(
+                        principal,
+                        SecurableType::Schema,
+                        &schema.full_name,
+                        &[Privilege::Owner, Privilege::UseSchema, Privilege::Browse],
+                    )
                     .await
                     .unwrap_or(false)
             };
@@ -78,7 +83,12 @@ impl SchemaUseCase for SchemaService {
 
     async fn get_schema(&self, principal: &str, full_name: &str) -> Result<SchemaInfo, DomainError> {
         let allowed = self.authorizer
-            .is_authorized_any(principal, SecurableType::Schema, full_name, &[Privilege::Owner, Privilege::UseSchema])
+            .is_authorized_any(
+                principal,
+                SecurableType::Schema,
+                full_name,
+                &[Privilege::Owner, Privilege::UseSchema, Privilege::Browse],
+            )
             .await?;
         if !allowed {
             return Err(DomainError::Forbidden(format!(

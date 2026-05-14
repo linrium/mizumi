@@ -14,6 +14,7 @@ export type AppSession = {
   email?: string
   preferredUsername?: string
   name?: string
+  groups?: string[]
   idToken: string
   refreshToken?: string
   expiresAt: number
@@ -31,7 +32,19 @@ type IdTokenClaims = {
   email?: string
   preferred_username?: string
   name?: string
+  groups?: string[] | string
   exp: number
+}
+
+function normalizeGroups(groups?: string[] | string) {
+  if (!groups) {
+    return undefined
+  }
+
+  const values = Array.isArray(groups) ? groups : [groups]
+  const normalized = values.map((value) => value.trim()).filter(Boolean)
+
+  return normalized.length > 0 ? normalized : undefined
 }
 
 function getAuthSecret() {
@@ -161,7 +174,8 @@ export function getStateCookieName() {
 }
 
 export async function sealSessionCookie(session: AppSession) {
-  return seal(session)
+  const { groups: _groups, ...persistedSession } = session
+  return seal(persistedSession)
 }
 
 export async function createStateCookie({
@@ -190,7 +204,12 @@ export async function readSessionFromCookieValue(
     return null
   }
 
-  return session
+  const claims = readTokenClaims(session.idToken)
+
+  return {
+    ...session,
+    groups: claims.groups,
+  }
 }
 
 export async function readStateCookie(value: string) {
@@ -236,5 +255,9 @@ export function readTokenClaims(idToken: string) {
     throw new Error("Invalid ID token")
   }
 
-  return decodeJson<IdTokenClaims>(payload)
+  const claims = decodeJson<IdTokenClaims>(payload)
+  return {
+    ...claims,
+    groups: normalizeGroups(claims.groups),
+  }
 }

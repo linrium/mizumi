@@ -54,6 +54,7 @@ type AppSidebarProps = {
 
 export function AppSidebar({ session }: AppSidebarProps) {
   const pathname = usePathname()
+  const groupsLabel = session.groups?.join(", ")
 
   return (
     <Sidebar collapsible="icon">
@@ -119,6 +120,14 @@ export function AppSidebar({ session }: AppSidebarProps) {
             {session.realm}
             {session.email ? ` • ${session.email}` : ""}
           </div>
+          {groupsLabel ? (
+            <div
+              className="mt-1 line-clamp-2 text-[11px] text-sidebar-foreground/70"
+              title={groupsLabel}
+            >
+              {groupsLabel}
+            </div>
+          ) : null}
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
