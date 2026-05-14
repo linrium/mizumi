@@ -1,9 +1,7 @@
 mod adapters;
 mod application;
-mod dagster;
 mod domain;
 mod infrastructure;
-mod uc;
 
 use std::sync::Arc;
 
@@ -11,8 +9,9 @@ use rdkafka::{ClientConfig, producer::FutureProducer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use adapters::inbound::http::create_router;
-use adapters::outbound::kubernetes::duckdb::SessionStore;
+use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
 use application::{
+    dagster_service::DagsterService,
     k8s_service::K8sQueryService, streaming_service::StreamingJobService,
     test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService,
@@ -43,10 +42,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let session_store = SessionStore::new();
     let state = Arc::new(AppState {
+        dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(session_store)),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
-        uc_service: Arc::new(UnityCatalogProxyService),
+        uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
+            config.uc_base_url.clone(),
+        ))),
     });
 
     let app = create_router(state);

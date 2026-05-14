@@ -1,12 +1,20 @@
 use axum::{extract::Request, response::Response};
 
-use crate::uc;
+use crate::adapters::outbound::http::uc::UnityCatalogHttpProxy;
 
-#[derive(Clone, Default)]
-pub struct UnityCatalogProxyService;
+#[derive(Clone)]
+pub struct UnityCatalogProxyService {
+    proxy: UnityCatalogHttpProxy,
+}
+
+impl UnityCatalogProxyService {
+    pub fn new(proxy: UnityCatalogHttpProxy) -> Self {
+        Self { proxy }
+    }
+}
 
 impl UnityCatalogProxyService {
     pub async fn proxy(&self, request: Request) -> Response {
-        uc::proxy(request).await
+        self.proxy.proxy(request).await
     }
 }
