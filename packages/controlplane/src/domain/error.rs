@@ -34,6 +34,6 @@ impl IntoResponse for AppError {
             AppError::Conflict(_) => StatusCode::CONFLICT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        (status, Json(json!({"error": self.to_string()}))).into_response()
+        (status, Json(json!({ "error": self.to_string() }))).into_response()
     }
 }

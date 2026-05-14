@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
-use axum::{
-    Json,
-    extract::{Path, State},
-    http::StatusCode,
-    response::IntoResponse,
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
 };
+
 use k8s_openapi::api::batch::v1::{Job, JobSpec};
 use k8s_openapi::api::core::v1::{Container, EnvVar, Pod, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -15,13 +11,14 @@ use kube::{
     Api, Client,
     api::{AttachParams, DeleteParams, ListParams, LogParams, PostParams},
 };
-use serde_json::{Value, json};
-use tokio::io::AsyncReadExt;
-use tokio::time::sleep;
+use serde_json::Value;
+use tokio::{io::AsyncReadExt, time::sleep};
 use uuid::Uuid;
 
-use crate::error::AppError;
-use crate::models::{QueryRequest, QueryResponse};
+use crate::domain::{
+    entities::query::QueryResponse,
+    error::AppError,
+};
 
 const NAMESPACE: &str = "spark";
 const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.3";
@@ -29,21 +26,52 @@ const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const JOB_TIMEOUT: Duration = Duration::from_secs(120);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 
-// ---- One-shot query (existing) ----
+pub struct SessionStore(Mutex<HashMap<String, String>>);
 
-pub async fn run_query(Json(req): Json<QueryRequest>) -> Result<Json<QueryResponse>, AppError> {
-    let client = Client::try_default().await?;
+impl SessionStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self(Mutex::new(HashMap::new())))
+    }
+
+    pub fn insert(&self, session_id: String, pod_name: String) {
+        self.0.lock().unwrap().insert(session_id, pod_name);
+    }
+
+    pub fn get(&self, session_id: &str) -> Option<String> {
+        self.0.lock().unwrap().get(session_id).cloned()
+    }
+
+    pub fn remove(&self, session_id: &str) -> Option<String> {
+        self.0.lock().unwrap().remove(session_id)
+    }
+
+    pub fn list(&self) -> Vec<(String, String)> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(id, pod)| (id.clone(), pod.clone()))
+            .collect()
+    }
+}
+
+pub async fn client() -> Result<Client, AppError> {
+    Ok(Client::try_default().await?)
+}
+
+pub async fn create_query_job(client: &Client, sql: &str) -> Result<String, AppError> {
     let job_name = format!("duckdb-query-{}", Uuid::new_v4());
-
     let jobs: Api<Job> = Api::namespaced(client.clone(), NAMESPACE);
-    jobs.create(&PostParams::default(), &build_job(&job_name, &req.sql))
+    jobs.create(&PostParams::default(), &build_job(&job_name, sql))
         .await?;
     tracing::info!(job = %job_name, "job created");
+    Ok(job_name)
+}
 
-    let result = wait_for_completion(&client, &job_name).await;
-    let _ = jobs.delete(&job_name, &DeleteParams::background()).await;
-    let logs = result?;
-    parse_output(&logs)
+pub async fn delete_query_job(client: &Client, job_name: &str) -> Result<(), AppError> {
+    let jobs: Api<Job> = Api::namespaced(client.clone(), NAMESPACE);
+    let _ = jobs.delete(job_name, &DeleteParams::background()).await?;
+    Ok(())
 }
 
 fn build_job(name: &str, sql: &str) -> Job {
@@ -80,7 +108,7 @@ fn build_job(name: &str, sql: &str) -> Job {
     }
 }
 
-async fn wait_for_completion(client: &Client, job_name: &str) -> Result<String, AppError> {
+pub async fn wait_for_completion(client: &Client, job_name: &str) -> Result<String, AppError> {
     let jobs: Api<Job> = Api::namespaced(client.clone(), NAMESPACE);
     let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
     let deadline = tokio::time::Instant::now() + JOB_TIMEOUT;
@@ -123,14 +151,6 @@ async fn get_pod_logs(pods: &Api<Pod>, job_name: &str) -> Result<String, AppErro
     Ok(pods.logs(pod_name, &LogParams::default()).await?)
 }
 
-// ---- Session management ----
-
-pub struct SessionStore(Mutex<HashMap<String, String>>); // session_id -> pod_name
-
-pub fn new_session_store() -> Arc<SessionStore> {
-    Arc::new(SessionStore(Mutex::new(HashMap::new())))
-}
-
 fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
     let mut vars = vec![
         env("AWS_DEFAULT_REGION", "us-east-1"),
@@ -155,6 +175,25 @@ fn env(name: &str, value: &str) -> EnvVar {
     }
 }
 
+pub async fn create_session(
+    client: &Client,
+    store: Arc<SessionStore>,
+) -> Result<(String, String), AppError> {
+    let session_id = Uuid::new_v4().to_string();
+    let pod_name = format!("duckdb-session-{session_id}");
+
+    spawn_session_pod(client, &pod_name).await?;
+    if let Err(e) = wait_for_pod_running(client, &pod_name).await {
+        let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
+        let _ = pods.delete(&pod_name, &DeleteParams::background()).await;
+        return Err(e);
+    }
+
+    store.insert(session_id.clone(), pod_name.clone());
+    tracing::info!(session_id = %session_id, pod = %pod_name, "session created");
+    Ok((session_id, pod_name))
+}
+
 async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppError> {
     let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
     let pod = Pod {
@@ -169,7 +208,6 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
                 name: "duckdb".to_string(),
                 image: Some(DUCKDB_IMAGE.to_string()),
                 image_pull_policy: Some("IfNotPresent".to_string()),
-                // Keep the pod alive; queries are sent via exec
                 command: Some(vec![
                     "tail".to_string(),
                     "-f".to_string(),
@@ -189,6 +227,7 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
 async fn wait_for_pod_running(client: &Client, pod_name: &str) -> Result<(), AppError> {
     let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
     let deadline = tokio::time::Instant::now() + SESSION_TIMEOUT;
+
     loop {
         if tokio::time::Instant::now() > deadline {
             return Err(AppError::Timeout);
@@ -205,102 +244,18 @@ async fn wait_for_pod_running(client: &Client, pod_name: &str) -> Result<(), App
     }
 }
 
-pub async fn create_session(State(store): State<Arc<SessionStore>>) -> impl IntoResponse {
-    let session_id = Uuid::new_v4().to_string();
-    let pod_name = format!("duckdb-session-{session_id}");
-
-    let client = match Client::try_default().await {
-        Ok(c) => c,
-        Err(e) => return AppError::from(e).into_response(),
-    };
-
-    if let Err(e) = spawn_session_pod(&client, &pod_name).await {
-        return e.into_response();
-    }
-
-    if let Err(e) = wait_for_pod_running(&client, &pod_name).await {
-        let pods: Api<Pod> = Api::namespaced(client, NAMESPACE);
-        let _ = pods.delete(&pod_name, &DeleteParams::background()).await;
-        return e.into_response();
-    }
-
-    store
-        .0
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), pod_name.clone());
-    tracing::info!(session_id = %session_id, pod = %pod_name, "session created");
-
-    (
-        StatusCode::CREATED,
-        Json(json!({ "session_id": session_id, "pod": pod_name })),
-    )
-        .into_response()
-}
-
-pub async fn list_sessions(State(store): State<Arc<SessionStore>>) -> impl IntoResponse {
-    let sessions: Vec<Value> = store
-        .0
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|(id, pod)| json!({ "session_id": id, "pod": pod }))
-        .collect();
-    Json(json!({ "sessions": sessions }))
-}
-
-pub async fn delete_session(
-    State(store): State<Arc<SessionStore>>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
-    let pod_name = match store.0.lock().unwrap().remove(&id) {
-        Some(p) => p,
-        None => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "error": "session not found" })),
-            )
-                .into_response();
-        }
-    };
-
-    let client = match Client::try_default().await {
-        Ok(c) => c,
-        Err(e) => return AppError::from(e).into_response(),
-    };
-
-    let pods: Api<Pod> = Api::namespaced(client, NAMESPACE);
-    let _ = pods.delete(&pod_name, &DeleteParams::background()).await;
-    tracing::info!(session_id = %id, pod = %pod_name, "session deleted");
-
-    StatusCode::NO_CONTENT.into_response()
+pub async fn delete_session_pod(client: &Client, pod_name: &str) -> Result<(), AppError> {
+    let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
+    let _ = pods.delete(pod_name, &DeleteParams::background()).await;
+    Ok(())
 }
 
 pub async fn session_query(
-    State(store): State<Arc<SessionStore>>,
-    Path(id): Path<String>,
-    Json(req): Json<QueryRequest>,
-) -> impl IntoResponse {
-    let pod_name = match store.0.lock().unwrap().get(&id).cloned() {
-        Some(p) => p,
-        None => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "error": "session not found" })),
-            )
-                .into_response();
-        }
-    };
-
-    let client = match Client::try_default().await {
-        Ok(c) => c,
-        Err(e) => return AppError::from(e).into_response(),
-    };
-
-    let pods: Api<Pod> = Api::namespaced(client, NAMESPACE);
-
-    // Pass SQL as $1 so it's never interpolated into the shell command string
-    let sql = req.sql.as_str();
+    client: &Client,
+    pod_name: &str,
+    sql: &str,
+) -> Result<QueryResponse, AppError> {
+    let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
     let cmd = [
         "sh",
         "-c",
@@ -313,12 +268,8 @@ pub async fn session_query(
         .stderr(true)
         .stdin(false);
 
-    let mut proc = match pods.exec(&pod_name, cmd, &ap).await {
-        Ok(p) => p,
-        Err(e) => return AppError::from(e).into_response(),
-    };
+    let mut proc = pods.exec(pod_name, cmd, &ap).await?;
 
-    // Read stdout (query results) then stderr (script errors), then wait for exit
     let mut stdout_data = String::new();
     if let Some(mut reader) = proc.stdout() {
         reader.read_to_string(&mut stdout_data).await.ok();
@@ -331,47 +282,37 @@ pub async fn session_query(
 
     let _ = proc.join().await;
 
-    // If stdout is empty, surface stderr as the error
     if stdout_data.trim().is_empty() && !stderr_data.trim().is_empty() {
-        return AppError::QueryFailed(stderr_data.trim().to_string()).into_response();
+        return Err(AppError::QueryFailed(stderr_data.trim().to_string()));
     }
 
-    match parse_output(&stdout_data) {
-        Ok(result) => result.into_response(),
-        Err(e) => e.into_response(),
-    }
+    parse_output(&stdout_data)
 }
 
-// ---- Shared output parsing ----
-
-fn parse_output(logs: &str) -> Result<Json<QueryResponse>, AppError> {
-    let last_line = logs.lines().last().unwrap_or("").trim();
-    let output: Value = serde_json::from_str(last_line)
-        .map_err(|e| AppError::Parse(format!("{e}: {last_line}")))?;
-
-    if let Some(err) = output.get("error").and_then(|v| v.as_str()) {
-        return Err(AppError::QueryFailed(err.to_string()));
-    }
-
-    let columns: Vec<String> = output["columns"]
-        .as_array()
-        .unwrap_or(&vec![])
+pub fn parse_output(logs: &str) -> Result<QueryResponse, AppError> {
+    let value: Value = serde_json::from_str(logs).map_err(|e| AppError::Parse(e.to_string()))?;
+    let columns = value
+        .get("columns")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| AppError::Parse("missing columns".into()))?
         .iter()
-        .filter_map(|v| v.as_str().map(String::from))
-        .collect();
-
-    let rows: Vec<Vec<Value>> = output["rows"]
-        .as_array()
-        .unwrap_or(&vec![])
+        .map(|v| v.as_str().unwrap_or_default().to_string())
+        .collect::<Vec<_>>();
+    let rows = value
+        .get("rows")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| AppError::Parse("missing rows".into()))?
         .iter()
         .map(|row| row.as_array().cloned().unwrap_or_default())
-        .collect();
+        .collect::<Vec<_>>();
+    let row_count = value
+        .get("row_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(rows.len() as u64) as usize;
 
-    let row_count = output["row_count"].as_u64().unwrap_or(rows.len() as u64) as usize;
-
-    Ok(Json(QueryResponse {
+    Ok(QueryResponse {
         columns,
         rows,
         row_count,
-    }))
+    })
 }
