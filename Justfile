@@ -27,7 +27,7 @@ spark_operator_chart := "spark-operator/spark-operator"
 spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
 spark_image := "mizumi-spark-rustfs:4.1.2"
-duckdb_image := "mizumi-duckdb:1.1.4"
+duckdb_image := "mizumi-duckdb:1.1.5"
 daft_image := "mizumi-daft:0.7.10"
 
 daft_namespace := "daft"
@@ -38,6 +38,8 @@ daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
 daft_simple_release := "daft-simple"
 daft_simple_values := "infra/k8s/daft/helm/simple-values.yaml"
 daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
+caddy_s3_hostname := "s3.ap-southeast-1.amazonaws.com"
+caddy_config := "infra/caddy/Caddyfile"
 
 redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
@@ -55,7 +57,8 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
-    kubectl port-forward -n {{keycloak_namespace}} unitycatalog-postgres-svc 5434:5432 &
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -71,6 +74,18 @@ forward:
     echo "Daft UI:          http://127.0.0.1:8265"
     wait
 
+caddy-s3-proxy:
+    caddy run --config {{caddy_config}}
+
+caddy-s3-trust:
+    caddy trust --config {{caddy_config}}
+
+caddy-s3-setup:
+    @echo "1. Ensure RustFS is reachable on http://127.0.0.1:9000 (for example: just forward)"
+    @echo "2. Add this host override: 127.0.0.1 {{caddy_s3_hostname}}"
+    @echo "3. Trust Caddy's local CA: just caddy-s3-trust"
+    @echo "4. Start the proxy: just caddy-s3-proxy"
+
 rustfs-helm-repo:
     helm repo add rustfs https://charts.rustfs.com/ 2>/dev/null || true
     helm repo update rustfs
@@ -83,6 +98,41 @@ rustfs-deploy: rustfs-helm-repo
       --values {{rustfs_values}}
     kubectl rollout status deployment/{{rustfs_release}} -n {{rustfs_namespace}} --timeout=180s
     kubectl get pods,svc,pvc -n {{rustfs_namespace}}
+
+rustfs-s3-proxy-deploy:
+    kubectl create namespace {{rustfs_namespace}} 2>/dev/null || true
+    kubectl apply -f infra/k8s/rustfs/s3-proxy.yaml
+    kubectl rollout status deployment/rustfs-s3-proxy -n {{rustfs_namespace}} --timeout=120s
+    kubectl get pods,svc,secret,configmap -n {{rustfs_namespace}} | rg rustfs-s3-proxy
+
+rustfs-s3-proxy-destroy:
+    kubectl delete -f infra/k8s/rustfs/s3-proxy.yaml --ignore-not-found
+
+rustfs-s3-proxy-dns-enable:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    patch='{"data":{"s3-proxy.override":"rewrite name exact s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local\nrewrite name exact unitycatalog.s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local\n"}}'
+    kubectl create configmap coredns-custom -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+    kubectl patch configmap coredns-custom -n kube-system --type merge -p "$patch"
+    kubectl rollout restart deployment/coredns -n kube-system
+    kubectl rollout status deployment/coredns -n kube-system --timeout=120s
+
+rustfs-s3-proxy-dns-disable:
+    kubectl patch configmap coredns-custom -n kube-system --type json -p='[{"op":"remove","path":"/data/s3-proxy.override"}]' || true
+    kubectl rollout restart deployment/coredns -n kube-system
+    kubectl rollout status deployment/coredns -n kube-system --timeout=120s
+
+rustfs-unitycatalog-anon-read-enable:
+    kubectl delete job rustfs-unitycatalog-anon-read -n {{rustfs_namespace}} --ignore-not-found
+    kubectl create job rustfs-unitycatalog-anon-read -n {{rustfs_namespace}} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc anonymous set download rustfs/unitycatalog'
+    kubectl wait --for=condition=complete job/rustfs-unitycatalog-anon-read -n {{rustfs_namespace}} --timeout=120s
+    kubectl logs job/rustfs-unitycatalog-anon-read -n {{rustfs_namespace}}
+
+rustfs-unitycatalog-anon-read-disable:
+    kubectl delete job rustfs-unitycatalog-anon-read-disable -n {{rustfs_namespace}} --ignore-not-found
+    kubectl create job rustfs-unitycatalog-anon-read-disable -n {{rustfs_namespace}} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc anonymous set private rustfs/unitycatalog'
+    kubectl wait --for=condition=complete job/rustfs-unitycatalog-anon-read-disable -n {{rustfs_namespace}} --timeout=120s
+    kubectl logs job/rustfs-unitycatalog-anon-read-disable -n {{rustfs_namespace}}
 
 rustfs-destroy:
     helm uninstall {{rustfs_release}} --namespace {{rustfs_namespace}} || true
@@ -148,6 +198,12 @@ spark-image-build:
 
 duckdb-image-build:
     docker build -t {{duckdb_image}} -f packages/duckdb/Dockerfile .
+
+duckdb-test-job:
+    kubectl delete job duckdb-rustfs-query -n {{spark_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/duckdb/query-job.yaml
+    kubectl wait --for=condition=complete job/duckdb-rustfs-query -n {{spark_namespace}} --timeout=120s
+    kubectl logs job/duckdb-rustfs-query -n {{spark_namespace}}
 
 daft-image-build:
     docker build -t {{daft_image}} -f packages/daft/Dockerfile .

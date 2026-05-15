@@ -1,6 +1,6 @@
 import type { NextConfig } from "next"
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:6000"
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,

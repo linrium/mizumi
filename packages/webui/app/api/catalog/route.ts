@@ -4,7 +4,7 @@ import {
   sessionTtlSeconds,
 } from "@/lib/auth/server"
 
-const API_BASE = "http://localhost:8080/api/2.1/unity-catalog"
+const API_BASE = "http://localhost:4000"
 
 function getPermissionsPath(
   resourceType: string | null,
@@ -37,7 +37,8 @@ async function ucFetch(
   if (init?.body) {
     headers["Content-Type"] = "application/json"
   }
-  const res = await fetch(`${API_BASE}${path}`, {
+  console.log(`${API_BASE}/uc${path}`)
+  const res = await fetch(`${API_BASE}/uc${path}`, {
     cache: "no-store",
     headers,
     ...init,

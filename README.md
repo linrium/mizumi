@@ -148,6 +148,26 @@ just ballista-forward
 
 `redpanda-deploy` also runs a bootstrap job that creates the default `mizumi-orders` topic.
 
+### HTTPS S3 Endpoint Alias
+
+If you need clients to talk to RustFS through `https://s3.ap-southeast-1.amazonaws.com`, this repo includes a local Caddy config at `infra/caddy/Caddyfile` that terminates TLS for that hostname and proxies to `http://127.0.0.1:9000`.
+
+Required local machine steps:
+
+```bash
+# 1. Start RustFS locally first
+just forward
+
+# 2. Map the AWS hostname to localhost
+echo '127.0.0.1 s3.ap-southeast-1.amazonaws.com' | sudo tee -a /etc/hosts
+
+# 3. Trust Caddy's local CA for the generated certificate
+just caddy-s3-trust
+
+# 4. Run the HTTPS proxy
+just caddy-s3-proxy
+```
+
 To create the example Spark streaming job through `controlplane` after `just forward`:
 
 ```bash

@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rustfs-s3-proxy-tls
+  namespace: rustfs
+type: kubernetes.io/tls
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDOTCCAiGgAwIBAgIJAMCvqYapgnMtMA0GCSqGSIb3DQEBCwUAMDIxMDAuBgNV
+    BAMMJ3VuaXR5Y2F0YWxvZy5zMy51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTAeFw0y
+    NjA1MTUxMjA4MTdaFw0zNjA1MTIxMjA4MTdaMDIxMDAuBgNVBAMMJ3VuaXR5Y2F0
+    YWxvZy5zMy51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTCCASIwDQYJKoZIhvcNAQEB
+    BQADggEPADCCAQoCggEBAKMDmUCVMRkA62urt/QuC4XKyWIwBAXR6bUpiR8YkmOM
+    XxJEms3BfLeCoVrhr+fhw6LEGmajxqevaJTXW6qodffIeFFmVFQqmm76F2nKbX0B
+    h5eVO8eo9KlTDlGUP4ji0CUnTM7b4hMhYUtRkpbqF/Ldi28KZ2LzWw2NT2lbwrmn
+    YvekkvapbMkGmrnKSbzZZyBnmtlPM2RKCtQG8Qan/MCaiEEn6AzI6dVrhcJDe4G9
+    ceWRcOlMv43Bmt7L55tfoo1GAVfd5IinYoQuVx7siwW1grTetBDVaERHZBTKmQqB
+    Hqv9Y4rYEZwLpD6xHlQXa0NPCgywM/4faL4GzUpQW2UCAwEAAaNSMFAwTgYDVR0R
+    BEcwRYIndW5pdHljYXRhbG9nLnMzLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tghpz
+    My51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEABB79
+    Fc/mpoYx7nJXjhVzSbPFWQX4B6W1Gj8NojC2d+do0Jblks2lSY5L9jj84OfU1g5p
+    G41huS87TE8CuwDqtu4aayRmvPz8EhuiEu3FVHysRNlO1Eyi9aZgZ3n5bh1GAOw8
+    H55eukvMtfAWDf7N3HUGARpIIq+cfCb66i2UtlEOR0rqe861k52MFeuyWUpNfbdp
+    EV8IVnMYWJzSpUWrL4R1MpiKc+VSiODbiOckD5vC2SIHHEnELI1qB0MBPz1gLUcq
+    JuVlff5mUMgSGy8G5FN/HWlS14xvYelksT8WcqzQqSRZ01vjyVRwRMlUCxHdaqwR
+    uEFwSxBvG07LKXSayQ==
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCjA5lAlTEZAOtr
+    q7f0LguFysliMAQF0em1KYkfGJJjjF8SRJrNwXy3gqFa4a/n4cOixBpmo8anr2iU
+    11uqqHX3yHhRZlRUKppu+hdpym19AYeXlTvHqPSpUw5RlD+I4tAlJ0zO2+ITIWFL
+    UZKW6hfy3YtvCmdi81sNjU9pW8K5p2L3pJL2qWzJBpq5ykm82WcgZ5rZTzNkSgrU
+    BvEGp/zAmohBJ+gMyOnVa4XCQ3uBvXHlkXDpTL+NwZrey+ebX6KNRgFX3eSIp2KE
+    Llce7IsFtYK03rQQ1WhER2QUypkKgR6r/WOK2BGcC6Q+sR5UF2tDTwoMsDP+H2i+
+    Bs1KUFtlAgMBAAECggEASYOO8kwVxzPd90GKhMjbE2wfI3OJ7OH8ZmGj3+0h31jn
+    awKbWVz/lHaJs8WBoa3znwyW52DGbsqw/CaexTiRcrvqXrMqJobL/G42btQGSlCN
+    SHPZcLImG9JD69BSUrYOriKqBcOtkXkFOoU/+WT6heEZR2tGsp4Smur2PApQp443
+    18EQuDchhPo6Bj0D4lUcPTrQ666cfrhw/wF+/bkb4gUukDHYfoxPrBx57msO3ZQO
+    cKJ1ed43f48azH0xwY2oMdR8gS/F23IUlHfRFE60WZ696FsDAjajBBVsJidUWva1
+    qo1ZR3GoFgRs0tmufkOdfE4uI79DYNQSthJZF1g7pQKBgQDMpe8RR0MvWtgX/qis
+    RMHQL1tjy4JK5LN9HIxuvr+6YHIZiAzIEsBCLUQvRn0ryVHVusnnUv1KcVhC8VQD
+    ZDtALaB+Yi1a+kHi385JuKoIggrgYgspSyaeXVAt8qAjFlcDKymAqEkqzMvh41XE
+    Uy2DLHhPEce7PqltMwXSCehDGwKBgQDL6zJ73KrVzuJobf9bR/nOKpiqROKNc38r
+    TBo3LCDBS81W/IanyCtem6uy3NkEusJ85o9SQKx0yt0qiw+9Wh1uVwxQ1izt5sg+
+    O2HDPGP0wJElfRRSFlp0itxbmXg2ppJE3HPGtbvegXYl7AxRdG93H1szSxq3wM7m
+    btFZRQVDfwKBgD0yidEy7EZm9iQGxU3uqb6lysCHBQl8ZqhNNzmO1SrY2IYGBzx1
+    TwT7IF66x4emhlBRsTr5uEDgsDIklKkG+ijw/AOPPFzuZXGA1+F31XEB4lrDNu88
+    R+onoWh8G6MidRa/e4O7z1V7NKTyJJ22+e82Bywt9vppfKTpEx6CU/BtAoGBALR+
+    AblQoIWPESeN9TA+jQXG/kn3nu/FAxK30Zx0Gqn9BkuwSR/JNVoQP/GZOR3OkMcs
+    7D7Jr9vQk+JMJCpd0R8RPX1vlWUdmLA8r1O36GGC8PZVt97Qmk/9eP464QS+e0ko
+    N/Hyec+Al6sJO/39KYwu3PKRz5xFtNyRygtR5E7RAoGAYexWhW6kTeLYlPCc8Zw3
+    /RvS4yxbemW4MxQsa4d0KgBsA5ExAhCsS/69JTSfcPNNea01RGa2bzTrjYasLWSR
+    ijvDRQ4L6uLObkOx/JL+PquSOaVTeDn4+aatPs4LcgvXwCGrzI1FdJ/jv48Tl439
+    yghpa8vprDTHQZA58vV6MDI=
+    -----END PRIVATE KEY-----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rustfs-s3-proxy-tls
+  namespace: spark
+type: kubernetes.io/tls
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDOTCCAiGgAwIBAgIJAMCvqYapgnMtMA0GCSqGSIb3DQEBCwUAMDIxMDAuBgNV
+    BAMMJ3VuaXR5Y2F0YWxvZy5zMy51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTAeFw0y
+    NjA1MTUxMjA4MTdaFw0zNjA1MTIxMjA4MTdaMDIxMDAuBgNVBAMMJ3VuaXR5Y2F0
+    YWxvZy5zMy51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTCCASIwDQYJKoZIhvcNAQEB
+    BQADggEPADCCAQoCggEBAKMDmUCVMRkA62urt/QuC4XKyWIwBAXR6bUpiR8YkmOM
+    XxJEms3BfLeCoVrhr+fhw6LEGmajxqevaJTXW6qodffIeFFmVFQqmm76F2nKbX0B
+    h5eVO8eo9KlTDlGUP4ji0CUnTM7b4hMhYUtRkpbqF/Ldi28KZ2LzWw2NT2lbwrmn
+    YvekkvapbMkGmrnKSbzZZyBnmtlPM2RKCtQG8Qan/MCaiEEn6AzI6dVrhcJDe4G9
+    ceWRcOlMv43Bmt7L55tfoo1GAVfd5IinYoQuVx7siwW1grTetBDVaERHZBTKmQqB
+    Hqv9Y4rYEZwLpD6xHlQXa0NPCgywM/4faL4GzUpQW2UCAwEAAaNSMFAwTgYDVR0R
+    BEcwRYIndW5pdHljYXRhbG9nLnMzLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tghpz
+    My51cy1lYXN0LTEuYW1hem9uYXdzLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEABB79
+    Fc/mpoYx7nJXjhVzSbPFWQX4B6W1Gj8NojC2d+do0Jblks2lSY5L9jj84OfU1g5p
+    G41huS87TE8CuwDqtu4aayRmvPz8EhuiEu3FVHysRNlO1Eyi9aZgZ3n5bh1GAOw8
+    H55eukvMtfAWDf7N3HUGARpIIq+cfCb66i2UtlEOR0rqe861k52MFeuyWUpNfbdp
+    EV8IVnMYWJzSpUWrL4R1MpiKc+VSiODbiOckD5vC2SIHHEnELI1qB0MBPz1gLUcq
+    JuVlff5mUMgSGy8G5FN/HWlS14xvYelksT8WcqzQqSRZ01vjyVRwRMlUCxHdaqwR
+    uEFwSxBvG07LKXSayQ==
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCjA5lAlTEZAOtr
+    q7f0LguFysliMAQF0em1KYkfGJJjjF8SRJrNwXy3gqFa4a/n4cOixBpmo8anr2iU
+    11uqqHX3yHhRZlRUKppu+hdpym19AYeXlTvHqPSpUw5RlD+I4tAlJ0zO2+ITIWFL
+    UZKW6hfy3YtvCmdi81sNjU9pW8K5p2L3pJL2qWzJBpq5ykm82WcgZ5rZTzNkSgrU
+    BvEGp/zAmohBJ+gMyOnVa4XCQ3uBvXHlkXDpTL+NwZrey+ebX6KNRgFX3eSIp2KE
+    Llce7IsFtYK03rQQ1WhER2QUypkKgR6r/WOK2BGcC6Q+sR5UF2tDTwoMsDP+H2i+
+    Bs1KUFtlAgMBAAECggEASYOO8kwVxzPd90GKhMjbE2wfI3OJ7OH8ZmGj3+0h31jn
+    awKbWVz/lHaJs8WBoa3znwyW52DGbsqw/CaexTiRcrvqXrMqJobL/G42btQGSlCN
+    SHPZcLImG9JD69BSUrYOriKqBcOtkXkFOoU/+WT6heEZR2tGsp4Smur2PApQp443
+    18EQuDchhPo6Bj0D4lUcPTrQ666cfrhw/wF+/bkb4gUukDHYfoxPrBx57msO3ZQO
+    cKJ1ed43f48azH0xwY2oMdR8gS/F23IUlHfRFE60WZ696FsDAjajBBVsJidUWva1
+    qo1ZR3GoFgRs0tmufkOdfE4uI79DYNQSthJZF1g7pQKBgQDMpe8RR0MvWtgX/qis
+    RMHQL1tjy4JK5LN9HIxuvr+6YHIZiAzIEsBCLUQvRn0ryVHVusnnUv1KcVhC8VQD
+    ZDtALaB+Yi1a+kHi385JuKoIggrgYgspSyaeXVAt8qAjFlcDKymAqEkqzMvh41XE
+    Uy2DLHhPEce7PqltMwXSCehDGwKBgQDL6zJ73KrVzuJobf9bR/nOKpiqROKNc38r
+    TBo3LCDBS81W/IanyCtem6uy3NkEusJ85o9SQKx0yt0qiw+9Wh1uVwxQ1izt5sg+
+    O2HDPGP0wJElfRRSFlp0itxbmXg2ppJE3HPGtbvegXYl7AxRdG93H1szSxq3wM7m
+    btFZRQVDfwKBgD0yidEy7EZm9iQGxU3uqb6lysCHBQl8ZqhNNzmO1SrY2IYGBzx1
+    TwT7IF66x4emhlBRsTr5uEDgsDIklKkG+ijw/AOPPFzuZXGA1+F31XEB4lrDNu88
+    R+onoWh8G6MidRa/e4O7z1V7NKTyJJ22+e82Bywt9vppfKTpEx6CU/BtAoGBALR+
+    AblQoIWPESeN9TA+jQXG/kn3nu/FAxK30Zx0Gqn9BkuwSR/JNVoQP/GZOR3OkMcs
+    7D7Jr9vQk+JMJCpd0R8RPX1vlWUdmLA8r1O36GGC8PZVt97Qmk/9eP464QS+e0ko
+    N/Hyec+Al6sJO/39KYwu3PKRz5xFtNyRygtR5E7RAoGAYexWhW6kTeLYlPCc8Zw3
+    /RvS4yxbemW4MxQsa4d0KgBsA5ExAhCsS/69JTSfcPNNea01RGa2bzTrjYasLWSR
+    ijvDRQ4L6uLObkOx/JL+PquSOaVTeDn4+aatPs4LcgvXwCGrzI1FdJ/jv48Tl439
+    yghpa8vprDTHQZA58vV6MDI=
+    -----END PRIVATE KEY-----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rustfs-s3-proxy-config
+  namespace: rustfs
+data:
+  Caddyfile: |
+    {
+      auto_https off
+    }
+
+    https://unitycatalog.s3.us-east-1.amazonaws.com {
+      log
+      tls /certs/tls.crt /certs/tls.key
+      rewrite * /unitycatalog{uri}
+      reverse_proxy http://rustfs-svc.rustfs.svc.cluster.local:9000 {
+        header_up Host rustfs-svc.rustfs.svc.cluster.local:9000
+        header_up -Authorization
+        header_up -X-Amz-Date
+        header_up -X-Amz-Content-Sha256
+        header_up -X-Amz-Security-Token
+        header_up -X-Amz-User-Agent
+        header_up -X-Amz-Decoded-Content-Length
+      }
+    }
+
+    https://s3.us-east-1.amazonaws.com {
+      log
+      tls /certs/tls.crt /certs/tls.key
+      reverse_proxy http://rustfs-svc.rustfs.svc.cluster.local:9000 {
+        header_up Host rustfs-svc.rustfs.svc.cluster.local:9000
+        header_up -Authorization
+        header_up -X-Amz-Date
+        header_up -X-Amz-Content-Sha256
+        header_up -X-Amz-Security-Token
+        header_up -X-Amz-User-Agent
+        header_up -X-Amz-Decoded-Content-Length
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs-s3-proxy
+  namespace: rustfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rustfs-s3-proxy
+  template:
+    metadata:
+      labels:
+        app: rustfs-s3-proxy
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2.8-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 443
+              name: https
+          volumeMounts:
+            - name: config
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: rustfs-s3-proxy-config
+        - name: tls
+          secret:
+            secretName: rustfs-s3-proxy-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs-s3-proxy
+  namespace: rustfs
+spec:
+  selector:
+    app: rustfs-s3-proxy
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443

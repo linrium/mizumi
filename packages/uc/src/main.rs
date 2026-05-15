@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::create_pool(&config.database.url, config.database.max_connections).await?;
 
     tracing::info!("Running migrations");
-    // db::run_migrations(pool.as_ref()).await?;
+    db::run_migrations(pool.as_ref()).await?;
 
     if config.s3.is_empty() {
         tracing::warn!(

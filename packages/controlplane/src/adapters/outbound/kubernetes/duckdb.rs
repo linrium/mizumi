@@ -5,7 +5,9 @@ use std::{
 };
 
 use k8s_openapi::api::batch::v1::{Job, JobSpec};
-use k8s_openapi::api::core::v1::{Container, EnvVar, Pod, PodSpec, PodTemplateSpec};
+use k8s_openapi::api::core::v1::{
+    Container, EnvVar, Pod, PodSpec, PodTemplateSpec, SecretVolumeSource, Volume, VolumeMount,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::{
     Api, Client,
@@ -21,7 +23,9 @@ use crate::domain::{
 };
 
 const NAMESPACE: &str = "spark";
-const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.4";
+const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.5";
+const S3_PROXY_TLS_SECRET: &str = "rustfs-s3-proxy-tls";
+const S3_PROXY_TLS_MOUNT_PATH: &str = "/etc/rustfs-s3-proxy";
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const JOB_TIMEOUT: Duration = Duration::from_secs(120);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -100,8 +104,10 @@ fn build_job(name: &str, sql: &str, uc_token: Option<&str>) -> Job {
                             "/opt/duckdb/query_api.py".to_string(),
                         ]),
                         env: Some(duckdb_env(Some(sql), uc_token)),
+                        volume_mounts: Some(duckdb_volume_mounts()),
                         ..Default::default()
                     }],
+                    volumes: Some(duckdb_volumes()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -164,6 +170,10 @@ fn duckdb_env(sql: Option<&str>, uc_token: Option<&str>) -> Vec<EnvVar> {
         ),
         env("AWS_ACCESS_KEY_ID", "rustfsadmin"),
         env("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
+        env(
+            "DUCKDB_CA_CERT_PATH",
+            &format!("{S3_PROXY_TLS_MOUNT_PATH}/tls.crt"),
+        ),
     ];
     if let Some(token) = uc_token {
         vars.push(env("DUCKDB_UC_TOKEN", token));
@@ -226,14 +236,36 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
                     "/dev/null".to_string(),
                 ]),
                 env: Some(duckdb_env(None, None)),
+                volume_mounts: Some(duckdb_volume_mounts()),
                 ..Default::default()
             }],
+            volumes: Some(duckdb_volumes()),
             ..Default::default()
         }),
         ..Default::default()
     };
     pods.create(&PostParams::default(), &pod).await?;
     Ok(())
+}
+
+fn duckdb_volume_mounts() -> Vec<VolumeMount> {
+    vec![VolumeMount {
+        name: "rustfs-s3-proxy-tls".to_string(),
+        mount_path: S3_PROXY_TLS_MOUNT_PATH.to_string(),
+        read_only: Some(true),
+        ..Default::default()
+    }]
+}
+
+fn duckdb_volumes() -> Vec<Volume> {
+    vec![Volume {
+        name: "rustfs-s3-proxy-tls".to_string(),
+        secret: Some(SecretVolumeSource {
+            secret_name: Some(S3_PROXY_TLS_SECRET.to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }]
 }
 
 async fn wait_for_pod_running(client: &Client, pod_name: &str) -> Result<(), AppError> {
@@ -313,7 +345,45 @@ pub async fn session_query(
 }
 
 pub fn parse_output(logs: &str) -> Result<QueryResponse, AppError> {
-    let value: Value = serde_json::from_str(logs).map_err(|e| AppError::Parse(e.to_string()))?;
+    let value = parse_output_value(logs)?;
+    query_response_from_value(&value)
+}
+
+fn parse_output_value(logs: &str) -> Result<Value, AppError> {
+    match serde_json::from_str::<Value>(logs) {
+        Ok(value) => return Ok(value),
+        Err(full_error) => {
+            let mut parse_errors = vec![full_error.to_string()];
+
+            for line in logs.lines().rev() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+
+                match serde_json::from_str::<Value>(trimmed) {
+                    Ok(value) if value.get("columns").is_some() && value.get("rows").is_some() => {
+                        return Ok(value);
+                    }
+                    Ok(value) if value.get("error").is_some() => {
+                        let message = value
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(trimmed)
+                            .to_string();
+                        return Err(AppError::QueryFailed(message));
+                    }
+                    Ok(_) => {}
+                    Err(err) => parse_errors.push(err.to_string()),
+                }
+            }
+
+            Err(AppError::Parse(parse_errors.remove(0)))
+        }
+    }
+}
+
+fn query_response_from_value(value: &Value) -> Result<QueryResponse, AppError> {
     let columns = value
         .get("columns")
         .and_then(|v| v.as_array())
@@ -338,4 +408,41 @@ pub fn parse_output(logs: &str) -> Result<QueryResponse, AppError> {
         rows,
         row_count,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_output;
+
+    #[test]
+    fn parse_output_accepts_mixed_log_stream_and_result_json() {
+        let logs = r#"{"message":"Starting DuckDB query API"}
+{"message":"Connected to DuckDB"}
+{"columns":["ok"],"rows":[[1]],"row_count":1}
+"#;
+
+        let response = parse_output(logs).expect("should parse final result object");
+
+        assert_eq!(response.columns, vec!["ok"]);
+        assert_eq!(response.rows.len(), 1);
+        assert_eq!(response.row_count, 1);
+        assert_eq!(response.rows[0][0], 1);
+    }
+
+    #[test]
+    fn parse_output_promotes_error_payloads() {
+        let logs = r#"{"message":"Starting DuckDB query API"}
+{"error":"DUCKDB_UC_TOKEN environment variable not set"}
+"#;
+
+        let error = match parse_output(logs) {
+            Ok(_) => panic!("should return query failure"),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "query failed: DUCKDB_UC_TOKEN environment variable not set"
+        );
+    }
 }

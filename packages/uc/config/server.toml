@@ -11,8 +11,8 @@
 # Runtime environment label ("dev" | "staging" | "prod")
 env = "dev"
 host = "localhost"
-port = 8080
-public_url = "http://localhost:8080"
+port = 8082
+public_url = "http://localhost:8082"
 
 # Set to "enable" to require JWT bearer-token authorization on all requests.
 # Set to "disable" to allow unauthenticated access (development only).
@@ -84,10 +84,10 @@ max_connections = 20
 # RustFS (port-forwarded locally via `just forward`)
 [[s3]]
 bucket_path = "s3://unitycatalog/"
-region     = "us-east-1"
+region = "us-east-1"
 access_key = "rustfsadmin"
 secret_key = "rustfsadmin"
-endpoint   = "http://localhost:9000"
+endpoint = "http://localhost:9000"
 
 # ---------------------------------------------------------------------------
 # Azure Data Lake Storage (ADLS) credential configuration.

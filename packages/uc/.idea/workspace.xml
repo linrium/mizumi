@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml">
+      <package file="$PROJECT_DIR$">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="961e7ef7-40ec-4d51-9b8d-fdadd9dc5188" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../.idea/unitycatalog-client@1.iml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/unitycatalog-client@1.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../../.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Justfile" beforeDir="false" afterPath="$PROJECT_DIR$/../../Justfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../../README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../infra/k8s/rustfs/helm/values.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../../infra/k8s/rustfs/helm/values.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../infra/k8s/unitycatalog/bootstrap-job.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../../infra/k8s/unitycatalog/bootstrap-job.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../controlplane/src/infrastructure/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/../controlplane/src/infrastructure/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../duckdb/query_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/../duckdb/query_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/server.toml" beforeDir="false" afterPath="$PROJECT_DIR$/config/server.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/token.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config/token.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../webui/app/api/catalog/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../webui/app/api/catalog/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../webui/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../webui/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../scripts/test.sql" beforeDir="false" afterPath="$PROJECT_DIR$/../../scripts/test.sql" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="orEU2M9z" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 3,
+  "fromUser": false
+}]]></component>
+  <component name="ProjectId" id="3Dl4sVz2cTVfCOA8t6HVsi3kZaF" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.rust.reset.selective.auto.import": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": ""
+  }
+}]]></component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="961e7ef7-40ec-4d51-9b8d-fdadd9dc5188" name="Changes" comment="" />
+      <created>1778843532977</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1778843532977</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

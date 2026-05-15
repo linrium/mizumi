@@ -9,7 +9,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: duckdb-query
-          image: mizumi-duckdb:1.1.3
+          image: mizumi-duckdb:1.1.5
           imagePullPolicy: IfNotPresent
           resources:
             requests:
@@ -18,7 +18,13 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-          command: ["python", "/opt/duckdb/query_rustfs.py"]
+          command:
+            - /bin/sh
+            - -lc
+            - |
+              cp /etc/rustfs-s3-proxy/tls.crt /usr/local/share/ca-certificates/rustfs-s3-proxy.crt
+              update-ca-certificates
+              python /opt/duckdb/query_api.py
           env:
             - name: AWS_DEFAULT_REGION
               value: us-east-1
@@ -30,4 +36,14 @@ spec:
               value: rustfsadmin
             - name: DUCKDB_DELTA_PATH
               value: s3://gold/sdp-warehouse/silver_orders
+            - name: DUCKDB_CA_CERT_PATH
+              value: /etc/rustfs-s3-proxy/tls.crt
+          volumeMounts:
+            - name: rustfs-s3-proxy-tls
+              mountPath: /etc/rustfs-s3-proxy
+              readOnly: true
+      volumes:
+        - name: rustfs-s3-proxy-tls
+          secret:
+            secretName: rustfs-s3-proxy-tls
   backoffLimit: 0

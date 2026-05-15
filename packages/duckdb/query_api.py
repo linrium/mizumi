@@ -1,6 +1,23 @@
 import json
 import os
 import sys
+from pathlib import Path
+
+CADDY_ROOT_CERT = Path.home() / "Library/Application Support/Caddy/pki/authorities/local/root.crt"
+CLUSTER_PROXY_CERT = Path(
+    os.getenv("DUCKDB_CA_CERT_PATH", "/etc/rustfs-s3-proxy/tls.crt")
+)
+
+if CADDY_ROOT_CERT.exists():
+    cert_path = str(CADDY_ROOT_CERT)
+    os.environ.setdefault("SSL_CERT_FILE", cert_path)
+    os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
+elif CLUSTER_PROXY_CERT.exists():
+    cert_path = str(CLUSTER_PROXY_CERT)
+    os.environ.setdefault("SSL_CERT_FILE", cert_path)
+    os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
 
 import duckdb
 
@@ -9,7 +26,13 @@ UC_ENDPOINT = os.getenv(
     "DUCKDB_UC_ENDPOINT",
     "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080",
 )
-UC_TOKEN = os.getenv("DUCKDB_UC_TOKEN", "")
+UC_TOKEN = os.getenv("DUCKDB_UC_TOKEN", "no-token")
+UC_AWS_REGION = os.getenv("DUCKDB_UC_AWS_REGION", "us-east-1")
+S3_ENDPOINT = os.getenv("AWS_ENDPOINT_URL", "http://rustfs-svc.rustfs.svc.cluster.local:9000")
+S3_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
+S3_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
+S3_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_SCOPE = os.getenv("DUCKDB_S3_SCOPE", "s3://unitycatalog")
 
 
 def sql_quote(value: str) -> str:
@@ -44,11 +67,29 @@ def main() -> None:
         debug_log("Loading DuckDB extensions", extensions=["httpfs", "delta", "unity_catalog"])
         con.execute("LOAD httpfs; LOAD delta; LOAD unity_catalog;")
 
+        endpoint_host = S3_ENDPOINT.replace("http://", "").replace("https://", "")
+        use_ssl = str(S3_ENDPOINT.startswith("https://")).lower()
+        create_s3_secret_sql = f"""
+        CREATE OR REPLACE SECRET rustfs (
+            TYPE s3,
+            KEY_ID '{sql_quote(S3_ACCESS_KEY)}',
+            SECRET '{sql_quote(S3_SECRET_KEY)}',
+            ENDPOINT '{sql_quote(endpoint_host)}',
+            USE_SSL {use_ssl},
+            URL_STYLE 'path',
+            REGION '{sql_quote(S3_REGION)}',
+            SCOPE '{sql_quote(S3_SCOPE)}'
+        )
+        """
+        debug_log("Creating S3 secret for UC storage", sql=create_s3_secret_sql)
+        con.execute(create_s3_secret_sql)
+
         create_secret_sql = f"""
-        CREATE SECRET (
+        CREATE SECRET(
             TYPE unity_catalog,
             TOKEN '{sql_quote(UC_TOKEN)}',
-            ENDPOINT '{sql_quote(UC_ENDPOINT)}'
+            ENDPOINT '{sql_quote(UC_ENDPOINT)}',
+            AWS_REGION '{sql_quote(UC_AWS_REGION)}'
         )
         """
         debug_log("Creating Unity Catalog secret", sql=create_secret_sql)

@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
-    <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/packages/duckdb_uc" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/packages/uc-java" vcs="Git" />
   </component>
 </project>

@@ -1,0 +1,21 @@
+{
+	local_certs
+}
+
+https://s3.ap-southeast-1.amazonaws.com {
+	reverse_proxy 127.0.0.1:9000
+}
+
+https://s3.us-east-1.amazonaws.com {
+	reverse_proxy 127.0.0.1:9000
+}
+
+https://unitycatalog.s3.ap-southeast-1.amazonaws.com {
+	rewrite * /unitycatalog{uri}
+	reverse_proxy 127.0.0.1:9000
+}
+
+https://unitycatalog.s3.us-east-1.amazonaws.com {
+	rewrite * /unitycatalog{uri}
+	reverse_proxy 127.0.0.1:9000
+}
