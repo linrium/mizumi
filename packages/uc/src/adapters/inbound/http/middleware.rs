@@ -99,3 +99,47 @@ fn extract_bearer(headers: &axum::http::HeaderMap) -> Option<String> {
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|t| t.trim().to_owned())
 }
+
+/// Debug middleware that logs every request and response (method, URI, headers, body).
+/// Only emits output when the `debug` or `trace` log level is active.
+pub async fn debug_log(request: Request<Body>, next: Next) -> Response {
+    if !tracing::enabled!(tracing::Level::DEBUG) {
+        return next.run(request).await;
+    }
+
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let req_headers = request.headers().clone();
+
+    let (parts, body) = request.into_parts();
+    let req_bytes = axum::body::to_bytes(body, usize::MAX)
+        .await
+        .unwrap_or_default();
+
+    tracing::debug!(
+        method = %method,
+        uri = %uri,
+        headers = ?req_headers,
+        body = %String::from_utf8_lossy(&req_bytes),
+        "→ request",
+    );
+
+    let request = Request::from_parts(parts, Body::from(req_bytes));
+    let response = next.run(request).await;
+
+    let status = response.status();
+    let res_headers = response.headers().clone();
+    let (res_parts, res_body) = response.into_parts();
+    let res_bytes = axum::body::to_bytes(res_body, usize::MAX)
+        .await
+        .unwrap_or_default();
+
+    tracing::debug!(
+        status = %status,
+        headers = ?res_headers,
+        body = %String::from_utf8_lossy(&res_bytes),
+        "← response",
+    );
+
+    Response::from_parts(res_parts, Body::from(res_bytes))
+}

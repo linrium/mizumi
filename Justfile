@@ -26,7 +26,7 @@ spark_operator_release := "spark-operator"
 spark_operator_chart := "spark-operator/spark-operator"
 spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
-spark_image := "mizumi-spark-rustfs:4.1.1"
+spark_image := "mizumi-spark-rustfs:4.1.2"
 duckdb_image := "mizumi-duckdb:1.1.4"
 daft_image := "mizumi-daft:0.7.10"
 
@@ -55,7 +55,7 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
-    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
+    kubectl port-forward -n {{keycloak_namespace}} unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -228,26 +228,12 @@ unitycatalog-bootstrap:
     kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
 jobs-submit-all:
-    just jobs-sumit-hdbank-card-payments-bronze-stream
-
-jobs-sumit-hdbank-card-payments-bronze-stream:
-    curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
-      -H 'Content-Type: application/json' \
-      -d '{"name":"hdbank-stream-raw-card-payment-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
-      | jq
-
-jobs-delete-hdbank-card-payments-bronze-stream:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
-      | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-card-payment-events-to-bronze") | .job.id')
-    [[ -z "$id" ]] && { echo "job not found"; exit 1; }
-    curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
+    just jobs-sumit-hdbank
 
 jobs-sumit-hdbank:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
-      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
       | jq
 
 jobs-delete-hdbank:

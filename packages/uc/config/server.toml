@@ -33,7 +33,7 @@ redirect_port = 8080
 #   Google:           "https://accounts.google.com"
 #   Microsoft Entra:  "https://login.microsoftonline.com/{tenant-id}/v2.0"
 #   Keycloak:         "http://localhost:8083/realms/sovico"
-allowed_issuers = ["http://localhost:8083/realms/sovico"]
+allowed_issuers = ["http://127.0.0.1:8083/realms/sovico"]
 
 # Accepted JWT audiences. Typically your application client ID or API identifier.
 audiences = ["webui"]
@@ -53,7 +53,7 @@ enabled = false
 # Database
 # ---------------------------------------------------------------------------
 [database]
-url = "postgres://ucuser:ucpassword@localhost:5432/ucdb"
+url = "postgres://ucuser:ucpassword@localhost:5434/ucdb"
 max_connections = 20
 
 # ---------------------------------------------------------------------------
@@ -79,6 +79,15 @@ max_connections = 20
 # access_key    = ""
 # secret_key    = ""
 # session_token = ""   # test-only: skips downscoping when set
+# endpoint      = ""   # S3-compatible endpoint (e.g. http://rustfs-svc.rustfs.svc.cluster.local:9000)
+
+# RustFS (port-forwarded locally via `just forward`)
+[[s3]]
+bucket_path = "s3://unitycatalog/"
+region     = "us-east-1"
+access_key = "rustfsadmin"
+secret_key = "rustfsadmin"
+endpoint   = "http://localhost:9000"
 
 # ---------------------------------------------------------------------------
 # Azure Data Lake Storage (ADLS) credential configuration.

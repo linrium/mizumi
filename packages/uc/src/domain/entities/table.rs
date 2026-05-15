@@ -169,18 +169,24 @@ pub struct TableInfo {
     pub catalog_name: String,
     pub schema_name: String,
     pub full_name: String,
-    pub table_type: TableType,
+    pub table_type: Option<TableType>,
     pub data_source_format: Option<DataSourceFormat>,
     pub columns: Option<Vec<ColumnInfo>>,
-    pub storage_location: Option<String>,
+    #[serde(rename = "storage_location")]
+    pub url: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<HashMap<String, String>>,
     pub owner: Option<String>,
-    pub created_at: i64,
+    pub column_count: Option<i32>,
+    pub created_at: Option<i64>,
     pub created_by: Option<String>,
     pub updated_at: Option<i64>,
     pub updated_by: Option<String>,
     pub view_definition: Option<String>,
+    pub view_dependencies: Option<serde_json::Value>,
+    pub uniform_iceberg_converted_delta_timestamp: Option<i64>,
+    pub uniform_iceberg_converted_delta_version: Option<i64>,
+    pub uniform_iceberg_metadata_location: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -188,13 +194,17 @@ pub struct CreateTable {
     pub name: String,
     pub catalog_name: String,
     pub schema_name: String,
-    pub table_type: TableType,
+    pub table_type: Option<TableType>,
     pub data_source_format: Option<DataSourceFormat>,
     pub columns: Vec<ColumnInfo>,
-    pub storage_location: Option<String>,
+    pub url: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<HashMap<String, String>>,
     pub view_definition: Option<String>,
+    pub column_count: Option<i32>,
+    pub uniform_iceberg_converted_delta_timestamp: Option<i64>,
+    pub uniform_iceberg_converted_delta_version: Option<i64>,
+    pub uniform_iceberg_metadata_location: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -220,8 +230,14 @@ pub enum TableOperation {
 pub struct AwsCredentials {
     pub access_key_id: String,
     pub secret_access_key: String,
+    /// Always serialized (empty string for static credentials) because the DuckDB Unity Catalog
+    /// extension requires this field to be present in the response.
+    #[serde(default)]
+    pub session_token: String,
+    /// Custom S3-compatible endpoint URL (e.g. RustFS/MinIO).
+    /// Absent for standard AWS S3.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_token: Option<String>,
+    pub endpoint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

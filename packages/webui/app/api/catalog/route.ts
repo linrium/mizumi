@@ -4,7 +4,7 @@ import {
   sessionTtlSeconds,
 } from "@/lib/auth/server"
 
-const API_BASE = "http://localhost:8082/api/2.1/unity-catalog"
+const API_BASE = "http://localhost:8080/api/2.1/unity-catalog"
 
 function getPermissionsPath(
   resourceType: string | null,

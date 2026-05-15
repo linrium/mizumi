@@ -45,7 +45,22 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::create_pool(&config.database.url, config.database.max_connections).await?;
 
     tracing::info!("Running migrations");
-    db::run_migrations(pool.as_ref()).await?;
+    // db::run_migrations(pool.as_ref()).await?;
+
+    if config.s3.is_empty() {
+        tracing::warn!(
+            "No [[s3]] entries configured — temporary S3 credentials will not be vended. \
+             Add [[s3]] sections to config/server.toml or set UC__S3__* env vars."
+        );
+    } else {
+        for s3 in &config.s3 {
+            tracing::info!(
+                bucket_path = %s3.bucket_path,
+                endpoint = %s3.endpoint.as_deref().unwrap_or("(AWS default)"),
+                "S3 bucket config loaded",
+            );
+        }
+    }
 
     // Build repositories
     let catalog_repo = Arc::new(PgCatalogRepository::new(pool.clone()));

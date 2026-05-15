@@ -102,6 +102,9 @@ pub struct S3BucketConfig {
     pub secret_key: Option<String>,
     /// Test-only: if set, these session credentials are used directly without downscoping.
     pub session_token: Option<String>,
+    /// Custom S3-compatible endpoint URL (e.g. for RustFS/MinIO).
+    /// When set, this is returned to clients so they can connect to the right host.
+    pub endpoint: Option<String>,
 }
 
 /// Azure Data Lake Storage (ADLS) credential configuration.

@@ -266,7 +266,7 @@ impl TableUseCase for TableService {
             )));
         }
 
-        let storage_location = table.storage_location.ok_or_else(|| {
+        let storage_location = table.url.ok_or_else(|| {
             DomainError::InvalidArgument(format!(
                 "Table {} does not have a storage location",
                 table.full_name

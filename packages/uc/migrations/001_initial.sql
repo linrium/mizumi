@@ -33,28 +33,33 @@ CREATE TABLE IF NOT EXISTS uc_schemas (
 );
 
 CREATE TABLE IF NOT EXISTS uc_tables (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    schema_id UUID NOT NULL REFERENCES uc_schemas(id),
-    name VARCHAR(255) NOT NULL,
-    table_type VARCHAR(64) NOT NULL,
-    data_source_format VARCHAR(64),
-    storage_location VARCHAR(2048),
-    comment TEXT,
-    owner VARCHAR(255),
-    created_at TIMESTAMP NOT NULL,
-    created_by VARCHAR(255),
-    updated_at TIMESTAMP,
-    updated_by VARCHAR(255),
-    view_definition TEXT,
-    UNIQUE(schema_id, name)
+    id                                        UUID         NOT NULL PRIMARY KEY,
+    name                                      VARCHAR(255) NOT NULL,
+    column_count                              INTEGER,
+    comment                                   VARCHAR(65535),
+    created_at                                TIMESTAMP(6),
+    created_by                                VARCHAR(255),
+    data_source_format                        VARCHAR(255),
+    owner                                     VARCHAR(255),
+    schema_id                                 UUID,
+    type                                      VARCHAR(255),
+    uniform_iceberg_converted_delta_timestamp TIMESTAMP(6),
+    uniform_iceberg_converted_delta_version   BIGINT,
+    uniform_iceberg_metadata_location         VARCHAR(65535),
+    updated_at                                TIMESTAMP(6),
+    updated_by                                VARCHAR(255),
+    url                                       VARCHAR(2048),
+    view_definition                           OID
 );
+
+CREATE INDEX idx_name ON uc_tables (name);
 
 CREATE TABLE IF NOT EXISTS uc_columns (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     table_id UUID NOT NULL REFERENCES uc_tables(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     ordinal_position SMALLINT NOT NULL,
-    type_text TEXT NOT NULL,
+    type_text OID NOT NULL,
     type_json TEXT,
     type_name VARCHAR(64) NOT NULL,
     type_precision INT,
@@ -62,7 +67,7 @@ CREATE TABLE IF NOT EXISTS uc_columns (
     type_interval_type VARCHAR(255),
     nullable BOOLEAN NOT NULL DEFAULT true,
     comment TEXT,
-    partition_index INT,
+    partition_index SMALLINT,
     UNIQUE(table_id, ordinal_position, name)
 );
 

@@ -3,6 +3,19 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/mizumi.iml" filepath="$PROJECT_DIR$/.idea/mizumi.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-ai.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-ai.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-anthropic.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-anthropic.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-autogen.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-autogen.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-client.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-client-tests.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-client-tests.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-client@1.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-client@1.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-crewai.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-crewai.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-dspy.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-dspy.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-gemini.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-gemini.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-langchain.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-langchain.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-litellm.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-litellm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-llamaindex.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-llamaindex.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/unitycatalog-openai.iml" filepath="$PROJECT_DIR$/.idea/unitycatalog-openai.iml" />
     </modules>
   </component>
 </project>

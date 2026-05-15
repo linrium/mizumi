@@ -27,7 +27,7 @@ ingress:
   enabled: false
 
 storageclass:
-  # name: standard
+  name: standard
   dataStorageSize: 512Mi
   logStorageSize: 512Mi
 

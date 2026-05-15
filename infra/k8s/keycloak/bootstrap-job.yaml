@@ -199,7 +199,6 @@ spec:
                 "redirectUris": $KEYCLOAK_CLIENT_REDIRECT_URIS,
                 "webOrigins": $KEYCLOAK_CLIENT_WEB_ORIGINS,
                 "attributes": {
-                  "post.logout.redirect.uris": $KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS,
                   "logout.confirmation.screen": "false"
                 }
               }

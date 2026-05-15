@@ -37,6 +37,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/callback", get(auth::callback))
         .nest("/api/2.1/unity-catalog", protected)
         .nest("/api/1.0/unity-control", scim_routes)
+        .layer(axum_middleware::from_fn(middleware::debug_log))
         .with_state(state)
 }
 

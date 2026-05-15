@@ -25,16 +25,20 @@ struct TableRow {
     name: String,
     schema_name: String,
     catalog_name: String,
-    table_type: String,
+    table_type: Option<String>,
     data_source_format: Option<String>,
-    storage_location: Option<String>,
+    url: Option<String>,
     comment: Option<String>,
     owner: Option<String>,
-    created_at: chrono::NaiveDateTime,
+    column_count: Option<i32>,
+    created_at: Option<chrono::NaiveDateTime>,
     created_by: Option<String>,
     updated_at: Option<chrono::NaiveDateTime>,
     updated_by: Option<String>,
     view_definition: Option<String>,
+    uniform_iceberg_converted_delta_timestamp: Option<chrono::NaiveDateTime>,
+    uniform_iceberg_converted_delta_version: Option<i64>,
+    uniform_iceberg_metadata_location: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -49,12 +53,16 @@ struct ColumnRow {
     ordinal_position: i16,
     comment: Option<String>,
     nullable: bool,
-    partition_index: Option<i32>,
-}
+    partition_index: Option<i16>,}
 
 const TABLE_SELECT: &str = "SELECT t.id, t.name, s.name as schema_name, c.name as catalog_name,
-            t.table_type, t.data_source_format, t.storage_location, t.comment, t.owner,
-            t.created_at, t.created_by, t.updated_at, t.updated_by, t.view_definition
+            t.\"type\" as table_type, t.data_source_format, t.url, t.comment, t.owner,
+            t.column_count, t.created_at, t.created_by, t.updated_at, t.updated_by,
+            CASE WHEN t.view_definition IS NOT NULL
+                 THEN convert_from(lo_get(t.view_definition), 'UTF8') END as view_definition,
+            t.uniform_iceberg_converted_delta_timestamp,
+            t.uniform_iceberg_converted_delta_version,
+            t.uniform_iceberg_metadata_location
      FROM uc_tables t
      JOIN uc_schemas s ON t.schema_id = s.id
      JOIN uc_catalogs c ON s.catalog_id = c.id";
@@ -76,7 +84,8 @@ fn parse_column_type_name(s: &str) -> Result<ColumnTypeName, DomainError> {
 
 async fn fetch_columns(pool: &PgPool, table_id: Uuid) -> Result<Vec<ColumnInfo>, DomainError> {
     let rows = sqlx::query_as::<_, ColumnRow>(
-        "SELECT name, type_text, type_json, type_name, type_precision, type_scale,
+        "SELECT name, convert_from(lo_get(type_text), 'UTF8') as type_text,
+                type_json, type_name, type_precision, type_scale,
                 type_interval_type, ordinal_position, comment, nullable, partition_index
          FROM uc_columns WHERE table_id = $1 ORDER BY ordinal_position ASC",
     )
@@ -98,7 +107,7 @@ async fn fetch_columns(pool: &PgPool, table_id: Uuid) -> Result<Vec<ColumnInfo>,
             position: row.ordinal_position as i32,
             comment: row.comment,
             nullable: Some(row.nullable),
-            partition_index: row.partition_index,
+            partition_index: row.partition_index.map(|v| v as i32),
         });
     }
     Ok(columns)
@@ -109,7 +118,11 @@ fn row_to_table_info(
     columns: Vec<ColumnInfo>,
     properties: Option<HashMap<String, String>>,
 ) -> Result<TableInfo, DomainError> {
-    let table_type = parse_table_type(&row.table_type)?;
+    let table_type = row
+        .table_type
+        .as_deref()
+        .map(parse_table_type)
+        .transpose()?;
     let data_source_format = row
         .data_source_format
         .as_deref()
@@ -125,15 +138,22 @@ fn row_to_table_info(
         table_type,
         data_source_format,
         columns: Some(columns),
-        storage_location: row.storage_location,
+        url: row.url,
         comment: row.comment,
         properties,
         owner: row.owner,
-        created_at: row.created_at.and_utc().timestamp_millis(),
+        column_count: row.column_count,
+        created_at: row.created_at.map(|t| t.and_utc().timestamp_millis()),
         created_by: row.created_by,
         updated_at: row.updated_at.map(|t| t.and_utc().timestamp_millis()),
         updated_by: row.updated_by,
         view_definition: row.view_definition,
+        view_dependencies: None,
+        uniform_iceberg_converted_delta_timestamp: row
+            .uniform_iceberg_converted_delta_timestamp
+            .map(|t| t.and_utc().timestamp_millis()),
+        uniform_iceberg_converted_delta_version: row.uniform_iceberg_converted_delta_version,
+        uniform_iceberg_metadata_location: row.uniform_iceberg_metadata_location,
     })
 }
 
@@ -162,21 +182,33 @@ impl TableRepository for PgTableRepository {
         let schema_id = schema_row.0;
 
         sqlx::query(
-            "INSERT INTO uc_tables (id, schema_id, name, table_type, data_source_format,
-             storage_location, comment, owner, created_at, updated_at, view_definition)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            "INSERT INTO uc_tables (id, schema_id, name, \"type\", data_source_format,
+             url, comment, owner, column_count, created_at, updated_at, view_definition,
+             uniform_iceberg_converted_delta_timestamp, uniform_iceberg_converted_delta_version,
+             uniform_iceberg_metadata_location)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                     CASE WHEN $12 IS NOT NULL THEN lo_from_bytea(0, convert_to($12, 'UTF8')) END,
+                     $13, $14, $15)",
         )
         .bind(id)
         .bind(schema_id)
         .bind(&cmd.name)
-        .bind(cmd.table_type.as_str())
+        .bind(cmd.table_type.as_ref().map(|t| t.as_str()))
         .bind(cmd.data_source_format.as_ref().map(|f| f.as_str()))
-        .bind(&cmd.storage_location)
+        .bind(&cmd.url)
         .bind(&cmd.comment)
         .bind(None::<String>)
+        .bind(cmd.column_count)
         .bind(now)
         .bind(now)
         .bind(&cmd.view_definition)
+        .bind(cmd.uniform_iceberg_converted_delta_timestamp.map(|ms| {
+            chrono::DateTime::from_timestamp_millis(ms)
+                .unwrap_or_default()
+                .naive_utc()
+        }))
+        .bind(cmd.uniform_iceberg_converted_delta_version)
+        .bind(&cmd.uniform_iceberg_metadata_location)
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| {
@@ -196,7 +228,8 @@ impl TableRepository for PgTableRepository {
             sqlx::query(
                 "INSERT INTO uc_columns (id, table_id, name, ordinal_position, type_text, type_json,
                  type_name, type_precision, type_scale, type_interval_type, nullable, comment, partition_index)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+                 VALUES ($1, $2, $3, $4, lo_from_bytea(0, convert_to($5, 'UTF8')), $6,
+                         $7, $8, $9, $10, $11, $12, $13)",
             )
             .bind(col_id)
             .bind(id)
@@ -210,7 +243,7 @@ impl TableRepository for PgTableRepository {
             .bind(&col.type_interval_type)
             .bind(col.nullable.unwrap_or(true))
             .bind(&col.comment)
-            .bind(col.partition_index)
+            .bind(col.partition_index.map(|v| v as i16))
             .execute(self.pool.as_ref())
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;
