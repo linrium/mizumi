@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use async_trait::async_trait;
 use crate::domain::{
     entities::metastore::MetastoreInfo,
     error::DomainError,
     ports::{inbound::MetastoreUseCase, outbound::MetastoreRepository},
 };
+use async_trait::async_trait;
+use std::sync::Arc;
 
 pub struct MetastoreService {
     repo: Arc<dyn MetastoreRepository>,

@@ -1,14 +1,13 @@
-use std::sync::Arc;
-use std::collections::HashMap;
+use super::{
+    decode_page_token, delete_properties, encode_page_token, fetch_properties, is_unique_violation,
+    upsert_properties,
+};
+use crate::domain::{entities::catalog::*, error::DomainError, ports::outbound::CatalogRepository};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::{
-    entities::catalog::*,
-    error::DomainError,
-    ports::outbound::CatalogRepository,
-};
-use super::{decode_page_token, encode_page_token, fetch_properties, upsert_properties, delete_properties, is_unique_violation};
 
 pub struct PgCatalogRepository {
     pool: Arc<PgPool>,
@@ -88,7 +87,11 @@ impl CatalogRepository for PgCatalogRepository {
         Ok(row.into_info(properties))
     }
 
-    async fn list(&self, max_results: Option<i32>, page_token: Option<String>) -> Result<ListCatalogsResponse, DomainError> {
+    async fn list(
+        &self,
+        max_results: Option<i32>,
+        page_token: Option<String>,
+    ) -> Result<ListCatalogsResponse, DomainError> {
         let limit = max_results.unwrap_or(100) as i64;
 
         let rows = if let Some(token) = page_token {
@@ -127,7 +130,10 @@ impl CatalogRepository for PgCatalogRepository {
             catalogs.push(row.into_info(props));
         }
 
-        Ok(ListCatalogsResponse { catalogs, next_page_token })
+        Ok(ListCatalogsResponse {
+            catalogs,
+            next_page_token,
+        })
     }
 
     async fn get(&self, name: &str) -> Result<CatalogInfo, DomainError> {
@@ -203,7 +209,10 @@ impl CatalogRepository for PgCatalogRepository {
             .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::NotFound(format!("Catalog not found: {}", name)));
+            return Err(DomainError::NotFound(format!(
+                "Catalog not found: {}",
+                name
+            )));
         }
 
         Ok(())
@@ -212,7 +221,9 @@ impl CatalogRepository for PgCatalogRepository {
 
 async fn cascade_delete_catalog(pool: &PgPool, catalog_id: Uuid) -> Result<(), DomainError> {
     #[derive(sqlx::FromRow)]
-    struct IdRow { id: Uuid }
+    struct IdRow {
+        id: Uuid,
+    }
 
     let schema_rows = sqlx::query_as::<_, IdRow>("SELECT id FROM uc_schemas WHERE catalog_id = $1")
         .bind(catalog_id)
@@ -227,16 +238,22 @@ async fn cascade_delete_catalog(pool: &PgPool, catalog_id: Uuid) -> Result<(), D
     Ok(())
 }
 
-pub(super) async fn cascade_delete_schema(pool: &PgPool, schema_id: Uuid) -> Result<(), DomainError> {
+pub(super) async fn cascade_delete_schema(
+    pool: &PgPool,
+    schema_id: Uuid,
+) -> Result<(), DomainError> {
     #[derive(sqlx::FromRow)]
-    struct IdRow { id: Uuid }
+    struct IdRow {
+        id: Uuid,
+    }
 
     // Delete model versions first, then registered models
-    let model_rows = sqlx::query_as::<_, IdRow>("SELECT id FROM uc_registered_models WHERE schema_id = $1")
-        .bind(schema_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let model_rows =
+        sqlx::query_as::<_, IdRow>("SELECT id FROM uc_registered_models WHERE schema_id = $1")
+            .bind(schema_id)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
     for model_row in model_rows {
         sqlx::query("DELETE FROM uc_model_versions WHERE registered_model_id = $1")

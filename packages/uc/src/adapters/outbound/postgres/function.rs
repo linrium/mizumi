@@ -1,13 +1,13 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use sqlx::PgPool;
-use uuid::Uuid;
+use super::{decode_page_token, encode_page_token, is_unique_violation};
 use crate::domain::{
     entities::{function::*, table::ColumnTypeName},
     error::DomainError,
     ports::outbound::FunctionRepository,
 };
-use super::{decode_page_token, encode_page_token, is_unique_violation};
+use async_trait::async_trait;
+use sqlx::PgPool;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct PgFunctionRepository {
     pool: Arc<PgPool>,
@@ -46,8 +46,7 @@ struct FunctionRow {
     external_language: Option<String>,
 }
 
-const FUNCTION_SELECT: &str =
-    "SELECT f.id, f.name, s.name as schema_name, c.name as catalog_name,
+const FUNCTION_SELECT: &str = "SELECT f.id, f.name, s.name as schema_name, c.name as catalog_name,
             f.comment, f.owner, f.created_at, f.created_by, f.updated_at, f.updated_by,
             f.data_type, f.full_data_type, f.input_params, f.return_params,
             f.routine_body, f.routine_definition, f.sql_data_access,
@@ -58,19 +57,29 @@ const FUNCTION_SELECT: &str =
      JOIN uc_catalogs c ON s.catalog_id = c.id";
 
 fn row_to_function_info(row: FunctionRow) -> Result<FunctionInfo, DomainError> {
-    let data_type = row.data_type.as_deref()
-        .map(|s| ColumnTypeName::from_str(s)
-            .ok_or_else(|| DomainError::Internal(format!("Unknown column type: {}", s))))
+    let data_type = row
+        .data_type
+        .as_deref()
+        .map(|s| {
+            ColumnTypeName::from_str(s)
+                .ok_or_else(|| DomainError::Internal(format!("Unknown column type: {}", s)))
+        })
         .transpose()?;
 
-    let input_params: Option<FunctionParameterInfos> = row.input_params
-        .map(|v| serde_json::from_value(v)
-            .map_err(|e| DomainError::Internal(format!("Failed to parse input_params: {}", e))))
+    let input_params: Option<FunctionParameterInfos> = row
+        .input_params
+        .map(|v| {
+            serde_json::from_value(v)
+                .map_err(|e| DomainError::Internal(format!("Failed to parse input_params: {}", e)))
+        })
         .transpose()?;
 
-    let return_params: Option<FunctionParameterInfos> = row.return_params
-        .map(|v| serde_json::from_value(v)
-            .map_err(|e| DomainError::Internal(format!("Failed to parse return_params: {}", e))))
+    let return_params: Option<FunctionParameterInfos> = row
+        .return_params
+        .map(|v| {
+            serde_json::from_value(v)
+                .map_err(|e| DomainError::Internal(format!("Failed to parse return_params: {}", e)))
+        })
         .transpose()?;
 
     let full_name = format!("{}.{}.{}", row.catalog_name, row.schema_name, row.name);
@@ -125,10 +134,14 @@ impl FunctionRepository for PgFunctionRepository {
         let now = chrono::Utc::now().naive_utc();
         let schema_id = schema_row.0;
 
-        let input_params_json = cmd.input_params.as_ref()
+        let input_params_json = cmd
+            .input_params
+            .as_ref()
             .map(|p| serde_json::to_value(p).map_err(|e| DomainError::Internal(e.to_string())))
             .transpose()?;
-        let return_params_json = cmd.return_params.as_ref()
+        let return_params_json = cmd
+            .return_params
+            .as_ref()
             .map(|p| serde_json::to_value(p).map_err(|e| DomainError::Internal(e.to_string())))
             .transpose()?;
 
@@ -229,7 +242,10 @@ impl FunctionRepository for PgFunctionRepository {
             functions.push(row_to_function_info(row)?);
         }
 
-        Ok(ListFunctionsResponse { functions, next_page_token })
+        Ok(ListFunctionsResponse {
+            functions,
+            next_page_token,
+        })
     }
 
     async fn get(&self, full_name: &str) -> Result<FunctionInfo, DomainError> {
@@ -252,7 +268,9 @@ impl FunctionRepository for PgFunctionRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Function not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Function not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -283,7 +301,10 @@ impl FunctionRepository for PgFunctionRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::NotFound(format!("Function not found: {}", full_name)));
+            return Err(DomainError::NotFound(format!(
+                "Function not found: {}",
+                full_name
+            )));
         }
 
         Ok(())

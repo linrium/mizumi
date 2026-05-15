@@ -1,18 +1,14 @@
-use std::sync::Arc;
-use std::collections::HashMap;
+use super::catalog::cascade_delete_schema;
+use super::{
+    decode_page_token, delete_properties, encode_page_token, fetch_properties, is_unique_violation,
+    upsert_properties,
+};
+use crate::domain::{entities::schema::*, error::DomainError, ports::outbound::SchemaRepository};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::{
-    entities::schema::*,
-    error::DomainError,
-    ports::outbound::SchemaRepository,
-};
-use super::{
-    decode_page_token, encode_page_token, fetch_properties, upsert_properties,
-    delete_properties, is_unique_violation,
-};
-use super::catalog::cascade_delete_schema;
 
 pub struct PgSchemaRepository {
     pool: Arc<PgPool>,
@@ -60,8 +56,7 @@ impl SchemaRow {
     }
 }
 
-const SCHEMA_SELECT: &str =
-    "SELECT s.id, s.name, c.name as catalog_name, s.comment, s.owner,
+const SCHEMA_SELECT: &str = "SELECT s.id, s.name, c.name as catalog_name, s.comment, s.owner,
             s.created_at, s.created_by, s.updated_at, s.updated_by,
             s.storage_root, s.storage_location
      FROM uc_schemas s
@@ -71,16 +66,17 @@ const SCHEMA_SELECT: &str =
 impl SchemaRepository for PgSchemaRepository {
     async fn create(&self, cmd: CreateSchema) -> Result<SchemaInfo, DomainError> {
         // Look up catalog
-        let catalog_row = sqlx::query_as::<_, (Uuid,)>(
-            "SELECT id FROM uc_catalogs WHERE name = $1",
-        )
-        .bind(&cmd.catalog_name)
-        .fetch_one(self.pool.as_ref())
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Catalog not found: {}", cmd.catalog_name)),
-            e => DomainError::Internal(e.to_string()),
-        })?;
+        let catalog_row =
+            sqlx::query_as::<_, (Uuid,)>("SELECT id FROM uc_catalogs WHERE name = $1")
+                .bind(&cmd.catalog_name)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| match e {
+                    sqlx::Error::RowNotFound => {
+                        DomainError::NotFound(format!("Catalog not found: {}", cmd.catalog_name))
+                    }
+                    e => DomainError::Internal(e.to_string()),
+                })?;
 
         let id = Uuid::new_v4();
         let now = chrono::Utc::now().naive_utc();
@@ -126,7 +122,12 @@ impl SchemaRepository for PgSchemaRepository {
         Ok(row.into_info(properties))
     }
 
-    async fn list(&self, catalog_name: &str, max_results: Option<i32>, page_token: Option<String>) -> Result<ListSchemasResponse, DomainError> {
+    async fn list(
+        &self,
+        catalog_name: &str,
+        max_results: Option<i32>,
+        page_token: Option<String>,
+    ) -> Result<ListSchemasResponse, DomainError> {
         let limit = max_results.unwrap_or(100) as i64;
 
         let rows = if let Some(token) = page_token {
@@ -167,7 +168,10 @@ impl SchemaRepository for PgSchemaRepository {
             schemas.push(row.into_info(props));
         }
 
-        Ok(ListSchemasResponse { schemas, next_page_token })
+        Ok(ListSchemasResponse {
+            schemas,
+            next_page_token,
+        })
     }
 
     async fn get(&self, full_name: &str) -> Result<SchemaInfo, DomainError> {
@@ -189,7 +193,9 @@ impl SchemaRepository for PgSchemaRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Schema not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Schema not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -228,8 +234,13 @@ impl SchemaRepository for PgSchemaRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Schema not found: {}", full_name)),
-            e if is_unique_violation(&e) => DomainError::AlreadyExists(format!("Schema already exists: {}.{}", catalog_name, new_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Schema not found: {}", full_name))
+            }
+            e if is_unique_violation(&e) => DomainError::AlreadyExists(format!(
+                "Schema already exists: {}.{}",
+                catalog_name, new_name
+            )),
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -261,7 +272,9 @@ impl SchemaRepository for PgSchemaRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Schema not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Schema not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -277,7 +290,10 @@ impl SchemaRepository for PgSchemaRepository {
                 .await
                 .map_err(|e| DomainError::Internal(e.to_string()))?;
             if result.rows_affected() == 0 {
-                return Err(DomainError::NotFound(format!("Schema not found: {}", full_name)));
+                return Err(DomainError::NotFound(format!(
+                    "Schema not found: {}",
+                    full_name
+                )));
             }
         }
 

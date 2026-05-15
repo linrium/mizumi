@@ -1,10 +1,11 @@
 import { deepseek } from "@ai-sdk/deepseek"
 import { createOpenAI } from "@ai-sdk/openai"
-import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
-import { NextRequest } from "next/server"
-import { z } from "zod"
 import type { LanguageModel } from "ai"
+import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
+import type { NextRequest } from "next/server"
+import { z } from "zod"
 import { fetchSchema } from "@/app/api/_lib/fetch-schema"
+import { getServerSession } from "@/lib/auth/server"
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"
 
@@ -24,11 +25,11 @@ async function ensureSession(sessionId: string | null): Promise<string> {
   return data.session_id
 }
 
-async function runSql(sessionId: string, sql: string) {
+async function runSql(sessionId: string, sql: string, idToken?: string) {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
@@ -70,6 +71,8 @@ export type PanelSummary = {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession()
+  const idToken = session?.idToken
   const {
     messages,
     sessionId,
@@ -157,7 +160,7 @@ export async function POST(req: NextRequest) {
         height,
       }) => {
         try {
-          const data = await runSql(resolvedSessionId, sql)
+          const data = await runSql(resolvedSessionId, sql, idToken)
           return {
             title,
             sql,

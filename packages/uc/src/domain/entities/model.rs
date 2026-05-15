@@ -60,7 +60,9 @@ impl ModelVersionStatus {
         match s {
             "PENDING_REGISTRATION" => Some(ModelVersionStatus::PENDING_REGISTRATION),
             "FAILED_REGISTRATION" => Some(ModelVersionStatus::FAILED_REGISTRATION),
-            "MODEL_VERSION_STATUS_UNKNOWN" => Some(ModelVersionStatus::MODEL_VERSION_STATUS_UNKNOWN),
+            "MODEL_VERSION_STATUS_UNKNOWN" => {
+                Some(ModelVersionStatus::MODEL_VERSION_STATUS_UNKNOWN)
+            }
             "READY" => Some(ModelVersionStatus::READY),
             _ => None,
         }

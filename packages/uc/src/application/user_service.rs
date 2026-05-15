@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use async_trait::async_trait;
 use crate::domain::{
     entities::user::{CreateUser, UpdateUser, User},
     error::DomainError,
     ports::{inbound::UserUseCase, outbound::UserRepository},
 };
+use async_trait::async_trait;
+use std::sync::Arc;
 
 pub struct UserService {
     repo: Arc<dyn UserRepository>,
@@ -22,7 +22,11 @@ impl UserUseCase for UserService {
         self.repo.create(cmd).await
     }
 
-    async fn list_users(&self, start_index: Option<usize>, count: Option<usize>) -> Result<Vec<User>, DomainError> {
+    async fn list_users(
+        &self,
+        start_index: Option<usize>,
+        count: Option<usize>,
+    ) -> Result<Vec<User>, DomainError> {
         let start = start_index.unwrap_or(0);
         let limit = count.unwrap_or(50).min(200);
         self.repo.list(start, limit).await

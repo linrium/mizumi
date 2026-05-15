@@ -1,10 +1,11 @@
 import { deepseek } from "@ai-sdk/deepseek"
 import { createOpenAI } from "@ai-sdk/openai"
-import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
-import { NextRequest } from "next/server"
-import { z } from "zod"
 import type { LanguageModel } from "ai"
+import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
+import type { NextRequest } from "next/server"
+import { z } from "zod"
 import { fetchSchema } from "@/app/api/_lib/fetch-schema"
+import { getServerSession } from "@/lib/auth/server"
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"
 
@@ -16,14 +17,14 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-async function runSql(sessionId: string | null, sql: string) {
+async function runSql(sessionId: string | null, sql: string, idToken?: string) {
   const url = sessionId
     ? `${API_BASE}/api/sessions/${sessionId}/query`
     : `${API_BASE}/api/query`
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken }),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
@@ -54,6 +55,8 @@ function resolveModel(modelId: ModelId): LanguageModel {
 
 export async function POST(req: NextRequest) {
   const { messages, sessionId, modelId } = await req.json()
+  const session = await getServerSession()
+  const idToken = session?.idToken
 
   const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-mini")
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
@@ -70,7 +73,7 @@ export async function POST(req: NextRequest) {
       }),
       execute: async ({ sql, explanation }) => {
         try {
-          const data = await runSql(sessionId, sql)
+          const data = await runSql(sessionId, sql, idToken)
           return {
             sql,
             explanation,
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
       }),
       execute: async ({ sql, title, chartType, x, y, explanation }) => {
         try {
-          const data = await runSql(sessionId, sql)
+          const data = await runSql(sessionId, sql, idToken)
           return {
             sql,
             title,

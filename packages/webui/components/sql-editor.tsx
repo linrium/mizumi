@@ -1,14 +1,15 @@
 "use client"
 
+import type { ColumnDef } from "@tanstack/react-table"
+import { Copy01Icon, PlayIcon, SqlIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
 import { useForm } from "@tanstack/react-form"
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { z } from "zod"
-import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { PlayIcon, Copy01Icon, SqlIcon } from "@hugeicons/core-free-icons"
-import type { ColumnDef } from "@tanstack/react-table"
 import { DataGrid } from "@/components/data-grid/data-grid"
+import { readStoredIdToken } from "@/lib/auth/client"
+import { Button } from "@/components/ui/button"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
 
@@ -134,7 +135,10 @@ export function SqlEditor() {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sql: value.sql }),
+          body: JSON.stringify({
+            sql: value.sql,
+            idToken: readStoredIdToken() ?? undefined,
+          }),
         })
         const elapsed = Date.now() - startRef.current
         const body = await res.json()

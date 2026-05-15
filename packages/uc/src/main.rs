@@ -1,22 +1,11 @@
-mod domain;
-mod application;
 mod adapters;
+mod application;
+mod domain;
 mod infrastructure;
 
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use application::{
-    catalog_service::CatalogService,
-    function_service::FunctionService,
-    metastore_service::MetastoreService,
-    model_service::ModelService,
-    permission_service::PermissionService,
-    schema_service::SchemaService,
-    table_service::TableService,
-    user_service::UserService,
-    volume_service::VolumeService,
-};
 use adapters::outbound::postgres::{
     catalog::PgCatalogRepository,
     function::PgFunctionRepository,
@@ -28,8 +17,21 @@ use adapters::outbound::postgres::{
     user::PgUserRepository,
     volume::PgVolumeRepository,
 };
-use infrastructure::{auth::JwtValidator, config::Config, db, server::{AppState, OAuth2Config}, token_manager::TokenManager};
+use application::{
+    catalog_service::CatalogService, function_service::FunctionService,
+    metastore_service::MetastoreService, model_service::ModelService,
+    permission_service::PermissionService, schema_service::SchemaService,
+    table_service::TableService, user_service::UserService, volume_service::VolumeService,
+};
 use domain::ports::outbound::MetastoreRepository;
+use infrastructure::{
+    auth::JwtValidator,
+    config::Config,
+    db,
+    server::{AppState, OAuth2Config},
+    temporary_credentials::TemporaryCredentialsVendor,
+    token_manager::TokenManager,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
     let version_repo = Arc::new(PgModelVersionRepository::new(pool.clone()));
     let metastore_repo = Arc::new(PgMetastoreRepository::new(pool.clone()));
     let user_repo = Arc::new(PgUserRepository::new(pool.clone()));
+    let temporary_credentials_vendor = Arc::new(TemporaryCredentialsVendor::new(config.clone()));
 
     // Initialize metastore (creates one if it doesn't exist)
     metastore_repo.initialize().await?;
@@ -108,14 +111,20 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(CatalogService::new(catalog_repo, authorizer.clone()));
     let schema_service: Arc<dyn domain::ports::inbound::SchemaUseCase> =
         Arc::new(SchemaService::new(schema_repo, authorizer.clone()));
-    let table_service: Arc<dyn domain::ports::inbound::TableUseCase> =
-        Arc::new(TableService::new(table_repo, authorizer.clone()));
+    let table_service: Arc<dyn domain::ports::inbound::TableUseCase> = Arc::new(TableService::new(
+        table_repo,
+        authorizer.clone(),
+        temporary_credentials_vendor.clone(),
+    ));
     let volume_service: Arc<dyn domain::ports::inbound::VolumeUseCase> =
         Arc::new(VolumeService::new(volume_repo, authorizer.clone()));
     let function_service: Arc<dyn domain::ports::inbound::FunctionUseCase> =
         Arc::new(FunctionService::new(function_repo, authorizer.clone()));
-    let model_service: Arc<dyn domain::ports::inbound::ModelUseCase> =
-        Arc::new(ModelService::new(model_repo, version_repo, authorizer.clone()));
+    let model_service: Arc<dyn domain::ports::inbound::ModelUseCase> = Arc::new(ModelService::new(
+        model_repo,
+        version_repo,
+        authorizer.clone(),
+    ));
     let metastore_service: Arc<dyn domain::ports::inbound::MetastoreUseCase> =
         Arc::new(MetastoreService::new(metastore_repo));
     let permission_service: Arc<dyn domain::ports::inbound::PermissionUseCase> =

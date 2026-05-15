@@ -64,6 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useSessionContext } from "@/hooks/use-session-context"
+import { readStoredIdToken } from "@/lib/auth/client"
 import type { ModelId, PanelSummary } from "@/app/api/dashboard/generate/route"
 import { MODELS } from "@/app/api/dashboard/generate/route"
 
@@ -1105,7 +1106,7 @@ export default function DashboardPage() {
   )
   const abortRefs = useRef<Record<string, AbortController>>({})
 
-  const { activeId, createSession } = useSessionContext()
+  const { activeId } = useSessionContext()
 
   const runQuery = useCallback(
     async (panel: Panel, sessionId: string | null) => {
@@ -1124,7 +1125,10 @@ export default function DashboardPage() {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sql: panel.sql }),
+          body: JSON.stringify({
+            sql: panel.sql,
+            idToken: readStoredIdToken() ?? undefined,
+          }),
           signal: ctrl.signal,
         })
         const json = await res.json()

@@ -202,3 +202,46 @@ pub struct ListTablesResponse {
     pub tables: Vec<TableInfo>,
     pub next_page_token: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GenerateTemporaryTableCredential {
+    pub table_id: Uuid,
+    pub operation: TableOperation,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub enum TableOperation {
+    UNKNOWN_TABLE_OPERATION,
+    READ,
+    READ_WRITE,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AwsCredentials {
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AzureUserDelegationSas {
+    pub sas_token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GcpOauthToken {
+    pub oauth_token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TemporaryCredentials {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aws_temp_credentials: Option<AwsCredentials>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub azure_user_delegation_sas: Option<AzureUserDelegationSas>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gcp_oauth_token: Option<GcpOauthToken>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiration_time: Option<i64>,
+}

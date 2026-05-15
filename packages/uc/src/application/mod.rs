@@ -1,9 +1,9 @@
 pub mod catalog_service;
+pub mod function_service;
+pub mod metastore_service;
+pub mod model_service;
+pub mod permission_service;
 pub mod schema_service;
 pub mod table_service;
-pub mod volume_service;
-pub mod function_service;
-pub mod model_service;
-pub mod metastore_service;
-pub mod permission_service;
 pub mod user_service;
+pub mod volume_service;

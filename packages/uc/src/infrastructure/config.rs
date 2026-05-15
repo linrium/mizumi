@@ -122,15 +122,27 @@ pub struct GcsConfig {
 }
 
 mod defaults {
-    pub fn env() -> String { "dev".into() }
-    pub fn host() -> String { "0.0.0.0".into() }
-    pub fn port() -> u16 { 8080 }
-    pub fn authorization() -> String { "disable".into() }
-    pub fn cookie_timeout() -> String { "P5D".into() }
+    pub fn env() -> String {
+        "dev".into()
+    }
+    pub fn host() -> String {
+        "0.0.0.0".into()
+    }
+    pub fn port() -> u16 {
+        8080
+    }
+    pub fn authorization() -> String {
+        "disable".into()
+    }
+    pub fn cookie_timeout() -> String {
+        "P5D".into()
+    }
     pub fn database_url() -> String {
         "postgres://postgres:password@localhost:5432/unitycatalog".into()
     }
-    pub fn max_connections() -> u32 { 20 }
+    pub fn max_connections() -> u32 {
+        20
+    }
 }
 
 impl Config {

@@ -1,13 +1,13 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use sqlx::PgPool;
-use uuid::Uuid;
+use super::{decode_page_token, encode_page_token, is_unique_violation};
 use crate::domain::{
     entities::model::*,
     error::DomainError,
-    ports::outbound::{RegisteredModelRepository, ModelVersionRepository},
+    ports::outbound::{ModelVersionRepository, RegisteredModelRepository},
 };
-use super::{decode_page_token, encode_page_token, is_unique_violation};
+use async_trait::async_trait;
+use sqlx::PgPool;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct PgRegisteredModelRepository {
     pool: Arc<PgPool>,
@@ -44,8 +44,7 @@ struct RegisteredModelRow {
     storage_location: Option<String>,
 }
 
-const MODEL_SELECT: &str =
-    "SELECT rm.id, rm.name, s.name as schema_name, c.name as catalog_name,
+const MODEL_SELECT: &str = "SELECT rm.id, rm.name, s.name as schema_name, c.name as catalog_name,
             rm.comment, rm.owner, rm.created_at, rm.created_by, rm.updated_at, rm.updated_by,
             rm.storage_location
      FROM uc_registered_models rm
@@ -118,11 +117,12 @@ impl RegisteredModelRepository for PgRegisteredModelRepository {
             }
         })?;
 
-        let row = sqlx::query_as::<_, RegisteredModelRow>(&format!("{} WHERE rm.id = $1", MODEL_SELECT))
-            .bind(id)
-            .fetch_one(self.pool.as_ref())
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let row =
+            sqlx::query_as::<_, RegisteredModelRow>(&format!("{} WHERE rm.id = $1", MODEL_SELECT))
+                .bind(id)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(row_to_model_info(row))
     }
@@ -171,7 +171,10 @@ impl RegisteredModelRepository for PgRegisteredModelRepository {
         };
 
         let registered_models = rows.into_iter().map(row_to_model_info).collect();
-        Ok(ListRegisteredModelsResponse { registered_models, next_page_token })
+        Ok(ListRegisteredModelsResponse {
+            registered_models,
+            next_page_token,
+        })
     }
 
     async fn get(&self, full_name: &str) -> Result<RegisteredModelInfo, DomainError> {
@@ -194,14 +197,20 @@ impl RegisteredModelRepository for PgRegisteredModelRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Registered model not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Registered model not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
         Ok(row_to_model_info(row))
     }
 
-    async fn update(&self, full_name: &str, cmd: UpdateRegisteredModel) -> Result<RegisteredModelInfo, DomainError> {
+    async fn update(
+        &self,
+        full_name: &str,
+        cmd: UpdateRegisteredModel,
+    ) -> Result<RegisteredModelInfo, DomainError> {
         let parts: Vec<&str> = full_name.splitn(3, '.').collect();
         if parts.len() != 3 {
             return Err(DomainError::InvalidArgument(format!(
@@ -233,7 +242,9 @@ impl RegisteredModelRepository for PgRegisteredModelRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Registered model not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Registered model not found: {}", full_name))
+            }
             e if is_unique_violation(&e) => DomainError::AlreadyExists(format!(
                 "Registered model already exists: {}.{}.{}",
                 catalog_name, schema_name, new_name
@@ -266,7 +277,9 @@ impl RegisteredModelRepository for PgRegisteredModelRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Registered model not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Registered model not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -316,8 +329,9 @@ const VERSION_SELECT: &str =
      JOIN uc_catalogs c ON s.catalog_id = c.id";
 
 fn row_to_version_info(row: ModelVersionRow) -> Result<ModelVersionInfo, DomainError> {
-    let status = ModelVersionStatus::from_str(&row.status)
-        .ok_or_else(|| DomainError::Internal(format!("Unknown model version status: {}", row.status)))?;
+    let status = ModelVersionStatus::from_str(&row.status).ok_or_else(|| {
+        DomainError::Internal(format!("Unknown model version status: {}", row.status))
+    })?;
     Ok(ModelVersionInfo {
         id: row.id,
         model_name: row.model_name,
@@ -396,11 +410,12 @@ impl ModelVersionRepository for PgModelVersionRepository {
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        let row = sqlx::query_as::<_, ModelVersionRow>(&format!("{} WHERE mv.id = $1", VERSION_SELECT))
-            .bind(id)
-            .fetch_one(self.pool.as_ref())
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let row =
+            sqlx::query_as::<_, ModelVersionRow>(&format!("{} WHERE mv.id = $1", VERSION_SELECT))
+                .bind(id)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         row_to_version_info(row)
     }
@@ -415,8 +430,10 @@ impl ModelVersionRepository for PgModelVersionRepository {
         let limit = max_results.unwrap_or(100) as i64;
 
         let rows = if let Some(token) = page_token {
-            let cursor: i64 = decode_page_token(&token)
-                .and_then(|s| s.parse::<i64>().map_err(|e| DomainError::InvalidArgument(format!("Invalid page token: {}", e))))?;
+            let cursor: i64 = decode_page_token(&token).and_then(|s| {
+                s.parse::<i64>()
+                    .map_err(|e| DomainError::InvalidArgument(format!("Invalid page token: {}", e)))
+            })?;
             sqlx::query_as::<_, ModelVersionRow>(&format!(
                 "{} WHERE c.name = $1 AND s.name = $2 AND rm.name = $3 AND mv.version > $4
                  ORDER BY mv.version ASC LIMIT $5",
@@ -448,7 +465,8 @@ impl ModelVersionRepository for PgModelVersionRepository {
         let has_more = rows.len() > limit as usize;
         let rows: Vec<ModelVersionRow> = rows.into_iter().take(limit as usize).collect();
         let next_page_token = if has_more {
-            rows.last().map(|r| encode_page_token(&r.version.to_string()))
+            rows.last()
+                .map(|r| encode_page_token(&r.version.to_string()))
         } else {
             None
         };
@@ -458,10 +476,17 @@ impl ModelVersionRepository for PgModelVersionRepository {
             model_versions.push(row_to_version_info(row)?);
         }
 
-        Ok(ListModelVersionsResponse { model_versions, next_page_token })
+        Ok(ListModelVersionsResponse {
+            model_versions,
+            next_page_token,
+        })
     }
 
-    async fn get(&self, model_full_name: &str, version: i64) -> Result<ModelVersionInfo, DomainError> {
+    async fn get(
+        &self,
+        model_full_name: &str,
+        version: i64,
+    ) -> Result<ModelVersionInfo, DomainError> {
         let (catalog_name, schema_name, model_name) = parse_model_full_name(model_full_name)?;
 
         let row = sqlx::query_as::<_, ModelVersionRow>(&format!(

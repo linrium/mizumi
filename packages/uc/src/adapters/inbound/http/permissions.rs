@@ -1,15 +1,14 @@
-use axum::{
-    extract::{Path, State},
-    response::IntoResponse,
-    Extension,
-    Json,
-};
-use std::sync::Arc;
 use crate::{
     adapters::inbound::http::error::AppError,
     domain::{error::DomainError, permissions::UpdatePermissions},
     infrastructure::server::AppState,
 };
+use axum::{
+    extract::{Path, State},
+    response::IntoResponse,
+    Extension, Json,
+};
+use std::sync::Arc;
 
 pub async fn get_permissions(
     State(state): State<Arc<AppState>>,

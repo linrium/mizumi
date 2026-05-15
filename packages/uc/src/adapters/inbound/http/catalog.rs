@@ -1,16 +1,14 @@
+use crate::{
+    adapters::inbound::http::error::AppError, domain::entities::catalog::*,
+    infrastructure::server::AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
-    Extension,
-    Json,
+    Extension, Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    domain::entities::catalog::*,
-    infrastructure::server::AppState,
-};
 
 #[derive(Deserialize)]
 pub struct ListParams {
@@ -28,7 +26,10 @@ pub async fn create_catalog(
     Extension(principal): Extension<String>,
     Json(body): Json<CreateCatalog>,
 ) -> Result<impl IntoResponse, AppError> {
-    let catalog = state.catalog_service.create_catalog(&principal, body).await?;
+    let catalog = state
+        .catalog_service
+        .create_catalog(&principal, body)
+        .await?;
     Ok(Json(catalog))
 }
 
@@ -59,7 +60,10 @@ pub async fn update_catalog(
     Path(name): Path<String>,
     Json(body): Json<UpdateCatalog>,
 ) -> Result<impl IntoResponse, AppError> {
-    let catalog = state.catalog_service.update_catalog(&principal, &name, body).await?;
+    let catalog = state
+        .catalog_service
+        .update_catalog(&principal, &name, body)
+        .await?;
     Ok(Json(catalog))
 }
 

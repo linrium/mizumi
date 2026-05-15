@@ -26,7 +26,8 @@ impl K8sQueryService {
 
     pub async fn run_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
         let client = duckdb::client().await?;
-        let job_name = duckdb::create_query_job(&client, &req.sql).await?;
+        let job_name =
+            duckdb::create_query_job(&client, &req.sql, req.id_token.as_deref()).await?;
         let result = duckdb::wait_for_completion(&client, &job_name).await;
         let _ = duckdb::delete_query_job(&client, &job_name).await;
         duckdb::parse_output(&result?)
@@ -62,6 +63,6 @@ impl K8sQueryService {
     ) -> Result<QueryResponse, AppError> {
         let pod_name = self.sessions.get(id).ok_or(AppError::NotFound)?;
         let client = duckdb::client().await?;
-        duckdb::session_query(&client, &pod_name, &req.sql).await
+        duckdb::session_query(&client, &pod_name, &req.sql, req.id_token.as_deref()).await
     }
 }

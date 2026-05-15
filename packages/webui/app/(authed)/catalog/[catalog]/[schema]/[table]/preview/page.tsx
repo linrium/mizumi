@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useParams } from "next/navigation"
 import type { ColumnDef } from "@tanstack/react-table"
+import { useParams } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessions } from "@/hooks/use-sessions"
+import { readStoredIdToken } from "@/lib/auth/client"
 
 type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>
@@ -17,7 +18,7 @@ async function runQuery(
   const res = await fetch(`/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken: readStoredIdToken() ?? undefined }),
   })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)

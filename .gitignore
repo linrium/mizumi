@@ -10,3 +10,4 @@ wheels/
 .venv
 target
 .next
+packages/uc-java

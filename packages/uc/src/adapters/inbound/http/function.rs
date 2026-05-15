@@ -1,16 +1,14 @@
+use crate::{
+    adapters::inbound::http::error::AppError, domain::entities::function::*,
+    infrastructure::server::AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
-    Extension,
-    Json,
+    Extension, Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    domain::entities::function::*,
-    infrastructure::server::AppState,
-};
 
 #[derive(Deserialize)]
 pub struct ListParams {
@@ -25,7 +23,10 @@ pub async fn create_function(
     Extension(principal): Extension<String>,
     Json(body): Json<CreateFunctionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let function = state.function_service.create_function(&principal, body.function_info).await?;
+    let function = state
+        .function_service
+        .create_function(&principal, body.function_info)
+        .await?;
     Ok(Json(function))
 }
 
@@ -36,7 +37,13 @@ pub async fn list_functions(
 ) -> Result<impl IntoResponse, AppError> {
     let response = state
         .function_service
-        .list_functions(&principal, &params.catalog_name, &params.schema_name, params.max_results, params.page_token)
+        .list_functions(
+            &principal,
+            &params.catalog_name,
+            &params.schema_name,
+            params.max_results,
+            params.page_token,
+        )
         .await?;
     Ok(Json(response))
 }
@@ -46,7 +53,10 @@ pub async fn get_function(
     Extension(principal): Extension<String>,
     Path(full_name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let function = state.function_service.get_function(&principal, &full_name).await?;
+    let function = state
+        .function_service
+        .get_function(&principal, &full_name)
+        .await?;
     Ok(Json(function))
 }
 
@@ -55,6 +65,9 @@ pub async fn delete_function(
     Extension(principal): Extension<String>,
     Path(full_name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    state.function_service.delete_function(&principal, &full_name).await?;
+    state
+        .function_service
+        .delete_function(&principal, &full_name)
+        .await?;
     Ok(Json(serde_json::json!({})))
 }

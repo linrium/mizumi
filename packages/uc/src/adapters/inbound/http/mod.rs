@@ -1,33 +1,35 @@
 pub mod auth;
-pub mod error;
 pub mod catalog;
-pub mod schema;
-pub mod table;
-pub mod volume;
+pub mod error;
 pub mod function;
-pub mod model;
 pub mod metastore;
 pub mod middleware;
+pub mod model;
 pub mod permissions;
+pub mod schema;
+pub mod table;
 pub mod user;
+pub mod volume;
 
-use axum::{middleware as axum_middleware, routing::{delete, get, post, put}, Router};
-use std::sync::Arc;
 use crate::infrastructure::server::AppState;
+use axum::{
+    middleware as axum_middleware,
+    routing::{get, post},
+    Router,
+};
+use std::sync::Arc;
 
 pub fn create_router(state: Arc<AppState>) -> Router {
-    let protected = api_routes()
-        .route_layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            middleware::require_auth,
-        ));
+    let protected = api_routes().route_layer(axum_middleware::from_fn_with_state(
+        state.clone(),
+        middleware::require_auth,
+    ));
 
     // SCIM2 user routes — also protected by auth middleware
-    let scim_routes = scim_routes()
-        .route_layer(axum_middleware::from_fn_with_state(
-            state.clone(),
-            middleware::require_auth,
-        ));
+    let scim_routes = scim_routes().route_layer(axum_middleware::from_fn_with_state(
+        state.clone(),
+        middleware::require_auth,
+    ));
 
     Router::new()
         // Public auth endpoints (no JWT required)
@@ -40,18 +42,25 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
 fn scim_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/scim2/Users", post(user::create_user).get(user::list_users))
+        .route(
+            "/scim2/Users",
+            post(user::create_user).get(user::list_users),
+        )
         .route(
             "/scim2/Users/:id",
-            get(user::get_user).put(user::update_user).delete(user::delete_user),
+            get(user::get_user)
+                .put(user::update_user)
+                .delete(user::delete_user),
         )
 }
-
 
 fn api_routes() -> Router<Arc<AppState>> {
     Router::new()
         // Catalogs
-        .route("/catalogs", post(catalog::create_catalog).get(catalog::list_catalogs))
+        .route(
+            "/catalogs",
+            post(catalog::create_catalog).get(catalog::list_catalogs),
+        )
         .route(
             "/catalogs/:name",
             get(catalog::get_catalog)
@@ -59,7 +68,10 @@ fn api_routes() -> Router<Arc<AppState>> {
                 .delete(catalog::delete_catalog),
         )
         // Schemas
-        .route("/schemas", post(schema::create_schema).get(schema::list_schemas))
+        .route(
+            "/schemas",
+            post(schema::create_schema).get(schema::list_schemas),
+        )
         .route(
             "/schemas/:full_name",
             get(schema::get_schema)
@@ -72,8 +84,15 @@ fn api_routes() -> Router<Arc<AppState>> {
             "/tables/:full_name",
             get(table::get_table).delete(table::delete_table),
         )
+        .route(
+            "/temporary-table-credentials",
+            post(table::generate_temporary_table_credentials),
+        )
         // Volumes
-        .route("/volumes", post(volume::create_volume).get(volume::list_volumes))
+        .route(
+            "/volumes",
+            post(volume::create_volume).get(volume::list_volumes),
+        )
         .route(
             "/volumes/:full_name",
             get(volume::get_volume)
@@ -81,13 +100,19 @@ fn api_routes() -> Router<Arc<AppState>> {
                 .delete(volume::delete_volume),
         )
         // Functions
-        .route("/functions", post(function::create_function).get(function::list_functions))
+        .route(
+            "/functions",
+            post(function::create_function).get(function::list_functions),
+        )
         .route(
             "/functions/:full_name",
             get(function::get_function).delete(function::delete_function),
         )
         // Registered Models
-        .route("/models", post(model::create_registered_model).get(model::list_registered_models))
+        .route(
+            "/models",
+            post(model::create_registered_model).get(model::list_registered_models),
+        )
         .route(
             "/models/:full_name",
             get(model::get_registered_model)

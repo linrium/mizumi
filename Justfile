@@ -27,6 +27,7 @@ spark_operator_chart := "spark-operator/spark-operator"
 spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
 spark_image := "mizumi-spark-rustfs:4.1.1"
+duckdb_image := "mizumi-duckdb:1.1.4"
 daft_image := "mizumi-daft:0.7.10"
 
 daft_namespace := "daft"
@@ -145,6 +146,9 @@ spark-operator-deploy: spark-helm-repo
 spark-image-build:
     docker build -t {{spark_image}} packages/spark
 
+duckdb-image-build:
+    docker build -t {{duckdb_image}} -f packages/duckdb/Dockerfile .
+
 daft-image-build:
     docker build -t {{daft_image}} -f packages/daft/Dockerfile .
 
@@ -225,7 +229,6 @@ unitycatalog-bootstrap:
 
 jobs-submit-all:
     just jobs-sumit-hdbank-card-payments-bronze-stream
-    just jobs-sumit-hdbank-customer-profiles-bronze-stream
 
 jobs-sumit-hdbank-card-payments-bronze-stream:
     curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \

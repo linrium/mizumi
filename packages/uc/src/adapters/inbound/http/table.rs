@@ -1,16 +1,14 @@
+use crate::{
+    adapters::inbound::http::error::AppError, domain::entities::table::*,
+    infrastructure::server::AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
-    Extension,
-    Json,
+    Extension, Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    domain::entities::table::*,
-    infrastructure::server::AppState,
-};
 
 #[derive(Deserialize)]
 pub struct ListParams {
@@ -36,7 +34,13 @@ pub async fn list_tables(
 ) -> Result<impl IntoResponse, AppError> {
     let response = state
         .table_service
-        .list_tables(&principal, &params.catalog_name, &params.schema_name, params.max_results, params.page_token)
+        .list_tables(
+            &principal,
+            &params.catalog_name,
+            &params.schema_name,
+            params.max_results,
+            params.page_token,
+        )
         .await?;
     Ok(Json(response))
 }
@@ -46,8 +50,23 @@ pub async fn get_table(
     Extension(principal): Extension<String>,
     Path(full_name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let table = state.table_service.get_table(&principal, &full_name).await?;
+    let table = state
+        .table_service
+        .get_table(&principal, &full_name)
+        .await?;
     Ok(Json(table))
+}
+
+pub async fn generate_temporary_table_credentials(
+    State(state): State<Arc<AppState>>,
+    Extension(principal): Extension<String>,
+    Json(body): Json<GenerateTemporaryTableCredential>,
+) -> Result<impl IntoResponse, AppError> {
+    let credentials = state
+        .table_service
+        .generate_temporary_table_credentials(&principal, body)
+        .await?;
+    Ok(Json(credentials))
 }
 
 pub async fn delete_table(
@@ -55,6 +74,9 @@ pub async fn delete_table(
     Extension(principal): Extension<String>,
     Path(full_name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    state.table_service.delete_table(&principal, &full_name).await?;
+    state
+        .table_service
+        .delete_table(&principal, &full_name)
+        .await?;
     Ok(Json(serde_json::json!({})))
 }

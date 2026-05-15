@@ -1,3 +1,7 @@
+use crate::{
+    adapters::inbound::http::error::AppError, domain::error::DomainError,
+    infrastructure::server::AppState,
+};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -7,11 +11,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    domain::error::DomainError,
-    infrastructure::server::AppState,
-};
 
 /// Query params returned by the OAuth2 provider to the callback URL.
 #[derive(Deserialize)]
@@ -92,10 +91,9 @@ pub async fn callback(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(DomainError::Internal(format!(
-            "Token exchange failed ({status}): {body}"
-        ))
-        .into());
+        return Err(
+            DomainError::Internal(format!("Token exchange failed ({status}): {body}")).into(),
+        );
     }
 
     let tokens: TokenResponse = resp

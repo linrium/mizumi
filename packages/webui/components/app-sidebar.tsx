@@ -6,6 +6,7 @@ import {
   Book03Icon,
   Chart01Icon,
   CodeIcon,
+  Copy01Icon,
   DashboardSquare01Icon,
   LakeIcon,
   Logout03Icon,
@@ -13,6 +14,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname } from "next/navigation"
+import { toast } from "sonner"
 import {
   Sidebar,
   SidebarContent,
@@ -55,6 +57,15 @@ type AppSidebarProps = {
 export function AppSidebar({ session }: AppSidebarProps) {
   const pathname = usePathname()
   const groupsLabel = session.groups?.join(", ")
+
+  async function copyDebugToken() {
+    try {
+      await navigator.clipboard.writeText(session.idToken)
+      toast.success("Copied ID token")
+    } catch {
+      toast.error("Failed to copy ID token")
+    }
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -130,6 +141,15 @@ export function AppSidebar({ session }: AppSidebarProps) {
           ) : null}
         </div>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={copyDebugToken}
+              tooltip="Copy debug token"
+            >
+              <HugeiconsIcon icon={Copy01Icon} size={16} />
+              <span>Copy debug token</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Log out">
               <a href="/auth/logout">

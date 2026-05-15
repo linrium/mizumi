@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use crate::{
     domain::ports::inbound::*,
     domain::ports::outbound::AuthorizerPort,
     infrastructure::{auth::JwtValidator, token_manager::TokenManager},
 };
+use std::sync::Arc;
 
 pub struct AppState {
     pub catalog_service: Arc<dyn CatalogUseCase>,

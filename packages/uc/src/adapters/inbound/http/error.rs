@@ -1,9 +1,9 @@
+use crate::domain::error::DomainError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
-use crate::domain::error::DomainError;
 
 pub struct AppError(pub DomainError);
 

@@ -1,3 +1,4 @@
+use crate::infrastructure::server::AppState;
 use axum::{
     body::Body,
     extract::State,
@@ -8,7 +9,6 @@ use axum::{
 };
 use base64::Engine as _;
 use std::sync::Arc;
-use crate::infrastructure::server::AppState;
 
 /// Tower middleware that validates `Authorization: Bearer <token>` on every
 /// request to the protected API. Inserts the principal (email or sub) as

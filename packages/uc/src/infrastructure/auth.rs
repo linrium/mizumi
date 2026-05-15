@@ -1,12 +1,12 @@
-use std::sync::Arc;
-use serde::Deserialize;
-use tokio::sync::RwLock;
+use crate::domain::error::DomainError;
 use jsonwebtoken::{
     decode, decode_header,
     jwk::{AlgorithmParameters, JwkSet},
     Algorithm, DecodingKey, Validation,
 };
-use crate::domain::error::DomainError;
+use serde::Deserialize;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Validated claims extracted from a JWT bearer token.
 #[derive(Debug, Clone, Deserialize)]
@@ -148,11 +148,13 @@ impl JwtValidator {
         let decoding_key = match &jwk.algorithm {
             AlgorithmParameters::RSA(rsa) => DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
                 .map_err(|e| DomainError::Internal(format!("JWK key error: {e}")))?,
-            AlgorithmParameters::EllipticCurve(ec) => {
-                DecodingKey::from_ec_components(&ec.x, &ec.y)
-                    .map_err(|e| DomainError::Internal(format!("JWK EC key error: {e}")))?
+            AlgorithmParameters::EllipticCurve(ec) => DecodingKey::from_ec_components(&ec.x, &ec.y)
+                .map_err(|e| DomainError::Internal(format!("JWK EC key error: {e}")))?,
+            _ => {
+                return Err(DomainError::InvalidArgument(
+                    "Unsupported JWK algorithm".into(),
+                ))
             }
-            _ => return Err(DomainError::InvalidArgument("Unsupported JWK algorithm".into())),
         };
 
         let alg = jwk

@@ -1,13 +1,13 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::PgPool;
-use uuid::Uuid;
 use crate::domain::{
     entities::user::{CreateUser, UpdateUser, User, UserState},
     error::DomainError,
     ports::outbound::UserRepository,
 };
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use sqlx::PgPool;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct PgUserRepository {
     pool: Arc<PgPool>,

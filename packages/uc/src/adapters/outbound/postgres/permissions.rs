@@ -1,11 +1,11 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use std::collections::HashMap;
 use crate::domain::{
     error::DomainError,
-    permissions::{Privilege, SecurableType, PermissionsList, PrivilegeAssignment},
+    permissions::{PermissionsList, Privilege, PrivilegeAssignment, SecurableType},
     ports::outbound::AuthorizerPort,
 };
+use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct PgAuthorizer {
     pool: Arc<sqlx::PgPool>,
@@ -200,10 +200,15 @@ impl AuthorizerPort for PgAuthorizer {
 
         let privilege_assignments = map
             .into_iter()
-            .map(|(principal, privileges)| PrivilegeAssignment { principal, privileges })
+            .map(|(principal, privileges)| PrivilegeAssignment {
+                principal,
+                privileges,
+            })
             .collect();
 
-        Ok(PermissionsList { privilege_assignments })
+        Ok(PermissionsList {
+            privilege_assignments,
+        })
     }
 
     async fn add_hierarchy(

@@ -105,10 +105,15 @@ impl From<User> for ScimUser {
             id: Some(u.id.to_string()),
             display_name: Some(u.name),
             user_name: Some(u.email.clone()),
-            emails: vec![ScimEmail { value: u.email, primary: true }],
+            emails: vec![ScimEmail {
+                value: u.email,
+                primary: true,
+            }],
             active: u.state == UserState::Enabled,
             external_id: u.external_id,
-            meta: Some(ScimMeta { resource_type: "User".to_string() }),
+            meta: Some(ScimMeta {
+                resource_type: "User".to_string(),
+            }),
         }
     }
 }

@@ -1,13 +1,10 @@
-use std::sync::Arc;
-use async_trait::async_trait;
 use crate::domain::{
     error::DomainError,
-    permissions::{Privilege, SecurableType, PermissionsList, UpdatePermissions},
-    ports::{
-        inbound::PermissionUseCase,
-        outbound::AuthorizerPort,
-    },
+    permissions::{PermissionsList, Privilege, SecurableType, UpdatePermissions},
+    ports::{inbound::PermissionUseCase, outbound::AuthorizerPort},
 };
+use async_trait::async_trait;
+use std::sync::Arc;
 
 pub struct PermissionService {
     authorizer: Arc<dyn AuthorizerPort>,
@@ -27,11 +24,19 @@ impl PermissionUseCase for PermissionService {
         securable_type: SecurableType,
         full_name: &str,
     ) -> Result<PermissionsList, DomainError> {
-        let allowed = self.authorizer
-            .is_authorized(principal, securable_type.clone(), full_name, Privilege::Owner)
+        let allowed = self
+            .authorizer
+            .is_authorized(
+                principal,
+                securable_type.clone(),
+                full_name,
+                Privilege::Owner,
+            )
             .await?;
         if !allowed {
-            return Err(DomainError::Forbidden("Only owners can view permissions".to_string()));
+            return Err(DomainError::Forbidden(
+                "Only owners can view permissions".to_string(),
+            ));
         }
         self.authorizer.list_grants(securable_type, full_name).await
     }
@@ -43,21 +48,39 @@ impl PermissionUseCase for PermissionService {
         full_name: &str,
         changes: UpdatePermissions,
     ) -> Result<PermissionsList, DomainError> {
-        let allowed = self.authorizer
-            .is_authorized(principal, securable_type.clone(), full_name, Privilege::Owner)
+        let allowed = self
+            .authorizer
+            .is_authorized(
+                principal,
+                securable_type.clone(),
+                full_name,
+                Privilege::Owner,
+            )
             .await?;
         if !allowed {
-            return Err(DomainError::Forbidden("Only owners can modify permissions".to_string()));
+            return Err(DomainError::Forbidden(
+                "Only owners can modify permissions".to_string(),
+            ));
         }
         for change in &changes.changes {
             for priv_ in &change.add {
                 self.authorizer
-                    .grant(&change.principal, securable_type.clone(), full_name, priv_.clone())
+                    .grant(
+                        &change.principal,
+                        securable_type.clone(),
+                        full_name,
+                        priv_.clone(),
+                    )
                     .await?;
             }
             for priv_ in &change.remove {
                 self.authorizer
-                    .revoke(&change.principal, securable_type.clone(), full_name, priv_.clone())
+                    .revoke(
+                        &change.principal,
+                        securable_type.clone(),
+                        full_name,
+                        priv_.clone(),
+                    )
                     .await?;
             }
         }

@@ -21,7 +21,7 @@ use crate::domain::{
 };
 
 const NAMESPACE: &str = "spark";
-const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.3";
+const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.4";
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const JOB_TIMEOUT: Duration = Duration::from_secs(120);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -59,10 +59,14 @@ pub async fn client() -> Result<Client, AppError> {
     Ok(Client::try_default().await?)
 }
 
-pub async fn create_query_job(client: &Client, sql: &str) -> Result<String, AppError> {
+pub async fn create_query_job(
+    client: &Client,
+    sql: &str,
+    uc_token: Option<&str>,
+) -> Result<String, AppError> {
     let job_name = format!("duckdb-query-{}", Uuid::new_v4());
     let jobs: Api<Job> = Api::namespaced(client.clone(), NAMESPACE);
-    jobs.create(&PostParams::default(), &build_job(&job_name, sql))
+    jobs.create(&PostParams::default(), &build_job(&job_name, sql, uc_token))
         .await?;
     tracing::info!(job = %job_name, "job created");
     Ok(job_name)
@@ -74,7 +78,7 @@ pub async fn delete_query_job(client: &Client, job_name: &str) -> Result<(), App
     Ok(())
 }
 
-fn build_job(name: &str, sql: &str) -> Job {
+fn build_job(name: &str, sql: &str, uc_token: Option<&str>) -> Job {
     Job {
         metadata: ObjectMeta {
             name: Some(name.to_string()),
@@ -95,7 +99,7 @@ fn build_job(name: &str, sql: &str) -> Job {
                             "python".to_string(),
                             "/opt/duckdb/query_api.py".to_string(),
                         ]),
-                        env: Some(duckdb_env(Some(sql))),
+                        env: Some(duckdb_env(Some(sql), uc_token)),
                         ..Default::default()
                     }],
                     ..Default::default()
@@ -151,7 +155,7 @@ async fn get_pod_logs(pods: &Api<Pod>, job_name: &str) -> Result<String, AppErro
     Ok(pods.logs(pod_name, &LogParams::default()).await?)
 }
 
-fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
+fn duckdb_env(sql: Option<&str>, uc_token: Option<&str>) -> Vec<EnvVar> {
     let mut vars = vec![
         env("AWS_DEFAULT_REGION", "us-east-1"),
         env(
@@ -161,7 +165,9 @@ fn duckdb_env(sql: Option<&str>) -> Vec<EnvVar> {
         env("AWS_ACCESS_KEY_ID", "rustfsadmin"),
         env("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
     ];
-    if let Ok(token) = std::env::var("DUCKDB_UC_TOKEN") {
+    if let Some(token) = uc_token {
+        vars.push(env("DUCKDB_UC_TOKEN", token));
+    } else if let Ok(token) = std::env::var("DUCKDB_UC_TOKEN") {
         vars.push(env("DUCKDB_UC_TOKEN", &token));
     }
     if let Ok(endpoint) = std::env::var("DUCKDB_UC_ENDPOINT") {
@@ -219,7 +225,7 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
                     "-f".to_string(),
                     "/dev/null".to_string(),
                 ]),
-                env: Some(duckdb_env(None)),
+                env: Some(duckdb_env(None, None)),
                 ..Default::default()
             }],
             ..Default::default()
@@ -260,15 +266,26 @@ pub async fn session_query(
     client: &Client,
     pod_name: &str,
     sql: &str,
+    uc_token: Option<&str>,
 ) -> Result<QueryResponse, AppError> {
     let pods: Api<Pod> = Api::namespaced(client.clone(), NAMESPACE);
-    let cmd = [
-        "sh",
-        "-c",
-        "DUCKDB_QUERY=$1 python /opt/duckdb/query_api.py",
-        "sh",
-        sql,
-    ];
+    let cmd = match uc_token {
+        Some(token) => vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "DUCKDB_UC_TOKEN=$1 DUCKDB_QUERY=$2 python /opt/duckdb/query_api.py".to_string(),
+            "sh".to_string(),
+            token.to_string(),
+            sql.to_string(),
+        ],
+        None => vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "DUCKDB_QUERY=$1 python /opt/duckdb/query_api.py".to_string(),
+            "sh".to_string(),
+            sql.to_string(),
+        ],
+    };
     let ap = AttachParams::default()
         .stdout(true)
         .stderr(true)

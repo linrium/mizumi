@@ -1,12 +1,10 @@
-use std::sync::Arc;
+use crate::domain::{
+    entities::metastore::MetastoreInfo, error::DomainError, ports::outbound::MetastoreRepository,
+};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::{
-    entities::metastore::MetastoreInfo,
-    error::DomainError,
-    ports::outbound::MetastoreRepository,
-};
 
 pub struct PgMetastoreRepository {
     pool: Arc<PgPool>,
@@ -25,7 +23,9 @@ struct MetastoreRow {
 
 impl From<MetastoreRow> for MetastoreInfo {
     fn from(row: MetastoreRow) -> Self {
-        MetastoreInfo { metastore_id: row.id }
+        MetastoreInfo {
+            metastore_id: row.id,
+        }
     }
 }
 

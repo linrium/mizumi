@@ -1,15 +1,9 @@
-use std::sync::Arc;
+use super::{decode_page_token, encode_page_token, is_unique_violation};
+use crate::domain::{entities::volume::*, error::DomainError, ports::outbound::VolumeRepository};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::{
-    entities::volume::*,
-    error::DomainError,
-    ports::outbound::VolumeRepository,
-};
-use super::{
-    decode_page_token, encode_page_token, is_unique_violation,
-};
 
 pub struct PgVolumeRepository {
     pool: Arc<PgPool>,
@@ -37,8 +31,7 @@ struct VolumeRow {
     updated_by: Option<String>,
 }
 
-const VOLUME_SELECT: &str =
-    "SELECT v.id, v.name, s.name as schema_name, c.name as catalog_name,
+const VOLUME_SELECT: &str = "SELECT v.id, v.name, s.name as schema_name, c.name as catalog_name,
             v.volume_type, v.storage_location, v.comment, v.owner,
             v.created_at, v.created_by, v.updated_at, v.updated_by
      FROM uc_volumes v
@@ -46,8 +39,9 @@ const VOLUME_SELECT: &str =
      JOIN uc_catalogs c ON s.catalog_id = c.id";
 
 fn row_to_volume_info(row: VolumeRow) -> Result<VolumeInfo, DomainError> {
-    let volume_type = VolumeType::from_str(&row.volume_type)
-        .ok_or_else(|| DomainError::Internal(format!("Unknown volume type: {}", row.volume_type)))?;
+    let volume_type = VolumeType::from_str(&row.volume_type).ok_or_else(|| {
+        DomainError::Internal(format!("Unknown volume type: {}", row.volume_type))
+    })?;
     let full_name = format!("{}.{}.{}", row.catalog_name, row.schema_name, row.name);
     Ok(VolumeInfo {
         volume_id: row.id,
@@ -172,7 +166,10 @@ impl VolumeRepository for PgVolumeRepository {
             volumes.push(row_to_volume_info(row)?);
         }
 
-        Ok(ListVolumesResponse { volumes, next_page_token })
+        Ok(ListVolumesResponse {
+            volumes,
+            next_page_token,
+        })
     }
 
     async fn get(&self, full_name: &str) -> Result<VolumeInfo, DomainError> {
@@ -195,7 +192,9 @@ impl VolumeRepository for PgVolumeRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Volume not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Volume not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
@@ -234,7 +233,9 @@ impl VolumeRepository for PgVolumeRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Volume not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Volume not found: {}", full_name))
+            }
             e if is_unique_violation(&e) => DomainError::AlreadyExists(format!(
                 "Volume already exists: {}.{}.{}",
                 catalog_name, schema_name, new_name
@@ -267,7 +268,9 @@ impl VolumeRepository for PgVolumeRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Volume not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Volume not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 

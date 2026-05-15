@@ -1,9 +1,6 @@
+use crate::{adapters::inbound::http::error::AppError, infrastructure::server::AppState};
 use axum::{extract::State, response::IntoResponse, Json};
 use std::sync::Arc;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    infrastructure::server::AppState,
-};
 
 pub async fn get_metastore_summary(
     State(state): State<Arc<AppState>>,

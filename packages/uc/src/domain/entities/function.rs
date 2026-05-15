@@ -1,6 +1,6 @@
+use super::table::ColumnTypeName;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use super::table::ColumnTypeName;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionParameterInfo {

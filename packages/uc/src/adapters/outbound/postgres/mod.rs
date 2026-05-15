@@ -1,18 +1,18 @@
-use std::collections::HashMap;
-use sqlx::PgPool;
-use uuid::Uuid;
-use base64::{Engine as _, engine::general_purpose};
 use crate::domain::error::DomainError;
+use base64::{engine::general_purpose, Engine as _};
+use sqlx::PgPool;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 pub mod catalog;
+pub mod function;
+pub mod metastore;
+pub mod model;
+pub mod permissions;
 pub mod schema;
 pub mod table;
-pub mod volume;
-pub mod function;
-pub mod model;
-pub mod metastore;
-pub mod permissions;
 pub mod user;
+pub mod volume;
 
 #[derive(sqlx::FromRow)]
 pub(super) struct PropertyRow {

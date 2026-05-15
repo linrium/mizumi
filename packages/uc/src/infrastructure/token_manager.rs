@@ -1,4 +1,5 @@
-use std::path::Path;
+use crate::domain::error::DomainError;
+use crate::infrastructure::auth::AuthClaims;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rsa::{
@@ -7,9 +8,8 @@ use rsa::{
     RsaPrivateKey,
 };
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use uuid::Uuid;
-use crate::domain::error::DomainError;
-use crate::infrastructure::auth::AuthClaims;
 
 const INTERNAL_ISSUER: &str = "internal";
 const KEY_BITS: usize = 2048;

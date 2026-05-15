@@ -1,17 +1,13 @@
-use std::sync::Arc;
-use std::collections::HashMap;
+use super::{
+    decode_page_token, delete_properties, encode_page_token, fetch_properties, is_unique_violation,
+    upsert_properties,
+};
+use crate::domain::{entities::table::*, error::DomainError, ports::outbound::TableRepository};
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::{
-    entities::table::*,
-    error::DomainError,
-    ports::outbound::TableRepository,
-};
-use super::{
-    decode_page_token, encode_page_token, fetch_properties, upsert_properties,
-    delete_properties, is_unique_violation,
-};
 
 pub struct PgTableRepository {
     pool: Arc<PgPool>,
@@ -56,8 +52,7 @@ struct ColumnRow {
     partition_index: Option<i32>,
 }
 
-const TABLE_SELECT: &str =
-    "SELECT t.id, t.name, s.name as schema_name, c.name as catalog_name,
+const TABLE_SELECT: &str = "SELECT t.id, t.name, s.name as schema_name, c.name as catalog_name,
             t.table_type, t.data_source_format, t.storage_location, t.comment, t.owner,
             t.created_at, t.created_by, t.updated_at, t.updated_by, t.view_definition
      FROM uc_tables t
@@ -115,7 +110,11 @@ fn row_to_table_info(
     properties: Option<HashMap<String, String>>,
 ) -> Result<TableInfo, DomainError> {
     let table_type = parse_table_type(&row.table_type)?;
-    let data_source_format = row.data_source_format.as_deref().map(parse_data_source_format).transpose()?;
+    let data_source_format = row
+        .data_source_format
+        .as_deref()
+        .map(parse_data_source_format)
+        .transpose()?;
     let full_name = format!("{}.{}.{}", row.catalog_name, row.schema_name, row.name);
     Ok(TableInfo {
         table_id: row.id,
@@ -221,14 +220,11 @@ impl TableRepository for PgTableRepository {
             upsert_properties(self.pool.as_ref(), id, "TABLE", props).await?;
         }
 
-        let row = sqlx::query_as::<_, TableRow>(&format!(
-            "{} WHERE t.id = $1",
-            TABLE_SELECT
-        ))
-        .bind(id)
-        .fetch_one(self.pool.as_ref())
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        let row = sqlx::query_as::<_, TableRow>(&format!("{} WHERE t.id = $1", TABLE_SELECT))
+            .bind(id)
+            .fetch_one(self.pool.as_ref())
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         let columns = fetch_columns(self.pool.as_ref(), id).await?;
         let properties = fetch_properties(self.pool.as_ref(), id, "TABLE").await?;
@@ -286,7 +282,10 @@ impl TableRepository for PgTableRepository {
             tables.push(row_to_table_info(row, columns, props)?);
         }
 
-        Ok(ListTablesResponse { tables, next_page_token })
+        Ok(ListTablesResponse {
+            tables,
+            next_page_token,
+        })
     }
 
     async fn get(&self, full_name: &str) -> Result<TableInfo, DomainError> {
@@ -309,13 +308,32 @@ impl TableRepository for PgTableRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Table not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Table not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 
         let id = row.id;
         let columns = fetch_columns(self.pool.as_ref(), id).await?;
         let properties = fetch_properties(self.pool.as_ref(), id, "TABLE").await?;
+        row_to_table_info(row, columns, properties)
+    }
+
+    async fn get_by_id(&self, table_id: Uuid) -> Result<TableInfo, DomainError> {
+        let row = sqlx::query_as::<_, TableRow>(&format!("{} WHERE t.id = $1", TABLE_SELECT))
+            .bind(table_id)
+            .fetch_one(self.pool.as_ref())
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => {
+                    DomainError::NotFound(format!("Table not found: {}", table_id))
+                }
+                e => DomainError::Internal(e.to_string()),
+            })?;
+
+        let columns = fetch_columns(self.pool.as_ref(), table_id).await?;
+        let properties = fetch_properties(self.pool.as_ref(), table_id, "TABLE").await?;
         row_to_table_info(row, columns, properties)
     }
 
@@ -341,7 +359,9 @@ impl TableRepository for PgTableRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::NotFound(format!("Table not found: {}", full_name)),
+            sqlx::Error::RowNotFound => {
+                DomainError::NotFound(format!("Table not found: {}", full_name))
+            }
             e => DomainError::Internal(e.to_string()),
         })?;
 

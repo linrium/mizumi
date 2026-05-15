@@ -1,3 +1,8 @@
+use crate::{
+    adapters::inbound::http::error::AppError,
+    domain::entities::user::{CreateUser, ScimListResponse, ScimUser, UpdateUser},
+    infrastructure::server::AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -6,11 +11,6 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::{
-    adapters::inbound::http::error::AppError,
-    domain::entities::user::{CreateUser, ScimListResponse, ScimUser, UpdateUser},
-    infrastructure::server::AppState,
-};
 
 #[derive(Deserialize)]
 pub struct ListParams {
@@ -28,14 +28,14 @@ pub async fn create_user(
 ) -> Result<impl IntoResponse, AppError> {
     let email = body
         .primary_email()
-        .ok_or_else(|| AppError::from(crate::domain::error::DomainError::InvalidArgument(
-            "User must have an email address (set in 'emails' or 'userName')".to_string(),
-        )))?
+        .ok_or_else(|| {
+            AppError::from(crate::domain::error::DomainError::InvalidArgument(
+                "User must have an email address (set in 'emails' or 'userName')".to_string(),
+            ))
+        })?
         .to_string();
 
-    let name = body
-        .display_name
-        .unwrap_or_else(|| email.clone());
+    let name = body.display_name.unwrap_or_else(|| email.clone());
 
     let cmd = CreateUser {
         name,
