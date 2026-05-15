@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SessionProvider } from "@/hooks/use-session-context"
-import { getServerSession } from "@/lib/auth/server"
+import { getServerSession } from "@/services/auth"
 
 export default async function AuthedLayout({
   children,

@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { getServerSessionResult } from "@/lib/auth/server"
+import { signInWithKeycloak } from "@/services/auth/actions"
+import { getServerSession } from "@/services/auth"
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -11,17 +12,12 @@ type LoginPageProps = {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { session, sealedValue } = await getServerSessionResult()
-  const realm = "sovico"
+  const session = await getServerSession()
   const { next } = await searchParams
 
-  if (session && !sealedValue) {
+  if (session) {
     redirect("/")
   }
-
-  const loginHref = next
-    ? `/auth/login?realm=${encodeURIComponent(realm)}&next=${encodeURIComponent(next)}`
-    : `/auth/login?realm=${encodeURIComponent(realm)}`
 
   return (
     <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,oklch(0.97_0.11_126)_0%,transparent_28%),linear-gradient(180deg,oklch(0.995_0.01_120)_0%,oklch(0.98_0.02_130)_45%,oklch(0.955_0.03_135)_100%)] px-6 py-16">
@@ -56,9 +52,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </Status>
           </div>
           <div className="grid gap-3">
-            <Button size="lg" asChild className="w-full">
-              <a href={loginHref}>Continue with Sovico</a>
-            </Button>
+            <form action={signInWithKeycloak}>
+              <input type="hidden" name="next" value={next ?? "/"} />
+              <Button size="lg" className="w-full" type="submit">
+                Continue with Sovico
+              </Button>
+            </form>
           </div>
           <p className="text-center text-[11px] text-muted-foreground">
             Authentication is handled by the local Keycloak instance and routed

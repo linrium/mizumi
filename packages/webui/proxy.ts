@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import {
-  getSessionCookieName,
-  readSessionFromCookieValue,
-} from "@/lib/auth/core"
+import { getSessionFromHeaders } from "@/services/auth"
 
 const PUBLIC_PATHS = ["/login", "/auth"]
 
@@ -25,10 +22,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const sessionCookie = request.cookies.get(getSessionCookieName())?.value
-  const session = sessionCookie
-    ? await readSessionFromCookieValue(sessionCookie)
-    : null
+  const session = await getSessionFromHeaders(request.headers, {
+    includeTokens: false,
+  })
 
   if (session) {
     return NextResponse.next()

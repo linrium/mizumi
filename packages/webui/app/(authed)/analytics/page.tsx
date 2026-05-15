@@ -25,9 +25,8 @@ import {
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
+import { MODELS, type ModelId } from "@/services/ai-models"
 import { cn } from "@/lib/utils"
-import { MODELS } from "@/app/api/analytics/chat/route"
-import type { ModelId } from "@/app/api/analytics/chat/route"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

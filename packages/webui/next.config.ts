@@ -14,8 +14,20 @@ const nextConfig: NextConfig = {
         destination: `${API_BASE_URL}/dagster/:path*`,
       },
       {
-        source: "/api/:path*",
-        destination: `${API_BASE_URL}/api/:path*`,
+        source: "/api/sessions/:path*",
+        destination: `${API_BASE_URL}/api/sessions/:path*`,
+      },
+      {
+        source: "/api/query",
+        destination: `${API_BASE_URL}/api/query`,
+      },
+      {
+        source: "/api/streaming/:path*",
+        destination: `${API_BASE_URL}/api/streaming/:path*`,
+      },
+      {
+        source: "/api/tests/:path*",
+        destination: `${API_BASE_URL}/api/tests/:path*`,
       },
     ]
   },

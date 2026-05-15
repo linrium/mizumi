@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { AuthHeaderProvider } from "@/components/auth-header-provider"
+import { getServerSession } from "@/services/auth"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -19,18 +20,20 @@ export const metadata: Metadata = {
   description: "Kubernetes-native data platform",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await getServerSession()
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col">
-        <AuthHeaderProvider />
+        <AuthHeaderProvider idToken={session?.idToken} />
         {children}
         <Toaster />
       </body>

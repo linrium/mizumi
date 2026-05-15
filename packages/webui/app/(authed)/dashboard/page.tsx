@@ -64,9 +64,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useSessionContext } from "@/hooks/use-session-context"
-import { readStoredIdToken } from "@/lib/auth/client"
-import type { ModelId, PanelSummary } from "@/app/api/dashboard/generate/route"
-import { MODELS } from "@/app/api/dashboard/generate/route"
+import { readStoredIdToken } from "@/services/auth/storage"
+import { MODELS, type ModelId } from "@/services/ai-models"
+import type { PanelSummary } from "@/services/dashboard"
 
 import "react-grid-layout/css/styles.css"
 

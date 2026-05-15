@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessions } from "@/hooks/use-sessions"
-import { readStoredIdToken } from "@/lib/auth/client"
+import { readStoredIdToken } from "@/services/auth/storage"
 
 type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>

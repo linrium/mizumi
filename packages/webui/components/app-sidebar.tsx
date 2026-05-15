@@ -14,7 +14,9 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname } from "next/navigation"
+import { startTransition } from "react"
 import { toast } from "sonner"
+import { signOut } from "@/services/auth/actions"
 import {
   Sidebar,
   SidebarContent,
@@ -27,7 +29,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import type { AppSession } from "@/lib/auth/core"
+import type { AppSession } from "@/services/auth/types"
 
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: Book03Icon },
@@ -59,6 +61,11 @@ export function AppSidebar({ session }: AppSidebarProps) {
   const groupsLabel = session.groups?.join(", ")
 
   async function copyDebugToken() {
+    if (!session.idToken) {
+      toast.error("No ID token available")
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(session.idToken)
       toast.success("Copied ID token")
@@ -151,11 +158,16 @@ export function AppSidebar({ session }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Log out">
-              <a href="/auth/logout">
-                <HugeiconsIcon icon={Logout03Icon} size={16} />
-                <span>Log out</span>
-              </a>
+            <SidebarMenuButton
+              tooltip="Log out"
+              onClick={() => {
+                startTransition(() => {
+                  void signOut()
+                })
+              }}
+            >
+              <HugeiconsIcon icon={Logout03Icon} size={16} />
+              <span>Log out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
