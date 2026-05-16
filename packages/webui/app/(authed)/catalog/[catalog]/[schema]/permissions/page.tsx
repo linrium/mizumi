@@ -33,12 +33,6 @@ export default function SchemaPermissionsPage() {
               active: true,
               icon: SecurityIcon,
             },
-            {
-              href: `/catalog/${catalog}/${schema}/request-permissions`,
-              label: "request permissions",
-              active: false,
-              icon: Key01Icon,
-            },
           ]}
         />
       </div>

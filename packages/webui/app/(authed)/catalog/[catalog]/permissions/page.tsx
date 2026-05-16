@@ -28,12 +28,6 @@ export default function CatalogPermissionsPage() {
               active: true,
               icon: SecurityIcon,
             },
-            {
-              href: `/catalog/${catalog}/request-permissions`,
-              label: "request permissions",
-              active: false,
-              icon: Key01Icon,
-            },
           ]}
         />
       </div>

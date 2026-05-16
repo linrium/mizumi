@@ -40,12 +40,6 @@ export default function CatalogPage() {
               active: false,
               icon: SecurityIcon,
             },
-            {
-              href: `/catalog/${catalog}/request-permissions`,
-              label: "request permissions",
-              active: false,
-              icon: Key01Icon,
-            },
           ]}
         />
       </div>
