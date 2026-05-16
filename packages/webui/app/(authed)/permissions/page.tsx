@@ -283,7 +283,7 @@ export default function PermissionsPage() {
               <TableHead>Status</TableHead>
               <TableHead>Privileges</TableHead>
               <TableHead>Reviewer</TableHead>
-              <TableHead>SLA</TableHead>
+              {/*<TableHead>SLA</TableHead>*/}
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
@@ -369,25 +369,21 @@ export default function PermissionsPage() {
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="font-medium">{request.reviewer}</div>
-                      <div className="mt-1 inline-flex items-center gap-1 text-muted-foreground">
-                        <HugeiconsIcon icon={Mail01Icon} size={13} />
-                        Reviewer notified
-                      </div>
                     </TableCell>
-                    <TableCell className="align-top">
-                      <div className="font-medium">
-                        {request.expires_in_days <= 0
-                          ? "Expired"
-                          : `${request.expires_in_days} day${
-                              request.expires_in_days === 1 ? "" : "s"
-                            }`}
-                      </div>
-                      <div className="text-muted-foreground">
-                        {request.expires_in_days <= 2
-                          ? "Escalate today"
-                          : "Within policy window"}
-                      </div>
-                    </TableCell>
+                    {/*<TableCell className="align-top">*/}
+                    {/*  <div className="font-medium">*/}
+                    {/*    {request.expires_in_days <= 0*/}
+                    {/*      ? "Expired"*/}
+                    {/*      : `${request.expires_in_days} day${*/}
+                    {/*          request.expires_in_days === 1 ? "" : "s"*/}
+                    {/*        }`}*/}
+                    {/*  </div>*/}
+                    {/*  <div className="text-muted-foreground">*/}
+                    {/*    {request.expires_in_days <= 2*/}
+                    {/*      ? "Escalate today"*/}
+                    {/*      : "Within policy window"}*/}
+                    {/*  </div>*/}
+                    {/*</TableCell>*/}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
