@@ -16,7 +16,7 @@ def _run_spark_job(
             "containers": [
                 {
                     "name": "dagster-pipes-execution",
-                    "imagePullPolicy": "IfNotPresent",
+                    "imagePullPolicy": "Never",
                 }
             ]
         },
@@ -88,11 +88,22 @@ def banking_gold_marts(
     context: dg.AssetExecutionContext,
     pipes_k8s_client: PipesK8sClient,
 ):
-    _run_spark_job(
-        context,
-        pipes_k8s_client,
-        "/opt/spark/jobs/hdbank/build_payment_analytics_gold.py",
-    )
-    yield dg.MaterializeResult(asset_key="banking_gold_risk_detection")
-    yield dg.MaterializeResult(asset_key="banking_gold_merchant_revenue")
-    yield dg.MaterializeResult(asset_key="banking_gold_user_spend")
+    yield from pipes_k8s_client.run(
+        context=context,
+        image=SPARK_IMAGE,
+        base_pod_spec={
+            "containers": [
+                {
+                    "name": "dagster-pipes-execution",
+                    "imagePullPolicy": "Never",
+                }
+            ]
+        },
+        command=[
+            "spark-submit",
+            "--master",
+            "local[*]",
+            *S3A_CONF,
+            "/opt/spark/jobs/hdbank/build_payment_analytics_gold.py",
+        ],
+    ).get_results()

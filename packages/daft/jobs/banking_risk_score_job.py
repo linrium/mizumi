@@ -7,8 +7,8 @@ import deltalake
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
-SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
-TARGET_PATH = "s3://gold/banking/customer_risk_scores"
+SILVER_TRANSACTIONS = "s3://unitycatalog/hdbank/hdbank_payments_prod_silver/card_payment_events_v1"
+TARGET_PATH = "s3://unitycatalog/hdbank/hdbank_payments_prod_gold/risk_detection_v1"
 
 S3_STORAGE_OPTIONS = {
     "endpoint_url": "http://rustfs-svc.rustfs.svc.cluster.local:9000",
@@ -35,10 +35,10 @@ def main() -> None:
         per_customer = (
             df.groupby("customer_id")
             .agg(
-                col.col("transaction_id").count().alias("tx_count"),
+                col.col("payment_event_id").count().alias("tx_count"),
                 col.col("amount").sum().alias("total_volume"),
                 col.col("amount").mean().alias("avg_amount"),
-                col.col("country_code").count_distinct().alias("country_count"),
+                col.col("merchant_category").count_distinct().alias("category_count"),
                 col.col("account_id").count_distinct().alias("account_count"),
             )
         )
@@ -58,7 +58,7 @@ def main() -> None:
 
         row_count = risk_scored.count_rows()
         preview = (
-            risk_scored.select("customer_id", "tx_count", "total_volume", "country_count", "risk_tier")
+            risk_scored.select("customer_id", "tx_count", "total_volume", "category_count", "risk_tier")
             .limit(5)
             .to_pydict()
         )

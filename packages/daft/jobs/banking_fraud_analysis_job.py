@@ -10,8 +10,8 @@ import ray
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
-SILVER_TRANSACTIONS = "s3://silver/banking/streaming"
-TARGET_PATH = "s3://gold/banking/fraud_pattern_analysis"
+SILVER_TRANSACTIONS = "s3://unitycatalog/hdbank/hdbank_payments_prod_silver/card_payment_events_v1"
+TARGET_PATH = "s3://unitycatalog/hdbank/hdbank_payments_prod_gold/fraud_pattern_analysis"
 
 S3_STORAGE_OPTIONS = {
     "endpoint_url": "http://rustfs-svc.rustfs.svc.cluster.local:9000",
@@ -42,18 +42,17 @@ def main() -> None:
 
         all_txns = (
             daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
-            .with_column("transaction_date", daft.col("timestamp").cast(daft.DataType.date()))
+            .with_column("transaction_date", daft.col("payment_timestamp").cast(daft.DataType.date()))
         )
 
-        # Detect structuring: customers with multiple transactions just below $10k threshold in same day
+        # Detect structuring: customers with 3+ transactions just below $10k threshold in same day
         structuring = (
             all_txns.where(
                 (daft.col("amount") >= 8000) & (daft.col("amount") < 10000)
-                & (daft.col("transaction_type").is_in(["DEBIT", "TRANSFER"]))
             )
             .groupby("customer_id", "transaction_date")
             .agg(
-                col.col("transaction_id").count().alias("near_threshold_count"),
+                col.col("payment_event_id").count().alias("near_threshold_count"),
                 col.col("amount").sum().alias("near_threshold_total"),
                 col.col("account_id").count_distinct().alias("accounts_used"),
             )
@@ -61,17 +60,16 @@ def main() -> None:
             .with_column("pattern_type", daft.lit("STRUCTURING"))
         )
 
-        # Detect cross-border anomalies: same customer, multiple countries in 24h
-        cross_border = (
+        # Detect multi-account anomalies: same customer using 3+ distinct accounts in a single day
+        multi_account = (
             all_txns.groupby("customer_id", "transaction_date")
             .agg(
-                col.col("country_code").count_distinct().alias("countries_in_day"),
-                col.col("transaction_id").count().alias("tx_count"),
-                col.col("amount").sum().alias("total_amount"),
                 col.col("account_id").count_distinct().alias("accounts_used"),
+                col.col("payment_event_id").count().alias("tx_count"),
+                col.col("amount").sum().alias("total_amount"),
             )
-            .where(daft.col("countries_in_day") >= 3)
-            .with_column("pattern_type", daft.lit("CROSS_BORDER_ANOMALY"))
+            .where(daft.col("accounts_used") >= 3)
+            .with_column("pattern_type", daft.lit("MULTI_ACCOUNT_ANOMALY"))
             .with_column("near_threshold_count", daft.col("tx_count"))
             .with_column("near_threshold_total", daft.col("total_amount"))
         )
@@ -80,7 +78,7 @@ def main() -> None:
             "customer_id", "transaction_date", "pattern_type",
             "near_threshold_count", "near_threshold_total", "accounts_used",
         ).concat(
-            cross_border.select(
+            multi_account.select(
                 "customer_id", "transaction_date", "pattern_type",
                 "near_threshold_count", "near_threshold_total", "accounts_used",
             )

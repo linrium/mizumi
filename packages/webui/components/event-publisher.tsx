@@ -10,6 +10,7 @@ import Editor from "@monaco-editor/react"
 import Image, { type StaticImageData } from "next/image"
 import { useState } from "react"
 
+import { apiFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 
 type SendResult =
@@ -79,7 +80,7 @@ export function EventPublisher({
     setResults((current) => ({ ...current, [option.id]: null }))
 
     try {
-      const res = await fetch(option.endpoint, {
+      const res = await apiFetch(option.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed),

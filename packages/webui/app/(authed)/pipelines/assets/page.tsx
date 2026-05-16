@@ -302,30 +302,49 @@ export default function AssetsPage() {
       </div>
     )
 
+  const freshCount = nodes.filter((n) => n.stale_status === "FRESH").length
+  const staleCount = nodes.filter((n) => n.stale_status === "STALE").length
+  const missingCount = nodes.filter((n) => n.stale_status === "MISSING").length
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      {selectedCount > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 border-b bg-muted/50 text-sm shrink-0">
-          <span className="text-muted-foreground">
-            {selectedCount} selected
-          </span>
-          <button
-            type="button"
-            onClick={handleMaterializeSelected}
-            disabled={materializingAll}
-            className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {materializingAll ? "Starting…" : "Materialize Selected"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setRowSelection({})}
-            className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors"
-          >
-            Clear
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-3 px-4 h-10 border-b bg-muted/50 text-sm shrink-0">
+        {selectedCount > 0 ? (
+          <span className="text-muted-foreground">{selectedCount} selected</span>
+        ) : (
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span>{nodes.length} assets</span>
+            {freshCount > 0 && (
+              <span className="text-green-600 dark:text-green-400">{freshCount} fresh</span>
+            )}
+            {staleCount > 0 && (
+              <span className="text-yellow-600 dark:text-yellow-400">{staleCount} stale</span>
+            )}
+            {missingCount > 0 && (
+              <span className="text-red-600 dark:text-red-400">{missingCount} missing</span>
+            )}
+          </div>
+        )}
+        {selectedCount > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleMaterializeSelected}
+              disabled={materializingAll}
+              className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {materializingAll ? "Starting…" : "Materialize Selected"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRowSelection({})}
+              className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
       <div className="flex-1 min-h-0 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">

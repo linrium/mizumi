@@ -165,12 +165,6 @@ export default function TeamDetailPage({
       <div className="border-b shrink-0">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <Link
-              href="/teams"
-              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
-            </Link>
             <div className="min-w-0">
               <h1 className="text-sm font-semibold truncate">{team.name}</h1>
               <p className="mt-0.5 text-xs text-muted-foreground">

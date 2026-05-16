@@ -13,18 +13,18 @@ job:
 head:
   resources:
     requests:
-      cpu: 500m
+      cpu: "1"
       memory: 2Gi
     limits:
-      cpu: 1000m
+      cpu: "1"
       memory: 4Gi
 
 worker:
   replicas: 1
   resources:
     requests:
-      cpu: 200m
+      cpu: "1"
       memory: 2Gi
     limits:
-      cpu: 500m
+      cpu: "1"
       memory: 3Gi

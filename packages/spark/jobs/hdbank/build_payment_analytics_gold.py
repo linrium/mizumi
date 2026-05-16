@@ -10,7 +10,7 @@ CUSTOMERS_SOURCE_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_payments_prod_silver/customers_v1"
 )
 RISK_TARGET_PATH = (
-    "s3a://unitycatalog/hdbank/hdbank_payments_prod_gold/risk_detection_v1"
+    "s3a://unitycatalog/hdbank/hdbank_payments_prod_gold/payment_risk_events_v1"
 )
 MERCHANT_TARGET_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_payments_prod_gold/merchant_revenue_v1"
@@ -151,7 +151,7 @@ def main() -> None:
         user_spend_df.write.format("delta").mode("overwrite").save(
             USER_SPEND_TARGET_PATH
         )
-        risk_detection_df.write.format("delta").mode("overwrite").save(
+        risk_detection_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(
             RISK_TARGET_PATH
         )
 
@@ -163,13 +163,20 @@ def main() -> None:
         spark.stop()
 
         pipes.report_asset_materialization(
+            asset_key="banking_gold_risk_detection",
             metadata={
                 "payment_event_rows": payment_event_rows,
                 "customer_profile_rows": customer_profile_rows,
-                "merchant_rows": merchant_rows,
-                "user_spend_rows": user_spend_rows,
                 "risk_rows": risk_rows,
-            }
+            },
+        )
+        pipes.report_asset_materialization(
+            asset_key="banking_gold_merchant_revenue",
+            metadata={"merchant_rows": merchant_rows},
+        )
+        pipes.report_asset_materialization(
+            asset_key="banking_gold_user_spend",
+            metadata={"user_spend_rows": user_spend_rows},
         )
 
 

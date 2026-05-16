@@ -291,16 +291,23 @@ jobs-sumit-hdbank token:
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{token}}" \
-      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-raw-card-payment-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
+      | jq
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
+      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
       | jq
 
-jobs-delete-hdbank:
+jobs-delete-hdbank token:
     #!/usr/bin/env bash
     set -euo pipefail
     id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
       | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-customer-profile-events-to-bronze") | .job.id')
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
-    curl -fsSL -X DELETE "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted"
+    curl -fsSL -X DELETE -H "Authorization: Bearer {{token}}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted"
 
 controlplane-deploy:
     kubectl apply -f infra/k8s/controlplane/postgres.yaml
@@ -317,6 +324,8 @@ daft-distributed-deploy:
       --namespace {{daft_namespace}} \
       --create-namespace \
       --values {{daft_distributed_values}}
+    kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
+      -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
 
 daft-distributed-deploy-with-job:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true
@@ -325,6 +334,8 @@ daft-distributed-deploy-with-job:
       --create-namespace \
       --values {{daft_distributed_values}} \
       --set-file job.script={{daft_distributed_script}}
+    kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
+      -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
 
 daft-simple-deploy:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true
