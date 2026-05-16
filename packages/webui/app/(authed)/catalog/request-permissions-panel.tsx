@@ -6,7 +6,6 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,24 +19,17 @@ import {
   type RequestStatus,
 } from "@/services/permissions"
 
-type PrivilegeGroup = { label: string; items: string[] }
-
-const SCOPE_PRIVILEGE_GROUPS: Record<RequestScope, PrivilegeGroup[]> = {
-  catalog: [
-    { label: "Access", items: ["BROWSE", "USE_CATALOG"] },
-    { label: "Create", items: ["CREATE_SCHEMA", "CREATE_TABLE", "CREATE_FUNCTION", "CREATE_VOLUME", "CREATE_MODEL"] },
-    { label: "Storage", items: ["CREATE_EXTERNAL_LOCATION", "CREATE_MANAGED_STORAGE", "CREATE_STORAGE_CREDENTIAL"] },
-  ],
-  schema: [
-    { label: "Access", items: ["BROWSE", "USE_SCHEMA", "SELECT", "MODIFY"] },
-    { label: "Create", items: ["CREATE_TABLE", "CREATE_EXTERNAL_TABLE", "CREATE_FUNCTION", "CREATE_VOLUME"] },
-    { label: "Files", items: ["READ_FILES", "WRITE_FILES", "READ_VOLUME"] },
-  ],
-  table: [
-    { label: "Access", items: ["BROWSE", "SELECT", "MODIFY"] },
-    { label: "Files", items: ["READ_FILES", "WRITE_FILES", "READ_VOLUME"] },
-  ],
-}
+const PRIVILEGE_GROUPS = [
+  { label: "General", privileges: ["OWNER", "BROWSE"] },
+  { label: "Catalog", privileges: ["CREATE_CATALOG", "USE_CATALOG"] },
+  { label: "Schema", privileges: ["CREATE_SCHEMA", "USE_SCHEMA"] },
+  { label: "Table", privileges: ["CREATE_TABLE", "SELECT", "MODIFY", "CREATE_EXTERNAL_TABLE"] },
+  { label: "Function", privileges: ["CREATE_FUNCTION", "EXECUTE"] },
+  { label: "Volume", privileges: ["CREATE_VOLUME", "READ_VOLUME", "CREATE_EXTERNAL_VOLUME"] },
+  { label: "Files", privileges: ["READ_FILES", "WRITE_FILES"] },
+  { label: "Storage", privileges: ["CREATE_EXTERNAL_LOCATION", "CREATE_MANAGED_STORAGE", "CREATE_STORAGE_CREDENTIAL"] },
+  { label: "Model", privileges: ["CREATE_MODEL"] },
+]
 
 function getStatusVariant(status: RequestStatus) {
   switch (status) {
@@ -66,11 +58,7 @@ type Props = {
 }
 
 export function RequestPermissionsPanel({ resource, scope }: Props) {
-  const groups = SCOPE_PRIVILEGE_GROUPS[scope]
-
   // Form state
-  const [requester, setRequester] = useState("")
-  const [team, setTeam] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [rationale, setRationale] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -110,10 +98,6 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
     e.preventDefault()
     setFormError(null)
 
-    if (!requester.trim()) {
-      setFormError("Your name or email is required.")
-      return
-    }
     if (selected.size === 0) {
       setFormError("Select at least one privilege.")
       return
@@ -122,8 +106,6 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
     setSubmitting(true)
     try {
       const created = await createPermissionRequest({
-        requester: requester.trim(),
-        team: team.trim() || undefined,
         resource,
         scope,
         privileges: Array.from(selected).sort(),
@@ -168,41 +150,17 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Your name / email</Label>
-              <Input
-                value={requester}
-                onChange={(e) => setRequester(e.target.value)}
-                placeholder="you@example.com"
-                className="h-8 text-xs"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                Team{" "}
-                <span className="text-muted-foreground">(optional)</span>
-              </Label>
-              <Input
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
-                placeholder="e.g. Growth Analytics"
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Privileges
             </Label>
-            {groups.map((group) => (
+            {PRIVILEGE_GROUPS.map((group) => (
               <div key={group.label} className="space-y-1.5">
                 <p className="text-[11px] font-medium text-muted-foreground">
                   {group.label}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {group.items.map((priv) => {
+                  {group.privileges.map((priv) => {
                     const checked = selected.has(priv)
                     return (
                       <div
@@ -218,7 +176,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                           }
                         }}
                         className={cn(
-                          "flex cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                          "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                           checked
                             ? "border-primary bg-primary/5 text-foreground"
                             : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
@@ -226,10 +184,10 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                       >
                         <Checkbox
                           checked={checked}
-                          className="pointer-events-none size-3"
+                          className="pointer-events-none size-3 shrink-0"
                           aria-hidden
                         />
-                        {priv}
+                        <span className="truncate" title={priv}>{priv}</span>
                       </div>
                     )
                   })}

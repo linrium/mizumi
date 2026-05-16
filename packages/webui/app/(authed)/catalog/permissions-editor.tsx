@@ -281,7 +281,7 @@ export function PermissionsEditor({
                 No principals with permissions found.
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {assignments.map((assignment) => {
                   const isActive =
                     assignment.principal.toLowerCase() ===
@@ -293,23 +293,23 @@ export function PermissionsEditor({
                       type="button"
                       onClick={() => loadAssignment(assignment)}
                       className={cn(
-                        "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+                        "w-full rounded border px-2.5 py-2 text-left transition-colors",
                         isActive
                           ? "border-primary bg-primary/5"
                           : "border-border hover:bg-accent/40",
                       )}
                     >
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-xs font-medium">
                         {assignment.principal}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <div className="mt-1.5 flex flex-wrap gap-1">
                         {(assignment.privileges ?? []).length === 0 ? (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             No privileges assigned.
                           </span>
                         ) : (
                           assignment.privileges?.map((privilege) => (
-                            <Badge key={privilege} variant="secondary">
+                            <Badge key={privilege} variant="secondary" className="text-[11px]">
                               {privilege}
                             </Badge>
                           ))
@@ -376,10 +376,10 @@ export function PermissionsEditor({
             <div className="space-y-4">
               {PRIVILEGE_GROUPS.map((group) => (
                 <div key={group.label} className="space-y-2">
-                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="text-[11px] font-medium text-muted-foreground">
                     {group.label}
-                  </h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
                     {group.privileges.map((privilege) => {
                       const checked = selected.has(privilege)
                       return (
@@ -400,18 +400,18 @@ export function PermissionsEditor({
                             togglePrivilege(privilege, !checked)
                           }}
                           className={cn(
-                            "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                            "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                             checked
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-accent/40",
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                           )}
                         >
                           <Checkbox
                             checked={checked}
-                            className="pointer-events-none"
+                            className="pointer-events-none size-3 shrink-0"
                             aria-hidden="true"
                           />
-                          <span>{privilege}</span>
+                          <span className="truncate" title={privilege}>{privilege}</span>
                         </div>
                       )
                     })}
