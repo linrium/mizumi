@@ -18,4 +18,5 @@ pub struct AppState {
     pub uc_service: Arc<UnityCatalogProxyService>,
     pub user_service: Arc<UserService>,
     pub keycloak_auth: Arc<KeycloakAuth>,
+    pub bypass_token: String,
 }

@@ -85,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &config.keycloak.realm,
             config.keycloak.audiences.clone(),
         )),
+        bypass_token: config.bypass_token.clone(),
     });
 
     let app = create_router(state);

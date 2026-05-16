@@ -30,6 +30,8 @@ pub struct KeycloakConfig {
 #[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
+    #[serde(default)]
+    pub bypass_token: String,
     pub database: DatabaseConfig,
     pub kafka: KafkaConfig,
     pub unity_catalog: UnityCatalogConfig,

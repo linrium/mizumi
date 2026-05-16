@@ -284,22 +284,23 @@ unitycatalog-bootstrap:
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{unitycatalog_namespace}} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
-jobs-submit-all:
-    just jobs-sumit-hdbank
+jobs-submit-all token:
+    just jobs-sumit-hdbank {{token}}
 
-jobs-sumit-hdbank:
-    curl -fsSL -X POST http://127.0.0.1:6000/api/streaming/jobs \
+jobs-sumit-hdbank token:
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
       -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
       | jq
 
 jobs-delete-hdbank:
     #!/usr/bin/env bash
     set -euo pipefail
-    id=$(curl -fsSL http://127.0.0.1:6000/api/streaming/jobs \
+    id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
       | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-customer-profile-events-to-bronze") | .job.id')
     [[ -z "$id" ]] && { echo "job not found"; exit 1; }
-    curl -fsSL -X DELETE "http://127.0.0.1:6000/api/streaming/jobs/$id" && echo "deleted"
+    curl -fsSL -X DELETE "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted"
 
 controlplane-deploy:
     kubectl apply -f infra/k8s/controlplane/postgres.yaml

@@ -19,6 +19,23 @@ import {
 } from "@/components/ui/table"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { toast } from "sonner"
+import { MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,137 +94,12 @@ function K8sStateBadge({ state }: { state: string | null | undefined }) {
   )
 }
 
-// ── Action buttons ────────────────────────────────────────────────────────────
-
-function ConfirmButton({
-  label,
-  confirmLabel,
-  pendingLabel,
-  className,
-  onConfirm,
-}: {
-  label: string
-  confirmLabel: string
-  pendingLabel: string
-  className?: string
-  onConfirm: () => Promise<void>
-}) {
-  const [stage, setStage] = useState<"idle" | "confirming" | "pending">("idle")
-
-  function handleClick(e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (stage === "idle") {
-      setStage("confirming")
-      return
-    }
-    if (stage === "confirming") {
-      setStage("pending")
-      onConfirm().finally(() => setStage("idle"))
-    }
-  }
-
-  function handleBlur() {
-    if (stage === "confirming") setStage("idle")
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      onBlur={handleBlur}
-      disabled={stage === "pending"}
-      className={`text-xs px-3 py-1 border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-        stage === "confirming" ? "bg-muted" : "hover:bg-muted"
-      } ${className ?? ""}`}
-    >
-      {stage === "pending"
-        ? pendingLabel
-        : stage === "confirming"
-          ? confirmLabel
-          : label}
-    </button>
-  )
-}
-
-function RestartButton({
-  id,
-  name,
-  onDone,
-}: {
-  id: string
-  name: string
-  onDone: () => void
-}) {
-  async function doRestart() {
-    const res = await fetchWithAuth(`/api/streaming/jobs/${id}/restart`, {
-      method: "POST",
-    })
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-    toast.success("Job restarted", { description: name })
-    onDone()
-  }
-
-  return (
-    <ConfirmButton
-      label="Restart"
-      confirmLabel="Confirm restart"
-      pendingLabel="Restarting…"
-      onConfirm={async () => {
-        try {
-          await doRestart()
-        } catch (err) {
-          toast.error("Failed to restart", {
-            description: (err as Error).message,
-          })
-        }
-      }}
-    />
-  )
-}
-
-function DeleteButton({
-  id,
-  name,
-  onDone,
-}: {
-  id: string
-  name: string
-  onDone: () => void
-}) {
-  async function doDelete() {
-    const res = await fetchWithAuth(`/api/streaming/jobs/${id}`, { method: "DELETE" })
-    if (res.status !== 204 && !res.ok) {
-      const json = await res.json()
-      throw new Error(json.error ?? `HTTP ${res.status}`)
-    }
-    toast.success("Job deleted", { description: name })
-    onDone()
-  }
-
-  return (
-    <ConfirmButton
-      label="Delete"
-      confirmLabel="Confirm delete"
-      pendingLabel="Deleting…"
-      className="text-destructive"
-      onConfirm={async () => {
-        try {
-          await doDelete()
-        } catch (err) {
-          toast.error("Failed to delete", {
-            description: (err as Error).message,
-          })
-        }
-      }}
-    />
-  )
-}
-
 // ── Columns ───────────────────────────────────────────────────────────────────
 
-function buildColumns(reload: () => void): ColumnDef<StreamingJob>[] {
+function buildColumns(
+  onRestart: (job: StreamingJob) => void,
+  onDelete: (job: StreamingJob) => void,
+): ColumnDef<StreamingJob>[] {
   return [
     {
       id: "name",
@@ -218,8 +110,18 @@ function buildColumns(reload: () => void): ColumnDef<StreamingJob>[] {
         </span>
       ),
     },
-    { id: "namespace", header: "Namespace", accessorFn: (j) => j.namespace },
-    { id: "image", header: "Image", accessorFn: (j) => j.image },
+    {
+      id: "deployment",
+      header: "Namespace / Image",
+      cell: ({ row }) => (
+        <div className="space-y-0.5">
+          <div className="font-medium">{row.original.namespace}</div>
+          <div className="text-xs text-muted-foreground font-mono">
+            {row.original.image}
+          </div>
+        </div>
+      ),
+    },
     {
       id: "state",
       header: "State",
@@ -228,24 +130,20 @@ function buildColumns(reload: () => void): ColumnDef<StreamingJob>[] {
       ),
     },
     {
-      id: "driver_pod",
-      header: "Driver Pod",
-      accessorFn: (j) => j.k8s_status?.driver_pod ?? "—",
-    },
-    {
-      id: "executor_instances",
+      id: "executors",
       header: "Executors",
-      accessorFn: (j) => j.executor_instances,
-    },
-    {
-      id: "executor_cores",
-      header: "Executor Cores",
-      accessorFn: (j) => j.executor_cores,
-    },
-    {
-      id: "executor_memory",
-      header: "Executor Memory",
-      accessorFn: (j) => j.executor_memory,
+      cell: ({ row }) => {
+        const { executor_instances, executor_cores, executor_memory } =
+          row.original
+        return (
+          <div className="space-y-0.5">
+            <div className="font-medium">{executor_instances} instances</div>
+            <div className="text-xs text-muted-foreground">
+              {executor_cores} cores · {executor_memory}
+            </div>
+          </div>
+        )
+      },
     },
     {
       id: "created_at",
@@ -256,18 +154,38 @@ function buildColumns(reload: () => void): ColumnDef<StreamingJob>[] {
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <div className="flex gap-1.5">
-          <RestartButton
-            id={row.original.id}
-            name={row.original.name}
-            onDone={reload}
-          />
-          <DeleteButton
-            id={row.original.id}
-            name={row.original.name}
-            onDone={reload}
-          />
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <HugeiconsIcon icon={MoreHorizontalIcon} size={14} />
+              <span className="sr-only">Open actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                onRestart(row.original)
+              }}
+            >
+              Restart
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(row.original)
+              }}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ]
@@ -280,12 +198,17 @@ export default function StreamingPage() {
   const [jobs, setJobs] = useState<StreamingJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [restartTarget, setRestartTarget] = useState<StreamingJob | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<StreamingJob | null>(null)
+  const [actionPending, setActionPending] = useState(false)
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchWithAuth("/api/streaming/jobs", { cache: "no-store" })
+      const res = await fetchWithAuth("/api/streaming/jobs", {
+        cache: "no-store",
+      })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
       setJobs(json.jobs ?? [])
@@ -300,7 +223,53 @@ export default function StreamingPage() {
     load()
   }, [])
 
-  const columns = buildColumns(load)
+  async function handleRestart() {
+    if (!restartTarget || actionPending) return
+    setActionPending(true)
+    try {
+      const res = await fetchWithAuth(
+        `/api/streaming/jobs/${restartTarget.id}/restart`,
+        { method: "POST" },
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      toast.success("Job restarted", { description: restartTarget.name })
+      setRestartTarget(null)
+      load()
+    } catch (err) {
+      toast.error("Failed to restart", {
+        description: (err as Error).message,
+      })
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget || actionPending) return
+    setActionPending(true)
+    try {
+      const res = await fetchWithAuth(
+        `/api/streaming/jobs/${deleteTarget.id}`,
+        { method: "DELETE" },
+      )
+      if (res.status !== 204 && !res.ok) {
+        const json = await res.json()
+        throw new Error(json.error ?? `HTTP ${res.status}`)
+      }
+      toast.success("Job deleted", { description: deleteTarget.name })
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      toast.error("Failed to delete", {
+        description: (err as Error).message,
+      })
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  const columns = buildColumns(setRestartTarget, setDeleteTarget)
   const table = useReactTable({
     data: jobs,
     columns,
@@ -347,7 +316,7 @@ export default function StreamingPage() {
                 }
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className="align-top">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
@@ -365,6 +334,113 @@ export default function StreamingPage() {
           )}
         </TableBody>
       </Table>
+
+      <Dialog
+        open={restartTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !actionPending) setRestartTarget(null)
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Restart job?</DialogTitle>
+            <DialogDescription className="sr-only">
+              Confirm restarting this streaming job.
+            </DialogDescription>
+          </DialogHeader>
+          {restartTarget && (
+            <div className="divide-y rounded-md border text-sm">
+              <div className="px-3 py-2.5 space-y-0.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Job
+                </p>
+                <p className="font-mono font-medium">{restartTarget.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {restartTarget.namespace}
+                </p>
+              </div>
+              <div className="px-3 py-2.5 space-y-1">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Current state
+                </p>
+                <K8sStateBadge state={restartTarget.k8s_status?.state} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={actionPending}
+              onClick={() => setRestartTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={actionPending}
+              onClick={handleRestart}
+            >
+              {actionPending ? "Restarting…" : "Restart"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !actionPending) setDeleteTarget(null)
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete job?</DialogTitle>
+            <DialogDescription className="sr-only">
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="divide-y rounded-md border text-sm">
+              <div className="px-3 py-2.5 space-y-0.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Job
+                </p>
+                <p className="font-mono font-medium">{deleteTarget.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {deleteTarget.namespace}
+                </p>
+              </div>
+              <div className="px-3 py-2.5 space-y-0.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Image
+                </p>
+                <p className="font-mono text-xs text-muted-foreground break-all">
+                  {deleteTarget.image}
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={actionPending}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={actionPending}
+              onClick={handleDelete}
+            >
+              {actionPending ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
