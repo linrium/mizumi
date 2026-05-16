@@ -3,11 +3,9 @@ use kube::api::{ApiResource, DeleteParams, DynamicObject, LogParams, PostParams}
 use kube::{Api, Client};
 use serde_json::{Value, json};
 
-use crate::{
-    domain::{
-        entities::streaming::{K8sStatus, StreamingJob},
-        error::AppError,
-    },
+use crate::domain::{
+    entities::streaming::{K8sStatus, StreamingJob},
+    error::AppError,
 };
 
 pub async fn client() -> Result<Client, kube::Error> {

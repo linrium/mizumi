@@ -63,6 +63,9 @@ spec:
           ports:
             - containerPort: 8080
               name: rest
+          env:
+            - name: RUST_LOG
+              value: debug
           volumeMounts:
             - name: config
               mountPath: /app/config/server.toml

@@ -41,6 +41,17 @@ const PRIVILEGES = [
 type Privilege = (typeof PRIVILEGES)[number]
 type ResourceType = "catalog" | "schema" | "table"
 
+const PRINCIPAL_NAME_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+})
+
+const HARDCODED_PRINCIPALS = [
+  "rikki@gmail.com",
+  "linh@gmail.com",
+  "khaosoi@gmail.com",
+  "khaopad@gmail.com",
+] as const
+
 const PRIVILEGE_GROUPS: ReadonlyArray<{
   label: string
   privileges: readonly Privilege[]
@@ -79,10 +90,30 @@ type PermissionsEditorProps = {
 function normalizePrivileges(
   assignments: PermissionAssignment[] | undefined,
 ): PermissionAssignment[] {
-  return (assignments ?? []).map((assignment) => ({
+  const normalizedAssignments = (assignments ?? []).map((assignment) => ({
     principal: assignment.principal,
     privileges: Array.from(new Set(assignment.privileges ?? [])).sort(),
   }))
+  const assignmentsByPrincipal = new Map(
+    normalizedAssignments.map((assignment) => [
+      assignment.principal.toLowerCase(),
+      assignment,
+    ]),
+  )
+
+  for (const principal of HARDCODED_PRINCIPALS) {
+    if (!assignmentsByPrincipal.has(principal.toLowerCase())) {
+      normalizedAssignments.push({
+        principal,
+        privileges: [],
+      })
+    }
+  }
+
+  return normalizedAssignments
+    .sort((left, right) =>
+      PRINCIPAL_NAME_COLLATOR.compare(left.principal, right.principal),
+    )
 }
 
 export function PermissionsEditor({
@@ -354,8 +385,22 @@ export function PermissionsEditor({
                       return (
                         <div
                           key={privilege}
+                          role="checkbox"
+                          tabIndex={0}
+                          aria-checked={checked}
+                          onClick={() => togglePrivilege(privilege, !checked)}
+                          onKeyDown={(event) => {
+                            if (
+                              event.key !== "Enter" &&
+                              event.key !== " "
+                            ) {
+                              return
+                            }
+                            event.preventDefault()
+                            togglePrivilege(privilege, !checked)
+                          }}
                           className={cn(
-                            "flex items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors",
+                            "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                             checked
                               ? "border-primary bg-primary/5"
                               : "border-border hover:bg-accent/40",
@@ -363,9 +408,8 @@ export function PermissionsEditor({
                         >
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={(value) =>
-                              togglePrivilege(privilege, value === true)
-                            }
+                            className="pointer-events-none"
+                            aria-hidden="true"
                           />
                           <span>{privilege}</span>
                         </div>

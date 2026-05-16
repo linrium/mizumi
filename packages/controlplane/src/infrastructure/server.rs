@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use crate::application::{
-    dagster_service::DagsterService,
-    k8s_service::K8sQueryService, streaming_service::StreamingJobService,
-    test_event_service::TestEventService,
+    dagster_service::DagsterService, k8s_service::K8sQueryService,
+    streaming_service::StreamingJobService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService,
 };
 

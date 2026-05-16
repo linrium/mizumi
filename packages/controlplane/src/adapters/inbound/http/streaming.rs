@@ -9,8 +9,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    domain::entities::streaming::CreateStreamingJobRequest,
-    infrastructure::server::AppState,
+    domain::entities::streaming::CreateStreamingJobRequest, infrastructure::server::AppState,
 };
 
 pub async fn list_streaming_jobs(State(state): State<Arc<AppState>>) -> impl IntoResponse {

@@ -49,8 +49,17 @@ export default function CatalogLayout({
   const [sidebarWidth, setSidebarWidth] = useState(360)
   const parts = pathname.split("/").filter(Boolean)
   const activeCat = parts[1]
-  const activeSch = parts[2]
-  const activeTbl = parts[3]
+  const resourceParts = parts.slice(2)
+  const activeSch =
+    resourceParts[0] && resourceParts[0] !== "permissions"
+      ? resourceParts[0]
+      : undefined
+  const activeTbl =
+    resourceParts[1] &&
+    resourceParts[1] !== "permissions" &&
+    resourceParts[1] !== "preview"
+      ? resourceParts[1]
+      : undefined
   const activeItemClass =
     "bg-primary/12 text-foreground font-medium ring-1 ring-primary/20"
   const activeIconClass = "text-primary"

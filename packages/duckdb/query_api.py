@@ -13,11 +13,6 @@ if CADDY_ROOT_CERT.exists():
     os.environ.setdefault("SSL_CERT_FILE", cert_path)
     os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
     os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
-elif CLUSTER_PROXY_CERT.exists():
-    cert_path = str(CLUSTER_PROXY_CERT)
-    os.environ.setdefault("SSL_CERT_FILE", cert_path)
-    os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
-    os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
 
 import duckdb
 
@@ -98,6 +93,7 @@ def main() -> None:
         hdbank_attach_sql = """
         ATTACH 'hdbank' AS hdbank (
             TYPE unity_catalog,
+            READ_ONLY,
             DEFAULT_SCHEMA 'hdbank_payments_prod_bronze'
         )
         """
@@ -107,6 +103,7 @@ def main() -> None:
         vietjetair_attach_sql = """
         ATTACH 'vietjetair' AS vietjetair (
             TYPE unity_catalog,
+            READ_ONLY,
             DEFAULT_SCHEMA 'vietjetair_bookings_prod_bronze'
         )
         """

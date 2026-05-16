@@ -17,10 +17,7 @@ use serde_json::Value;
 use tokio::{io::AsyncReadExt, time::sleep};
 use uuid::Uuid;
 
-use crate::domain::{
-    entities::query::QueryResponse,
-    error::AppError,
-};
+use crate::domain::{entities::query::QueryResponse, error::AppError};
 
 const NAMESPACE: &str = "spark";
 const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.5";
@@ -100,8 +97,14 @@ fn build_job(name: &str, sql: &str, uc_token: Option<&str>) -> Job {
                         image: Some(DUCKDB_IMAGE.to_string()),
                         image_pull_policy: Some("IfNotPresent".to_string()),
                         command: Some(vec![
-                            "python".to_string(),
-                            "/opt/duckdb/query_api.py".to_string(),
+                            "/bin/sh".to_string(),
+                            "-lc".to_string(),
+                            format!(
+                                "cp {0}/tls.crt /usr/local/share/ca-certificates/rustfs-s3-proxy.crt && \
+update-ca-certificates && \
+python /opt/duckdb/query_api.py",
+                                S3_PROXY_TLS_MOUNT_PATH
+                            ),
                         ]),
                         env: Some(duckdb_env(Some(sql), uc_token)),
                         volume_mounts: Some(duckdb_volume_mounts()),
@@ -231,9 +234,14 @@ async fn spawn_session_pod(client: &Client, pod_name: &str) -> Result<(), AppErr
                 image: Some(DUCKDB_IMAGE.to_string()),
                 image_pull_policy: Some("IfNotPresent".to_string()),
                 command: Some(vec![
-                    "tail".to_string(),
-                    "-f".to_string(),
-                    "/dev/null".to_string(),
+                    "/bin/sh".to_string(),
+                    "-lc".to_string(),
+                    format!(
+                        "cp {0}/tls.crt /usr/local/share/ca-certificates/rustfs-s3-proxy.crt && \
+update-ca-certificates && \
+tail -f /dev/null",
+                        S3_PROXY_TLS_MOUNT_PATH
+                    ),
                 ]),
                 env: Some(duckdb_env(None, None)),
                 volume_mounts: Some(duckdb_volume_mounts()),

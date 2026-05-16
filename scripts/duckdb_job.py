@@ -11,38 +11,15 @@ if CADDY_ROOT_CERT.exists():
 
 import duckdb
 
-UC_TOKEN = os.getenv("DUCKDB_UC_TOKEN", "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6ImRkZmFhNzYyZGExNDgyZDQyNDVjM2FmZTZhZDBmMjczZjJmZmM0ZmUifQ.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImludGVybmFsIiwiaWF0IjoxNzc4ODQxNzg0LCJqdGkiOiI0NTlkNTA3MS0zYjBmLTQ5MGMtYWIxMi1lYTEzZTk1YmE2NDMiLCJ0eXBlIjoiU0VSVklDRSJ9.d-H4TF-qkZb50GJjnxHiNnxTNBihx15d_0K8xfCBG1LWPTjLcCWnQwz0MRUqebIh2Yx59KlBy6sBRZ9YNb5cUOsxJ4Rf8tbcgOXUi88XOOghaGi6-NusyY8-AZLKnqwO2b01M2SU403oyJ0uoPAjYZEXk9l5MjoGnnXAnE4Q6FI5Bd6saZSHWyV89b5cLXNYJqbKbDd2tF5eqODu5ykmvbHzT0XAvscvg_-MJvT70LwPyk94MuwGPVxa-fBzxDj9eAKs2IyTxtVNiiAfVuLu7DQyFhbCNOanrpiD_14RM5u5-EoLTelkwH_K4cWKmylwQm7K5ekhU2GDvN86PjcJ3w")
+UC_TOKEN = os.getenv("DUCKDB_UC_TOKEN", "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJCTTNIdFJmRGhBQVQ4cDhOdHRNVmN2Ym5xNUNtNnB2RUp4Q1hZVUhXYW1nIn0.eyJleHAiOjE3Nzg4OTY2NjEsImlhdCI6MTc3ODg5NjM2MSwiYXV0aF90aW1lIjoxNzc4ODkzOTkzLCJqdGkiOiIwMzU5OTgwYS1mOWMzLWQwMzctNDNmOC0wMzIyZGM0YjYwNjYiLCJpc3MiOiJodHRwOi8va2V5Y2xvYWstc3ZjLmtleWNsb2FrLnN2Yy5jbHVzdGVyLmxvY2FsOjgwODAvcmVhbG1zL3NvdmljbyIsImF1ZCI6IndlYnVpIiwic3ViIjoiZjhiMjQyMDktOTYzOS00ODIxLTg3NzctN2FiNDRiMWI5M2VmIiwidHlwIjoiSUQiLCJhenAiOiJ3ZWJ1aSIsInNpZCI6IjViMDgyMTQ3LTZlYzYtNDY3Ny1hOGFkLWY4YWVmNWM0NWFjNyIsImF0X2hhc2giOiJvSzBKd3BsRnZCVlFNNDhibng3T0ZRIiwiYWNyIjoiMSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiS2hhbyBTb2kiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJraGFvc29pQGdtYWlsLmNvbSIsImdpdmVuX25hbWUiOiJLaGFvIiwiZmFtaWx5X25hbWUiOiJTb2kiLCJlbWFpbCI6ImtoYW9zb2lAZ21haWwuY29tIn0.DjRgybLqrlgs3_P8ElnyOH6jZUFTNhgf8RlmnHJzaGbIbY1ZBHZ4r2S3FqIARqq33SwiuQevboJ_fPTU76h176oy-xTL8LAH0lI8BjVyJypGSnVblQu_DZBiEfm1_BppaGIUSJqbfE6q400_9tqixuHB6gAA91a-6jDKtOJ-rXwMAHKZkPpEkuvitXGErEX6jypV8C1MQsRavUKt9qLQsp_vTfQwEKuBqEPironsl5Nr5RBkyYzaIm-gqwsf795wjCEjB4V2-ee_n8NlR97ne2t7c8X0FNn6IER4htmvO3sd0TazzTNWi8VU9U2qkk3qXo9wwllcfm69483aY3UMhQ")
 UC_ENDPOINT = os.getenv("DUCKDB_UC_ENDPOINT", "http://localhost:8082")
 UC_AWS_REGION = os.getenv("DUCKDB_UC_AWS_REGION", "us-east-1")
-S3_ENDPOINT = os.getenv("AWS_ENDPOINT_URL", "http://localhost:9000")
-S3_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
-S3_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
-S3_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_SCOPE = os.getenv("DUCKDB_S3_SCOPE", "s3://unitycatalog")
 
 if not UC_TOKEN:
     raise RuntimeError("DUCKDB_UC_TOKEN is required")
 
-endpoint_host = S3_ENDPOINT.replace("http://", "").replace("https://", "")
-use_ssl = str(S3_ENDPOINT.startswith("https://")).lower()
-
-duckdb.sql("INSTALL httpfs;")
 duckdb.sql("INSTALL unity_catalog;")
-duckdb.sql("LOAD httpfs;")
 duckdb.sql("LOAD unity_catalog;")
-
-duckdb.sql(f"""
-CREATE SECRET (
-    TYPE s3,
-    KEY_ID '{S3_ACCESS_KEY}',
-    SECRET '{S3_SECRET_KEY}',
-    ENDPOINT '{endpoint_host}',
-    USE_SSL {use_ssl},
-    URL_STYLE 'path',
-    REGION '{S3_REGION}',
-    SCOPE '{S3_SCOPE}'
-);
-""")
 
 duckdb.sql(f"""
 CREATE SECRET(
@@ -54,7 +31,7 @@ CREATE SECRET(
 """)
 
 duckdb.sql("""
-ATTACH 'hdbank' AS hdbank (TYPE unity_catalog, DEFAULT_SCHEMA 'hdbank_payments_prod_bronze');
+ATTACH 'hdbank' AS hdbank (TYPE unity_catalog, READ_ONLY, DEFAULT_SCHEMA 'hdbank_payments_prod_bronze');
 """)
 
 duckdb.sql("SHOW ALL TABLES;").show()

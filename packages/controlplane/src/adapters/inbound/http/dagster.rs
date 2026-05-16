@@ -64,10 +64,7 @@ pub async fn launch_run(
     state.dagster_service.launch_run(request).await
 }
 
-pub async fn get_run(
-    State(state): State<Arc<AppState>>,
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn get_run(State(state): State<Arc<AppState>>, Path(run_id): Path<String>) -> Response {
     state.dagster_service.get_run(run_id).await
 }
 
@@ -108,7 +105,10 @@ pub async fn get_schedule_asset_selection(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Response {
-    state.dagster_service.get_schedule_asset_selection(name).await
+    state
+        .dagster_service
+        .get_schedule_asset_selection(name)
+        .await
 }
 
 pub async fn get_schedule_tick_history(
@@ -116,5 +116,8 @@ pub async fn get_schedule_tick_history(
     Path(name): Path<String>,
     Query(params): Query<TickHistoryParams>,
 ) -> Response {
-    state.dagster_service.get_schedule_tick_history(name, params).await
+    state
+        .dagster_service
+        .get_schedule_tick_history(name, params)
+        .await
 }

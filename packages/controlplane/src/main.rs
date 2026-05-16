@@ -6,14 +6,13 @@ mod infrastructure;
 use std::sync::Arc;
 
 use rdkafka::{ClientConfig, producer::FutureProducer};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use adapters::inbound::http::create_router;
 use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
 use application::{
-    dagster_service::DagsterService,
-    k8s_service::K8sQueryService, streaming_service::StreamingJobService,
-    test_event_service::TestEventService,
+    dagster_service::DagsterService, k8s_service::K8sQueryService,
+    streaming_service::StreamingJobService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService,
 };
 use infrastructure::{config::Config, db, server::AppState};

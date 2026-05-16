@@ -20,7 +20,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/livez", get(|| async { StatusCode::OK }))
         .route("/readyz", get(|| async { StatusCode::OK }))
         .route("/api/query", post(k8s::run_query))
-        .route("/api/sessions", get(k8s::list_sessions).post(k8s::create_session))
+        .route(
+            "/api/sessions",
+            get(k8s::list_sessions).post(k8s::create_session),
+        )
         .route("/api/sessions/{id}", delete(k8s::delete_session))
         .route("/api/sessions/{id}/query", post(k8s::session_query))
         .route(
@@ -62,15 +65,30 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))
-        .route("/dagster/asset-status/{*path}", get(dagster::get_asset_status))
-        .route("/dagster/materialize/{*path}", post(dagster::materialize_asset))
-        .route("/dagster/materialize-many", post(dagster::materialize_many_assets))
-        .route("/dagster/runs", get(dagster::list_runs).post(dagster::launch_run))
+        .route(
+            "/dagster/asset-status/{*path}",
+            get(dagster::get_asset_status),
+        )
+        .route(
+            "/dagster/materialize/{*path}",
+            post(dagster::materialize_asset),
+        )
+        .route(
+            "/dagster/materialize-many",
+            post(dagster::materialize_many_assets),
+        )
+        .route(
+            "/dagster/runs",
+            get(dagster::list_runs).post(dagster::launch_run),
+        )
         .route(
             "/dagster/runs/{run_id}",
             get(dagster::get_run).delete(dagster::terminate_run),
         )
-        .route("/dagster/runs/{run_id}/events", get(dagster::get_run_events))
+        .route(
+            "/dagster/runs/{run_id}/events",
+            get(dagster::get_run_events),
+        )
         .route("/dagster/jobs", get(dagster::list_jobs))
         .route("/dagster/schedules", get(dagster::list_schedules))
         .route(
