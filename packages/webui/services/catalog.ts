@@ -32,7 +32,7 @@ function getPermissionsPath(
 
 async function getAuthToken() {
   const session = await getServerSession()
-  return session?.idToken
+  return session?.accessToken ?? session?.idToken
 }
 
 async function ucFetch<T>(path: string, init?: RequestInit): Promise<T> {

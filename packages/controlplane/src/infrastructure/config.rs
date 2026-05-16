@@ -2,20 +2,42 @@ use config::{ConfigError, Environment, File};
 use serde::Deserialize;
 
 #[derive(Clone, Deserialize)]
+pub struct DatabaseConfig {
+    pub url: String,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct KafkaConfig {
+    pub bootstrap_servers: String,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct UnityCatalogConfig {
+    pub base_url: String,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct KeycloakConfig {
+    pub url: String,
+    pub realm: String,
+    #[serde(default)]
+    pub audiences: Vec<String>,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
-    pub database_url: String,
-    pub kafka_bootstrap_servers: String,
     pub bind_addr: String,
-    pub uc_base_url: String,
-    pub keycloak_url: String,
-    pub keycloak_realm: String,
+    pub database: DatabaseConfig,
+    pub kafka: KafkaConfig,
+    pub unity_catalog: UnityCatalogConfig,
+    pub keycloak: KeycloakConfig,
 }
 
 impl Config {
     pub fn load() -> Result<Self, ConfigError> {
         config::Config::builder()
             .add_source(File::with_name("config").required(false))
-            .add_source(Environment::default())
+            .add_source(Environment::default().separator("__").list_separator(","))
             .build()?
             .try_deserialize()
     }

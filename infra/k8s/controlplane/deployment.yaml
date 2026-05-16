@@ -59,18 +59,20 @@ spec:
           ports:
             - containerPort: 6000
           env:
-            - name: DATABASE_URL
+            - name: DATABASE__URL
               valueFrom:
                 secretKeyRef:
                   name: controlplane-postgres-secret
-                  key: DATABASE_URL
+                  key: DATABASE__URL
             - name: DAGSTER_BASE_URL
               value: "http://dagster-dagster-webserver.dagster.svc.cluster.local:80"
-            - name: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA__BOOTSTRAP_SERVERS
               value: "redpanda-svc.redpanda.svc.cluster.local:9092"
-            - name: KEYCLOAK_URL
+            - name: UNITY_CATALOG__BASE_URL
+              value: "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/api/2.1/unity-catalog"
+            - name: KEYCLOAK__URL
               value: "http://keycloak.keycloak.svc.cluster.local:8080"
-            - name: KEYCLOAK_REALM
+            - name: KEYCLOAK__REALM
               value: "mizumi"
             - name: RUST_LOG
               value: "info"

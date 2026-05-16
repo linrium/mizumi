@@ -26,12 +26,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Config::load().expect("failed to load config");
-    let db = db::create_pool(&config.database_url)
+    let db = db::create_pool(&config.database.url)
         .await
         .expect("failed to connect to postgres");
 
     let kafka_producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", &config.kafka_bootstrap_servers)
+        .set("bootstrap.servers", &config.kafka.bootstrap_servers)
         .set("message.timeout.ms", "10000")
         .create()
         .expect("failed to create kafka producer");
@@ -48,12 +48,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
-            config.uc_base_url.clone(),
+            config.unity_catalog.base_url.clone(),
         ))),
         user_service: Arc::new(UserService::new(db.clone())),
         keycloak_auth: Arc::new(KeycloakAuth::new(
-            &config.keycloak_url,
-            &config.keycloak_realm,
+            &config.keycloak.url,
+            &config.keycloak.realm,
+            config.keycloak.audiences.clone(),
         )),
     });
 

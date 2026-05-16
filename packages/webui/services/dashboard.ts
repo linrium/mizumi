@@ -18,12 +18,14 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-async function ensureSession(sessionId: string | null): Promise<string> {
+async function ensureSession(sessionId: string | null, token?: string): Promise<string> {
   if (sessionId) {
     return sessionId
   }
 
-  const res = await fetch(`${API_BASE}/api/sessions`, { method: "POST" })
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}/api/sessions`, { method: "POST", headers })
   if (!res.ok) {
     throw new Error(`Failed to create session: HTTP ${res.status}`)
   }
@@ -32,11 +34,13 @@ async function ensureSession(sessionId: string | null): Promise<string> {
   return data.session_id
 }
 
-async function runSql(sessionId: string, sql: string, idToken?: string) {
+async function runSql(sessionId: string, sql: string, token?: string) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers.Authorization = `Bearer ${token}`
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, idToken }),
+    headers,
+    body: JSON.stringify({ sql }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -71,7 +75,7 @@ export type PanelSummary = {
 
 export async function handleDashboardGenerate(req: NextRequest) {
   const session = await getServerSession()
-  const idToken = session?.idToken
+  const idToken = session?.accessToken ?? session?.idToken
   const {
     messages,
     sessionId,
@@ -89,7 +93,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
   }
 
   const model = resolveModel(modelId ?? "gpt-5.4-mini")
-  const resolvedSessionId = await ensureSession(sessionId)
+  const resolvedSessionId = await ensureSession(sessionId, idToken)
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 
   const panelList =

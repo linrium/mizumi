@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/api-client"
+
 export type RequestStatus = "pending" | "ready" | "needs-info" | "approved" | "cancelled"
 export type RequestScope = "catalog" | "schema" | "table"
 export type RiskLevel = "low" | "medium" | "high"
@@ -77,7 +79,7 @@ export async function listPermissionRequests(params?: {
     url.searchParams.set("status", params.status)
   }
   if (params?.search) url.searchParams.set("search", params.search)
-  const res = await fetch(url.toString())
+  const res = await apiFetch(url.toString())
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.requests
@@ -86,7 +88,7 @@ export async function listPermissionRequests(params?: {
 export async function createPermissionRequest(
   body: CreatePermissionRequestBody,
 ): Promise<PermissionRequest> {
-  const res = await fetch("/api/permissions/requests", {
+  const res = await apiFetch("/api/permissions/requests", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -102,7 +104,7 @@ export async function updateRequestStatus(
   id: string,
   status: RequestStatus,
 ): Promise<PermissionRequest> {
-  const res = await fetch(`/api/permissions/requests/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`/api/permissions/requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -116,7 +118,7 @@ export async function cancelPermissionRequest(id: string): Promise<PermissionReq
 }
 
 export async function bulkApprove(ids: string[]): Promise<PermissionRequest[]> {
-  const res = await fetch("/api/permissions/requests/bulk-approve", {
+  const res = await apiFetch("/api/permissions/requests/bulk-approve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids }),
@@ -127,21 +129,21 @@ export async function bulkApprove(ids: string[]): Promise<PermissionRequest[]> {
 }
 
 export async function listPolicyTemplates(): Promise<PolicyTemplate[]> {
-  const res = await fetch("/api/permissions/policy-templates")
+  const res = await apiFetch("/api/permissions/policy-templates")
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.templates
 }
 
 export async function listBlastRadius(): Promise<BlastRadiusPreview[]> {
-  const res = await fetch("/api/permissions/blast-radius")
+  const res = await apiFetch("/api/permissions/blast-radius")
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.previews
 }
 
 export async function listTimeBoundGrants(): Promise<TimeBoundGrant[]> {
-  const res = await fetch("/api/permissions/grants")
+  const res = await apiFetch("/api/permissions/grants")
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.grants

@@ -1,11 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
+use jsonwebtoken::{
+    Algorithm, DecodingKey, Validation, decode, decode_header,
+    jwk::{AlgorithmParameters, JwkSet},
 };
-
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,8 +39,7 @@ pub enum AuthError {
     #[allow(dead_code)]
     MissingToken,
     InvalidToken,
-    UnknownKey,
-    JwksFetch(String),
+    Internal(String),
 }
 
 impl std::fmt::Display for AuthError {
@@ -50,118 +47,164 @@ impl std::fmt::Display for AuthError {
         match self {
             AuthError::MissingToken => write!(f, "missing bearer token"),
             AuthError::InvalidToken => write!(f, "invalid token"),
-            AuthError::UnknownKey => write!(f, "unknown signing key"),
-            AuthError::JwksFetch(e) => write!(f, "failed to fetch JWKS: {}", e),
+            AuthError::Internal(e) => write!(f, "auth internal error: {e}"),
         }
     }
 }
 
-struct JwksCache {
-    keys: HashMap<String, Arc<DecodingKey>>,
-    fetched_at: Instant,
+#[derive(Deserialize)]
+struct OidcDiscovery {
+    jwks_uri: String,
 }
 
 pub struct KeycloakAuth {
-    client: reqwest::Client,
-    jwks_url: String,
-    issuer: String,
-    cache: RwLock<Option<JwksCache>>,
+    http: reqwest::Client,
+    pub issuer: String,
+    pub audiences: Vec<String>,
+    jwks_uri: Arc<RwLock<Option<String>>>,
+    jwks_cache: Arc<RwLock<Option<JwkSet>>>,
 }
 
-const CACHE_TTL: Duration = Duration::from_secs(3600);
-
 impl KeycloakAuth {
-    pub fn new(keycloak_url: &str, realm: &str) -> Self {
-        let base = keycloak_url.trim_end_matches('/');
+    pub fn new(keycloak_url: &str, realm: &str, audiences: Vec<String>) -> Self {
+        let issuer = format!(
+            "{}/realms/{}",
+            keycloak_url.trim_end_matches('/'),
+            realm
+        );
         Self {
-            client: reqwest::Client::new(),
-            jwks_url: format!("{}/realms/{}/protocol/openid-connect/certs", base, realm),
-            issuer: format!("{}/realms/{}", base, realm),
-            cache: RwLock::new(None),
+            http: reqwest::Client::new(),
+            issuer,
+            audiences,
+            jwks_uri: Arc::new(RwLock::new(None)),
+            jwks_cache: Arc::new(RwLock::new(None)),
         }
     }
 
-    async fn fetch_keys(&self) -> Result<HashMap<String, Arc<DecodingKey>>, AuthError> {
-        let body: serde_json::Value = self
-            .client
-            .get(&self.jwks_url)
+    async fn resolve_jwks_uri(&self) -> Result<String, AuthError> {
+        if let Some(uri) = self.jwks_uri.read().await.as_ref() {
+            return Ok(uri.clone());
+        }
+        let discovery_url = format!(
+            "{}/.well-known/openid-configuration",
+            self.issuer.trim_end_matches('/')
+        );
+        tracing::debug!("fetching OIDC discovery: {}", discovery_url);
+        let res = self
+            .http
+            .get(&discovery_url)
             .send()
             .await
-            .map_err(|e| AuthError::JwksFetch(e.to_string()))?
-            .json()
+            .map_err(|e| AuthError::Internal(format!("OIDC discovery request failed: {e}")))?;
+
+        let status = res.status();
+        let body = res
+            .text()
             .await
-            .map_err(|e| AuthError::JwksFetch(e.to_string()))?;
+            .map_err(|e| AuthError::Internal(format!("OIDC discovery read failed: {e}")))?;
 
-        let keys_arr = body["keys"]
-            .as_array()
-            .ok_or_else(|| AuthError::JwksFetch("missing keys array".into()))?;
-
-        let mut keys = HashMap::new();
-        for key in keys_arr {
-            let (Some(kid), Some("RSA"), Some(n), Some(e)) = (
-                key["kid"].as_str(),
-                key["kty"].as_str(),
-                key["n"].as_str(),
-                key["e"].as_str(),
-            ) else {
-                continue;
-            };
-            match DecodingKey::from_rsa_components(n, e) {
-                Ok(dk) => {
-                    keys.insert(kid.to_string(), Arc::new(dk));
-                }
-                Err(err) => {
-                    tracing::warn!("skipping JWK kid={}: {}", kid, err);
-                }
-            }
+        if !status.is_success() {
+            return Err(AuthError::Internal(format!(
+                "OIDC discovery returned {status}: {body}"
+            )));
         }
-        Ok(keys)
+
+        let doc: OidcDiscovery = serde_json::from_str(&body)
+            .map_err(|e| AuthError::Internal(format!("OIDC discovery parse failed: {e} — body: {body}")))?;
+
+        let uri = doc.jwks_uri.clone();
+        *self.jwks_uri.write().await = Some(uri.clone());
+        Ok(uri)
     }
 
-    async fn get_keys(&self, force_refresh: bool) -> Result<HashMap<String, Arc<DecodingKey>>, AuthError> {
-        if !force_refresh {
-            let cache = self.cache.read().await;
-            if let Some(c) = cache.as_ref() {
-                if c.fetched_at.elapsed() < CACHE_TTL {
-                    return Ok(c.keys.clone());
-                }
-            }
-        }
+    async fn fetch_jwks(&self) -> Result<JwkSet, AuthError> {
+        let uri = self.resolve_jwks_uri().await?;
+        self.http
+            .get(&uri)
+            .send()
+            .await
+            .map_err(|e| AuthError::Internal(format!("JWKS fetch failed: {e}")))?
+            .json::<JwkSet>()
+            .await
+            .map_err(|e| AuthError::Internal(format!("JWKS parse failed: {e}")))
+    }
 
-        let keys = self.fetch_keys().await?;
-        let mut cache = self.cache.write().await;
-        *cache = Some(JwksCache {
-            keys: keys.clone(),
-            fetched_at: Instant::now(),
-        });
-        Ok(keys)
+    async fn get_jwks(&self) -> Result<JwkSet, AuthError> {
+        if let Some(cached) = self.jwks_cache.read().await.as_ref() {
+            return Ok(cached.clone());
+        }
+        let fresh = self.fetch_jwks().await?;
+        *self.jwks_cache.write().await = Some(fresh.clone());
+        Ok(fresh)
+    }
+
+    async fn refresh_jwks(&self) -> Result<JwkSet, AuthError> {
+        *self.jwks_cache.write().await = None;
+        let fresh = self.fetch_jwks().await?;
+        *self.jwks_cache.write().await = Some(fresh.clone());
+        Ok(fresh)
     }
 
     pub async fn validate(&self, token: &str) -> Result<KeycloakClaims, AuthError> {
         let header = decode_header(token).map_err(|_| AuthError::InvalidToken)?;
-        let kid = header.kid.ok_or(AuthError::InvalidToken)?;
+        let kid = header.kid.as_deref();
 
-        let key = {
-            let keys = self.get_keys(false).await?;
-            match keys.get(&kid).cloned() {
-                Some(k) => k,
-                None => {
-                    let keys = self.get_keys(true).await?;
-                    keys.get(&kid).cloned().ok_or(AuthError::UnknownKey)?
-                }
-            }
+        match self.try_validate(token, kid, false).await {
+            Ok(c) => Ok(c),
+            Err(_) => self.try_validate(token, kid, true).await,
+        }
+    }
+
+    async fn try_validate(
+        &self,
+        token: &str,
+        kid: Option<&str>,
+        force_refresh: bool,
+    ) -> Result<KeycloakClaims, AuthError> {
+        let jwks = if force_refresh {
+            self.refresh_jwks().await?
+        } else {
+            self.get_jwks().await?
         };
 
-        let mut validation = Validation::new(Algorithm::RS256);
+        let jwk = match kid {
+            Some(id) => jwks.find(id),
+            None => jwks.keys.first(),
+        }
+        .ok_or(AuthError::InvalidToken)?;
+
+        let decoding_key = match &jwk.algorithm {
+            AlgorithmParameters::RSA(rsa) => DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
+                .map_err(|e| AuthError::Internal(format!("JWK RSA key error: {e}")))?,
+            AlgorithmParameters::EllipticCurve(ec) => {
+                DecodingKey::from_ec_components(&ec.x, &ec.y)
+                    .map_err(|e| AuthError::Internal(format!("JWK EC key error: {e}")))?
+            }
+            _ => return Err(AuthError::Internal("unsupported JWK algorithm".into())),
+        };
+
+        let alg = jwk
+            .common
+            .key_algorithm
+            .and_then(|a| a.to_string().parse::<Algorithm>().ok())
+            .unwrap_or(Algorithm::RS256);
+
+        tracing::debug!("jwk issuer: {}", self.issuer);
+        tracing::debug!("jwk audiences: {:?}", self.audiences);
+
+        let mut validation = Validation::new(alg);
         validation.set_issuer(&[&self.issuer]);
-        validation.validate_aud = false;
+        if self.audiences.is_empty() {
+            validation.validate_aud = false;
+        } else {
+            validation.set_audience(&self.audiences);
+        }
 
-        let data = decode::<KeycloakClaims>(token, &key, &validation)
+        decode::<KeycloakClaims>(token, &decoding_key, &validation)
+            .map(|d| d.claims)
             .map_err(|e| {
-                tracing::debug!("JWT validation failed: {}", e);
+                tracing::debug!("JWT validation failed: {e}");
                 AuthError::InvalidToken
-            })?;
-
-        Ok(data.claims)
+            })
     }
 }

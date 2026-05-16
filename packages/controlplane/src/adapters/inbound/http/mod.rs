@@ -26,6 +26,7 @@ async fn require_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let token = extract_bearer(req.headers()).ok_or(StatusCode::UNAUTHORIZED)?;
+    tracing::debug!("valid token {:?}", token);
 
     let claims = state
         .keycloak_auth

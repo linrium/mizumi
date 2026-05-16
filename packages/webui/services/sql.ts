@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { readStoredIdToken } from "@/lib/auth/storage"
+import { apiFetch } from "@/lib/api-client"
 
 export const sqlSchema = z.object({
   sql: z.string().min(1, "SQL query is required"),
@@ -41,13 +41,10 @@ export async function runSessionSqlQuery(
   sessionId: string,
   sql: string,
 ): Promise<QueryResponse> {
-  const res = await fetch(`/api/sessions/${sessionId}/query`, {
+  const res = await apiFetch(`/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sql,
-      idToken: readStoredIdToken() ?? undefined,
-    }),
+    body: JSON.stringify({ sql }),
   })
   const body = await res.json()
   if (!res.ok) {
@@ -57,13 +54,10 @@ export async function runSessionSqlQuery(
 }
 
 export async function runSqlQuery(sql: string): Promise<QueryResponse> {
-  const res = await fetch("/api/query", {
+  const res = await apiFetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sql,
-      idToken: readStoredIdToken() ?? undefined,
-    }),
+    body: JSON.stringify({ sql }),
   })
   const body = await res.json()
   if (!res.ok) {

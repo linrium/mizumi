@@ -18,12 +18,14 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-async function runSql(sessionId: string | null, sql: string, idToken?: string) {
+async function runSql(sessionId: string | null, sql: string, token?: string) {
   const url = `${API_BASE}/api/query`
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers.Authorization = `Bearer ${token}`
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, idToken }),
+    headers,
+    body: JSON.stringify({ sql }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -48,7 +50,7 @@ function resolveModel(modelId: ModelId): LanguageModel {
 export async function handleAnalyticsChat(req: NextRequest) {
   const { messages, sessionId, modelId } = await req.json()
   const session = await getServerSession()
-  const idToken = session?.idToken
+  const idToken = session?.accessToken ?? session?.idToken
   const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-mini")
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 
