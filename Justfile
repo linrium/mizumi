@@ -54,7 +54,7 @@ forward:
     set -euo pipefail
     trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
     kubectl port-forward -n {{rustfs_namespace}} svc/rustfs-svc 9000:9000 9001:9001 &
-    kubectl port-forward -n {{dagster_namespace}} svc/dagster-dagster-webserver 8080:8080 &
+    kubectl port-forward -n {{dagster_namespace}} svc/dagster-dagster-webserver 8080:80 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &

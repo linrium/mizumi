@@ -5,9 +5,9 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import type { TableSummary } from "@/services/catalog-types"
 import { getTablesAction } from "../../actions"
 import { CatalogTabs } from "../../catalog-tabs"
-import type { TableSummary } from "@/services/catalog"
 
 export default function SchemaPage() {
   const { catalog, schema } = useParams<{ catalog: string; schema: string }>()

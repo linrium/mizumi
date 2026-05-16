@@ -6,24 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessions } from "@/hooks/use-sessions"
-import { readStoredIdToken } from "@/lib/auth/storage"
+import { type QueryResponse, runSessionSqlQuery } from "@/services/sql"
 
-type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>
-
-async function runQuery(
-  sessionId: string,
-  sql: string,
-): Promise<QueryResponse> {
-  const res = await fetch(`/api/sessions/${sessionId}/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, idToken: readStoredIdToken() ?? undefined }),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-  return json as QueryResponse
-}
 
 function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -99,7 +84,7 @@ export default function TablePreviewPage() {
           if (!s) throw new Error("Failed to create session")
           sessionId = s.session_id
         }
-        const result = await runQuery(
+        const result = await runSessionSqlQuery(
           sessionId,
           `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
         )

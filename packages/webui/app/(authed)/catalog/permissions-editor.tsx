@@ -4,7 +4,6 @@ import { ArrowDown01Icon, UserIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { getPermissionsAction, patchPermissionsAction } from "./actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,7 +26,8 @@ import {
   CatalogApiError,
   type PermissionAssignment,
   type PermissionsResponse,
-} from "@/services/catalog"
+} from "@/services/catalog-types"
+import { getPermissionsAction, patchPermissionsAction } from "./actions"
 
 const DEFAULT_PRINCIPALS = [
   "linh@gmail.com",
@@ -416,7 +416,7 @@ export function PermissionsEditor({
                     {group.privileges.map((privilege) => {
                       const checked = selected.has(privilege)
                       return (
-                        <label
+                        <div
                           key={privilege}
                           className={cn(
                             "flex items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors",
@@ -432,7 +432,7 @@ export function PermissionsEditor({
                             }
                           />
                           <span>{privilege}</span>
-                        </label>
+                        </div>
                       )
                     })}
                   </div>

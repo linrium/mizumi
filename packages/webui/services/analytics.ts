@@ -19,9 +19,7 @@ const openai = createOpenAI({
 })
 
 async function runSql(sessionId: string | null, sql: string, idToken?: string) {
-  const url = sessionId
-    ? `${API_BASE}/api/sessions/${sessionId}/query`
-    : `${API_BASE}/api/query`
+  const url = `${API_BASE}/api/query`
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

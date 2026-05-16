@@ -1,31 +1,21 @@
 "use client"
 
-import type { ColumnDef } from "@tanstack/react-table"
 import { Copy01Icon, PlayIcon, SqlIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
 import { useForm } from "@tanstack/react-form"
+import type { ColumnDef } from "@tanstack/react-table"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { z } from "zod"
 import { DataGrid } from "@/components/data-grid/data-grid"
-import { readStoredIdToken } from "@/lib/auth/storage"
 import { Button } from "@/components/ui/button"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import { useSessionContext } from "@/hooks/use-session-context"
-
-const schema = z.object({
-  sql: z.string().min(1, "SQL query is required"),
-})
-
-type QueryResponse = {
-  columns: string[]
-  rows: unknown[][]
-  row_count: number
-}
-
-type Result =
-  | { ok: true; data: QueryResponse; elapsed: number }
-  | { ok: false; error: string }
+import {
+  executeSqlQuery,
+  formatQueryResultsAsTsv,
+  type QueryResponse,
+  type SqlQueryResult,
+  sqlSchema,
+} from "@/services/sql"
 
 type Row = Record<string, unknown>
 
@@ -85,11 +75,9 @@ const RESULTS_MAX = 800
 const RESULTS_DEFAULT = 300
 
 export function SqlEditor() {
-  const [result, setResult] = useState<Result | null>(null)
+  const [result, setResult] = useState<SqlQueryResult | null>(null)
   const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
-  const startRef = useRef<number>(0)
-  const { activeId, createSession } = useSessionContext()
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -115,67 +103,24 @@ export function SqlEditor() {
 
   const form = useForm({
     defaultValues: {
-      sql: "select * from banking.transactions.silver_transactions",
+      sql: "select * from hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
     },
-    validators: { onSubmit: schema },
+    validators: { onSubmit: sqlSchema },
     onSubmit: async ({ value }) => {
       setResult(null)
-      startRef.current = Date.now()
-      try {
-        let sessionId = activeId
-        if (!sessionId) {
-          const session = await createSession()
-          if (!session) {
-            setResult({ ok: false, error: "Failed to create session" })
-            return
-          }
-          sessionId = session.session_id
-        }
-        const url = `/api/sessions/${sessionId}/query`
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sql: value.sql,
-            idToken: readStoredIdToken() ?? undefined,
-          }),
-        })
-        const elapsed = Date.now() - startRef.current
-        const body = await res.json()
-        if (!res.ok) {
-          setResult({ ok: false, error: body.error ?? `HTTP ${res.status}` })
-        } else {
-          setResult({ ok: true, data: body as QueryResponse, elapsed })
-        }
-      } catch (e) {
-        setResult({ ok: false, error: (e as Error).message })
-      }
+      setResult(await executeSqlQuery(value.sql))
     },
   })
 
   const copyResults = () => {
     if (!result?.ok) return
-    const header = result.data.columns.join("\t")
-    const rows = result.data.rows
-      .map((r) => r.map(String).join("\t"))
-      .join("\n")
-    navigator.clipboard.writeText(`${header}\n${rows}`)
+    navigator.clipboard.writeText(formatQueryResultsAsTsv(result.data))
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
-        <HugeiconsIcon
-          icon={SqlIcon}
-          size={15}
-          className="text-muted-foreground"
-        />
-        <span className="text-sm font-medium text-muted-foreground">
-          query.sql
-        </span>
-        <div className="flex-1" />
-
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button
@@ -200,7 +145,7 @@ export function SqlEditor() {
           }}
           className="h-full"
         >
-          <form.Field name="sql" validators={{ onChange: schema.shape.sql }}>
+          <form.Field name="sql" validators={{ onChange: sqlSchema.shape.sql }}>
             {(field) => (
               <div className="h-full flex flex-col">
                 <Editor
@@ -249,7 +194,9 @@ export function SqlEditor() {
         style={{ height: resultsHeight }}
       >
         {/* Resize handle */}
-        <div
+        <button
+          type="button"
+          aria-label="Resize results pane"
           onMouseDown={handleResizeMouseDown}
           className="h-1 w-full cursor-row-resize hover:bg-primary/30 transition-colors shrink-0"
         />

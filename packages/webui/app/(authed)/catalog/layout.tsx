@@ -4,9 +4,9 @@ import { Book03Icon, DatabaseIcon, TableIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
-import { getCatalogsAction, getSchemasAction, getTablesAction } from "./actions"
 import { cn } from "@/lib/utils"
-import type { Catalog, Schema, TableSummary } from "@/services/catalog"
+import type { Catalog, Schema, TableSummary } from "@/services/catalog-types"
+import { getCatalogsAction, getSchemasAction, getTablesAction } from "./actions"
 
 function Chevron({ open }: { open: boolean }) {
   return (
