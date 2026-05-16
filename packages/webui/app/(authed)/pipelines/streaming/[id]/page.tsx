@@ -6,6 +6,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { toast } from "sonner"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ function useJobDetail(id: string) {
 
     async function fetchAll() {
       try {
-        const jobRes = await fetch(`/api/streaming/jobs/${id}`, {
+        const jobRes = await fetchWithAuth(`/api/streaming/jobs/${id}`, {
           cache: "no-store",
         })
         if (!jobRes.ok) {
@@ -152,7 +153,7 @@ function useJobDetail(id: string) {
         }
         const jobData = (await jobRes.json()) as StreamingJobDetail
 
-        const logsRes = await fetch(`/api/streaming/jobs/${id}/logs`, {
+        const logsRes = await fetchWithAuth(`/api/streaming/jobs/${id}/logs`, {
           cache: "no-store",
         })
         let logsData: LogsResponse | null = null
@@ -220,7 +221,7 @@ export default function StreamingJobDetailPage() {
   const { job, logs, logsError, loading, error } = useJobDetail(id)
 
   async function doRestart() {
-    const res = await fetch(`/api/streaming/jobs/${id}/restart`, {
+    const res = await fetchWithAuth(`/api/streaming/jobs/${id}/restart`, {
       method: "POST",
     })
     const json = await res.json()
@@ -229,7 +230,7 @@ export default function StreamingJobDetailPage() {
   }
 
   async function doDelete() {
-    const res = await fetch(`/api/streaming/jobs/${id}`, { method: "DELETE" })
+    const res = await fetchWithAuth(`/api/streaming/jobs/${id}`, { method: "DELETE" })
     if (res.status !== 204 && !res.ok) {
       const json = await res.json().catch(() => ({}))
       throw new Error(json.error ?? `HTTP ${res.status}`)

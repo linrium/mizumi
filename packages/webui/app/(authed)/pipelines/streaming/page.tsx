@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   type ColumnDef,
   flexRender,
@@ -139,7 +140,7 @@ function RestartButton({
   onDone: () => void
 }) {
   async function doRestart() {
-    const res = await fetch(`/api/streaming/jobs/${id}/restart`, {
+    const res = await fetchWithAuth(`/api/streaming/jobs/${id}/restart`, {
       method: "POST",
     })
     const json = await res.json()
@@ -176,7 +177,7 @@ function DeleteButton({
   onDone: () => void
 }) {
   async function doDelete() {
-    const res = await fetch(`/api/streaming/jobs/${id}`, { method: "DELETE" })
+    const res = await fetchWithAuth(`/api/streaming/jobs/${id}`, { method: "DELETE" })
     if (res.status !== 204 && !res.ok) {
       const json = await res.json()
       throw new Error(json.error ?? `HTTP ${res.status}`)
@@ -284,7 +285,7 @@ export default function StreamingPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/streaming/jobs", { cache: "no-store" })
+      const res = await fetchWithAuth("/api/streaming/jobs", { cache: "no-store" })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
       setJobs(json.jobs ?? [])
