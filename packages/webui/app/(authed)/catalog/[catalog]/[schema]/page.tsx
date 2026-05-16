@@ -5,26 +5,9 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { getTablesAction } from "../../actions"
 import { CatalogTabs } from "../../catalog-tabs"
-
-type TableSummary = {
-  name: string
-  catalog_name: string
-  schema_name: string
-  table_type: string
-}
-
-async function fetchTables(
-  catalog: string,
-  schema: string,
-): Promise<TableSummary[]> {
-  const res = await fetch(
-    `/api/catalog?${new URLSearchParams({ type: "tables", catalog, schema })}`,
-  )
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-  return json.tables ?? []
-}
+import type { TableSummary } from "@/services/catalog"
 
 export default function SchemaPage() {
   const { catalog, schema } = useParams<{ catalog: string; schema: string }>()
@@ -34,7 +17,8 @@ export default function SchemaPage() {
 
   useEffect(() => {
     setLoading(true)
-    fetchTables(catalog, schema)
+    getTablesAction(catalog, schema)
+      .then((data) => data.tables ?? [])
       .then(setTables)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))

@@ -5,18 +5,9 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { getSchemasAction } from "../actions"
 import { CatalogTabs } from "../catalog-tabs"
-
-type Schema = { name: string; catalog_name: string; comment?: string }
-
-async function fetchSchemas(catalog: string): Promise<Schema[]> {
-  const res = await fetch(
-    `/api/catalog?${new URLSearchParams({ type: "schemas", catalog })}`,
-  )
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-  return json.schemas ?? []
-}
+import type { Schema } from "@/services/catalog"
 
 export default function CatalogPage() {
   const { catalog } = useParams<{ catalog: string }>()
@@ -26,7 +17,8 @@ export default function CatalogPage() {
 
   useEffect(() => {
     setLoading(true)
-    fetchSchemas(catalog)
+    getSchemasAction(catalog)
+      .then((data) => data.schemas ?? [])
       .then(setSchemas)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -41,11 +33,7 @@ export default function CatalogPage() {
         </p>
         <CatalogTabs
           tabs={[
-            {
-              href: `/catalog/${catalog}`,
-              label: "schemas",
-              active: true,
-            },
+            { href: `/catalog/${catalog}`, label: "schemas", active: true },
             {
               href: `/catalog/${catalog}/permissions`,
               label: "permissions",

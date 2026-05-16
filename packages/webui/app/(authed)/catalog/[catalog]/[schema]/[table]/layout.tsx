@@ -5,15 +5,9 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { getTableAction } from "../../../actions"
 import { cn } from "@/lib/utils"
 import { TableContext, type TableDetail } from "./table-context"
-
-async function apiFetch<T>(params: Record<string, string>): Promise<T> {
-  const res = await fetch(`/api/catalog?${new URLSearchParams(params)}`)
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-  return json as T
-}
 
 type Tab = "schema" | "preview" | "permissions"
 
@@ -41,19 +35,21 @@ export default function TableLayout({
   useEffect(() => {
     setDetail(null)
     setError(null)
-    apiFetch<TableDetail>({ type: "table", catalog, schema, table })
+    getTableAction(catalog, schema, table)
       .then(setDetail)
       .catch((e: Error) => setError(e.message))
   }, [catalog, schema, table])
 
-  if (error)
+  if (error) {
     return <div className="p-4 text-sm text-destructive font-mono">{error}</div>
-  if (!detail)
+  }
+  if (!detail) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         Loading…
       </div>
     )
+  }
 
   const fullPath = `${detail.catalog_name}.${detail.schema_name}.${detail.name}`
   const basePath = `/catalog/${catalog}/${schema}/${table}`

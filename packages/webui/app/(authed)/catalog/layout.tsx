@@ -4,29 +4,9 @@ import { Book03Icon, DatabaseIcon, TableIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
+import { getCatalogsAction, getSchemasAction, getTablesAction } from "./actions"
 import { cn } from "@/lib/utils"
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Catalog = { name: string; comment?: string }
-type Schema = { name: string; catalog_name: string; comment?: string }
-type TableSummary = {
-  name: string
-  catalog_name: string
-  schema_name: string
-  table_type: string
-}
-
-// ── API ───────────────────────────────────────────────────────────────────────
-
-async function apiFetch<T>(params: Record<string, string>): Promise<T> {
-  const res = await fetch(`/api/catalog?${new URLSearchParams(params)}`)
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-  return json as T
-}
-
-// ── Chevron ───────────────────────────────────────────────────────────────────
+import type { Catalog, Schema, TableSummary } from "@/services/catalog"
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -52,8 +32,6 @@ function Chevron({ open }: { open: boolean }) {
   )
 }
 
-// ── Tree ──────────────────────────────────────────────────────────────────────
-
 export default function CatalogLayout({
   children,
 }: {
@@ -71,8 +49,8 @@ export default function CatalogLayout({
   const [sidebarWidth, setSidebarWidth] = useState(360)
 
   useEffect(() => {
-    apiFetch<{ catalogs: Catalog[] }>({ type: "catalogs" })
-      .then((d) => setCatalogs(d.catalogs ?? []))
+    getCatalogsAction()
+      .then((data) => setCatalogs(data.catalogs ?? []))
       .finally(() => setLoading(false))
   }, [])
 
@@ -88,11 +66,8 @@ export default function CatalogLayout({
     toggle(cat)
     router.push(`/catalog/${cat}`)
     if (!schemas[cat]) {
-      const d = await apiFetch<{ schemas: Schema[] }>({
-        type: "schemas",
-        catalog: cat,
-      })
-      setSchemas((prev) => ({ ...prev, [cat]: d.schemas ?? [] }))
+      const data = await getSchemasAction(cat)
+      setSchemas((prev) => ({ ...prev, [cat]: data.schemas ?? [] }))
     }
   }
 
@@ -101,12 +76,8 @@ export default function CatalogLayout({
     toggle(key)
     router.push(`/catalog/${cat}/${sch}`)
     if (!tables[key]) {
-      const d = await apiFetch<{ tables: TableSummary[] }>({
-        type: "tables",
-        catalog: cat,
-        schema: sch,
-      })
-      setTables((prev) => ({ ...prev, [key]: d.tables ?? [] }))
+      const data = await getTablesAction(cat, sch)
+      setTables((prev) => ({ ...prev, [key]: data.tables ?? [] }))
     }
   }
 
@@ -114,13 +85,12 @@ export default function CatalogLayout({
     router.push(`/catalog/${cat}/${sch}/${tbl}`)
   }
 
-  // Derive active segments from pathname: /catalog/[cat]/[sch]/[tbl]
-  const parts = pathname.split("/").filter(Boolean) // ['catalog', cat, sch, tbl]
+  const parts = pathname.split("/").filter(Boolean)
   const activeCat = parts[1]
   const activeSch = parts[2]
   const activeTbl = parts[3]
 
-  function startResize(event: React.MouseEvent<HTMLDivElement>) {
+  function startResize(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
 
     const minWidth = 300
@@ -152,7 +122,6 @@ export default function CatalogLayout({
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* ── Tree panel ── */}
       <div
         ref={sidebarRef}
         className="relative shrink-0 border-r flex flex-col overflow-hidden select-none"
@@ -169,7 +138,6 @@ export default function CatalogLayout({
 
             return (
               <div key={cat.name}>
-                {/* Catalog row */}
                 <button
                   type="button"
                   onClick={() => handleCatalog(cat.name)}
@@ -198,7 +166,6 @@ export default function CatalogLayout({
 
                     return (
                       <div key={schKey}>
-                        {/* Schema row */}
                         <button
                           type="button"
                           onClick={() => handleSchema(cat.name, sch.name)}
@@ -267,13 +234,10 @@ export default function CatalogLayout({
               resizeBy(16)
             }
           }}
-          className="absolute inset-y-0 right-0 w-1 cursor-col-resize bg-transparent transition-colors hover:bg-border"
-          title="Resize catalog sidebar"
+          className="absolute right-0 top-0 h-full w-1 translate-x-1/2 cursor-col-resize bg-transparent outline-none focus:bg-border/60 hover:bg-border/40"
         />
       </div>
-
-      {/* ── Detail panel ── */}
-      <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
+      <div className="min-w-0 flex-1 overflow-hidden">{children}</div>
     </div>
   )
 }
