@@ -5,7 +5,7 @@ import { authClient } from "@/lib/auth-client"
 
 let isHandlingUnauthorized = false
 
-async function getToken(): Promise<string | undefined> {
+export async function getToken(): Promise<string | undefined> {
   const { data } = await authClient.getSession()
   const session = data as AppSession | null
   return session?.idToken

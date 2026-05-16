@@ -56,6 +56,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
+        debug_log(f"UC_TOKEN: {UC_TOKEN}")
+        
         con = duckdb.connect()
         debug_log("Connected to DuckDB")
 

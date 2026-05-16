@@ -112,7 +112,7 @@ function buildColumns(
     },
     {
       id: "deployment",
-      header: "Namespace / Image",
+      header: "Namespace",
       cell: ({ row }) => (
         <div className="space-y-0.5">
           <div className="font-medium">{row.original.namespace}</div>

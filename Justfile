@@ -58,7 +58,7 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
-    # kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
+    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &

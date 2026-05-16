@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, getToken } from "@/lib/api-client"
 
 export const sqlSchema = z.object({
   sql: z.string().min(1, "SQL query is required"),
@@ -54,10 +54,11 @@ export async function runSessionSqlQuery(
 }
 
 export async function runSqlQuery(sql: string): Promise<QueryResponse> {
+  const idToken = await getToken()
   const res = await apiFetch("/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken }),
   })
   const body = await res.json()
   if (!res.ok) {
