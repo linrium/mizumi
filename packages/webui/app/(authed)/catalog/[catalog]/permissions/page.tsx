@@ -10,7 +10,7 @@ export default function CatalogPermissionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="px-6 py-4 border-b shrink-0">
+      <div className="px-6 pt-4 shrink-0">
         <h1 className="text-sm font-semibold">{catalog}</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
           Manage catalog permissions

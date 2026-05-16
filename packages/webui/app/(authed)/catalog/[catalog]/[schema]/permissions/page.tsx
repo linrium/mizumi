@@ -10,7 +10,7 @@ export default function SchemaPermissionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="px-6 py-4 border-b shrink-0">
+      <div className="px-6 pt-4 shrink-0">
         <div className="flex items-baseline gap-1.5">
           <h1 className="text-sm font-semibold">{schema}</h1>
           <span className="text-xs text-muted-foreground font-mono">

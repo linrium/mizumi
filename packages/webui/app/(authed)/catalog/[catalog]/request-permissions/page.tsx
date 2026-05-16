@@ -19,7 +19,7 @@ export default async function CatalogRequestPermissionsPage({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-6 py-4 shrink-0">
+      <div className="px-6 pt-4 shrink-0">
         <h1 className="text-sm font-semibold">{catalog}</h1>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Request catalog permissions

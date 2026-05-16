@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import {
   DatabaseIcon,
   SecurityIcon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { toast } from "sonner"
@@ -211,42 +210,37 @@ export function CatalogRequestPermissionsForm({
 
   return (
     <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,rgba(72,101,255,0.04)_0%,rgba(72,101,255,0)_28%),radial-gradient(circle_at_top_left,rgba(16,185,129,0.08),transparent_30%)]">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
-        <section className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
-          <div className="border-b border-border/70 px-6 py-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <Badge
-                  variant="outline"
-                  className="border-emerald-900/10 bg-emerald-50 text-emerald-900/80"
-                >
-                  Self-service access request
-                </Badge>
-                <div className="space-y-1">
-                  <h2 className="text-xl font-semibold tracking-tight">
-                    Request access to {catalog}
-                  </h2>
-                  <p className="max-w-2xl text-sm text-muted-foreground">
-                    Choose only the catalog privileges you do not already have.
-                    Existing access is locked in below, and only missing
-                    privileges can be requested from this page.
-                  </p>
-                </div>
-              </div>
-
-              <div className="min-w-[240px] rounded-2xl border border-border/70 bg-muted/30 px-4 py-3">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  Requesting as
-                </p>
-                <p className="mt-1 break-all font-mono text-xs">
-                  {currentPrincipal || "Unknown principal"}
-                </p>
-              </div>
+      <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <section className="space-y-4">
+          <div className="space-y-4">
+            <Badge
+              variant="outline"
+              className="border-emerald-900/10 bg-emerald-50 text-emerald-900/80"
+            >
+              Self-service access request
+            </Badge>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Request access to {catalog}
+              </h2>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Choose only the catalog privileges you do not already have.
+                Existing access is shown below, and only missing privileges can
+                be requested from this page.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-muted/35 px-4 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Requesting as
+              </p>
+              <p className="mt-1 break-all font-mono text-xs">
+                {currentPrincipal || "Unknown principal"}
+              </p>
             </div>
           </div>
 
-          <div className="grid gap-4 px-6 py-5 md:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)]">
-            <div className="rounded-2xl border border-border/70 bg-background px-4 py-4">
+          <div className="space-y-4">
+            <div className="rounded-md bg-background/80 px-4 py-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <HugeiconsIcon
                   icon={DatabaseIcon}
@@ -276,7 +270,7 @@ export function CatalogRequestPermissionsForm({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/70 bg-background px-4 py-4">
+            <div className="rounded-md bg-background/80 px-4 py-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <HugeiconsIcon
                   icon={SecurityIcon}
@@ -290,7 +284,7 @@ export function CatalogRequestPermissionsForm({
               </p>
 
               <div className="mt-4 space-y-3">
-                <div className="rounded-xl border border-dashed border-border bg-muted/20 px-3 py-3">
+                <div className="rounded-xl bg-muted/20 px-3 py-3">
                   <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                     Selected
                   </p>
@@ -326,108 +320,104 @@ export function CatalogRequestPermissionsForm({
           </div>
         </section>
 
-        {error && (
-          <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        {forbidden && (
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
-            You do not have permission to inspect catalog privileges for this
-            resource, so the page cannot determine which privileges are missing.
-          </div>
-        )}
-
-        {!forbidden && (
-          <section className="rounded-3xl border border-border/70 bg-card px-6 py-5 shadow-sm">
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold">Requestable privileges</h3>
-              <p className="text-sm text-muted-foreground">
-                The list below excludes anything already granted to{" "}
-                <span className="font-mono text-foreground">
-                  {currentPrincipal || "your principal"}
-                </span>
-                .
-              </p>
+        <section className="space-y-6">
+          {error && (
+            <div className="rounded-2xl bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {error}
             </div>
+          )}
 
-            {loading ? (
-              <p className="mt-5 text-sm text-muted-foreground">Loading…</p>
-            ) : requestableGroups.length === 0 ? (
-              <div className="mt-5 rounded-2xl border border-emerald-900/10 bg-emerald-50/60 px-4 py-4 text-sm text-emerald-950/80">
-                Everything in this catalog privilege set is already assigned to
-                your principal. There is nothing left to request here.
+          {forbidden && (
+            <div className="rounded-2xl bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
+              You do not have permission to inspect catalog privileges for this
+              resource, so the page cannot determine which privileges are
+              missing.
+            </div>
+          )}
+
+          {!forbidden && (
+            <section className="space-y-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold">Requestable privileges</h3>
+                <p className="text-sm text-muted-foreground">
+                  The list below excludes anything already granted to{" "}
+                  <span className="font-mono text-foreground">
+                    {currentPrincipal || "your principal"}
+                  </span>
+                  .
+                </p>
               </div>
-            ) : (
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                {requestableGroups.map((group) => (
-                  <div
-                    key={group.label}
-                    className="rounded-2xl border border-border/70 bg-background p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                          {group.label}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {group.privileges.length} available to request
-                        </p>
+
+              {loading ? (
+                <p className="mt-5 text-sm text-muted-foreground">Loading…</p>
+              ) : requestableGroups.length === 0 ? (
+                <div className="mt-5 rounded-2xl bg-emerald-50/60 px-4 py-4 text-sm text-emerald-950/80">
+                  Everything in this catalog privilege set is already assigned
+                  to your principal. There is nothing left to request here.
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {requestableGroups.map((group) => (
+                    <div
+                      key={group.label}
+                      className="rounded-md border border-border bg-background/80 p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                            {group.label}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {group.privileges.length} available to request
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {group.privileges.map((privilege) => {
+                          const checked = selected.has(privilege)
+
+                          return (
+                            <button
+                              key={privilege}
+                              type="button"
+                              aria-pressed={checked}
+                              onClick={() => togglePrivilege(privilege, !checked)}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") {
+                                  return
+                                }
+                                event.preventDefault()
+                                togglePrivilege(privilege, !checked)
+                              }}
+                              className={cn(
+                                "flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
+                                checked
+                                  ? "bg-primary/6"
+                                  : "hover:bg-accent/40",
+                              )}
+                            >
+                              <Checkbox
+                                checked={checked}
+                                className="pointer-events-none"
+                                aria-hidden="true"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <Label className="cursor-pointer text-sm">
+                                  {privilege}
+                                </Label>
+                              </div>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
-
-                    <div className="space-y-2">
-                      {group.privileges.map((privilege) => {
-                        const checked = selected.has(privilege)
-
-                        return (
-                          <button
-                            key={privilege}
-                            type="button"
-                            aria-pressed={checked}
-                            onClick={() => togglePrivilege(privilege, !checked)}
-                            onKeyDown={(event) => {
-                              if (event.key !== "Enter" && event.key !== " ") {
-                                return
-                              }
-                              event.preventDefault()
-                              togglePrivilege(privilege, !checked)
-                            }}
-                            className={cn(
-                              "flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
-                              checked
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:bg-accent/40",
-                            )}
-                          >
-                            <Checkbox
-                              checked={checked}
-                              className="pointer-events-none"
-                              aria-hidden="true"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <Label className="cursor-pointer text-sm">
-                                {privilege}
-                              </Label>
-                            </div>
-                            {checked && (
-                              <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={14}
-                                className="text-primary"
-                              />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </section>
       </div>
     </div>
   )
