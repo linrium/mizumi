@@ -1,26 +1,11 @@
 "use client"
 
-import { ArrowDown01Icon, UserIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
 import { Label } from "@/components/ui/label"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import {
   CatalogApiError,
@@ -28,13 +13,6 @@ import {
   type PermissionsResponse,
 } from "@/services/catalog-types"
 import { getPermissionsAction, patchPermissionsAction } from "./actions"
-
-const DEFAULT_PRINCIPALS = [
-  "linh@gmail.com",
-  "khaosoi@gmail.com",
-  "khaopad@gmail.com",
-  "rikki@gmail.com",
-] as const
 
 const PRIVILEGES = [
   "OWNER",
@@ -96,8 +74,6 @@ type PermissionsEditorProps = {
   catalog: string
   schema?: string
   table?: string
-  title: string
-  subtitle: string
 }
 
 function normalizePrivileges(
@@ -114,15 +90,12 @@ export function PermissionsEditor({
   catalog,
   schema,
   table,
-  title,
-  subtitle,
 }: PermissionsEditorProps) {
   const [assignments, setAssignments] = useState<PermissionAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [forbidden, setForbidden] = useState(false)
-  const [principalOpen, setPrincipalOpen] = useState(false)
   const [principal, setPrincipal] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -192,30 +165,14 @@ export function PermissionsEditor({
     [selected, originalPrivileges],
   )
 
-  const principalOptions = useMemo(() => {
-    const deduped = new Map<string, string>()
-
-    for (const email of DEFAULT_PRINCIPALS) {
-      deduped.set(email.toLowerCase(), email)
-    }
-
-    for (const assignment of assignments) {
-      deduped.set(assignment.principal.toLowerCase(), assignment.principal)
-    }
-
-    return Array.from(deduped.values())
-  }, [assignments])
-
   function loadAssignment(next: PermissionAssignment) {
     setPrincipal(next.principal)
     setSelected(new Set(next.privileges ?? []))
-    setPrincipalOpen(false)
   }
 
   function resetEditor() {
     setPrincipal("")
     setSelected(new Set())
-    setPrincipalOpen(false)
   }
 
   function togglePrivilege(privilege: Privilege, checked: boolean) {
@@ -279,77 +236,9 @@ export function PermissionsEditor({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-4 rounded-lg border bg-card p-4">
-          <div className="space-y-2">
-            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Principal
-            </Label>
-            <Popover open={principalOpen} onOpenChange={setPrincipalOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={principalOpen}
-                  className="w-full justify-between"
-                >
-                  <span className="truncate">
-                    {principal || "Select or enter a principal"}
-                  </span>
-                  <HugeiconsIcon
-                    icon={ArrowDown01Icon}
-                    size={16}
-                    className="shrink-0 text-muted-foreground"
-                  />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[320px] p-0" align="start">
-                <Command>
-                  <CommandInput
-                    value={principal}
-                    onValueChange={setPrincipal}
-                    placeholder="Search principals…"
-                  />
-                  <CommandList>
-                    <CommandEmpty>No principal found.</CommandEmpty>
-                    <CommandGroup>
-                      {principalOptions.map((option) => (
-                        <CommandItem
-                          key={option}
-                          value={option}
-                          onSelect={() =>
-                            loadAssignment({
-                              principal: option,
-                              privileges:
-                                assignments.find(
-                                  (assignment) =>
-                                    assignment.principal.toLowerCase() ===
-                                    option.toLowerCase(),
-                                )?.privileges ?? [],
-                            })
-                          }
-                        >
-                          <HugeiconsIcon
-                            icon={UserIcon}
-                            size={14}
-                            className="mr-2 text-muted-foreground"
-                          />
-                          <span className="truncate">{option}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
+    <div className="mx-auto flex w-full h-full flex-col">
+      <div className="grid h-full lg:grid-cols-[350px_minmax(0,1fr)]">
+        <div className="space-y-4 h-full border-r bg-card p-4">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={resetEditor}>
               Reset
@@ -363,23 +252,64 @@ export function PermissionsEditor({
             </Button>
           </div>
 
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Principals
+            </Label>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : assignments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No principals with permissions found.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {assignments.map((assignment) => {
+                  const isActive =
+                    assignment.principal.toLowerCase() ===
+                    principal.trim().toLowerCase()
+
+                  return (
+                    <button
+                      key={assignment.principal}
+                      type="button"
+                      onClick={() => loadAssignment(assignment)}
+                      className={cn(
+                        "w-full rounded-lg border px-3 py-3 text-left transition-colors",
+                        isActive
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent/40",
+                      )}
+                    >
+                      <p className="truncate text-sm font-medium">
+                        {assignment.principal}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(assignment.privileges ?? []).length === 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            No privileges assigned.
+                          </span>
+                        ) : (
+                          assignment.privileges?.map((privilege) => (
+                            <Badge key={privilege} variant="secondary">
+                              {privilege}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           {currentAssignment && (
             <div className="space-y-2">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Current privileges
+                Editing principal
               </Label>
-              <div className="flex flex-wrap gap-1.5">
-                {(currentAssignment.privileges ?? []).map((privilege) => (
-                  <Badge key={privilege} variant="secondary">
-                    {privilege}
-                  </Badge>
-                ))}
-                {(currentAssignment.privileges ?? []).length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No privileges assigned.
-                  </p>
-                )}
-              </div>
+              <p className="text-sm">{currentAssignment.principal}</p>
             </div>
           )}
 
@@ -395,7 +325,7 @@ export function PermissionsEditor({
           )}
         </div>
 
-        <div className="space-y-4 rounded-lg border bg-card p-4">
+        <div className="space-y-4 bg-card p-4">
           <div className="space-y-1">
             <h2 className="text-sm font-semibold">Privileges</h2>
             <p className="text-sm text-muted-foreground">

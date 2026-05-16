@@ -32,12 +32,7 @@ export default function CatalogPermissionsPage() {
         />
       </div>
 
-      <PermissionsEditor
-        resourceType="catalog"
-        catalog={catalog}
-        title="Edit catalog permissions"
-        subtitle={catalog}
-      />
+      <PermissionsEditor resourceType="catalog" catalog={catalog} />
     </div>
   )
 }

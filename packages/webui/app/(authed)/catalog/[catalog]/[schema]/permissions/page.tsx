@@ -41,8 +41,6 @@ export default function SchemaPermissionsPage() {
         resourceType="schema"
         catalog={catalog}
         schema={schema}
-        title="Edit schema permissions"
-        subtitle={`${catalog}.${schema}`}
       />
     </div>
   )

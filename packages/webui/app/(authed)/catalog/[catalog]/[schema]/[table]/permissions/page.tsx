@@ -14,8 +14,6 @@ export default function TablePermissionsPage() {
       catalog={detail.catalog_name}
       schema={detail.schema_name}
       table={detail.name}
-      title="Edit table permissions"
-      subtitle={`${detail.catalog_name}.${detail.schema_name}.${detail.name}`}
     />
   )
 }
