@@ -408,7 +408,7 @@ export function PermissionsEditor({
                         >
                           <Checkbox
                             checked={checked}
-                            className="pointer-events-none size-3 shrink-0"
+                            className="pointer-events-none shrink-0"
                             aria-hidden="true"
                           />
                           <span className="truncate" title={privilege}>{privilege}</span>

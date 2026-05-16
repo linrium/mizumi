@@ -141,14 +141,6 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
     <div className="grid h-full lg:grid-cols-[520px_minmax(0,1fr)] overflow-hidden">
       {/* ── Left: submit form ── */}
       <div className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5">
-        <div>
-          <h2 className="text-sm font-semibold">Request access</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Submit a permission request for{" "}
-            <span className="font-mono">{resource}</span>.
-          </p>
-        </div>
-
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -184,7 +176,8 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                       >
                         <Checkbox
                           checked={checked}
-                          className="pointer-events-none size-3 shrink-0"
+                          onCheckedChange={() => {}}
+                          className="pointer-events-none shrink-0"
                           aria-hidden
                         />
                         <span className="truncate" title={priv}>{priv}</span>
