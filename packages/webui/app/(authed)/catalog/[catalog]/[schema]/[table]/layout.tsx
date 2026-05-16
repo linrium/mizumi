@@ -9,7 +9,7 @@ import { getTableAction } from "../../../actions"
 import { cn } from "@/lib/utils"
 import { TableContext, type TableDetail } from "./table-context"
 
-type Tab = "schema" | "preview" | "permissions"
+type Tab = "schema" | "preview" | "permissions" | "request-permissions"
 
 export default function TableLayout({
   children,
@@ -28,6 +28,8 @@ export default function TableLayout({
 
   const activeTab: Tab = pathname.endsWith("/preview")
     ? "preview"
+    : pathname.endsWith("/request-permissions")
+      ? "request-permissions"
     : pathname.endsWith("/permissions")
       ? "permissions"
       : "schema"
@@ -60,7 +62,9 @@ export default function TableLayout({
         ? basePath
         : tab === "preview"
           ? `${basePath}/preview`
-          : `${basePath}/permissions`,
+          : tab === "permissions"
+            ? `${basePath}/permissions`
+            : `${basePath}/request-permissions`,
     )
   }
 
@@ -107,6 +111,10 @@ export default function TableLayout({
               { key: "schema", label: "schema" },
               { key: "preview", label: "preview" },
               { key: "permissions", label: "permissions" },
+              {
+                key: "request-permissions",
+                label: "request permissions",
+              },
             ] satisfies { key: Tab; label: string }[]
           ).map((tab) => (
             <button
@@ -121,7 +129,8 @@ export default function TableLayout({
               )}
             >
               <span className="flex items-center gap-1.5">
-                {tab.key === "permissions" && (
+                {(tab.key === "permissions" ||
+                  tab.key === "request-permissions") && (
                   <HugeiconsIcon icon={SecurityIcon} size={12} />
                 )}
                 {tab.label}

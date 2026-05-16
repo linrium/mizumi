@@ -1,11 +1,11 @@
 "use client"
 
-import {Key01Icon, SecurityIcon} from "@hugeicons/core-free-icons"
+import { SecurityIcon } from "@hugeicons/core-free-icons"
 import { useParams } from "next/navigation"
 import { CatalogTabs } from "../../../catalog-tabs"
 import { PermissionsEditor } from "../../../permissions-editor"
 
-export default function SchemaPermissionsPage() {
+export default function SchemaRequestPermissionsPage() {
   const { catalog, schema } = useParams<{ catalog: string; schema: string }>()
 
   return (
@@ -18,7 +18,7 @@ export default function SchemaPermissionsPage() {
           </span>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Manage schema permissions
+          Request schema permissions
         </p>
         <CatalogTabs
           tabs={[
@@ -30,14 +30,14 @@ export default function SchemaPermissionsPage() {
             {
               href: `/catalog/${catalog}/${schema}/permissions`,
               label: "permissions",
-              active: true,
+              active: false,
               icon: SecurityIcon,
             },
             {
               href: `/catalog/${catalog}/${schema}/request-permissions`,
               label: "request permissions",
-              active: false,
-              icon: Key01Icon,
+              active: true,
+              icon: SecurityIcon,
             },
           ]}
         />

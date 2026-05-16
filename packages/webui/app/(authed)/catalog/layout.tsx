@@ -52,11 +52,13 @@ export default function CatalogLayout({
   const resourceParts = parts.slice(2)
   const activeSch =
     resourceParts[0] && resourceParts[0] !== "permissions"
+      && resourceParts[0] !== "request-permissions"
       ? resourceParts[0]
       : undefined
   const activeTbl =
     resourceParts[1] &&
     resourceParts[1] !== "permissions" &&
+    resourceParts[1] !== "request-permissions" &&
     resourceParts[1] !== "preview"
       ? resourceParts[1]
       : undefined

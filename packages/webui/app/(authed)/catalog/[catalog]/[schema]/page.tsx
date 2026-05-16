@@ -1,6 +1,6 @@
 "use client"
 
-import { SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
+import {Key01Icon, SecurityIcon, TableIcon} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -48,6 +48,12 @@ export default function SchemaPage() {
               label: "permissions",
               active: false,
               icon: SecurityIcon,
+            },
+            {
+              href: `/catalog/${catalog}/${schema}/request-permissions`,
+              label: "request permissions",
+              active: false,
+              icon: Key01Icon,
             },
           ]}
         />

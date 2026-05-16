@@ -1,6 +1,6 @@
 "use client"
 
-import { DatabaseIcon, SecurityIcon } from "@hugeicons/core-free-icons"
+import {DatabaseIcon, Key01Icon, SecurityIcon} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -39,6 +39,12 @@ export default function CatalogPage() {
               label: "permissions",
               active: false,
               icon: SecurityIcon,
+            },
+            {
+              href: `/catalog/${catalog}/request-permissions`,
+              label: "request permissions",
+              active: false,
+              icon: Key01Icon,
             },
           ]}
         />
