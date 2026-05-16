@@ -5,8 +5,7 @@ import { useParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import { useSessions } from "@/hooks/use-sessions"
-import { type QueryResponse, runSessionSqlQuery } from "@/services/sql"
+import { type QueryResponse, runSqlQuery } from "@/services/sql"
 
 type Row = Record<string, unknown>
 
@@ -38,7 +37,8 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
         id: col,
         accessorKey: col,
         header: col,
-        size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+        size: 120,
+        minSize: 60,
         meta: { cell: { variant: "short-text" as const } },
       })),
     [queryResult],
@@ -52,7 +52,12 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
 
   return (
     <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
-      <DataGrid table={table} {...dataGridProps} height={height} />
+      <DataGrid
+        table={table}
+        {...dataGridProps}
+        height={height}
+        stretchColumns
+      />
     </div>
   )
 }
@@ -66,7 +71,6 @@ export default function TablePreviewPage() {
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { createSession } = useSessions()
 
   useEffect(() => {
     let cancelled = false
@@ -75,17 +79,7 @@ export default function TablePreviewPage() {
       setError(null)
       setQueryResult(null)
       try {
-        const res = await fetch("/api/sessions")
-        const data = res.ok ? await res.json() : { sessions: [] }
-        const existing: { session_id: string }[] = data.sessions ?? []
-        let sessionId = existing[0]?.session_id ?? null
-        if (!sessionId) {
-          const s = await createSession()
-          if (!s) throw new Error("Failed to create session")
-          sessionId = s.session_id
-        }
-        const result = await runSessionSqlQuery(
-          sessionId,
+        const result = await runSqlQuery(
           `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
         )
         if (!cancelled) setQueryResult(result)
@@ -99,7 +93,7 @@ export default function TablePreviewPage() {
     return () => {
       cancelled = true
     }
-  }, [catalog, schema, table, createSession])
+  }, [catalog, schema, table])
 
   if (loading)
     return (

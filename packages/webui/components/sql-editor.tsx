@@ -49,7 +49,8 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
         id: col,
         accessorKey: col,
         header: col,
-        size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+        size: 120,
+        minSize: 60,
         meta: { cell: { variant: "short-text" as const } },
       })),
     [queryResult],
@@ -63,7 +64,12 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
 
   return (
     <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
-      <DataGrid table={table} {...dataGridProps} height={height} />
+      <DataGrid
+        table={table}
+        {...dataGridProps}
+        height={height}
+        stretchColumns
+      />
     </div>
   )
 }

@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
+import Image, { type StaticImageData } from "next/image"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,8 @@ type EventPublisherProps = {
   title: string
   subtitle: string
   options: EventOption[]
+  logoSrc?: StaticImageData
+  logoAlt?: string
 }
 
 function prettyJson(value: Record<string, unknown>) {
@@ -36,6 +39,8 @@ export function EventPublisher({
   title,
   subtitle,
   options,
+  logoSrc,
+  logoAlt,
 }: EventPublisherProps) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -108,11 +113,23 @@ export function EventPublisher({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3 shrink-0">
-        <HugeiconsIcon
-          icon={LiveStreaming01Icon}
-          size={15}
-          className="text-muted-foreground"
-        />
+        {logoSrc ? (
+          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border bg-background">
+            <Image
+              src={logoSrc}
+              alt={logoAlt ?? `${title} logo`}
+              fill
+              sizes="32px"
+              className="object-contain p-1"
+            />
+          </div>
+        ) : (
+          <HugeiconsIcon
+            icon={LiveStreaming01Icon}
+            size={15}
+            className="text-muted-foreground"
+          />
+        )}
         <div className="min-w-0">
           <div className="text-sm font-medium text-foreground">{title}</div>
           <div className="text-xs text-muted-foreground">{subtitle}</div>
