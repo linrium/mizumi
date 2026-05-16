@@ -16,38 +16,60 @@ import {
   cancelPermissionRequestAction,
   getMyPrivilegesAction,
   listPermissionRequestsAction,
-  submitPermissionRequestAction,
   type StoredPermissionRequest,
+  submitPermissionRequestAction,
 } from "./actions"
 
 const PRIVILEGE_GROUPS = [
   { label: "General", privileges: ["OWNER", "BROWSE"] },
   { label: "Catalog", privileges: ["CREATE_CATALOG", "USE_CATALOG"] },
   { label: "Schema", privileges: ["CREATE_SCHEMA", "USE_SCHEMA"] },
-  { label: "Table", privileges: ["CREATE_TABLE", "SELECT", "MODIFY", "CREATE_EXTERNAL_TABLE"] },
+  {
+    label: "Table",
+    privileges: ["CREATE_TABLE", "SELECT", "MODIFY", "CREATE_EXTERNAL_TABLE"],
+  },
   { label: "Function", privileges: ["CREATE_FUNCTION", "EXECUTE"] },
-  { label: "Volume", privileges: ["CREATE_VOLUME", "READ_VOLUME", "CREATE_EXTERNAL_VOLUME"] },
+  {
+    label: "Volume",
+    privileges: ["CREATE_VOLUME", "READ_VOLUME", "CREATE_EXTERNAL_VOLUME"],
+  },
   { label: "Files", privileges: ["READ_FILES", "WRITE_FILES"] },
-  { label: "Storage", privileges: ["CREATE_EXTERNAL_LOCATION", "CREATE_MANAGED_STORAGE", "CREATE_STORAGE_CREDENTIAL"] },
+  {
+    label: "Storage",
+    privileges: [
+      "CREATE_EXTERNAL_LOCATION",
+      "CREATE_MANAGED_STORAGE",
+      "CREATE_STORAGE_CREDENTIAL",
+    ],
+  },
   { label: "Model", privileges: ["CREATE_MODEL"] },
 ]
 
 function getStatusVariant(status: RequestStatus) {
   switch (status) {
-    case "approved": return "success"
-    case "ready": return "info"
-    case "needs-info": return "warning"
-    case "cancelled": return "error"
-    default: return "default"
+    case "approved":
+      return "success"
+    case "ready":
+      return "info"
+    case "needs-info":
+      return "warning"
+    case "cancelled":
+      return "error"
+    default:
+      return "default"
   }
 }
 
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
-    case "ready": return "Grant-ready"
-    case "needs-info": return "Needs info"
-    case "cancelled": return "Cancelled"
-    default: return status[0]!.toUpperCase() + status.slice(1)
+    case "ready":
+      return "Grant-ready"
+    case "needs-info":
+      return "Needs info"
+    case "cancelled":
+      return "Cancelled"
+    default:
+      return status[0]?.toUpperCase() + status.slice(1)
   }
 }
 
@@ -72,7 +94,9 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
-  const [grantedPrivileges, setGrantedPrivileges] = useState<Set<string>>(new Set())
+  const [grantedPrivileges, setGrantedPrivileges] = useState<Set<string>>(
+    new Set(),
+  )
 
   useEffect(() => {
     setLoadingHistory(true)
@@ -106,15 +130,21 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
       const result = await submitPermissionRequestAction({
         resource,
         scope,
-        privileges: value.privileges.filter((p) => !grantedPrivileges.has(p)).sort(),
+        privileges: value.privileges
+          .filter((p) => !grantedPrivileges.has(p))
+          .sort(),
         rationale: value.rationale.trim(),
       })
       if (result.error) {
         setServerError(result.error)
         return
       }
-      setHistory((prev) => [result.data!, ...prev])
-      toast.success("Request submitted", { description: result.data!.id })
+      if (!result.data) {
+        setServerError("Request submission failed.")
+        return
+      }
+      setHistory((prev) => [result.data, ...prev])
+      toast.success("Request submitted", { description: result.data.code })
       formApi.reset()
     },
   })
@@ -127,7 +157,11 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
       toast.error("Failed to cancel", { description: result.error })
       return
     }
-    setHistory((prev) => prev.map((r) => (r.id === id ? result.data! : r)))
+    if (!result.data) {
+      toast.error("Failed to cancel", { description: "Request not found." })
+      return
+    }
+    setHistory((prev) => prev.map((r) => (r.id === id ? result.data : r)))
     toast.success("Request cancelled")
   }
 
@@ -156,32 +190,19 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     <div className="grid grid-cols-2 gap-1.5">
                       {group.privileges.map((priv) => {
                         const granted = grantedPrivileges.has(priv)
-                        const checked = granted || field.state.value.includes(priv)
+                        const checked =
+                          granted || field.state.value.includes(priv)
                         return (
-                          <div
+                          <button
                             key={priv}
-                            role="checkbox"
-                            tabIndex={granted ? -1 : 0}
-                            aria-checked={checked}
-                            aria-disabled={granted}
+                            type="button"
+                            disabled={granted}
                             onClick={() => {
-                              if (granted) return
                               field.setValue(
                                 checked
                                   ? field.state.value.filter((p) => p !== priv)
                                   : [...field.state.value, priv],
                               )
-                            }}
-                            onKeyDown={(e) => {
-                              if (granted) return
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault()
-                                field.setValue(
-                                  checked
-                                    ? field.state.value.filter((p) => p !== priv)
-                                    : [...field.state.value, priv],
-                                )
-                              }
                             }}
                             className={cn(
                               "flex min-w-0 items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none",
@@ -195,13 +216,30 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                   ),
                             )}
                           >
-                            <span className="truncate" title={priv}>{priv}</span>
+                            <Checkbox
+                              checked={checked}
+                              disabled={granted}
+                              onCheckedChange={(next) => {
+                                if (granted) return
+                                field.setValue(
+                                  next === true
+                                    ? [...field.state.value, priv]
+                                    : field.state.value.filter(
+                                        (p) => p !== priv,
+                                      ),
+                                )
+                              }}
+                              className="pointer-events-none size-3.5"
+                            />
+                            <span className="truncate" title={priv}>
+                              {priv}
+                            </span>
                             {granted && (
                               <span className="ml-auto shrink-0 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                                 Granted
                               </span>
                             )}
-                          </div>
+                          </button>
                         )
                       })}
                     </div>
@@ -283,7 +321,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                         </StatusLabel>
                       </Status>
                       <span className="font-mono text-xs text-muted-foreground">
-                        {req.id}
+                        {req.code}
                       </span>
                     </div>
                     {CANCELLABLE.includes(req.status) && (

@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async rewrites() {
     return [
-      // dagster routes have no /api/ prefix on the server
       {
         source: "/api/dagster/:path*",
         destination: `${API_BASE_URL}/dagster/:path*`,

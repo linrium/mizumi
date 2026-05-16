@@ -1,18 +1,19 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct PermissionRequest {
-    pub id: String,
-    pub requester: String,
-    pub team: String,
+    pub id: Uuid,
+    pub requester_id: Uuid,
+    pub team: Uuid,
     pub resource: String,
     pub scope: String,
     pub privileges: Vec<String>,
     pub submitted_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub status: String,
-    pub reviewer: String,
+    pub reviewer_id: Uuid,
     pub rationale: String,
     pub risk: String,
     pub created_at: DateTime<Utc>,
@@ -23,6 +24,7 @@ pub struct PermissionRequest {
 pub struct PermissionRequestResponse {
     #[serde(flatten)]
     pub request: PermissionRequest,
+    pub code: String,
     pub expires_in_days: i64,
 }
 
@@ -33,13 +35,13 @@ pub struct UpdateRequestStatusBody {
 
 #[derive(Debug, Deserialize)]
 pub struct BulkApproveBody {
-    pub ids: Vec<String>,
+    pub ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreatePermissionRequestBody {
-    pub requester: String,
-    pub team: Option<String>,
+    pub requester_id: Uuid,
+    pub team: Option<Uuid>,
     pub resource: String,
     pub scope: String,
     pub privileges: Vec<String>,
@@ -48,7 +50,7 @@ pub struct CreatePermissionRequestBody {
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct PolicyTemplate {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
     pub scope: String,
     pub teams: Vec<String>,
@@ -64,8 +66,8 @@ pub struct PolicyTemplate {
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct BlastRadiusPreviewRow {
-    pub request_id: String,
-    pub requester: String,
+    pub request_id: Uuid,
+    pub requester_id: Uuid,
     pub resource: String,
     pub scope: String,
     pub risk: String,
@@ -78,14 +80,14 @@ pub struct BlastRadiusPreviewRow {
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct TimeBoundGrant {
-    pub id: String,
+    pub id: Uuid,
     pub principal: String,
     pub team: String,
     pub resource: String,
     pub privilege: String,
     pub started_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
-    pub reviewer: String,
+    pub reviewer_id: String,
     pub renewal_status: String,
     pub reason: String,
     pub created_at: DateTime<Utc>,

@@ -7,7 +7,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
-import { useEffect, useDeferredValue, useMemo, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -31,10 +31,10 @@ import { cn } from "@/lib/utils"
 import {
   bulkApprove,
   listPermissionRequests,
-  updateRequestStatus,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
+  updateRequestStatus,
 } from "@/services/permissions"
 
 const FILTERS = [
@@ -94,18 +94,28 @@ export default function PermissionsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [approving, setApproving] = useState(false)
 
-  async function load() {
-    setLoading(true)
-    try {
-      const data = await listPermissionRequests()
-      setRequests(data)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    load()
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      try {
+        const data = await listPermissionRequests()
+        if (!cancelled) {
+          setRequests(data)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filteredRequests = useMemo(() => {
@@ -118,7 +128,7 @@ export default function PermissionsPage() {
         search.length === 0
           ? true
           : [
-              request.id,
+              request.code,
               request.requester,
               request.team,
               request.resource,
@@ -189,7 +199,8 @@ export default function PermissionsPage() {
     id: string,
     action: "approve" | "needs-info",
   ) {
-    const status: RequestStatus = action === "approve" ? "approved" : "needs-info"
+    const status: RequestStatus =
+      action === "approve" ? "approved" : "needs-info"
     const updated = await updateRequestStatus(id, status)
     setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
   }
@@ -329,17 +340,17 @@ export default function PermissionsPage() {
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={() => toggleSelected(request.id)}
-                        aria-label={`Select ${request.id}`}
+                        aria-label={`Select ${request.code}`}
                       />
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center">
                           <span className="font-medium">
                             {request.requester}
                           </span>
                           <span className="font-mono text-muted-foreground">
-                            {request.id}
+                            {request.code}
                           </span>
                         </div>
                         <div className="text-muted-foreground">

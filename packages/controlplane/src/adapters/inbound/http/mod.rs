@@ -18,7 +18,7 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 
-use crate::infrastructure::{server::AppState};
+use crate::infrastructure::server::AppState;
 
 async fn require_auth(
     State(state): State<Arc<AppState>>,
@@ -26,16 +26,12 @@ async fn require_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let token = extract_bearer(req.headers()).ok_or(StatusCode::UNAUTHORIZED)?;
-    tracing::debug!("valid token {:?}", token);
+    // tracing::debug!("valid token {:?}", token);
 
-    let claims = state
-        .keycloak_auth
-        .validate(&token)
-        .await
-        .map_err(|e| {
-            tracing::debug!("auth rejected: {}", e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    let claims = state.keycloak_auth.validate(&token).await.map_err(|e| {
+        tracing::debug!("auth rejected: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
 
     if let Err(e) = state.user_service.ensure_registered(&claims).await {
         tracing::error!("user registration failed: {}", e);
@@ -162,10 +158,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(dagster::get_schedule_tick_history),
         )
         .route("/uc/{*path}", any(uc::proxy))
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            require_auth,
-        ))
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .with_state(state.clone());
 
     Router::new()

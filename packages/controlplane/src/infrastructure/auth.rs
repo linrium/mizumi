@@ -67,11 +67,7 @@ pub struct KeycloakAuth {
 
 impl KeycloakAuth {
     pub fn new(keycloak_url: &str, realm: &str, audiences: Vec<String>) -> Self {
-        let issuer = format!(
-            "{}/realms/{}",
-            keycloak_url.trim_end_matches('/'),
-            realm
-        );
+        let issuer = format!("{}/realms/{}", keycloak_url.trim_end_matches('/'), realm);
         Self {
             http: reqwest::Client::new(),
             issuer,
@@ -109,8 +105,9 @@ impl KeycloakAuth {
             )));
         }
 
-        let doc: OidcDiscovery = serde_json::from_str(&body)
-            .map_err(|e| AuthError::Internal(format!("OIDC discovery parse failed: {e} — body: {body}")))?;
+        let doc: OidcDiscovery = serde_json::from_str(&body).map_err(|e| {
+            AuthError::Internal(format!("OIDC discovery parse failed: {e} — body: {body}"))
+        })?;
 
         let uri = doc.jwks_uri.clone();
         *self.jwks_uri.write().await = Some(uri.clone());
@@ -176,10 +173,8 @@ impl KeycloakAuth {
         let decoding_key = match &jwk.algorithm {
             AlgorithmParameters::RSA(rsa) => DecodingKey::from_rsa_components(&rsa.n, &rsa.e)
                 .map_err(|e| AuthError::Internal(format!("JWK RSA key error: {e}")))?,
-            AlgorithmParameters::EllipticCurve(ec) => {
-                DecodingKey::from_ec_components(&ec.x, &ec.y)
-                    .map_err(|e| AuthError::Internal(format!("JWK EC key error: {e}")))?
-            }
+            AlgorithmParameters::EllipticCurve(ec) => DecodingKey::from_ec_components(&ec.x, &ec.y)
+                .map_err(|e| AuthError::Internal(format!("JWK EC key error: {e}")))?,
             _ => return Err(AuthError::Internal("unsupported JWK algorithm".into())),
         };
 

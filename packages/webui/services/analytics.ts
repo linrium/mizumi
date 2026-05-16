@@ -50,7 +50,7 @@ function resolveModel(modelId: ModelId): LanguageModel {
 export async function handleAnalyticsChat(req: NextRequest) {
   const { messages, sessionId, modelId } = await req.json()
   const session = await getServerSession()
-  const idToken = session?.accessToken ?? session?.idToken
+  const idToken = session?.idToken
   const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-mini")
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 

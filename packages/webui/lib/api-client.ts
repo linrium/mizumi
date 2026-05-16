@@ -6,7 +6,7 @@ import type { AppSession } from "@/lib/auth/types"
 async function getToken(): Promise<string | undefined> {
   const { data } = await authClient.getSession()
   const session = data as AppSession | null
-  return session?.accessToken ?? session?.idToken
+  return session?.idToken
 }
 
 export async function apiFetch(

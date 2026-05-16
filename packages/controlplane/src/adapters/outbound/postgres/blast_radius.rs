@@ -7,7 +7,7 @@ pub async fn list(db: &PgPool) -> Result<Vec<BlastRadiusPreviewRow>, sqlx::Error
         r#"
         SELECT
             br.request_id,
-            pr.requester,
+            pr.requester_id,
             pr.resource,
             pr.scope,
             pr.risk,

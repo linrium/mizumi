@@ -75,7 +75,7 @@ export type PanelSummary = {
 
 export async function handleDashboardGenerate(req: NextRequest) {
   const session = await getServerSession()
-  const idToken = session?.accessToken ?? session?.idToken
+  const idToken = session?.idToken
   const {
     messages,
     sessionId,

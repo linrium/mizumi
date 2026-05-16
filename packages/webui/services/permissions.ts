@@ -1,11 +1,17 @@
 import { apiFetch } from "@/lib/api-client"
 
-export type RequestStatus = "pending" | "ready" | "needs-info" | "approved" | "cancelled"
+export type RequestStatus =
+  | "pending"
+  | "ready"
+  | "needs-info"
+  | "approved"
+  | "cancelled"
 export type RequestScope = "catalog" | "schema" | "table"
 export type RiskLevel = "low" | "medium" | "high"
 
 export type PermissionRequest = {
   id: string
+  code: string
   requester: string
   team: string
   resource: string
@@ -102,16 +108,21 @@ export async function updateRequestStatus(
   id: string,
   status: RequestStatus,
 ): Promise<PermissionRequest> {
-  const res = await apiFetch(`/api/permissions/requests/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  })
+  const res = await apiFetch(
+    `/api/permissions/requests/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    },
+  )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
 
-export async function cancelPermissionRequest(id: string): Promise<PermissionRequest> {
+export async function cancelPermissionRequest(
+  id: string,
+): Promise<PermissionRequest> {
   return updateRequestStatus(id, "cancelled")
 }
 

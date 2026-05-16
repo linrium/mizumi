@@ -1,6 +1,9 @@
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::domain::entities::permission::PermissionRequest;
+
+const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000011";
 
 pub async fn list(
     db: &PgPool,
@@ -27,8 +30,8 @@ pub async fn list(
 
 pub async fn create(
     db: &PgPool,
-    requester: &str,
-    team: &str,
+    requester_id: Uuid,
+    team: Uuid,
     resource: &str,
     scope: &str,
     privileges: &[String],
@@ -37,37 +40,36 @@ pub async fn create(
     sqlx::query_as::<_, PermissionRequest>(
         r#"
         INSERT INTO permission_requests (
-            id, requester, team, resource, scope, privileges,
-            submitted_at, expires_at, status, reviewer, rationale, risk
+            requester_id, team, resource, scope, privileges,
+            submitted_at, expires_at, status, reviewer_id, rationale, risk
         ) VALUES (
-            'PR-' || nextval('permission_request_seq')::text,
             $1, $2, $3, $4, $5,
-            NOW(), NOW() + INTERVAL '7 days', 'pending', 'Data Platform', $6, 'low'
+            NOW(), NOW() + INTERVAL '7 days', 'pending',
+            $7::uuid, $6, 'low'
         ) RETURNING *
         "#,
     )
-    .bind(requester)
+    .bind(requester_id)
     .bind(team)
     .bind(resource)
     .bind(scope)
     .bind(privileges)
     .bind(rationale)
+    .bind(DEFAULT_REVIEWER_ID)
     .fetch_one(db)
     .await
 }
 
-pub async fn get(db: &PgPool, id: &str) -> Result<Option<PermissionRequest>, sqlx::Error> {
-    sqlx::query_as::<_, PermissionRequest>(
-        "SELECT * FROM permission_requests WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_optional(db)
-    .await
+pub async fn get(db: &PgPool, id: Uuid) -> Result<Option<PermissionRequest>, sqlx::Error> {
+    sqlx::query_as::<_, PermissionRequest>("SELECT * FROM permission_requests WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
 }
 
 pub async fn update_status(
     db: &PgPool,
-    id: &str,
+    id: Uuid,
     status: &str,
 ) -> Result<Option<PermissionRequest>, sqlx::Error> {
     sqlx::query_as::<_, PermissionRequest>(
@@ -81,7 +83,7 @@ pub async fn update_status(
 
 pub async fn bulk_update_status(
     db: &PgPool,
-    ids: &[String],
+    ids: &[Uuid],
     status: &str,
 ) -> Result<Vec<PermissionRequest>, sqlx::Error> {
     sqlx::query_as::<_, PermissionRequest>(

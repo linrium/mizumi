@@ -7,6 +7,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::{
     domain::entities::permission::{
@@ -52,9 +53,9 @@ pub async fn create_request(
 
 pub async fn get_request(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
-    match state.permission_service.get_request(&id).await {
+    match state.permission_service.get_request(id).await {
         Ok(request) => Json(request).into_response(),
         Err(err) => err.into_response(),
     }
@@ -62,10 +63,14 @@ pub async fn get_request(
 
 pub async fn update_request_status(
     State(state): State<Arc<AppState>>,
-    Path(id): Path<String>,
+    Path(id): Path<Uuid>,
     Json(body): Json<UpdateRequestStatusBody>,
 ) -> impl IntoResponse {
-    match state.permission_service.update_request_status(&id, body).await {
+    match state
+        .permission_service
+        .update_request_status(id, body)
+        .await
+    {
         Ok(request) => Json(request).into_response(),
         Err(err) => err.into_response(),
     }

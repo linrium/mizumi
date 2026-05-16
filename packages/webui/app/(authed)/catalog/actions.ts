@@ -1,5 +1,6 @@
 "use server"
 
+import { getServerSession } from "@/lib/auth"
 import {
   getCatalogs,
   getPermissions,
@@ -8,8 +9,40 @@ import {
   getTables,
   patchPermissions,
 } from "@/services/catalog"
-import { getServerSession } from "@/lib/auth"
-import type { RequestScope, RequestStatus, RiskLevel } from "@/services/permissions"
+import type {
+  RequestScope,
+  RequestStatus,
+  RiskLevel,
+} from "@/services/permissions"
+
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
+const DEFAULT_REVIEWER_ID = "10000000-0000-0000-0000-000000000011"
+const DEFAULT_REVIEWER_NAME = "Data Steward"
+const DEFAULT_REQUEST_TEAM_ID = "10000000-0000-0000-0000-000000000006"
+
+const TEAM_IDS_BY_NAME: Record<string, string> = {
+  "Fraud Ops": "10000000-0000-0000-0000-000000000001",
+  "Growth Analytics": "10000000-0000-0000-0000-000000000002",
+  "Finance BI": "10000000-0000-0000-0000-000000000003",
+  "ML Platform": "10000000-0000-0000-0000-000000000004",
+  Operations: "10000000-0000-0000-0000-000000000005",
+  "Data Platform": "10000000-0000-0000-0000-000000000006",
+  "Executive Analytics": "10000000-0000-0000-0000-000000000007",
+  "Support Intelligence": "10000000-0000-0000-0000-000000000008",
+  Governance: "10000000-0000-0000-0000-000000000009",
+  Security: "10000000-0000-0000-0000-000000000010",
+  "Data Steward": "10000000-0000-0000-0000-000000000011",
+}
+
+function resolveRequesterTeamId(groups?: string[]) {
+  for (const group of groups ?? []) {
+    if (TEAM_IDS_BY_NAME[group]) {
+      return TEAM_IDS_BY_NAME[group]
+    }
+  }
+
+  return DEFAULT_REQUEST_TEAM_ID
+}
 
 export async function getCatalogsAction() {
   return getCatalogs()
@@ -51,7 +84,7 @@ export async function getMyPrivilegesAction(
   try {
     const data = await getPermissions(resourceType, catalog, schema, table)
     const assignment = (data.privilege_assignments ?? []).find(
-      (a) => a.principal.toLowerCase() === session.email!.toLowerCase(),
+      (a) => a.principal.toLowerCase() === session.email?.toLowerCase(),
     )
     return assignment?.privileges ?? []
   } catch {
@@ -75,6 +108,7 @@ export async function patchPermissionsAction(input: {
 
 export type StoredPermissionRequest = {
   id: string
+  code: string
   requester: string
   team: string
   resource: string
@@ -89,11 +123,10 @@ export type StoredPermissionRequest = {
   risk: RiskLevel
 }
 
-let seq = 1043
-
 const permissionStore: StoredPermissionRequest[] = [
   {
     id: "PR-1042",
+    code: "PR-1042",
     requester: "Annie Case",
     team: "Fraud Ops",
     resource: "risk.gold_chargebacks",
@@ -109,6 +142,7 @@ const permissionStore: StoredPermissionRequest[] = [
   },
   {
     id: "PR-1041",
+    code: "PR-1041",
     requester: "Mai Nguyen",
     team: "Growth Analytics",
     resource: "marketing",
@@ -124,6 +158,7 @@ const permissionStore: StoredPermissionRequest[] = [
   },
   {
     id: "PR-1039",
+    code: "PR-1039",
     requester: "Kenji Mori",
     team: "Finance BI",
     resource: "finance.ap_closure",
@@ -154,25 +189,85 @@ export async function submitPermissionRequestAction(body: {
   if (!body.privileges.length) {
     return { error: "Select at least one privilege." }
   }
-  const now = new Date().toISOString()
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  const req: StoredPermissionRequest = {
-    id: `PR-${seq++}`,
-    requester: "You",
-    team: "",
-    resource: body.resource,
-    scope: body.scope,
-    privileges: body.privileges,
-    submitted_at: now,
-    expires_at: expires,
-    expires_in_days: 7,
-    status: "pending",
-    reviewer: "Data Platform",
-    rationale: body.rationale,
-    risk: "low",
+  const session = await getServerSession()
+  if (!session?.idToken) {
+    return { error: "You must be signed in to submit a request." }
   }
-  permissionStore.unshift(req)
-  return { data: req }
+  if (!session.sub) {
+    return { error: "Your session is missing a user identifier." }
+  }
+
+  try {
+    const requesterTeamId = resolveRequesterTeamId(session.groups)
+    const res = await fetch(`${API_BASE_URL}/api/permissions/requests`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${session.idToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requester_id: session.sub,
+        team: requesterTeamId,
+        resource: body.resource,
+        scope: body.scope,
+        privileges: body.privileges,
+        rationale: body.rationale,
+        reviewer_id: DEFAULT_REVIEWER_ID,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      return {
+        error:
+          (err as { error?: string }).error ??
+          `Failed to submit request (${res.status}).`,
+      }
+    }
+
+    const request = (await res.json()) as {
+      id: string
+      code: string
+      requester_id: string
+      team: string
+      resource: string
+      scope: RequestScope
+      privileges: string[]
+      submitted_at: string
+      expires_at: string
+      expires_in_days: number
+      status: RequestStatus
+      reviewer_id: string
+      rationale: string
+      risk: RiskLevel
+    }
+
+    return {
+      data: {
+        id: request.id,
+        code: request.code,
+        requester:
+          session.name ?? session.email ?? session.preferredUsername ?? "You",
+        team: "",
+        resource: request.resource,
+        scope: request.scope,
+        privileges: request.privileges,
+        submitted_at: request.submitted_at,
+        expires_at: request.expires_at,
+        expires_in_days: request.expires_in_days,
+        status: request.status,
+        reviewer:
+          request.reviewer_id === DEFAULT_REVIEWER_ID
+            ? DEFAULT_REVIEWER_NAME
+            : request.reviewer_id,
+        rationale: request.rationale,
+        risk: request.risk,
+      },
+    }
+  } catch {
+    return { error: "Failed to reach the permissions service." }
+  }
 }
 
 export async function cancelPermissionRequestAction(
@@ -180,6 +275,8 @@ export async function cancelPermissionRequestAction(
 ): Promise<{ data?: StoredPermissionRequest; error?: string }> {
   const idx = permissionStore.findIndex((r) => r.id === id)
   if (idx === -1) return { error: "Request not found." }
-  permissionStore[idx] = { ...permissionStore[idx]!, status: "cancelled" }
+  const current = permissionStore[idx]
+  if (!current) return { error: "Request not found." }
+  permissionStore[idx] = { ...current, status: "cancelled" }
   return { data: permissionStore[idx] }
 }
