@@ -316,7 +316,7 @@ export default function PermissionsPage() {
                   >
                     <TableCell className="align-top">
                       <div className="space-y-1">
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-2">
                           <span className="font-medium">
                             {request.requester}
                           </span>

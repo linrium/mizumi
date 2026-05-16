@@ -3,6 +3,7 @@ mod application;
 mod domain;
 mod infrastructure;
 
+use std::fs;
 use std::sync::Arc;
 
 use rdkafka::{ClientConfig, producer::FutureProducer};
@@ -18,6 +19,25 @@ use application::{
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
+fn resolve_uc_admin_token(config: &Config) -> Result<String, Box<dyn std::error::Error>> {
+    if let Some(path) = &config.unity_catalog.admin_token_file {
+        let token = fs::read_to_string(path)?.trim().to_string();
+        if token.is_empty() {
+            return Err("unity_catalog.admin_token_file points to an empty file".into());
+        }
+        return Ok(token);
+    }
+
+    let token = config.unity_catalog.admin_token.trim().to_string();
+    if token.is_empty() {
+        return Err(
+            "unity_catalog.admin_token or unity_catalog.admin_token_file must be configured".into(),
+        );
+    }
+
+    Ok(token)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
@@ -26,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Config::load().expect("failed to load config");
+    let uc_admin_token = resolve_uc_admin_token(&config)?;
     let db = db::create_pool(&config.database.url)
         .await
         .expect("failed to connect to postgres");
@@ -48,14 +69,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             db.clone(),
             UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
                 config.unity_catalog.base_url.clone(),
-                config.unity_catalog.admin_token.clone(),
+                uc_admin_token.clone(),
             )),
         )),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.unity_catalog.base_url.clone(),
-            config.unity_catalog.admin_token.clone(),
+            uc_admin_token,
         ))),
         user_service: Arc::new(UserService::new(db.clone())),
         keycloak_auth: Arc::new(KeycloakAuth::new(
