@@ -8,15 +8,16 @@ import {
   CodeIcon,
   Copy01Icon,
   DashboardSquare01Icon,
+  Key01Icon,
   LakeIcon,
   Logout03Icon,
   WorkflowCircle01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { startTransition } from "react"
 import { toast } from "sonner"
-import { signOut } from "@/lib/auth/actions"
 import {
   Sidebar,
   SidebarContent,
@@ -29,10 +30,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { signOut } from "@/lib/auth/actions"
 import type { AppSession } from "@/lib/auth/types"
 
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: Book03Icon },
+  { title: "Permissions", href: "/permissions", icon: Key01Icon },
   { title: "SQL Editor", href: "/editor", icon: CodeIcon },
   { title: "Pipelines", href: "/pipelines", icon: WorkflowCircle01Icon },
   { title: "Analytics", href: "/analytics", icon: Chart01Icon },
@@ -97,10 +100,10 @@ export function AppSidebar({ session }: AppSidebarProps) {
                     tooltip={item.title}
                     isActive={pathname.startsWith(item.href)}
                   >
-                    <a href={item.href}>
+                    <Link href={item.href}>
                       <HugeiconsIcon icon={item.icon} size={16} />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -118,10 +121,10 @@ export function AppSidebar({ session }: AppSidebarProps) {
                     tooltip={item.title}
                     isActive={pathname.startsWith(item.href)}
                   >
-                    <a href={item.href}>
+                    <Link href={item.href}>
                       <HugeiconsIcon icon={item.icon} size={16} />
                       <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

@@ -360,7 +360,7 @@ export function CatalogRequestPermissionsForm({
                   {requestableGroups.map((group) => (
                     <div
                       key={group.label}
-                      className="rounded-md border border-border bg-background/80 p-3"
+                      className="rounded-md bg-background/80 p-3 shadow-sm"
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div>
