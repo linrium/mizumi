@@ -3,10 +3,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-pub struct PermissionRequest {
+pub struct PermissionRequestView {
     pub id: Uuid,
     pub requester_id: Uuid,
-    pub team: Uuid,
+    pub requester: String,
+    pub requester_email: String,
+    pub team_id: Uuid,
+    pub team: String,
     pub resource: String,
     pub scope: String,
     pub privileges: Vec<String>,
@@ -14,6 +17,7 @@ pub struct PermissionRequest {
     pub expires_at: DateTime<Utc>,
     pub status: String,
     pub reviewer_id: Uuid,
+    pub reviewer: String,
     pub rationale: String,
     pub risk: String,
     pub created_at: DateTime<Utc>,
@@ -22,8 +26,24 @@ pub struct PermissionRequest {
 
 #[derive(Debug, Serialize)]
 pub struct PermissionRequestResponse {
-    #[serde(flatten)]
-    pub request: PermissionRequest,
+    pub id: Uuid,
+    pub requester_id: Uuid,
+    pub requester: String,
+    pub requester_email: String,
+    pub team_id: Uuid,
+    pub team: String,
+    pub resource: String,
+    pub scope: String,
+    pub privileges: Vec<String>,
+    pub submitted_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub status: String,
+    pub reviewer_id: Uuid,
+    pub reviewer: String,
+    pub rationale: String,
+    pub risk: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub code: String,
     pub expires_in_days: i64,
 }

@@ -14,6 +14,7 @@ pub struct KafkaConfig {
 #[derive(Clone, Deserialize)]
 pub struct UnityCatalogConfig {
     pub base_url: String,
+    pub admin_token: String,
 }
 
 #[derive(Clone, Deserialize)]

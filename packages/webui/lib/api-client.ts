@@ -1,12 +1,30 @@
 "use client"
 
-import { authClient } from "@/lib/auth-client"
 import type { AppSession } from "@/lib/auth/types"
+import { authClient } from "@/lib/auth-client"
+
+let isHandlingUnauthorized = false
 
 async function getToken(): Promise<string | undefined> {
   const { data } = await authClient.getSession()
   const session = data as AppSession | null
   return session?.idToken
+}
+
+async function handleUnauthorized() {
+  if (isHandlingUnauthorized) {
+    return
+  }
+
+  isHandlingUnauthorized = true
+
+  try {
+    await authClient.signOut()
+  } catch {
+    // Ignore sign-out failures and still force navigation to login.
+  } finally {
+    window.location.replace("/login")
+  }
 }
 
 export async function apiFetch(
@@ -18,5 +36,11 @@ export async function apiFetch(
   if (token) {
     headers.set("Authorization", `Bearer ${token}`)
   }
-  return fetch(input, { ...init, headers })
+  const response = await fetch(input, { ...init, headers })
+
+  if (response.status === 401) {
+    void handleUnauthorized()
+  }
+
+  return response
 }

@@ -44,11 +44,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(session_store)),
-        permission_service: Arc::new(PermissionService::new(db.clone())),
+        permission_service: Arc::new(PermissionService::new(
+            db.clone(),
+            UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
+                config.unity_catalog.base_url.clone(),
+                config.unity_catalog.admin_token.clone(),
+            )),
+        )),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.unity_catalog.base_url.clone(),
+            config.unity_catalog.admin_token.clone(),
         ))),
         user_service: Arc::new(UserService::new(db.clone())),
         keycloak_auth: Arc::new(KeycloakAuth::new(

@@ -10,7 +10,14 @@ import { formatDistanceToNowStrict } from "date-fns"
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +36,6 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import {
-  bulkApprove,
   listPermissionRequests,
   type PermissionRequest,
   type RequestStatus,
@@ -87,22 +93,35 @@ function formatScopeLabel(scope: string) {
 export default function PermissionsPage() {
   const [requests, setRequests] = useState<PermissionRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
   const [activeFilter, setActiveFilter] =
     useState<(typeof FILTERS)[number]["key"]>("all")
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [approving, setApproving] = useState(false)
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null)
+  const [approveTarget, setApproveTarget] = useState<PermissionRequest | null>(
+    null,
+  )
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       setLoading(true)
+      setError(null)
       try {
         const data = await listPermissionRequests()
         if (!cancelled) {
           setRequests(data)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load permission requests",
+          )
         }
       } finally {
         if (!cancelled) {
@@ -155,41 +174,18 @@ export default function PermissionsPage() {
     }
   }, [requests])
 
-  const allVisibleSelected =
-    filteredRequests.length > 0 &&
-    filteredRequests.every((request) => selectedIds.includes(request.id))
-
-  function toggleSelected(requestId: string) {
-    setSelectedIds((current) =>
-      current.includes(requestId)
-        ? current.filter((id) => id !== requestId)
-        : [...current, requestId],
-    )
-  }
-
-  function toggleAllVisible(checked: boolean) {
-    setSelectedIds((current) => {
-      if (!checked) {
-        return current.filter(
-          (id) => !filteredRequests.some((request) => request.id === id),
-        )
-      }
-
-      const next = new Set(current)
-      for (const request of filteredRequests) next.add(request.id)
-      return [...next]
-    })
-  }
-
   async function handleApprove() {
-    if (selectedIds.length === 0 || approving) return
+    if (!approveTarget || approving) return
     setApproving(true)
+    setError(null)
     try {
-      const updated = await bulkApprove(selectedIds)
+      const updated = await updateRequestStatus(approveTarget.id, "approved")
       setRequests((prev) =>
-        prev.map((r) => updated.find((u) => u.id === r.id) ?? r),
+        prev.map((r) => (r.id === updated.id ? updated : r)),
       )
-      setSelectedIds([])
+      setApproveTarget(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve request")
     } finally {
       setApproving(false)
     }
@@ -201,8 +197,18 @@ export default function PermissionsPage() {
   ) {
     const status: RequestStatus =
       action === "approve" ? "approved" : "needs-info"
-    const updated = await updateRequestStatus(id, status)
-    setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+    setActiveRequestId(id)
+    setError(null)
+    try {
+      const updated = await updateRequestStatus(id, status)
+      setRequests((prev) =>
+        prev.map((r) => (r.id === updated.id ? updated : r)),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update request")
+    } finally {
+      setActiveRequestId(null)
+    }
   }
 
   const filterCounts = useMemo(() => {
@@ -222,27 +228,9 @@ export default function PermissionsPage() {
             <p className="mt-0.5 text-xs text-muted-foreground">
               Review access grants, temporary exceptions, and renewals.
             </p>
+            {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
           </div>
-          <div className="flex items-center gap-2">
-            {selectedIds.length > 0 && (
-              <>
-                <span className="text-xs text-muted-foreground">
-                  {selectedIds.length} selected
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={approving}
-                  onClick={handleApprove}
-                >
-                  {approving ? "Approving…" : "Approve"}
-                </Button>
-                <Button type="button" variant="outline" size="sm">
-                  Request details
-                </Button>
-              </>
-            )}
-          </div>
+          <div />
         </div>
 
         <div className="flex items-center justify-between gap-4 overflow-x-auto border-t px-3">
@@ -290,15 +278,6 @@ export default function PermissionsPage() {
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={allVisibleSelected}
-                  onCheckedChange={(checked) =>
-                    toggleAllVisible(checked === true)
-                  }
-                  aria-label="Select all visible requests"
-                />
-              </TableHead>
               <TableHead>Request</TableHead>
               <TableHead>Resource</TableHead>
               <TableHead>Status</TableHead>
@@ -312,7 +291,7 @@ export default function PermissionsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Loading…
@@ -320,29 +299,21 @@ export default function PermissionsPage() {
               </TableRow>
             ) : filteredRequests.length > 0 ? (
               filteredRequests.map((request) => {
-                const isSelected = selectedIds.includes(request.id)
                 const submittedLabel = formatDistanceToNowStrict(
                   new Date(request.submitted_at),
                   { addSuffix: true },
                 )
+                const isActioning = activeRequestId === request.id
 
                 return (
                   <TableRow
                     key={request.id}
-                    data-state={isSelected ? "selected" : undefined}
                     className={cn(
                       request.risk === "high" && "bg-destructive/5",
                       request.expires_in_days <= 2 &&
                         "border-l-2 border-l-primary",
                     )}
                   >
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSelected(request.id)}
-                        aria-label={`Select ${request.code}`}
-                      />
-                    </TableCell>
                     <TableCell className="align-top">
                       <div className="space-y-1">
                         <div className="flex items-center">
@@ -430,13 +401,17 @@ export default function PermissionsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem
-                            onClick={() =>
-                              handleDropdownAction(request.id, "approve")
+                            disabled={
+                              isActioning || request.status === "approved"
                             }
+                            onClick={() => setApproveTarget(request)}
                           >
-                            Approve request
+                            {isActioning && request.status !== "approved"
+                              ? "Approving…"
+                              : "Approve request"}
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            disabled={isActioning}
                             onClick={() =>
                               handleDropdownAction(request.id, "needs-info")
                             }
@@ -455,7 +430,7 @@ export default function PermissionsPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No permission requests match the current filters
@@ -480,6 +455,39 @@ export default function PermissionsPage() {
           <span>{requests.length} total</span>
         </div>
       </div>
+
+      <Dialog
+        open={approveTarget != null}
+        onOpenChange={(open) => {
+          if (!open && !approving) {
+            setApproveTarget(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve permission request?</DialogTitle>
+            <DialogDescription>
+              {approveTarget
+                ? `${approveTarget.requester} will be granted ${approveTarget.privileges.join(", ")} on ${approveTarget.resource}.`
+                : "Confirm this permission grant."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={approving}
+              onClick={() => setApproveTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" disabled={approving} onClick={handleApprove}>
+              {approving ? "Approving…" : "Approve"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

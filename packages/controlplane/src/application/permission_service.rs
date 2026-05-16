@@ -6,10 +6,12 @@ use crate::{
     adapters::outbound::postgres::{
         blast_radius, permission_requests, policy_templates, time_bound_grants,
     },
+    application::uc_service::UnityCatalogProxyService,
     domain::{
         entities::permission::{
-            BlastRadiusPreviewRow, BulkApproveBody, CreatePermissionRequestBody, PermissionRequest,
-            PermissionRequestResponse, PolicyTemplate, TimeBoundGrant, UpdateRequestStatusBody,
+            BlastRadiusPreviewRow, BulkApproveBody, CreatePermissionRequestBody,
+            PermissionRequestResponse, PermissionRequestView, PolicyTemplate, TimeBoundGrant,
+            UpdateRequestStatusBody,
         },
         error::AppError,
     },
@@ -21,11 +23,12 @@ const DEFAULT_REQUEST_TEAM_ID: &str = "10000000-0000-0000-0000-000000000006";
 #[derive(Clone)]
 pub struct PermissionService {
     db: PgPool,
+    uc_service: UnityCatalogProxyService,
 }
 
 impl PermissionService {
-    pub fn new(db: PgPool) -> Self {
-        Self { db }
+    pub fn new(db: PgPool, uc_service: UnityCatalogProxyService) -> Self {
+        Self { db, uc_service }
     }
 
     fn request_code(id: Uuid) -> String {
@@ -33,14 +36,43 @@ impl PermissionService {
         format!("PR-{}", &simple[..8])
     }
 
-    fn into_response(request: PermissionRequest) -> PermissionRequestResponse {
+    fn into_response(request: PermissionRequestView) -> PermissionRequestResponse {
         let expires_in_days = (request.expires_at - Utc::now()).num_days();
         let code = Self::request_code(request.id);
         PermissionRequestResponse {
-            request,
+            id: request.id,
+            requester_id: request.requester_id,
+            requester: request.requester,
+            requester_email: request.requester_email,
+            team_id: request.team_id,
+            team: request.team,
+            resource: request.resource,
+            scope: request.scope,
+            privileges: request.privileges,
+            submitted_at: request.submitted_at,
+            expires_at: request.expires_at,
+            status: request.status,
+            reviewer_id: request.reviewer_id,
+            reviewer: request.reviewer,
+            rationale: request.rationale,
+            risk: request.risk,
+            created_at: request.created_at,
+            updated_at: request.updated_at,
             code,
             expires_in_days,
         }
+    }
+
+    async fn grant_request(&self, request: &PermissionRequestView) -> Result<(), AppError> {
+        self.uc_service
+            .grant_permissions(
+                &request.scope,
+                &request.resource,
+                &request.requester_email,
+                &request.privileges,
+            )
+            .await
+            .map_err(AppError::QueryFailed)
     }
 
     pub async fn list_requests(
@@ -62,9 +94,12 @@ impl PermissionService {
                     Some(q) if !q.is_empty() => {
                         let q = q.to_lowercase();
                         r.id.to_string().contains(&q)
-                            || r.requester_id.to_string().contains(&q)
+                            || r.requester.to_lowercase().contains(&q)
+                            || r.requester_email.to_lowercase().contains(&q)
+                            || r.team.to_lowercase().contains(&q)
                             || r.resource.to_lowercase().contains(&q)
                             || r.status.to_lowercase().contains(&q)
+                            || r.reviewer.to_lowercase().contains(&q)
                             || r.rationale.to_lowercase().contains(&q)
                             || r.privileges.iter().any(|p| p.to_lowercase().contains(&q))
                     }
@@ -123,6 +158,15 @@ impl PermissionService {
                 VALID_STATUSES.join(", ")
             )));
         }
+
+        let existing = permission_requests::get(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
+        if body.status == "approved" && existing.status != "approved" {
+            self.grant_request(&existing).await?;
+        }
+
         let request = permission_requests::update_status(&self.db, id, &body.status)
             .await?
             .ok_or(AppError::NotFound)?;
@@ -133,6 +177,17 @@ impl PermissionService {
         &self,
         body: BulkApproveBody,
     ) -> Result<Vec<PermissionRequestResponse>, AppError> {
+        if body.ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let requests = permission_requests::list_by_ids(&self.db, &body.ids).await?;
+        for request in &requests {
+            if request.status != "approved" {
+                self.grant_request(request).await?;
+            }
+        }
+
         let requests =
             permission_requests::bulk_update_status(&self.db, &body.ids, "approved").await?;
         Ok(requests.into_iter().map(Self::into_response).collect())

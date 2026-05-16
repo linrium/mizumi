@@ -16,11 +16,27 @@ fn client() -> &'static reqwest::Client {
 #[derive(Clone)]
 pub struct UnityCatalogHttpProxy {
     base_url: String,
+    admin_token: String,
+}
+
+#[derive(serde::Serialize)]
+struct PermissionChange<'a> {
+    principal: &'a str,
+    add: &'a [String],
+    remove: &'a [String],
+}
+
+#[derive(serde::Serialize)]
+struct PatchPermissionsBody<'a> {
+    changes: [PermissionChange<'a>; 1],
 }
 
 impl UnityCatalogHttpProxy {
-    pub fn new(base_url: String) -> Self {
-        Self { base_url }
+    pub fn new(base_url: String, admin_token: String) -> Self {
+        Self {
+            base_url,
+            admin_token,
+        }
     }
 
     pub async fn proxy(&self, request: Request) -> Response {
@@ -81,5 +97,41 @@ impl UnityCatalogHttpProxy {
                     .into_response()
             }
         }
+    }
+
+    pub async fn grant_permissions(
+        &self,
+        scope: &str,
+        resource: &str,
+        principal: &str,
+        privileges: &[String],
+    ) -> Result<(), String> {
+        let uc_url = format!("{}/permissions/{scope}/{resource}", self.base_url);
+        let remove: Vec<String> = Vec::new();
+        let body = PatchPermissionsBody {
+            changes: [PermissionChange {
+                principal,
+                add: privileges,
+                remove: &remove,
+            }],
+        };
+
+        let response = client()
+            .patch(&uc_url)
+            .bearer_auth(&self.admin_token)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("UC permissions request failed: {e}"))?;
+
+        if response.status().is_success() {
+            return Ok(());
+        }
+
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        Err(format!(
+            "UC permissions request failed with {status}: {body}"
+        ))
     }
 }
