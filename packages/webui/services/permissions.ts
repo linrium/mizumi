@@ -24,17 +24,31 @@ export type PermissionRequest = {
   reviewer: string
   rationale: string
   risk: RiskLevel
+  policy_template_id: string | null
+  policy_template_name: string | null
+  policy_template_resource: string | null
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
+  policy_template_owner_id: string | null
+  policy_template_owner: string | null
+  queue_decision:
+    | "auto-approved"
+    | "reviewer-gate"
+    | "security-escalation"
+    | "manual-review"
 }
 
 export type PolicyTemplate = {
   id: string
   name: string
   scope: RequestScope
+  resource: string | null
+  team_ids: string[]
   teams: string[]
   privileges: string[]
   approval_mode: "auto" | "review" | "escalate"
   risk: RiskLevel
   usage_30d: number
+  owner_id: string
   owner: string
   last_updated: string
 }

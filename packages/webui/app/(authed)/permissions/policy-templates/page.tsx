@@ -38,6 +38,10 @@ function formatApprovalMode(mode: string) {
   return "Security escalation"
 }
 
+function formatResourceLabel(resource: string | null) {
+  return resource ?? "Any resource"
+}
+
 export default function PolicyTemplatesPage() {
   const [templates, setTemplates] = useState<PolicyTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,6 +79,7 @@ export default function PolicyTemplatesPage() {
             <TableRow className="hover:bg-transparent">
               <TableHead>Template</TableHead>
               <TableHead>Scope</TableHead>
+              <TableHead>Resource</TableHead>
               <TableHead>Privileges</TableHead>
               <TableHead>Teams</TableHead>
               <TableHead>Approval</TableHead>
@@ -86,7 +91,7 @@ export default function PolicyTemplatesPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Loading…
@@ -99,9 +104,6 @@ export default function PolicyTemplatesPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{template.name}</span>
-                        <span className="font-mono text-muted-foreground">
-                          {template.id}
-                        </span>
                       </div>
                       <div className="text-muted-foreground">
                         Updated{" "}
@@ -121,6 +123,9 @@ export default function PolicyTemplatesPage() {
                         {template.risk} risk
                       </Badge>
                     </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-muted-foreground">
+                    {formatResourceLabel(template.resource)}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -144,7 +149,11 @@ export default function PolicyTemplatesPage() {
                     {formatApprovalMode(template.approval_mode)}
                   </TableCell>
                   <TableCell>{template.usage_30d} requests / 30d</TableCell>
-                  <TableCell>{template.owner}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div>{template.owner}</div>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             )}

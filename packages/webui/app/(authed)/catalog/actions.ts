@@ -121,6 +121,17 @@ export type StoredPermissionRequest = {
   reviewer: string
   rationale: string
   risk: RiskLevel
+  policy_template_id: string | null
+  policy_template_name: string | null
+  policy_template_resource: string | null
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
+  policy_template_owner_id: string | null
+  policy_template_owner: string | null
+  queue_decision:
+    | "auto-approved"
+    | "reviewer-gate"
+    | "security-escalation"
+    | "manual-review"
 }
 
 const permissionStore: StoredPermissionRequest[] = [
@@ -139,6 +150,13 @@ const permissionStore: StoredPermissionRequest[] = [
     reviewer: "Data Platform",
     rationale: "Investigating a spike in dispute reversals for the Japan lane.",
     risk: "high",
+    policy_template_id: "40000000-0000-0000-0000-000000000002",
+    policy_template_name: "Operational writeback",
+    policy_template_resource: "risk.gold_chargebacks",
+    policy_template_approval_mode: "review",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000011",
+    policy_template_owner: "Data Steward",
+    queue_decision: "reviewer-gate",
   },
   {
     id: "PR-1041",
@@ -155,6 +173,13 @@ const permissionStore: StoredPermissionRequest[] = [
     reviewer: "Governance",
     rationale: "Standing up a campaign-attribution sandbox for a new partner.",
     risk: "medium",
+    policy_template_id: "40000000-0000-0000-0000-000000000003",
+    policy_template_name: "Catalog bootstrap",
+    policy_template_resource: "marketing",
+    policy_template_approval_mode: "review",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
+    policy_template_owner: "Data Platform",
+    queue_decision: "reviewer-gate",
   },
   {
     id: "PR-1039",
@@ -168,16 +193,113 @@ const permissionStore: StoredPermissionRequest[] = [
     expires_at: "2026-05-28T10:00:00.000Z",
     expires_in_days: 14,
     status: "approved",
-    reviewer: "Minh Tran",
+    reviewer: "Governance",
     rationale: "Month-end close support for vendor accrual reconciliation.",
     risk: "low",
+    policy_template_id: "40000000-0000-0000-0000-000000000001",
+    policy_template_name: "Analytics read sandbox",
+    policy_template_resource: null,
+    policy_template_approval_mode: "auto",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000009",
+    policy_template_owner: "Governance",
+    queue_decision: "auto-approved",
   },
 ]
+
+type PermissionRequestApiResponse = {
+  id: string
+  code: string
+  requester_id: string
+  requester: string
+  requester_email: string
+  team_id: string
+  team: string
+  resource: string
+  scope: RequestScope
+  privileges: string[]
+  submitted_at: string
+  expires_at: string
+  expires_in_days: number
+  status: RequestStatus
+  reviewer_id: string
+  reviewer: string
+  rationale: string
+  risk: RiskLevel
+  policy_template_id: string | null
+  policy_template_name: string | null
+  policy_template_resource: string | null
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
+  policy_template_owner_id: string | null
+  policy_template_owner: string | null
+  queue_decision:
+    | "auto-approved"
+    | "reviewer-gate"
+    | "security-escalation"
+    | "manual-review"
+}
+
+function mapPermissionRequest(
+  request: PermissionRequestApiResponse,
+): StoredPermissionRequest {
+  return {
+    id: request.id,
+    code: request.code,
+    requester: request.requester,
+    team: request.team,
+    resource: request.resource,
+    scope: request.scope,
+    privileges: request.privileges,
+    submitted_at: request.submitted_at,
+    expires_at: request.expires_at,
+    expires_in_days: request.expires_in_days,
+    status: request.status,
+    reviewer:
+      request.reviewer ||
+      (request.reviewer_id === DEFAULT_REVIEWER_ID
+        ? DEFAULT_REVIEWER_NAME
+        : request.reviewer_id),
+    rationale: request.rationale,
+    risk: request.risk,
+    policy_template_id: request.policy_template_id,
+    policy_template_name: request.policy_template_name,
+    policy_template_resource: request.policy_template_resource,
+    policy_template_approval_mode: request.policy_template_approval_mode,
+    policy_template_owner_id: request.policy_template_owner_id,
+    policy_template_owner: request.policy_template_owner,
+    queue_decision: request.queue_decision,
+  }
+}
 
 export async function listPermissionRequestsAction(
   resource: string,
 ): Promise<StoredPermissionRequest[]> {
-  return permissionStore.filter((r) => r.resource === resource)
+  const session = await getServerSession()
+  if (!session?.idToken) {
+    return permissionStore.filter((r) => r.resource === resource)
+  }
+
+  try {
+    const url = new URL("/api/permissions/requests", API_BASE_URL)
+    url.searchParams.set("resource", resource)
+
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${session.idToken}`,
+      },
+    })
+
+    if (!res.ok) {
+      return permissionStore.filter((r) => r.resource === resource)
+    }
+
+    const body = (await res.json()) as {
+      requests: PermissionRequestApiResponse[]
+    }
+    return body.requests.map(mapPermissionRequest)
+  } catch {
+    return permissionStore.filter((r) => r.resource === resource)
+  }
 }
 
 export async function submitPermissionRequestAction(body: {
@@ -226,44 +348,18 @@ export async function submitPermissionRequestAction(body: {
       }
     }
 
-    const request = (await res.json()) as {
-      id: string
-      code: string
-      requester_id: string
-      team: string
-      resource: string
-      scope: RequestScope
-      privileges: string[]
-      submitted_at: string
-      expires_at: string
-      expires_in_days: number
-      status: RequestStatus
-      reviewer_id: string
-      rationale: string
-      risk: RiskLevel
-    }
+    const request = (await res.json()) as PermissionRequestApiResponse
 
     return {
-      data: {
-        id: request.id,
-        code: request.code,
+      data: mapPermissionRequest({
+        ...request,
         requester:
-          session.name ?? session.email ?? session.preferredUsername ?? "You",
-        team: "",
-        resource: request.resource,
-        scope: request.scope,
-        privileges: request.privileges,
-        submitted_at: request.submitted_at,
-        expires_at: request.expires_at,
-        expires_in_days: request.expires_in_days,
-        status: request.status,
-        reviewer:
-          request.reviewer_id === DEFAULT_REVIEWER_ID
-            ? DEFAULT_REVIEWER_NAME
-            : request.reviewer_id,
-        rationale: request.rationale,
-        risk: request.risk,
-      },
+          request.requester ||
+          session.name ||
+          session.email ||
+          session.preferredUsername ||
+          "You",
+      }),
     }
   } catch {
     return { error: "Failed to reach the permissions service." }
@@ -273,6 +369,30 @@ export async function submitPermissionRequestAction(body: {
 export async function cancelPermissionRequestAction(
   id: string,
 ): Promise<{ data?: StoredPermissionRequest; error?: string }> {
+  const session = await getServerSession()
+  if (session?.idToken) {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/permissions/requests/${id}`,
+        {
+          method: "PATCH",
+          cache: "no-store",
+          headers: {
+            Authorization: `Bearer ${session.idToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: "cancelled" }),
+        },
+      )
+
+      if (res.ok) {
+        return { data: mapPermissionRequest(await res.json()) }
+      }
+    } catch {
+      // Fall through to local mock state when the API is unavailable.
+    }
+  }
+
   const idx = permissionStore.findIndex((r) => r.id === id)
   if (idx === -1) return { error: "Request not found." }
   const current = permissionStore[idx]

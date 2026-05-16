@@ -1,3 +1,17 @@
+CREATE TABLE users
+(
+    id         UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    email      TEXT        NOT NULL,
+    username   TEXT        NOT NULL,
+    full_name  TEXT        NOT NULL DEFAULT '',
+    roles      TEXT[]      NOT NULL DEFAULT '{}',
+    user_type  TEXT        NOT NULL DEFAULT 'USER' CHECK (user_type IN ('GROUP', 'USER')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX users_email_idx ON users (email);
+
 CREATE TABLE teams
 (
     id         UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
@@ -8,38 +22,40 @@ CREATE TABLE teams
 
 CREATE UNIQUE INDEX teams_name_idx ON teams (name);
 
-CREATE TABLE permission_requests
-(
-    id           UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
-    requester_id UUID        NOT NULL,
-    team         UUID        NOT NULL REFERENCES teams (id),
-    resource     TEXT        NOT NULL,
-    scope        TEXT        NOT NULL,
-    privileges   TEXT[]      NOT NULL DEFAULT '{}',
-    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at   TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL DEFAULT 'pending',
-    reviewer_id  UUID        NOT NULL REFERENCES teams (id),
-    rationale    TEXT        NOT NULL DEFAULT '',
-    risk         TEXT        NOT NULL DEFAULT 'low',
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE policy_templates
 (
     id            UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     name          TEXT        NOT NULL,
     scope         TEXT        NOT NULL,
-    teams         TEXT[]      NOT NULL DEFAULT '{}',
+    resource      TEXT,
+    team_ids      UUID[]      NOT NULL DEFAULT '{}',
     privileges    TEXT[]      NOT NULL DEFAULT '{}',
     approval_mode TEXT        NOT NULL DEFAULT 'review',
     risk          TEXT        NOT NULL DEFAULT 'low',
     usage_30d     INTEGER     NOT NULL DEFAULT 0,
-    owner         TEXT        NOT NULL,
+    owner_id      UUID        NOT NULL REFERENCES teams (id),
     last_updated  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE permission_requests
+(
+    id                 UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    requester_id       UUID        NOT NULL REFERENCES users (id),
+    team               UUID        NOT NULL REFERENCES teams (id),
+    resource           TEXT        NOT NULL,
+    scope              TEXT        NOT NULL,
+    privileges         TEXT[]      NOT NULL DEFAULT '{}',
+    submitted_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at         TIMESTAMPTZ NOT NULL,
+    status             TEXT        NOT NULL DEFAULT 'pending',
+    reviewer_id        UUID        NOT NULL REFERENCES teams (id),
+    rationale          TEXT        NOT NULL DEFAULT '',
+    risk               TEXT        NOT NULL DEFAULT 'low',
+    policy_template_id UUID REFERENCES policy_templates (id),
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE blast_radius_previews
@@ -70,6 +86,15 @@ CREATE TABLE time_bound_grants
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+INSERT INTO users (id, email, username, full_name, user_type)
+VALUES ('20000000-0000-0000-0000-000000000001', 'annie.case@example.com', 'annie.case', 'Annie Case', 'USER'),
+       ('20000000-0000-0000-0000-000000000002', 'mai.nguyen@example.com', 'mai.nguyen', 'Mai Nguyen', 'USER'),
+       ('20000000-0000-0000-0000-000000000003', 'kenji.mori@example.com', 'kenji.mori', 'Kenji Mori', 'USER'),
+       ('20000000-0000-0000-0000-000000000004', 'nora.patel@example.com', 'nora.patel', 'Nora Patel', 'USER'),
+       ('20000000-0000-0000-0000-000000000005', 'bao.ho@example.com', 'bao.ho', 'Bao Ho', 'USER'),
+       ('20000000-0000-0000-0000-000000000006', 'linh.vu@example.com', 'linh.vu', 'Linh Vu', 'USER'),
+       ('20000000-0000-0000-0000-000000000007', 'haruto.sato@example.com', 'haruto.sato', 'Haruto Sato', 'USER');
+
 INSERT INTO teams (id, name)
 VALUES ('10000000-0000-0000-0000-000000000001', 'Fraud Ops'),
        ('10000000-0000-0000-0000-000000000002', 'Growth Analytics'),
@@ -83,48 +108,58 @@ VALUES ('10000000-0000-0000-0000-000000000001', 'Fraud Ops'),
        ('10000000-0000-0000-0000-000000000010', 'Security'),
        ('10000000-0000-0000-0000-000000000011', 'Data Steward');
 
+INSERT INTO policy_templates (id, name, scope, resource, team_ids, privileges, approval_mode, risk, usage_30d, owner_id,
+                              last_updated)
+VALUES ('40000000-0000-0000-0000-000000000001', 'Analytics read sandbox', 'schema', NULL,
+        ARRAY ['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-000000000003'::uuid,'10000000-0000-0000-0000-000000000007'::uuid],
+        ARRAY ['USE_SCHEMA','SELECT'], 'auto', 'low', 28, '10000000-0000-0000-0000-000000000009',
+        '2026-05-12T09:00:00Z'),
+       ('40000000-0000-0000-0000-000000000002', 'Operational writeback', 'table', 'risk.gold_chargebacks',
+        ARRAY ['10000000-0000-0000-0000-000000000005'::uuid,'10000000-0000-0000-0000-000000000001'::uuid],
+        ARRAY ['SELECT','MODIFY'], 'review', 'high', 9, '10000000-0000-0000-0000-000000000011',
+        '2026-05-09T15:30:00Z'),
+       ('40000000-0000-0000-0000-000000000003', 'Catalog bootstrap', 'catalog', 'marketing',
+        ARRAY ['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-000000000004'::uuid],
+        ARRAY ['USE_CATALOG','CREATE_SCHEMA'], 'review', 'medium', 6, '10000000-0000-0000-0000-000000000006',
+        '2026-05-10T05:10:00Z'),
+       ('40000000-0000-0000-0000-000000000004', 'Sensitive feature access', 'table',
+        'feature_store.user_embeddings', ARRAY ['10000000-0000-0000-0000-000000000004'::uuid], ARRAY ['SELECT'],
+        'escalate', 'high', 4, '10000000-0000-0000-0000-000000000010', '2026-05-14T02:20:00Z');
+
 INSERT INTO permission_requests (id, requester_id, team, resource, scope, privileges, submitted_at, expires_at, status,
-                                 reviewer_id, rationale, risk)
+                                 reviewer_id, rationale, risk, policy_template_id)
 VALUES ('30000000-0000-0000-0000-000000001042', '20000000-0000-0000-0000-000000000001',
         '10000000-0000-0000-0000-000000000001', 'risk.gold_chargebacks', 'table', ARRAY ['SELECT','MODIFY'],
-        '2026-05-16T01:12:00Z', '2026-05-17T01:12:00Z', 'pending', '10000000-0000-0000-0000-000000000006',
-        'Investigating a spike in dispute reversals for the Japan lane.', 'high'),
+        '2026-05-16T01:12:00Z', '2026-05-17T01:12:00Z', 'ready', '10000000-0000-0000-0000-000000000011',
+        'Investigating a spike in dispute reversals for the Japan lane.', 'high',
+        '40000000-0000-0000-0000-000000000002'),
        ('30000000-0000-0000-0000-000000001041', '20000000-0000-0000-0000-000000000002',
         '10000000-0000-0000-0000-000000000002', 'marketing', 'catalog', ARRAY ['USE_CATALOG','CREATE_SCHEMA'],
-        '2026-05-15T06:30:00Z', '2026-05-21T06:30:00Z', 'ready', '10000000-0000-0000-0000-000000000009',
-        'Standing up a campaign-attribution sandbox for a new partner.', 'medium'),
+        '2026-05-15T06:30:00Z', '2026-05-21T06:30:00Z', 'ready', '10000000-0000-0000-0000-000000000006',
+        'Standing up a campaign-attribution sandbox for a new partner.', 'medium',
+        '40000000-0000-0000-0000-000000000003'),
        ('30000000-0000-0000-0000-000000001039', '20000000-0000-0000-0000-000000000003',
         '10000000-0000-0000-0000-000000000003', 'finance.ap_closure', 'schema', ARRAY ['USE_SCHEMA','SELECT'],
-        '2026-05-14T10:00:00Z', '2026-05-30T10:00:00Z', 'approved', '10000000-0000-0000-0000-000000000011',
-        'Month-end close support for vendor accrual reconciliation.', 'low'),
+        '2026-05-14T10:00:00Z', '2026-05-30T10:00:00Z', 'approved', '10000000-0000-0000-0000-000000000009',
+        'Month-end close support for vendor accrual reconciliation.', 'low',
+        '40000000-0000-0000-0000-000000000001'),
        ('30000000-0000-0000-0000-000000001038', '20000000-0000-0000-0000-000000000004',
         '10000000-0000-0000-0000-000000000004', 'feature_store.user_embeddings', 'table', ARRAY ['SELECT'],
         '2026-05-14T02:48:00Z', '2026-05-19T02:48:00Z', 'needs-info', '10000000-0000-0000-0000-000000000010',
-        'Model retraining run needs a narrower cohort definition.', 'medium'),
+        'Model retraining run needs a narrower cohort definition.', 'medium',
+        '40000000-0000-0000-0000-000000000004'),
        ('30000000-0000-0000-0000-000000001036', '20000000-0000-0000-0000-000000000005',
         '10000000-0000-0000-0000-000000000005', 'ops.runbooks', 'schema', ARRAY ['USE_SCHEMA','SELECT','MODIFY'],
         '2026-05-13T08:15:00Z', '2026-05-18T08:15:00Z', 'pending', '10000000-0000-0000-0000-000000000011',
-        'Support rotation needs edit access for incident annotations.', 'high'),
+        'Support rotation needs edit access for incident annotations.', 'high', NULL),
        ('30000000-0000-0000-0000-000000001034', '20000000-0000-0000-0000-000000000006',
         '10000000-0000-0000-0000-000000000007', 'board_metrics', 'catalog', ARRAY ['USE_CATALOG','CREATE_SCHEMA'],
-        '2026-05-12T09:10:00Z', '2026-05-23T09:10:00Z', 'ready', '10000000-0000-0000-0000-000000000006',
-        'Dedicated exec reporting workspace for Q2 operating review.', 'medium'),
+        '2026-05-12T09:10:00Z', '2026-05-23T09:10:00Z', 'pending', '10000000-0000-0000-0000-000000000006',
+        'Dedicated exec reporting workspace for Q2 operating review.', 'medium', NULL),
        ('30000000-0000-0000-0000-000000001031', '20000000-0000-0000-0000-000000000007',
         '10000000-0000-0000-0000-000000000008', 'support.ticket_embeddings', 'table', ARRAY ['SELECT'],
         '2026-05-11T23:40:00Z', '2026-05-25T23:40:00Z', 'pending', '10000000-0000-0000-0000-000000000010',
-        'Case clustering pilot for deflection opportunities.', 'low');
-
-INSERT INTO policy_templates (id, name, scope, teams, privileges, approval_mode, risk, usage_30d, owner, last_updated)
-VALUES ('40000000-0000-0000-0000-000000000001', 'Analytics read sandbox', 'schema',
-        ARRAY ['Growth Analytics','Finance BI','Executive Analytics'], ARRAY ['USE_SCHEMA','SELECT'], 'auto', 'low', 28,
-        'Governance', '2026-05-12T09:00:00Z'),
-       ('40000000-0000-0000-0000-000000000002', 'Operational writeback', 'table', ARRAY ['Operations','Fraud Ops'],
-        ARRAY ['SELECT','MODIFY'], 'review', 'high', 9, 'Data Steward', '2026-05-09T15:30:00Z'),
-       ('40000000-0000-0000-0000-000000000003', 'Catalog bootstrap', 'catalog',
-        ARRAY ['Growth Analytics','ML Platform'], ARRAY ['USE_CATALOG','CREATE_SCHEMA'], 'review', 'medium', 6,
-        'Data Platform', '2026-05-10T05:10:00Z'),
-       ('40000000-0000-0000-0000-000000000004', 'Sensitive feature access', 'table', ARRAY ['ML Platform'],
-        ARRAY ['SELECT'], 'escalate', 'high', 4, 'Security', '2026-05-14T02:20:00Z');
+        'Case clustering pilot for deflection opportunities.', 'low', NULL);
 
 INSERT INTO blast_radius_previews (request_id, downstream_assets, dashboards, consumers, sensitive_domains,
                                    recommended_guardrail)

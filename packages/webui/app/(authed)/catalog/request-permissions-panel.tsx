@@ -74,6 +74,21 @@ function formatStatusLabel(status: RequestStatus) {
   }
 }
 
+function formatQueueDecision(
+  decision: StoredPermissionRequest["queue_decision"],
+) {
+  switch (decision) {
+    case "auto-approved":
+      return "Auto-approved by policy template"
+    case "reviewer-gate":
+      return "Matched policy template, pending reviewer gate"
+    case "security-escalation":
+      return "Matched policy template, sent to escalation"
+    default:
+      return "No matching template, queued for manual review"
+  }
+}
+
 const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"]
 
 type Props = {
@@ -145,7 +160,11 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         return
       }
       setHistory((prev) => [result.data, ...prev])
-      toast.success("Request submitted", { description: result.data.code })
+      toast.success("Request submitted", {
+        description: result.data.policy_template_name
+          ? `${result.data.code} - ${formatQueueDecision(result.data.queue_decision)}`
+          : `${result.data.code} - Manual review`,
+      })
       formApi.reset()
     },
   })
@@ -352,6 +371,34 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                       {req.rationale}
                     </p>
                   )}
+
+                  <div className="flex flex-wrap gap-1">
+                    {req.policy_template_name ? (
+                      <>
+                        <Badge variant="outline" className="text-[11px]">
+                          {req.policy_template_name}
+                        </Badge>
+                        {req.policy_template_resource ? (
+                          <Badge variant="outline" className="text-[11px]">
+                            {req.policy_template_resource}
+                          </Badge>
+                        ) : null}
+                        {req.policy_template_approval_mode ? (
+                          <Badge variant="outline" className="text-[11px]">
+                            {req.policy_template_approval_mode}
+                          </Badge>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Badge variant="outline" className="text-[11px]">
+                        Manual exception
+                      </Badge>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatQueueDecision(req.queue_decision)}
+                  </p>
 
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span>

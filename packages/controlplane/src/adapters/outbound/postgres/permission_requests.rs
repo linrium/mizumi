@@ -22,12 +22,20 @@ const REQUEST_VIEW_SELECT: &str = r#"
         reviewer.name AS reviewer,
         pr.rationale,
         pr.risk,
+        pr.policy_template_id,
+        pt.name AS policy_template_name,
+        pt.resource AS policy_template_resource,
+        pt.approval_mode AS policy_template_approval_mode,
+        pt.owner_id AS policy_template_owner_id,
+        template_owner.name AS policy_template_owner,
         pr.created_at,
         pr.updated_at
     FROM permission_requests pr
     JOIN users requester ON requester.id = pr.requester_id
     JOIN teams team ON team.id = pr.team
     JOIN teams reviewer ON reviewer.id = pr.reviewer_id
+    LEFT JOIN policy_templates pt ON pt.id = pr.policy_template_id
+    LEFT JOIN teams template_owner ON template_owner.id = pt.owner_id
 "#;
 
 pub async fn list(
@@ -92,12 +100,20 @@ pub async fn create(
             reviewer.name AS reviewer,
             inserted.rationale,
             inserted.risk,
+            inserted.policy_template_id,
+            pt.name AS policy_template_name,
+            pt.resource AS policy_template_resource,
+            pt.approval_mode AS policy_template_approval_mode,
+            pt.owner_id AS policy_template_owner_id,
+            template_owner.name AS policy_template_owner,
             inserted.created_at,
             inserted.updated_at
         FROM inserted
         JOIN users requester ON requester.id = inserted.requester_id
         JOIN teams team ON team.id = inserted.team
         JOIN teams reviewer ON reviewer.id = inserted.reviewer_id
+        LEFT JOIN policy_templates pt ON pt.id = inserted.policy_template_id
+        LEFT JOIN teams template_owner ON template_owner.id = pt.owner_id
         "#
     ))
     .bind(requester_id)
@@ -153,12 +169,20 @@ pub async fn update_status(
             reviewer.name AS reviewer,
             updated.rationale,
             updated.risk,
+            updated.policy_template_id,
+            pt.name AS policy_template_name,
+            pt.resource AS policy_template_resource,
+            pt.approval_mode AS policy_template_approval_mode,
+            pt.owner_id AS policy_template_owner_id,
+            template_owner.name AS policy_template_owner,
             updated.created_at,
             updated.updated_at
         FROM updated
         JOIN users requester ON requester.id = updated.requester_id
         JOIN teams team ON team.id = updated.team
         JOIN teams reviewer ON reviewer.id = updated.reviewer_id
+        LEFT JOIN policy_templates pt ON pt.id = updated.policy_template_id
+        LEFT JOIN teams template_owner ON template_owner.id = pt.owner_id
         "#
     ))
     .bind(status)
@@ -197,12 +221,20 @@ pub async fn bulk_update_status(
             reviewer.name AS reviewer,
             updated.rationale,
             updated.risk,
+            updated.policy_template_id,
+            pt.name AS policy_template_name,
+            pt.resource AS policy_template_resource,
+            pt.approval_mode AS policy_template_approval_mode,
+            pt.owner_id AS policy_template_owner_id,
+            template_owner.name AS policy_template_owner,
             updated.created_at,
             updated.updated_at
         FROM updated
         JOIN users requester ON requester.id = updated.requester_id
         JOIN teams team ON team.id = updated.team
         JOIN teams reviewer ON reviewer.id = updated.reviewer_id
+        LEFT JOIN policy_templates pt ON pt.id = updated.policy_template_id
+        LEFT JOIN teams template_owner ON template_owner.id = pt.owner_id
         ORDER BY updated.submitted_at DESC
         "#
     ))
@@ -221,5 +253,67 @@ pub async fn list_by_ids(
     ))
     .bind(ids)
     .fetch_all(db)
+    .await
+}
+
+pub async fn update_policy_metadata(
+    db: &PgPool,
+    id: Uuid,
+    policy_template_id: Option<Uuid>,
+    reviewer_id: Uuid,
+    risk: &str,
+    status: &str,
+) -> Result<Option<PermissionRequestView>, sqlx::Error> {
+    sqlx::query_as::<_, PermissionRequestView>(&format!(
+        r#"
+        WITH updated AS (
+            UPDATE permission_requests
+            SET policy_template_id = $1,
+                reviewer_id = $2,
+                risk = $3,
+                status = $4,
+                updated_at = NOW()
+            WHERE id = $5
+            RETURNING *
+        )
+        SELECT
+            updated.id,
+            updated.requester_id,
+            requester.full_name AS requester,
+            requester.email AS requester_email,
+            updated.team AS team_id,
+            team.name AS team,
+            updated.resource,
+            updated.scope,
+            updated.privileges,
+            updated.submitted_at,
+            updated.expires_at,
+            updated.status,
+            updated.reviewer_id,
+            reviewer.name AS reviewer,
+            updated.rationale,
+            updated.risk,
+            updated.policy_template_id,
+            pt.name AS policy_template_name,
+            pt.resource AS policy_template_resource,
+            pt.approval_mode AS policy_template_approval_mode,
+            pt.owner_id AS policy_template_owner_id,
+            template_owner.name AS policy_template_owner,
+            updated.created_at,
+            updated.updated_at
+        FROM updated
+        JOIN users requester ON requester.id = updated.requester_id
+        JOIN teams team ON team.id = updated.team
+        JOIN teams reviewer ON reviewer.id = updated.reviewer_id
+        LEFT JOIN policy_templates pt ON pt.id = updated.policy_template_id
+        LEFT JOIN teams template_owner ON template_owner.id = pt.owner_id
+        "#
+    ))
+    .bind(policy_template_id)
+    .bind(reviewer_id)
+    .bind(risk)
+    .bind(status)
+    .bind(id)
+    .fetch_optional(db)
     .await
 }

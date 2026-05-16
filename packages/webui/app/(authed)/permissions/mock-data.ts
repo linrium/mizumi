@@ -15,17 +15,31 @@ export type PermissionRequest = {
   rationale: string
   expiresInDays: number
   risk: RiskLevel
+  policyTemplateId?: string
+  policyTemplateName?: string
+  policyTemplateResource?: string | null
+  policyTemplateApprovalMode?: "auto" | "review" | "escalate"
+  policyTemplateOwnerId?: string
+  policyTemplateOwner?: string
+  queueDecision?:
+    | "auto-approved"
+    | "reviewer-gate"
+    | "security-escalation"
+    | "manual-review"
 }
 
 export type PolicyTemplate = {
   id: string
   name: string
   scope: RequestScope
+  resource: string | null
+  teamIds: string[]
   teams: string[]
   privileges: string[]
   approvalMode: "auto" | "review" | "escalate"
   risk: RiskLevel
   usage30d: number
+  ownerId: string
   owner: string
   lastUpdated: string
 }
@@ -162,11 +176,18 @@ export const MOCK_POLICY_TEMPLATES: PolicyTemplate[] = [
     id: "PT-001",
     name: "Analytics read sandbox",
     scope: "schema",
+    resource: null,
+    teamIds: [
+      "10000000-0000-0000-0000-000000000002",
+      "10000000-0000-0000-0000-000000000003",
+      "10000000-0000-0000-0000-000000000007",
+    ],
     teams: ["Growth Analytics", "Finance BI", "Executive Analytics"],
     privileges: ["USE_SCHEMA", "SELECT"],
     approvalMode: "auto",
     risk: "low",
     usage30d: 28,
+    ownerId: "10000000-0000-0000-0000-000000000009",
     owner: "Governance",
     lastUpdated: "2026-05-12T09:00:00.000Z",
   },
@@ -174,11 +195,17 @@ export const MOCK_POLICY_TEMPLATES: PolicyTemplate[] = [
     id: "PT-002",
     name: "Operational writeback",
     scope: "table",
+    resource: "risk.gold_chargebacks",
+    teamIds: [
+      "10000000-0000-0000-0000-000000000005",
+      "10000000-0000-0000-0000-000000000001",
+    ],
     teams: ["Operations", "Fraud Ops"],
     privileges: ["SELECT", "MODIFY"],
     approvalMode: "review",
     risk: "high",
     usage30d: 9,
+    ownerId: "10000000-0000-0000-0000-000000000011",
     owner: "Data Steward",
     lastUpdated: "2026-05-09T15:30:00.000Z",
   },
@@ -186,11 +213,17 @@ export const MOCK_POLICY_TEMPLATES: PolicyTemplate[] = [
     id: "PT-003",
     name: "Catalog bootstrap",
     scope: "catalog",
+    resource: "marketing",
+    teamIds: [
+      "10000000-0000-0000-0000-000000000002",
+      "10000000-0000-0000-0000-000000000004",
+    ],
     teams: ["Growth Analytics", "ML Platform"],
     privileges: ["USE_CATALOG", "CREATE_SCHEMA"],
     approvalMode: "review",
     risk: "medium",
     usage30d: 6,
+    ownerId: "10000000-0000-0000-0000-000000000006",
     owner: "Data Platform",
     lastUpdated: "2026-05-10T05:10:00.000Z",
   },
@@ -198,11 +231,14 @@ export const MOCK_POLICY_TEMPLATES: PolicyTemplate[] = [
     id: "PT-004",
     name: "Sensitive feature access",
     scope: "table",
+    resource: "feature_store.user_embeddings",
+    teamIds: ["10000000-0000-0000-0000-000000000004"],
     teams: ["ML Platform"],
     privileges: ["SELECT"],
     approvalMode: "escalate",
     risk: "high",
     usage30d: 4,
+    ownerId: "10000000-0000-0000-0000-000000000010",
     owner: "Security",
     lastUpdated: "2026-05-14T02:20:00.000Z",
   },

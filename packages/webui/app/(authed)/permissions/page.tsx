@@ -2,7 +2,6 @@
 
 import {
   CheckmarkCircle01Icon,
-  Mail01Icon,
   MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -90,6 +89,19 @@ function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1)
 }
 
+function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
+  switch (decision) {
+    case "auto-approved":
+      return "Auto-approved by template"
+    case "reviewer-gate":
+      return "Matched template, routed to reviewer"
+    case "security-escalation":
+      return "Matched template, escalated"
+    default:
+      return "No template match, manual triage"
+  }
+}
+
 export default function PermissionsPage() {
   const [requests, setRequests] = useState<PermissionRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,6 +165,9 @@ export default function PermissionsPage() {
               request.resource,
               request.reviewer,
               request.rationale,
+              request.policy_template_name ?? "",
+              request.policy_template_owner ?? "",
+              request.queue_decision,
               ...request.privileges,
             ].some((value) => value.toLowerCase().includes(search))
 
@@ -165,12 +180,14 @@ export default function PermissionsPage() {
     const ready = requests.filter((item) => item.status === "ready")
     const expiringSoon = requests.filter((item) => item.expires_in_days <= 3)
     const highRisk = requests.filter((item) => item.risk === "high")
+    const matchedTemplates = requests.filter((item) => item.policy_template_id)
 
     return {
       pending: pending.length,
       ready: ready.length,
       expiringSoon: expiringSoon.length,
       highRisk: highRisk.length,
+      matchedTemplates: matchedTemplates.length,
     }
   }, [requests])
 
@@ -348,12 +365,34 @@ export default function PermissionsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
-                      <Status variant={getStatusVariant(request.status)}>
-                        <StatusIndicator />
-                        <StatusLabel>
-                          {formatStatusLabel(request.status)}
-                        </StatusLabel>
-                      </Status>
+                      <div className="space-y-2">
+                        <Status variant={getStatusVariant(request.status)}>
+                          <StatusIndicator />
+                          <StatusLabel>
+                            {formatStatusLabel(request.status)}
+                          </StatusLabel>
+                        </Status>
+                        <div className="text-muted-foreground">
+                          {formatQueueDecision(request.queue_decision)}
+                        </div>
+                        {request.policy_template_name ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline">
+                              {request.policy_template_name}
+                            </Badge>
+                            {request.policy_template_resource ? (
+                              <Badge variant="outline">
+                                {request.policy_template_resource}
+                              </Badge>
+                            ) : null}
+                            {request.policy_template_approval_mode && (
+                              <Badge variant="outline">
+                                {request.policy_template_approval_mode}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="mt-2 text-muted-foreground">
                         Submitted {submittedLabel}
                       </div>
@@ -368,7 +407,14 @@ export default function PermissionsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
-                      <div className="font-medium">{request.reviewer}</div>
+                      <div className="space-y-1">
+                        <div className="font-medium">{request.reviewer}</div>
+                        {request.policy_template_owner ? (
+                          <div className="text-muted-foreground">
+                            Template owner {request.policy_template_owner}
+                          </div>
+                        ) : null}
+                      </div>
                     </TableCell>
                     {/*<TableCell className="align-top">*/}
                     {/*  <div className="font-medium">*/}
@@ -440,10 +486,13 @@ export default function PermissionsPage() {
       <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
-          Policy simulation: low-risk SELECT requests from approved teams can be
-          auto-granted.
+          Requests now show the policy template decision that drove queue
+          routing.
         </div>
         <div className="flex items-center gap-3">
+          {stats.matchedTemplates > 0 && (
+            <span>{stats.matchedTemplates} matched templates</span>
+          )}
           {stats.expiringSoon > 0 && (
             <span>{stats.expiringSoon} expiring soon</span>
           )}
