@@ -36,4 +36,8 @@ impl UserService {
             .map_err(AppError::Sqlx)?
             .ok_or(AppError::NotFound)
     }
+
+    pub async fn list_users(&self) -> Result<Vec<User>, AppError> {
+        users::list(&self.db).await.map_err(AppError::Sqlx)
+    }
 }

@@ -32,6 +32,22 @@ const nextConfig: NextConfig = {
         source: "/api/permissions/:path*",
         destination: `${API_BASE_URL}/api/permissions/:path*`,
       },
+      {
+        source: "/api/teams/:path*",
+        destination: `${API_BASE_URL}/api/teams/:path*`,
+      },
+      {
+        source: "/api/teams",
+        destination: `${API_BASE_URL}/api/teams`,
+      },
+      {
+        source: "/api/users/:path*",
+        destination: `${API_BASE_URL}/api/users/:path*`,
+      },
+      {
+        source: "/api/users",
+        destination: `${API_BASE_URL}/api/users`,
+      },
     ]
   },
 }

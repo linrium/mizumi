@@ -509,15 +509,79 @@ export default function PermissionsPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Approve permission request?</DialogTitle>
-            <DialogDescription>
-              {approveTarget
-                ? `${approveTarget.requester} will be granted ${approveTarget.privileges.join(", ")} on ${approveTarget.resource}.`
-                : "Confirm this permission grant."}
+            <DialogDescription className="sr-only">
+              Review the details below before approving this access grant.
             </DialogDescription>
           </DialogHeader>
+
+          {approveTarget && (
+            <div className="divide-y rounded-md border text-sm">
+              <div className="px-3 py-2.5 space-y-0.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Requester
+                </p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium">{approveTarget.requester}</span>
+                  <span className="font-mono text-xs text-muted-foreground shrink-0">
+                    {approveTarget.code}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{approveTarget.team}</p>
+                {approveTarget.rationale && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 pt-0.5">
+                    {approveTarget.rationale}
+                  </p>
+                )}
+              </div>
+
+              <div className="px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Resource
+                </p>
+                <p className="font-mono text-xs break-all leading-relaxed">
+                  {approveTarget.resource}
+                </p>
+                <div className="flex flex-wrap items-center gap-1">
+                  <Badge variant="outline">{formatScopeLabel(approveTarget.scope)}</Badge>
+                  <Badge variant={getRiskVariant(approveTarget.risk)}>
+                    {approveTarget.risk} risk
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Privileges to grant
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {approveTarget.privileges.map((p) => (
+                    <Badge key={p} variant="secondary">
+                      {p}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-3 py-2.5 space-y-0.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Reviewer
+                </p>
+                <p className="font-medium">{approveTarget.reviewer}</p>
+                {approveTarget.policy_template_name && (
+                  <p className="text-xs text-muted-foreground">
+                    Template: {approveTarget.policy_template_name}
+                    {approveTarget.policy_template_owner
+                      ? ` · ${approveTarget.policy_template_owner}`
+                      : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"

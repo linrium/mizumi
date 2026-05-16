@@ -42,3 +42,9 @@ pub async fn get(db: &PgPool, id: Uuid) -> Result<Option<User>, sqlx::Error> {
         .fetch_optional(db)
         .await
 }
+
+pub async fn list(db: &PgPool) -> Result<Vec<User>, sqlx::Error> {
+    sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY full_name ASC")
+        .fetch_all(db)
+        .await
+}

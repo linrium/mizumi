@@ -14,8 +14,8 @@ use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::Se
 use application::{
     dagster_service::DagsterService, k8s_service::K8sQueryService,
     permission_service::PermissionService, streaming_service::StreamingJobService,
-    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
-    user_service::UserService,
+    team_service::TeamService, test_event_service::TestEventService,
+    uc_service::UnityCatalogProxyService, user_service::UserService,
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
@@ -73,6 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )),
         )),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
+        team_service: Arc::new(TeamService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.unity_catalog.base_url.clone(),

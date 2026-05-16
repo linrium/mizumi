@@ -18,3 +18,10 @@ pub async fn me(
         Err(err) => err.into_response(),
     }
 }
+
+pub async fn list_users(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match state.user_service.list_users().await {
+        Ok(users) => Json(serde_json::json!({ "users": users })).into_response(),
+        Err(err) => err.into_response(),
+    }
+}

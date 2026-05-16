@@ -11,6 +11,7 @@ import {
   Key01Icon,
   LakeIcon,
   Logout03Icon,
+  UserMultiple02Icon,
   WorkflowCircle01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -36,6 +37,7 @@ import type { AppSession } from "@/lib/auth/types"
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: Book03Icon },
   { title: "Permissions", href: "/permissions", icon: Key01Icon },
+  { title: "Teams", href: "/teams", icon: UserMultiple02Icon },
   { title: "SQL Editor", href: "/editor", icon: CodeIcon },
   { title: "Pipelines", href: "/pipelines", icon: WorkflowCircle01Icon },
   { title: "Analytics", href: "/analytics", icon: Chart01Icon },

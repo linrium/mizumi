@@ -2,6 +2,7 @@ pub mod dagster;
 pub mod k8s;
 pub mod permissions;
 pub mod streaming;
+pub mod teams;
 pub mod tests;
 pub mod uc;
 pub mod users;
@@ -48,6 +49,17 @@ fn extract_bearer(headers: &HeaderMap) -> Option<String> {
 
 pub fn create_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
+        .route("/api/teams", get(teams::list_teams).post(teams::create_team))
+        .route("/api/teams/{id}", get(teams::get_team))
+        .route(
+            "/api/teams/{id}/members",
+            get(teams::list_members).post(teams::add_member),
+        )
+        .route(
+            "/api/teams/{id}/members/{user_id}",
+            delete(teams::remove_member),
+        )
+        .route("/api/users", get(users::list_users))
         .route("/api/users/me", get(users::me))
         .route("/api/query", post(k8s::run_query))
         .route(
