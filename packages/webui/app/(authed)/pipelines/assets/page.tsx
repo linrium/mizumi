@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   type ColumnDef,
   flexRender,
@@ -88,14 +89,14 @@ async function apiFetch<T>(
   const url = params
     ? `/api/dagster/${path}?${new URLSearchParams(params)}`
     : `/api/dagster/${path}`
-  const res = await fetch(url, { cache: "no-store" })
+  const res = await fetchWithAuth(url, { cache: "no-store" })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as T
 }
 
 async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
-  const res = await fetch(`/api/dagster/materialize/${path.join("/")}`, {
+  const res = await fetchWithAuth(`/api/dagster/materialize/${path.join("/")}`, {
     method: "POST",
   })
   const json = await res.json()
@@ -106,7 +107,7 @@ async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
 async function materializeManyAssets(
   paths: string[][],
 ): Promise<{ run_id: string }> {
-  const res = await fetch("/api/dagster/materialize-many", {
+  const res = await fetchWithAuth("/api/dagster/materialize-many", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths }),

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import { toast } from "sonner"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 dayjs.extend(relativeTime)
@@ -214,7 +215,7 @@ function useAssetStatus(pathSegments: string[]) {
 
     async function poll() {
       try {
-        const res = await fetch(`/api/dagster/asset-status/${pathKey}`, {
+        const res = await fetchWithAuth(`/api/dagster/asset-status/${pathKey}`, {
           cache: "no-store",
         })
         if (!res.ok) return
@@ -370,7 +371,7 @@ export default function AssetDetailPage() {
   async function handleMaterialize() {
     setMaterializing(true)
     try {
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `/api/dagster/materialize/${pathSegments.join("/")}`,
         { method: "POST" },
       )
@@ -390,7 +391,7 @@ export default function AssetDetailPage() {
 
   useEffect(() => {
     const url = `/api/dagster/asset-nodes/${pathSegments.join("/")}`
-    fetch(url, { cache: "no-store" })
+    fetchWithAuth(url, { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)

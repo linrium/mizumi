@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { Separator } from "@/components/ui/separator"
@@ -91,7 +92,7 @@ type TickHistoryResponse = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`/api/dagster/${path}`, { cache: "no-store" })
+  const res = await fetchWithAuth(`/api/dagster/${path}`, { cache: "no-store" })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as T

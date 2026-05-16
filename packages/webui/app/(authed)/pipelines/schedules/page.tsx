@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 
@@ -30,7 +31,7 @@ type Schedule = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`/api/dagster/${path}`, { cache: "no-store" })
+  const res = await fetchWithAuth(`/api/dagster/${path}`, { cache: "no-store" })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as T

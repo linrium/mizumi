@@ -18,6 +18,7 @@ import {
 import dagre from "@dagrejs/dagre"
 import "@xyflow/react/dist/style.css"
 import { cn } from "@/lib/utils"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import Link from "next/link"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
@@ -337,7 +338,7 @@ export function LineageGraph({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/dagster/asset-nodes", { cache: "no-store" })
+    fetchWithAuth("/api/dagster/asset-nodes", { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)

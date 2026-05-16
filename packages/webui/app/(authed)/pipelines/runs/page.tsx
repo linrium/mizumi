@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   type ColumnDef,
   flexRender,
@@ -88,7 +89,7 @@ async function apiFetch<T>(
   const url = params
     ? `/api/dagster/${path}?${new URLSearchParams(params)}`
     : `/api/dagster/${path}`
-  const res = await fetch(url, { cache: "no-store" })
+  const res = await fetchWithAuth(url, { cache: "no-store" })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as T

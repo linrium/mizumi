@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { cn } from "@/lib/utils"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import { Badge } from "@/components/ui/badge"
@@ -254,7 +255,7 @@ function ReExecutions({
 
   useEffect(() => {
     if (!rootRunId) return
-    fetch(`/api/dagster/runs?limit=20`, { cache: "no-store" })
+    fetchWithAuth(`/api/dagster/runs?limit=20`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { runs: Run[] }) => {
         const related = d.runs.filter(
@@ -331,8 +332,8 @@ function useRunDetail(runId: string) {
     async function fetchAll() {
       try {
         const [runRes, eventsRes] = await Promise.all([
-          fetch(`/api/dagster/runs/${runId}`, { cache: "no-store" }),
-          fetch(`/api/dagster/runs/${runId}/events`, { cache: "no-store" }),
+          fetchWithAuth(`/api/dagster/runs/${runId}`, { cache: "no-store" }),
+          fetchWithAuth(`/api/dagster/runs/${runId}/events`, { cache: "no-store" }),
         ])
         if (!runRes.ok) throw new Error(`HTTP ${runRes.status}`)
         const runData = (await runRes.json()) as Run
