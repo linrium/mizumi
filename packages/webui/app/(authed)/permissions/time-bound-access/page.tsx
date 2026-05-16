@@ -1,4 +1,7 @@
+"use client"
+
 import { formatDistanceToNowStrict } from "date-fns"
+import { useEffect, useState } from "react"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
@@ -8,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { MOCK_TIME_BOUND_GRANTS } from "../mock-data"
+import { listTimeBoundGrants, type TimeBoundGrant } from "@/services/permissions"
 
 function getRenewalVariant(status: "healthy" | "expiring" | "expired") {
   switch (status) {
@@ -28,6 +31,22 @@ function formatRenewalLabel(status: "healthy" | "expiring" | "expired") {
 }
 
 export default function TimeBoundAccessPage() {
+  const [grants, setGrants] = useState<TimeBoundGrant[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    listTimeBoundGrants()
+      .then(setGrants)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const expiringToday = grants.filter((g) => {
+    const diff = new Date(g.expires_at).getTime() - Date.now()
+    return diff >= 0 && diff < 86_400_000
+  }).length
+
+  const expired = grants.filter((g) => g.renewal_status === "expired").length
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b shrink-0 px-3 py-2.5">
@@ -39,7 +58,9 @@ export default function TimeBoundAccessPage() {
             </p>
           </div>
           <div className="text-xs text-muted-foreground">
-            1 grant expires today and 1 has already lapsed
+            {expiringToday > 0 && `${expiringToday} grant${expiringToday === 1 ? "" : "s"} expire${expiringToday === 1 ? "s" : ""} today`}
+            {expiringToday > 0 && expired > 0 && " and "}
+            {expired > 0 && `${expired} have already lapsed`}
           </div>
         </div>
       </div>
@@ -58,51 +79,62 @@ export default function TimeBoundAccessPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {MOCK_TIME_BOUND_GRANTS.map((grant) => (
-              <TableRow key={grant.grantId}>
-                <TableCell className="align-top">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{grant.principal}</span>
-                      <span className="font-mono text-muted-foreground">
-                        {grant.grantId}
-                      </span>
-                    </div>
-                    <div className="text-muted-foreground">{grant.team}</div>
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-muted-foreground">
-                  {grant.resource}
-                </TableCell>
-                <TableCell>{grant.privilege}</TableCell>
-                <TableCell className="align-top text-muted-foreground">
-                  <div>
-                    Started{" "}
-                    {formatDistanceToNowStrict(new Date(grant.startedAt), {
-                      addSuffix: true,
-                    })}
-                  </div>
-                  <div>
-                    Expires{" "}
-                    {formatDistanceToNowStrict(new Date(grant.expiresAt), {
-                      addSuffix: true,
-                    })}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Status variant={getRenewalVariant(grant.renewalStatus)}>
-                    <StatusIndicator />
-                    <StatusLabel>
-                      {formatRenewalLabel(grant.renewalStatus)}
-                    </StatusLabel>
-                  </Status>
-                </TableCell>
-                <TableCell>{grant.reviewer}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {grant.reason}
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  Loading…
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              grants.map((grant) => (
+                <TableRow key={grant.id}>
+                  <TableCell className="align-top">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{grant.principal}</span>
+                        <span className="font-mono text-muted-foreground">
+                          {grant.id}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground">{grant.team}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-muted-foreground">
+                    {grant.resource}
+                  </TableCell>
+                  <TableCell>{grant.privilege}</TableCell>
+                  <TableCell className="align-top text-muted-foreground">
+                    <div>
+                      Started{" "}
+                      {formatDistanceToNowStrict(new Date(grant.started_at), {
+                        addSuffix: true,
+                      })}
+                    </div>
+                    <div>
+                      Expires{" "}
+                      {formatDistanceToNowStrict(new Date(grant.expires_at), {
+                        addSuffix: true,
+                      })}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Status variant={getRenewalVariant(grant.renewal_status)}>
+                      <StatusIndicator />
+                      <StatusLabel>
+                        {formatRenewalLabel(grant.renewal_status)}
+                      </StatusLabel>
+                    </Status>
+                  </TableCell>
+                  <TableCell>{grant.reviewer}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {grant.reason}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

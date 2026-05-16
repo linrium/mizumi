@@ -12,8 +12,8 @@ use adapters::inbound::http::create_router;
 use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
 use application::{
     dagster_service::DagsterService, k8s_service::K8sQueryService,
-    streaming_service::StreamingJobService, test_event_service::TestEventService,
-    uc_service::UnityCatalogProxyService,
+    permission_service::PermissionService, streaming_service::StreamingJobService,
+    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
 };
 use infrastructure::{config::Config, db, server::AppState};
 
@@ -43,6 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(session_store)),
+        permission_service: Arc::new(PermissionService::new(db.clone())),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(

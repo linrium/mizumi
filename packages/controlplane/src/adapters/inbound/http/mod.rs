@@ -1,5 +1,6 @@
 pub mod dagster;
 pub mod k8s;
+pub mod permissions;
 pub mod streaming;
 pub mod tests;
 pub mod uc;
@@ -102,6 +103,30 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route(
             "/dagster/schedules/{name}/ticks",
             get(dagster::get_schedule_tick_history),
+        )
+        .route(
+            "/api/permissions/requests",
+            get(permissions::list_requests),
+        )
+        .route(
+            "/api/permissions/requests/bulk-approve",
+            post(permissions::bulk_approve),
+        )
+        .route(
+            "/api/permissions/requests/{id}",
+            get(permissions::get_request).patch(permissions::update_request_status),
+        )
+        .route(
+            "/api/permissions/policy-templates",
+            get(permissions::list_policy_templates),
+        )
+        .route(
+            "/api/permissions/blast-radius",
+            get(permissions::list_blast_radius),
+        )
+        .route(
+            "/api/permissions/grants",
+            get(permissions::list_time_bound_grants),
         )
         .route("/uc/{*path}", any(uc::proxy))
         .with_state(state)

@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -8,10 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  MOCK_BLAST_RADIUS,
-  type RequestScope,
+  listBlastRadius,
+  type BlastRadiusPreview,
   type RiskLevel,
-} from "../mock-data"
+} from "@/services/permissions"
 
 function getRiskVariant(risk: RiskLevel) {
   switch (risk) {
@@ -24,11 +27,22 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
-function formatScopeLabel(scope: RequestScope) {
+function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1)
 }
 
 export default function BlastRadiusPreviewPage() {
+  const [previews, setPreviews] = useState<BlastRadiusPreview[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    listBlastRadius()
+      .then(setPreviews)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const highGuardrailCount = previews.filter((p) => p.risk === "high").length
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b shrink-0 px-3 py-2.5">
@@ -36,12 +50,14 @@ export default function BlastRadiusPreviewPage() {
           <div>
             <h1 className="text-sm font-semibold">Blast-radius preview</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Mock impact analysis for requests that touch shared or sensitive
+              Impact analysis for requests that touch shared or sensitive
               resources.
             </p>
           </div>
           <div className="text-xs text-muted-foreground">
-            2 requests should ship with extra guardrails
+            {highGuardrailCount} request
+            {highGuardrailCount === 1 ? "" : "s"} should ship with extra
+            guardrails
           </div>
         </div>
       </div>
@@ -58,55 +74,66 @@ export default function BlastRadiusPreviewPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {MOCK_BLAST_RADIUS.map((item) => (
-              <TableRow key={item.requestId}>
-                <TableCell className="align-top">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{item.requester}</span>
-                      <span className="font-mono text-muted-foreground">
-                        {item.requestId}
-                      </span>
-                    </div>
-                    <div className="text-muted-foreground">
-                      {item.consumers} consuming teams
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="align-top">
-                  <div className="space-y-1">
-                    <div className="font-mono text-muted-foreground">
-                      {item.resource}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline">
-                        {formatScopeLabel(item.scope)}
-                      </Badge>
-                      <Badge variant={getRiskVariant(item.risk)}>
-                        {item.risk} risk
-                      </Badge>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="align-top text-muted-foreground">
-                  <div>{item.downstreamAssets} downstream assets</div>
-                  <div>{item.dashboards} dashboards</div>
-                  <div>{item.consumers} direct consumers</div>
-                </TableCell>
-                <TableCell className="align-top">
-                  <div className="flex flex-wrap gap-1">
-                    {item.sensitiveDomains.map((domain) => (
-                      <Badge key={domain} variant="outline">
-                        {domain}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell className="align-top text-muted-foreground">
-                  {item.recommendedGuardrail}
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  Loading…
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              previews.map((item) => (
+                <TableRow key={item.request_id}>
+                  <TableCell className="align-top">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{item.requester}</span>
+                        <span className="font-mono text-muted-foreground">
+                          {item.request_id}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        {item.consumers} consuming teams
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="space-y-1">
+                      <div className="font-mono text-muted-foreground">
+                        {item.resource}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline">
+                          {formatScopeLabel(item.scope)}
+                        </Badge>
+                        <Badge variant={getRiskVariant(item.risk)}>
+                          {item.risk} risk
+                        </Badge>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top text-muted-foreground">
+                    <div>{item.downstream_assets} downstream assets</div>
+                    <div>{item.dashboards} dashboards</div>
+                    <div>{item.consumers} direct consumers</div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="flex flex-wrap gap-1">
+                      {item.sensitive_domains.map((domain) => (
+                        <Badge key={domain} variant="outline">
+                          {domain}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top text-muted-foreground">
+                    {item.recommended_guardrail}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

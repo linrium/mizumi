@@ -2,13 +2,12 @@
 
 import {
   CheckmarkCircle01Icon,
-  Key01Icon,
   Mail01Icon,
   MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
-import { useDeferredValue, useMemo, useState } from "react"
+import { useEffect, useDeferredValue, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,11 +29,13 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import {
-  MOCK_REQUESTS,
-  type RequestScope,
+  bulkApprove,
+  listPermissionRequests,
+  updateRequestStatus,
+  type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
-} from "./mock-data"
+} from "@/services/permissions"
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -79,21 +80,38 @@ function formatStatusLabel(status: RequestStatus) {
   }
 }
 
-function formatScopeLabel(scope: RequestScope) {
+function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1)
 }
 
 export default function PermissionsPage() {
+  const [requests, setRequests] = useState<PermissionRequest[]>([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
   const [activeFilter, setActiveFilter] =
     useState<(typeof FILTERS)[number]["key"]>("all")
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [approving, setApproving] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const data = await listPermissionRequests()
+      setRequests(data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
 
   const filteredRequests = useMemo(() => {
     const search = deferredQuery.trim().toLowerCase()
 
-    return MOCK_REQUESTS.filter((request) => {
+    return requests.filter((request) => {
       const matchesFilter =
         activeFilter === "all" ? true : request.status === activeFilter
       const matchesSearch =
@@ -111,13 +129,13 @@ export default function PermissionsPage() {
 
       return matchesFilter && matchesSearch
     })
-  }, [activeFilter, deferredQuery])
+  }, [requests, activeFilter, deferredQuery])
 
   const stats = useMemo(() => {
-    const pending = MOCK_REQUESTS.filter((item) => item.status === "pending")
-    const ready = MOCK_REQUESTS.filter((item) => item.status === "ready")
-    const expiringSoon = MOCK_REQUESTS.filter((item) => item.expiresInDays <= 3)
-    const highRisk = MOCK_REQUESTS.filter((item) => item.risk === "high")
+    const pending = requests.filter((item) => item.status === "pending")
+    const ready = requests.filter((item) => item.status === "ready")
+    const expiringSoon = requests.filter((item) => item.expires_in_days <= 3)
+    const highRisk = requests.filter((item) => item.risk === "high")
 
     return {
       pending: pending.length,
@@ -125,7 +143,7 @@ export default function PermissionsPage() {
       expiringSoon: expiringSoon.length,
       highRisk: highRisk.length,
     }
-  }, [])
+  }, [requests])
 
   const allVisibleSelected =
     filteredRequests.length > 0 &&
@@ -153,76 +171,107 @@ export default function PermissionsPage() {
     })
   }
 
+  async function handleApprove() {
+    if (selectedIds.length === 0 || approving) return
+    setApproving(true)
+    try {
+      const updated = await bulkApprove(selectedIds)
+      setRequests((prev) =>
+        prev.map((r) => updated.find((u) => u.id === r.id) ?? r),
+      )
+      setSelectedIds([])
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  async function handleDropdownAction(
+    id: string,
+    action: "approve" | "needs-info",
+  ) {
+    const status: RequestStatus = action === "approve" ? "approved" : "needs-info"
+    const updated = await updateRequestStatus(id, status)
+    setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+  }
+
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: requests.length }
+    for (const r of requests) {
+      counts[r.status] = (counts[r.status] ?? 0) + 1
+    }
+    return counts
+  }, [requests])
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b shrink-0">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold">Permission requests</h1>
-              <Badge variant="outline">{filteredRequests.length}</Badge>
-            </div>
+            <h1 className="text-sm font-semibold">Permission requests</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Review access grants, temporary exceptions, and renewals.
             </p>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2">
-          <Badge variant="outline">{stats.pending} pending</Badge>
-          <Badge variant="outline">{stats.ready} grant-ready</Badge>
-          <Badge variant="outline">{stats.expiringSoon} expiring soon</Badge>
-          <Badge variant="outline">{stats.highRisk} high risk</Badge>
-          <span className="text-xs text-muted-foreground">
-            Mock ideas: auto-approve low-risk bundles, show policy diffs,
-            default risky grants to time-bound access.
-          </span>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search request, resource, team, or privilege"
-              className="w-full min-w-56 max-w-sm"
-            />
-            {FILTERS.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={() => setActiveFilter(filter.key)}
-                className={cn(
-                  "px-2.5 py-1.5 text-xs rounded border transition-colors",
-                  activeFilter === filter.key
-                    ? "border-foreground text-foreground bg-muted/60"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                )}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-
           <div className="flex items-center gap-2">
-            {selectedIds.length > 0 ? (
+            {selectedIds.length > 0 && (
               <>
                 <span className="text-xs text-muted-foreground">
                   {selectedIds.length} selected
                 </span>
-                <Button type="button" size="sm">
-                  Approve
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={approving}
+                  onClick={handleApprove}
+                >
+                  {approving ? "Approving…" : "Approve"}
                 </Button>
                 <Button type="button" variant="outline" size="sm">
                   Request details
                 </Button>
               </>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                2 requests could be auto-approved by policy template
-              </span>
             )}
           </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 overflow-x-auto border-t px-3">
+          <div className="flex items-center -mb-px">
+            {FILTERS.map((filter) => {
+              const count = filterCounts[filter.key] ?? 0
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setActiveFilter(filter.key)}
+                  className={cn(
+                    "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors",
+                    activeFilter === filter.key
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {filter.label}
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      activeFilter === filter.key
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search"
+            className="my-1.5 h-7 w-48 min-w-0 shrink text-xs"
+          />
         </div>
       </div>
 
@@ -249,11 +298,20 @@ export default function PermissionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRequests.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  Loading…
+                </TableCell>
+              </TableRow>
+            ) : filteredRequests.length > 0 ? (
               filteredRequests.map((request) => {
                 const isSelected = selectedIds.includes(request.id)
                 const submittedLabel = formatDistanceToNowStrict(
-                  new Date(request.submittedAt),
+                  new Date(request.submitted_at),
                   { addSuffix: true },
                 )
 
@@ -263,7 +321,7 @@ export default function PermissionsPage() {
                     data-state={isSelected ? "selected" : undefined}
                     className={cn(
                       request.risk === "high" && "bg-destructive/5",
-                      request.expiresInDays <= 2 &&
+                      request.expires_in_days <= 2 &&
                         "border-l-2 border-l-primary",
                     )}
                   >
@@ -336,14 +394,14 @@ export default function PermissionsPage() {
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="font-medium">
-                        {request.expiresInDays <= 0
+                        {request.expires_in_days <= 0
                           ? "Expired"
-                          : `${request.expiresInDays} day${
-                              request.expiresInDays === 1 ? "" : "s"
+                          : `${request.expires_in_days} day${
+                              request.expires_in_days === 1 ? "" : "s"
                             }`}
                       </div>
                       <div className="text-muted-foreground">
-                        {request.expiresInDays <= 2
+                        {request.expires_in_days <= 2
                           ? "Escalate today"
                           : "Within policy window"}
                       </div>
@@ -360,8 +418,18 @@ export default function PermissionsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem>Approve request</DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleDropdownAction(request.id, "approve")
+                            }
+                          >
+                            Approve request
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleDropdownAction(request.id, "needs-info")
+                            }
+                          >
                             Request more context
                           </DropdownMenuItem>
                           <DropdownMenuItem>
@@ -390,10 +458,16 @@ export default function PermissionsPage() {
       <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
-          Policy simulation: low-risk `SELECT` requests from approved teams can
-          be auto-granted.
+          Policy simulation: low-risk SELECT requests from approved teams can be
+          auto-granted.
         </div>
-        <div>Mock queue for UI exploration</div>
+        <div className="flex items-center gap-3">
+          {stats.expiringSoon > 0 && (
+            <span>{stats.expiringSoon} expiring soon</span>
+          )}
+          {stats.highRisk > 0 && <span>{stats.highRisk} high risk</span>}
+          <span>{requests.length} total</span>
+        </div>
       </div>
     </div>
   )
