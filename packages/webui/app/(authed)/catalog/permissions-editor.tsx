@@ -239,19 +239,6 @@ export function PermissionsEditor({
     <div className="mx-auto flex w-full h-full flex-col">
       <div className="grid h-full lg:grid-cols-[350px_minmax(0,1fr)]">
         <div className="space-y-4 h-full border-r bg-card p-4">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={resetEditor}>
-              Reset
-            </Button>
-            <Button
-              size="sm"
-              onClick={saveChanges}
-              disabled={saving || loading}
-            >
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
-
           <div className="space-y-2">
             <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Principals
@@ -303,15 +290,43 @@ export function PermissionsEditor({
               </div>
             )}
           </div>
+        </div>
 
-          {currentAssignment && (
+        <div className="space-y-4 bg-card p-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold">Privileges</h2>
+            <p className="text-sm text-muted-foreground">
+              Select the privileges to assign to the chosen principal.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Editing principal
               </Label>
-              <p className="text-sm">{currentAssignment.principal}</p>
+              {currentAssignment ? (
+                <p className="text-sm">{currentAssignment.principal}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Select a principal to edit permissions.
+                </p>
+              )}
             </div>
-          )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={resetEditor}>
+                Reset
+              </Button>
+              <Button
+                size="sm"
+                onClick={saveChanges}
+                disabled={saving || loading}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
+          </div>
 
           {error && (
             <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -323,15 +338,6 @@ export function PermissionsEditor({
               You do not have permission to edit this resource.
             </p>
           )}
-        </div>
-
-        <div className="space-y-4 bg-card p-4">
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold">Privileges</h2>
-            <p className="text-sm text-muted-foreground">
-              Select the privileges to assign to the chosen principal.
-            </p>
-          </div>
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
