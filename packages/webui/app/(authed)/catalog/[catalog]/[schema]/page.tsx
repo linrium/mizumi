@@ -49,6 +49,12 @@ export default function SchemaPage() {
               active: false,
               icon: SecurityIcon,
             },
+            {
+              href: `/catalog/${catalog}/${schema}/request-permissions`,
+              label: "request access",
+              active: false,
+              icon: SecurityIcon,
+            },
           ]}
         />
       </div>

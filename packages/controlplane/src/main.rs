@@ -14,8 +14,9 @@ use application::{
     dagster_service::DagsterService, k8s_service::K8sQueryService,
     permission_service::PermissionService, streaming_service::StreamingJobService,
     test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
+    user_service::UserService,
 };
-use infrastructure::{config::Config, db, server::AppState};
+use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let config = Config::load();
+    let config = Config::load().expect("failed to load config");
     let db = db::create_pool(&config.database_url)
         .await
         .expect("failed to connect to postgres");
@@ -49,6 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.uc_base_url.clone(),
         ))),
+        user_service: Arc::new(UserService::new(db.clone())),
+        keycloak_auth: Arc::new(KeycloakAuth::new(
+            &config.keycloak_url,
+            &config.keycloak_realm,
+        )),
     });
 
     let app = create_router(state);

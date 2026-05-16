@@ -36,6 +36,16 @@ pub struct BulkApproveBody {
     pub ids: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CreatePermissionRequestBody {
+    pub requester: String,
+    pub team: Option<String>,
+    pub resource: String,
+    pub scope: String,
+    pub privileges: Vec<String>,
+    pub rationale: String,
+}
+
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct PolicyTemplate {
     pub id: String,

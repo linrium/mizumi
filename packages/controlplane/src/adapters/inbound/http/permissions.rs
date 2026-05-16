@@ -3,17 +3,21 @@ use std::sync::Arc;
 use axum::{
     Json,
     extract::{Path, Query, State},
+    http::StatusCode,
     response::IntoResponse,
 };
 use serde::Deserialize;
 
 use crate::{
-    domain::entities::permission::{BulkApproveBody, UpdateRequestStatusBody},
+    domain::entities::permission::{
+        BulkApproveBody, CreatePermissionRequestBody, UpdateRequestStatusBody,
+    },
     infrastructure::server::AppState,
 };
 
 #[derive(Deserialize)]
 pub struct ListQuery {
+    pub resource: Option<String>,
     pub status: Option<String>,
     pub search: Option<String>,
 }
@@ -24,10 +28,24 @@ pub async fn list_requests(
 ) -> impl IntoResponse {
     match state
         .permission_service
-        .list_requests(params.status.as_deref(), params.search.as_deref())
+        .list_requests(
+            params.resource.as_deref(),
+            params.status.as_deref(),
+            params.search.as_deref(),
+        )
         .await
     {
         Ok(requests) => Json(serde_json::json!({ "requests": requests })).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+pub async fn create_request(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CreatePermissionRequestBody>,
+) -> impl IntoResponse {
+    match state.permission_service.create_request(body).await {
+        Ok(request) => (StatusCode::CREATED, Json(request)).into_response(),
         Err(err) => err.into_response(),
     }
 }

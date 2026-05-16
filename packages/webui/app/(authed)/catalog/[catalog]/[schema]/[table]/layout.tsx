@@ -111,7 +111,7 @@ export default function TableLayout({
               { key: "schema", label: "schema" },
               { key: "preview", label: "preview" },
               { key: "permissions", label: "permissions" },
-
+              { key: "request-permissions", label: "request access" },
             ] satisfies { key: Tab; label: string }[]
           ).map((tab) => (
             <button

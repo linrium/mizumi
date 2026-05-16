@@ -20,3 +20,5 @@ sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "migra
 chrono = { version = "0.4", features = ["serde"] }
 rdkafka = { version = "0.37", features = ["cmake-build", "tokio"] }
 futures = "0.3.32"
+jsonwebtoken = "9"
+config = { version = "0.14", features = ["toml"] }

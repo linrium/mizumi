@@ -5,14 +5,15 @@ use crate::{
     adapters::outbound::postgres::{blast_radius, permission_requests, policy_templates, time_bound_grants},
     domain::{
         entities::permission::{
-            BlastRadiusPreviewRow, BulkApproveBody, PermissionRequest, PermissionRequestResponse,
-            PolicyTemplate, TimeBoundGrant, UpdateRequestStatusBody,
+            BlastRadiusPreviewRow, BulkApproveBody, CreatePermissionRequestBody,
+            PermissionRequest, PermissionRequestResponse, PolicyTemplate, TimeBoundGrant,
+            UpdateRequestStatusBody,
         },
         error::AppError,
     },
 };
 
-const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved"];
+const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved", "cancelled"];
 
 #[derive(Clone)]
 pub struct PermissionService {
@@ -31,10 +32,11 @@ impl PermissionService {
 
     pub async fn list_requests(
         &self,
+        resource: Option<&str>,
         status: Option<&str>,
         search: Option<&str>,
     ) -> Result<Vec<PermissionRequestResponse>, AppError> {
-        let requests = permission_requests::list(&self.db).await?;
+        let requests = permission_requests::list(&self.db, resource).await?;
 
         let filtered = requests
             .into_iter()
@@ -62,6 +64,29 @@ impl PermissionService {
             .collect();
 
         Ok(filtered)
+    }
+
+    pub async fn create_request(
+        &self,
+        body: CreatePermissionRequestBody,
+    ) -> Result<PermissionRequestResponse, AppError> {
+        if body.requester.trim().is_empty() {
+            return Err(AppError::QueryFailed("requester is required".into()));
+        }
+        if body.privileges.is_empty() {
+            return Err(AppError::QueryFailed("at least one privilege is required".into()));
+        }
+        let request = permission_requests::create(
+            &self.db,
+            body.requester.trim(),
+            body.team.as_deref().unwrap_or(""),
+            &body.resource,
+            &body.scope,
+            &body.privileges,
+            &body.rationale,
+        )
+        .await?;
+        Ok(Self::into_response(request))
     }
 
     pub async fn get_request(&self, id: &str) -> Result<PermissionRequestResponse, AppError> {
@@ -93,7 +118,8 @@ impl PermissionService {
         &self,
         body: BulkApproveBody,
     ) -> Result<Vec<PermissionRequestResponse>, AppError> {
-        let requests = permission_requests::bulk_update_status(&self.db, &body.ids, "approved").await?;
+        let requests =
+            permission_requests::bulk_update_status(&self.db, &body.ids, "approved").await?;
         Ok(requests.into_iter().map(Self::into_response).collect())
     }
 

@@ -1,0 +1,6 @@
+database_url           = "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
+kafka_bootstrap_servers = "127.0.0.1:19092"
+bind_addr              = "0.0.0.0:4000"
+uc_base_url            = "http://localhost:8082/api/2.1/unity-catalog"
+keycloak_url           = "http://localhost:8080"
+keycloak_realm         = "mizumi"

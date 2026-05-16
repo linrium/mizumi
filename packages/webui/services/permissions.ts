@@ -1,4 +1,4 @@
-export type RequestStatus = "pending" | "ready" | "needs-info" | "approved"
+export type RequestStatus = "pending" | "ready" | "needs-info" | "approved" | "cancelled"
 export type RequestScope = "catalog" | "schema" | "table"
 export type RiskLevel = "low" | "medium" | "high"
 
@@ -57,21 +57,45 @@ export type TimeBoundGrant = {
   reason: string
 }
 
+export type CreatePermissionRequestBody = {
+  requester: string
+  team?: string
+  resource: string
+  scope: RequestScope
+  privileges: string[]
+  rationale: string
+}
+
 export async function listPermissionRequests(params?: {
+  resource?: string
   status?: string
   search?: string
 }): Promise<PermissionRequest[]> {
   const url = new URL("/api/permissions/requests", window.location.origin)
+  if (params?.resource) url.searchParams.set("resource", params.resource)
   if (params?.status && params.status !== "all") {
     url.searchParams.set("status", params.status)
   }
-  if (params?.search) {
-    url.searchParams.set("search", params.search)
-  }
+  if (params?.search) url.searchParams.set("search", params.search)
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.requests
+}
+
+export async function createPermissionRequest(
+  body: CreatePermissionRequestBody,
+): Promise<PermissionRequest> {
+  const res = await fetch("/api/permissions/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function updateRequestStatus(
@@ -85,6 +109,10 @@ export async function updateRequestStatus(
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
+}
+
+export async function cancelPermissionRequest(id: string): Promise<PermissionRequest> {
+  return updateRequestStatus(id, "cancelled")
 }
 
 export async function bulkApprove(ids: string[]): Promise<PermissionRequest[]> {
