@@ -406,11 +406,11 @@ export function PermissionsEditor({
                               : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                           )}
                         >
-                          <Checkbox
-                            checked={checked}
-                            className="pointer-events-none shrink-0"
-                            aria-hidden="true"
-                          />
+                          {/*<Checkbox*/}
+                          {/*  checked={checked}*/}
+                          {/*  className="pointer-events-none shrink-0"*/}
+                          {/*  aria-hidden="true"*/}
+                          {/*/>*/}
                           <span className="truncate" title={privilege}>{privilege}</span>
                         </div>
                       )

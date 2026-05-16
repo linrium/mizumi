@@ -1,5 +1,6 @@
 "use client"
 
+import { useForm } from "@tanstack/react-form"
 import { formatDistanceToNowStrict } from "date-fns"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -10,14 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import type { RequestScope, RequestStatus } from "@/services/permissions"
 import {
-  cancelPermissionRequest,
-  createPermissionRequest,
-  listPermissionRequests,
-  type PermissionRequest,
-  type RequestScope,
-  type RequestStatus,
-} from "@/services/permissions"
+  cancelPermissionRequestAction,
+  getMyPrivilegesAction,
+  listPermissionRequestsAction,
+  submitPermissionRequestAction,
+  type StoredPermissionRequest,
+} from "./actions"
 
 const PRIVILEGE_GROUPS = [
   { label: "General", privileges: ["OWNER", "BROWSE"] },
@@ -57,166 +58,201 @@ type Props = {
   scope: RequestScope
 }
 
-export function RequestPermissionsPanel({ resource, scope }: Props) {
-  // Form state
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [rationale, setRationale] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+function parseResource(resource: string, scope: RequestScope) {
+  const parts = resource.split(".")
+  return {
+    catalog: parts[0] ?? resource,
+    schema: scope !== "catalog" ? parts[1] : undefined,
+    table: scope === "table" ? parts[2] : undefined,
+  }
+}
 
-  // History state
-  const [history, setHistory] = useState<PermissionRequest[]>([])
+export function RequestPermissionsPanel({ resource, scope }: Props) {
+  const [history, setHistory] = useState<StoredPermissionRequest[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-
-  function togglePrivilege(p: string) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(p)) next.delete(p)
-      else next.add(p)
-      return next
-    })
-  }
-
-  async function loadHistory() {
-    setLoadingHistory(true)
-    try {
-      const data = await listPermissionRequests({ resource })
-      setHistory(data)
-    } catch {
-      // silently fail for history
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [grantedPrivileges, setGrantedPrivileges] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    loadHistory()
-  }, [resource])
+    setLoadingHistory(true)
+    const { catalog, schema, table } = parseResource(resource, scope)
+    Promise.all([
+      listPermissionRequestsAction(resource),
+      getMyPrivilegesAction(scope, catalog, schema, table),
+    ])
+      .then(([requests, privileges]) => {
+        setHistory(requests)
+        setGrantedPrivileges(new Set(privileges))
+      })
+      .catch(() => {})
+      .finally(() => setLoadingHistory(false))
+  }, [resource, scope])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setFormError(null)
-
-    if (selected.size === 0) {
-      setFormError("Select at least one privilege.")
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const created = await createPermissionRequest({
+  const form = useForm({
+    defaultValues: {
+      privileges: [] as string[],
+      rationale: "",
+    },
+    validators: {
+      onSubmit: ({ value }) => {
+        if (value.privileges.length === 0) {
+          return { fields: { privileges: "Select at least one privilege." } }
+        }
+      },
+    },
+    onSubmit: async ({ value, formApi }) => {
+      setServerError(null)
+      const result = await submitPermissionRequestAction({
         resource,
         scope,
-        privileges: Array.from(selected).sort(),
-        rationale: rationale.trim(),
+        privileges: value.privileges.filter((p) => !grantedPrivileges.has(p)).sort(),
+        rationale: value.rationale.trim(),
       })
-      setHistory((prev) => [created, ...prev])
-      setSelected(new Set())
-      setRationale("")
-      toast.success("Request submitted", { description: created.id })
-    } catch (err) {
-      const msg = (err as Error).message
-      setFormError(msg)
-      toast.error("Failed to submit", { description: msg })
-    } finally {
-      setSubmitting(false)
-    }
-  }
+      if (result.error) {
+        setServerError(result.error)
+        return
+      }
+      setHistory((prev) => [result.data!, ...prev])
+      toast.success("Request submitted", { description: result.data!.id })
+      formApi.reset()
+    },
+  })
 
   async function handleCancel(id: string) {
     setCancellingId(id)
-    try {
-      const updated = await cancelPermissionRequest(id)
-      setHistory((prev) => prev.map((r) => (r.id === id ? updated : r)))
-      toast.success("Request cancelled")
-    } catch (err) {
-      toast.error("Failed to cancel", { description: (err as Error).message })
-    } finally {
-      setCancellingId(null)
+    const result = await cancelPermissionRequestAction(id)
+    setCancellingId(null)
+    if (result.error) {
+      toast.error("Failed to cancel", { description: result.error })
+      return
     }
+    setHistory((prev) => prev.map((r) => (r.id === id ? result.data! : r)))
+    toast.success("Request cancelled")
   }
 
   return (
     <div className="grid h-full lg:grid-cols-[520px_minmax(0,1fr)] overflow-hidden">
       {/* ── Left: submit form ── */}
-      <div className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="space-y-3">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Privileges
-            </Label>
-            {PRIVILEGE_GROUPS.map((group) => (
-              <div key={group.label} className="space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground">
-                  {group.label}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {group.privileges.map((priv) => {
-                    const checked = selected.has(priv)
-                    return (
-                      <div
-                        key={priv}
-                        role="checkbox"
-                        tabIndex={0}
-                        aria-checked={checked}
-                        onClick={() => togglePrivilege(priv)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            togglePrivilege(priv)
-                          }
-                        }}
-                        className={cn(
-                          "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
-                          checked
-                            ? "border-primary bg-primary/5 text-foreground"
-                            : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
-                        )}
-                      >
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={() => {}}
-                          className="pointer-events-none shrink-0"
-                          aria-hidden
-                        />
-                        <span className="truncate" title={priv}>{priv}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          form.handleSubmit()
+        }}
+        className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5"
+      >
+        <div className="space-y-3">
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Privileges
+          </Label>
+          <form.Field name="privileges">
+            {(field) => (
+              <>
+                {PRIVILEGE_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                      {group.label}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {group.privileges.map((priv) => {
+                        const granted = grantedPrivileges.has(priv)
+                        const checked = granted || field.state.value.includes(priv)
+                        return (
+                          <div
+                            key={priv}
+                            role="checkbox"
+                            tabIndex={granted ? -1 : 0}
+                            aria-checked={checked}
+                            aria-disabled={granted}
+                            onClick={() => {
+                              if (granted) return
+                              field.setValue(
+                                checked
+                                  ? field.state.value.filter((p) => p !== priv)
+                                  : [...field.state.value, priv],
+                              )
+                            }}
+                            onKeyDown={(e) => {
+                              if (granted) return
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault()
+                                field.setValue(
+                                  checked
+                                    ? field.state.value.filter((p) => p !== priv)
+                                    : [...field.state.value, priv],
+                                )
+                              }
+                            }}
+                            className={cn(
+                              "flex min-w-0 items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none",
+                              granted
+                                ? "cursor-default border-emerald-500/40 bg-emerald-500/8 text-emerald-700 dark:text-emerald-400"
+                                : cn(
+                                    "cursor-pointer focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                                    checked
+                                      ? "border-primary bg-primary/5 text-foreground"
+                                      : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                                  ),
+                            )}
+                          >
+                            <span className="truncate" title={priv}>{priv}</span>
+                            {granted && (
+                              <span className="ml-auto shrink-0 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                Granted
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {field.state.meta.errors.length > 0 && (
+                  <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    {String(field.state.meta.errors[0])}
+                  </p>
+                )}
+              </>
+            )}
+          </form.Field>
+        </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Rationale / comment
-            </Label>
-            <Textarea
-              value={rationale}
-              onChange={(e) => setRationale(e.target.value)}
-              placeholder="Describe why you need this access…"
-              className="min-h-20 text-xs"
-            />
-          </div>
-
-          {formError && (
-            <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              {formError}
-            </p>
+        <form.Field name="rationale">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Rationale / comment
+              </Label>
+              <Textarea
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="Describe why you need this access…"
+                className="min-h-20 text-xs"
+              />
+            </div>
           )}
+        </form.Field>
 
-          <Button
-            type="submit"
-            size="sm"
-            disabled={submitting}
-            className="self-start"
-          >
-            {submitting ? "Submitting…" : "Submit request"}
-          </Button>
-        </form>
-      </div>
+        {serverError && (
+          <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {serverError}
+          </p>
+        )}
+
+        <form.Subscribe selector={(s) => s.isSubmitting}>
+          {(isSubmitting) => (
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting}
+              className="self-start"
+            >
+              {isSubmitting ? "Submitting…" : "Submit request"}
+            </Button>
+          )}
+        </form.Subscribe>
+      </form>
 
       {/* ── Right: history ── */}
       <div className="flex flex-col overflow-hidden bg-card">
@@ -253,7 +289,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     {CANCELLABLE.includes(req.status) && (
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="destructive"
                         size="sm"
                         disabled={cancellingId === req.id}
                         onClick={() => handleCancel(req.id)}
