@@ -1,10 +1,11 @@
 "use client"
 
+import { Tick02Icon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import {
@@ -110,10 +111,9 @@ function normalizePrivileges(
     }
   }
 
-  return normalizedAssignments
-    .sort((left, right) =>
-      PRINCIPAL_NAME_COLLATOR.compare(left.principal, right.principal),
-    )
+  return normalizedAssignments.sort((left, right) =>
+    PRINCIPAL_NAME_COLLATOR.compare(left.principal, right.principal),
+  )
 }
 
 export function PermissionsEditor({
@@ -309,7 +309,11 @@ export function PermissionsEditor({
                           </span>
                         ) : (
                           assignment.privileges?.map((privilege) => (
-                            <Badge key={privilege} variant="secondary" className="text-[11px]">
+                            <Badge
+                              key={privilege}
+                              variant="secondary"
+                              className="text-[11px]"
+                            >
                               {privilege}
                             </Badge>
                           ))
@@ -383,22 +387,10 @@ export function PermissionsEditor({
                     {group.privileges.map((privilege) => {
                       const checked = selected.has(privilege)
                       return (
-                        <div
+                        <button
                           key={privilege}
-                          role="checkbox"
-                          tabIndex={0}
-                          aria-checked={checked}
+                          type="button"
                           onClick={() => togglePrivilege(privilege, !checked)}
-                          onKeyDown={(event) => {
-                            if (
-                              event.key !== "Enter" &&
-                              event.key !== " "
-                            ) {
-                              return
-                            }
-                            event.preventDefault()
-                            togglePrivilege(privilege, !checked)
-                          }}
                           className={cn(
                             "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                             checked
@@ -406,13 +398,25 @@ export function PermissionsEditor({
                               : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
                           )}
                         >
-                          {/*<Checkbox*/}
-                          {/*  checked={checked}*/}
-                          {/*  className="pointer-events-none shrink-0"*/}
-                          {/*  aria-hidden="true"*/}
-                          {/*/>*/}
-                          <span className="truncate" title={privilege}>{privilege}</span>
-                        </div>
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                              checked
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input bg-background text-transparent dark:bg-input/30",
+                            )}
+                          >
+                            <HugeiconsIcon
+                              icon={Tick02Icon}
+                              size={12}
+                              strokeWidth={2}
+                            />
+                          </span>
+                          <span className="truncate" title={privilege}>
+                            {privilege}
+                          </span>
+                        </button>
                       )
                     })}
                   </div>

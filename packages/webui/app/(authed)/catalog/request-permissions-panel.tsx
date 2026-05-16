@@ -1,12 +1,13 @@
 "use client"
 
+import { Tick02Icon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { useForm } from "@tanstack/react-form"
 import { formatDistanceToNowStrict } from "date-fns"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { Textarea } from "@/components/ui/textarea"
@@ -216,21 +217,21 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                   ),
                             )}
                           >
-                            <Checkbox
-                              checked={checked}
-                              disabled={granted}
-                              onCheckedChange={(next) => {
-                                if (granted) return
-                                field.setValue(
-                                  next === true
-                                    ? [...field.state.value, priv]
-                                    : field.state.value.filter(
-                                        (p) => p !== priv,
-                                      ),
-                                )
-                              }}
-                              className="pointer-events-none size-3.5"
-                            />
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                                checked
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-input bg-background text-transparent dark:bg-input/30",
+                              )}
+                            >
+                              <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={12}
+                                strokeWidth={2}
+                              />
+                            </span>
                             <span className="truncate" title={priv}>
                               {priv}
                             </span>
