@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { writeStoredIdToken } from "@/services/auth/storage"
+import { writeStoredIdToken } from "@/lib/auth/storage"
 
 type AuthHeaderProviderProps = {
   idToken?: string

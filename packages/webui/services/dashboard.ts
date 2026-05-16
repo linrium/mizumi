@@ -5,7 +5,7 @@ import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
 import type { NextRequest } from "next/server"
 import { z } from "zod"
 import { MODELS, type ModelId } from "@/services/ai-models"
-import { getServerSession } from "@/services/auth"
+import { getServerSession } from "@/lib/auth"
 import { fetchSchema } from "@/services/unity-catalog"
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"

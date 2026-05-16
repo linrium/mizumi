@@ -2,8 +2,8 @@ import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { signInWithKeycloak } from "@/services/auth/actions"
-import { getServerSession } from "@/services/auth"
+import { getServerSession } from "@/lib/auth"
+import { signInWithKeycloak } from "@/lib/auth/actions"
 
 type LoginPageProps = {
   searchParams: Promise<{

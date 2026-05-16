@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSessionFromHeaders } from "@/services/auth"
+import { getSessionFromHeaders } from "@/lib/auth"
 
 const PUBLIC_PATHS = ["/login", "/auth"]
 

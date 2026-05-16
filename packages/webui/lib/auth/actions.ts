@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth, KEYCLOAK_PROVIDER_ID } from "@/services/auth"
+import { auth, KEYCLOAK_PROVIDER_ID } from "@/lib/auth"
 
 function normalizeNextPath(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !value.startsWith("/")) {

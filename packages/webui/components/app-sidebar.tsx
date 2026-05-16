@@ -16,7 +16,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { usePathname } from "next/navigation"
 import { startTransition } from "react"
 import { toast } from "sonner"
-import { signOut } from "@/services/auth/actions"
+import { signOut } from "@/lib/auth/actions"
 import {
   Sidebar,
   SidebarContent,
@@ -29,7 +29,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import type { AppSession } from "@/services/auth/types"
+import type { AppSession } from "@/lib/auth/types"
 
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: Book03Icon },

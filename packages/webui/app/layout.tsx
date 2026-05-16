@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { AuthHeaderProvider } from "@/components/auth-header-provider"
-import { getServerSession } from "@/services/auth"
+import { getServerSession } from "@/lib/auth"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 

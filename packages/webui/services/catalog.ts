@@ -1,4 +1,4 @@
-import { getServerSession } from "@/services/auth"
+import { getServerSession } from "@/lib/auth"
 
 const API_BASE = "http://localhost:4000"
 

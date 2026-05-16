@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useSessionContext } from "@/hooks/use-session-context"
-import { readStoredIdToken } from "@/services/auth/storage"
+import { readStoredIdToken } from "@/lib/auth/storage"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import type { PanelSummary } from "@/services/dashboard"
 
