@@ -1,6 +1,6 @@
 "use client"
 
-import {Key01Icon, SecurityIcon} from "@hugeicons/core-free-icons"
+import { SecurityIcon } from "@hugeicons/core-free-icons"
 import { useParams } from "next/navigation"
 import { CatalogTabs } from "../../catalog-tabs"
 import { PermissionsEditor } from "../../permissions-editor"
@@ -26,6 +26,12 @@ export default function CatalogPermissionsPage() {
               href: `/catalog/${catalog}/permissions`,
               label: "permissions",
               active: true,
+              icon: SecurityIcon,
+            },
+            {
+              href: `/catalog/${catalog}/request-permissions`,
+              label: "request access",
+              active: false,
               icon: SecurityIcon,
             },
           ]}

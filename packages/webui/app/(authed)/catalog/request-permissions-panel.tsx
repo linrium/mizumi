@@ -138,7 +138,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
   }
 
   return (
-    <div className="grid h-full lg:grid-cols-[420px_minmax(0,1fr)] overflow-hidden">
+    <div className="grid h-full lg:grid-cols-[520px_minmax(0,1fr)] overflow-hidden">
       {/* ── Left: submit form ── */}
       <div className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5">
         <div>

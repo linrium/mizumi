@@ -60,8 +60,6 @@ export type TimeBoundGrant = {
 }
 
 export type CreatePermissionRequestBody = {
-  requester: string
-  team?: string
   resource: string
   scope: RequestScope
   privileges: string[]
