@@ -47,12 +47,47 @@ export default function CatalogLayout({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(360)
+  const parts = pathname.split("/").filter(Boolean)
+  const activeCat = parts[1]
+  const activeSch = parts[2]
+  const activeTbl = parts[3]
+  const activeItemClass =
+    "bg-primary/12 text-foreground font-medium ring-1 ring-primary/20"
+  const activeIconClass = "text-primary"
 
   useEffect(() => {
     getCatalogsAction()
       .then((data) => setCatalogs(data.catalogs ?? []))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!activeCat) return
+
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      next.add(activeCat)
+      if (activeSch) next.add(`${activeCat}.${activeSch}`)
+      return next
+    })
+
+    if (!schemas[activeCat]) {
+      void getSchemasAction(activeCat).then((data) => {
+        setSchemas((prev) => ({ ...prev, [activeCat]: data.schemas ?? [] }))
+      })
+    }
+  }, [activeCat, activeSch, schemas])
+
+  useEffect(() => {
+    if (!activeCat || !activeSch) return
+
+    const key = `${activeCat}.${activeSch}`
+    if (tables[key]) return
+
+    void getTablesAction(activeCat, activeSch).then((data) => {
+      setTables((prev) => ({ ...prev, [key]: data.tables ?? [] }))
+    })
+  }, [activeCat, activeSch, tables])
 
   function toggle(key: string) {
     setExpanded((prev) => {
@@ -84,11 +119,6 @@ export default function CatalogLayout({
   function handleTable(cat: string, sch: string, tbl: string) {
     router.push(`/catalog/${cat}/${sch}/${tbl}`)
   }
-
-  const parts = pathname.split("/").filter(Boolean)
-  const activeCat = parts[1]
-  const activeSch = parts[2]
-  const activeTbl = parts[3]
 
   function startResize(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
@@ -143,14 +173,17 @@ export default function CatalogLayout({
                   onClick={() => handleCatalog(cat.name)}
                   className={cn(
                     "flex w-full items-center gap-1.5 pl-2 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                    catActive && "bg-accent text-accent-foreground font-medium",
+                    catActive && activeItemClass,
                   )}
                 >
                   <Chevron open={catOpen} />
                   <HugeiconsIcon
                     icon={Book03Icon}
                     size={15}
-                    className="shrink-0 text-muted-foreground"
+                    className={cn(
+                      "shrink-0 text-muted-foreground",
+                      catActive && activeIconClass,
+                    )}
                   />
                   <span className="truncate flex-1">{cat.name}</span>
                 </button>
@@ -171,15 +204,17 @@ export default function CatalogLayout({
                           onClick={() => handleSchema(cat.name, sch.name)}
                           className={cn(
                             "flex w-full items-center gap-1.5 pl-6 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                            schActive &&
-                              "bg-accent text-accent-foreground font-medium",
+                            schActive && activeItemClass,
                           )}
                         >
                           <Chevron open={schOpen} />
                           <HugeiconsIcon
                             icon={DatabaseIcon}
                             size={15}
-                            className="shrink-0 text-muted-foreground"
+                            className={cn(
+                              "shrink-0 text-muted-foreground",
+                              schActive && activeIconClass,
+                            )}
                           />
                           <span className="truncate flex-1">{sch.name}</span>
                         </button>
@@ -200,14 +235,16 @@ export default function CatalogLayout({
                                 }
                                 className={cn(
                                   "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                  tblActive &&
-                                    "bg-accent text-accent-foreground font-medium",
+                                  tblActive && activeItemClass,
                                 )}
                               >
                                 <HugeiconsIcon
                                   icon={TableIcon}
                                   size={15}
-                                  className="shrink-0 text-muted-foreground"
+                                  className={cn(
+                                    "shrink-0 text-muted-foreground",
+                                    tblActive && activeIconClass,
+                                  )}
                                 />
                                 <span className="truncate">{tbl.name}</span>
                               </button>
