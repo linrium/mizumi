@@ -1,18 +1,13 @@
 "use client"
 
 import {
-  ArrowRight01Icon,
-  ArrowUpRight01Icon,
   CheckmarkCircle01Icon,
-  Clock01Icon,
   Key01Icon,
   Mail01Icon,
   MoreHorizontalIcon,
-  Shield01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
-import type { ComponentProps } from "react"
 import { useDeferredValue, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -156,7 +151,7 @@ const MOCK_REQUESTS: PermissionRequest[] = [
 ]
 
 const FILTERS = [
-  { key: "all", label: "All requests" },
+  { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "ready", label: "Grant-ready" },
   { key: "needs-info", label: "Needs info" },
@@ -176,7 +171,7 @@ function getStatusVariant(status: RequestStatus) {
   }
 }
 
-function getRiskBadgeVariant(risk: RiskLevel) {
+function getRiskVariant(risk: RiskLevel) {
   switch (risk) {
     case "high":
       return "destructive"
@@ -189,10 +184,10 @@ function getRiskBadgeVariant(risk: RiskLevel) {
 
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
-    case "needs-info":
-      return "Needs info"
     case "ready":
       return "Grant-ready"
+    case "needs-info":
+      return "Needs info"
     default:
       return status[0]?.toUpperCase() + status.slice(1)
   }
@@ -232,17 +227,17 @@ export default function PermissionsPage() {
     })
   }, [activeFilter, deferredQuery])
 
-  const summary = useMemo(() => {
-    const open = MOCK_REQUESTS.filter((item) => item.status !== "approved")
+  const stats = useMemo(() => {
+    const pending = MOCK_REQUESTS.filter((item) => item.status === "pending")
+    const ready = MOCK_REQUESTS.filter((item) => item.status === "ready")
     const expiringSoon = MOCK_REQUESTS.filter((item) => item.expiresInDays <= 3)
-    const highImpact = MOCK_REQUESTS.filter((item) => item.risk === "high")
-    const grantReady = MOCK_REQUESTS.filter((item) => item.status === "ready")
+    const highRisk = MOCK_REQUESTS.filter((item) => item.risk === "high")
 
     return {
-      open: open.length,
+      pending: pending.length,
+      ready: ready.length,
       expiringSoon: expiringSoon.length,
-      highImpact: highImpact.length,
-      grantReady: grantReady.length,
+      highRisk: highRisk.length,
     }
   }, [])
 
@@ -273,175 +268,117 @@ export default function PermissionsPage() {
   }
 
   return (
-    <div className="min-h-full bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-primary)_10%,transparent),transparent_28%)]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
-        <section className="flex flex-col gap-4 rounded-2xl border bg-background/90 p-5 shadow-sm backdrop-blur">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-                <HugeiconsIcon icon={Shield01Icon} size={14} />
-                Review lane
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Permission requests
-                </h1>
-                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                  Triage inbound access requests, spot high-risk grants, and
-                  keep temporary access from lingering.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <SummaryCard
-                label="Open queue"
-                value={summary.open}
-                hint="Needs reviewer action"
-                icon={Clock01Icon}
-              />
-              <SummaryCard
-                label="Expiring soon"
-                value={summary.expiringSoon}
-                hint="Within 72 hours"
-                icon={ArrowUpRight01Icon}
-              />
-              <SummaryCard
-                label="High impact"
-                value={summary.highImpact}
-                hint="Catalog write or broad scope"
-                icon={Key01Icon}
-              />
-              <SummaryCard
-                label="Grant-ready"
-                value={summary.grantReady}
-                hint="Safe to batch approve"
-                icon={CheckmarkCircle01Icon}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-xl border bg-background p-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search request ID, requester, resource, or privilege"
-                    className="md:max-w-sm"
-                  />
-
-                  <div className="flex flex-wrap gap-2">
-                    {FILTERS.map((filter) => (
-                      <Button
-                        key={filter.key}
-                        type="button"
-                        variant={
-                          activeFilter === filter.key ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => setActiveFilter(filter.key)}
-                      >
-                        {filter.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm">
-                    Export queue
-                  </Button>
-                  <Button type="button" size="sm">
-                    New access policy
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Queue health</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Mock workflow ideas baked into the UI.
-                  </p>
-                </div>
-                <Badge variant="outline">prototype</Badge>
-              </div>
-              <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-                <p>
-                  `3` requests are waiting on security review and `2` could be
-                  auto-approved if policy templates existed.
-                </p>
-                <p>
-                  Add later: policy diff previews, entitlement history, and
-                  approval recipes by team.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {selectedIds.length > 0 ? (
-          <section className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-medium">
-                {selectedIds.length} request
-                {selectedIds.length === 1 ? "" : "s"} selected
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Mock bulk actions help validate the review flow before wiring in
-                real APIs.
-              </p>
-            </div>
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="border-b shrink-0">
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Button type="button" size="sm">
-                Approve selected
-              </Button>
-              <Button type="button" variant="outline" size="sm">
-                Request details
-              </Button>
-              <Button type="button" variant="ghost" size="sm">
-                Clear
-              </Button>
+              <HugeiconsIcon
+                icon={Key01Icon}
+                size={15}
+                className="text-muted-foreground"
+              />
+              <h1 className="text-sm font-semibold">Permission requests</h1>
+              <Badge variant="outline">{filteredRequests.length}</Badge>
             </div>
-          </section>
-        ) : null}
-
-        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <div className="border-b px-5 py-4">
-            <h2 className="text-sm font-semibold">Request queue</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {filteredRequests.length} visible request
-              {filteredRequests.length === 1 ? "" : "s"}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Review access grants, temporary exceptions, and renewals.
             </p>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allVisibleSelected}
-                    onCheckedChange={(checked) =>
-                      toggleAllVisible(checked === true)
-                    }
-                    aria-label="Select all visible requests"
-                  />
-                </TableHead>
-                <TableHead>Requester</TableHead>
-                <TableHead>Resource</TableHead>
-                <TableHead>Privileges</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Reviewer</TableHead>
-                <TableHead>SLA</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRequests.map((request) => {
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm">
+              Export
+            </Button>
+            <Button type="button" size="sm">
+              New policy
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t px-3 py-2">
+          <Badge variant="outline">{stats.pending} pending</Badge>
+          <Badge variant="outline">{stats.ready} grant-ready</Badge>
+          <Badge variant="outline">{stats.expiringSoon} expiring soon</Badge>
+          <Badge variant="outline">{stats.highRisk} high risk</Badge>
+          <span className="text-xs text-muted-foreground">
+            Mock ideas: auto-approve low-risk bundles, show policy diffs,
+            default risky grants to time-bound access.
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search request, resource, team, or privilege"
+              className="w-full min-w-56 max-w-sm"
+            />
+            {FILTERS.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setActiveFilter(filter.key)}
+                className={cn(
+                  "px-2.5 py-1.5 text-xs rounded border transition-colors",
+                  activeFilter === filter.key
+                    ? "border-foreground text-foreground bg-muted/60"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                )}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 ? (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {selectedIds.length} selected
+                </span>
+                <Button type="button" size="sm">
+                  Approve
+                </Button>
+                <Button type="button" variant="outline" size="sm">
+                  Request details
+                </Button>
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                2 requests could be auto-approved by policy template
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-background">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allVisibleSelected}
+                  onCheckedChange={(checked) =>
+                    toggleAllVisible(checked === true)
+                  }
+                  aria-label="Select all visible requests"
+                />
+              </TableHead>
+              <TableHead>Request</TableHead>
+              <TableHead>Resource</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Privileges</TableHead>
+              <TableHead>Reviewer</TableHead>
+              <TableHead>SLA</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredRequests.length > 0 ? (
+              filteredRequests.map((request) => {
                 const isSelected = selectedIds.includes(request.id)
                 const submittedLabel = formatDistanceToNowStrict(
                   new Date(request.submittedAt),
@@ -471,38 +408,31 @@ export default function PermissionsPage() {
                           <span className="font-medium">
                             {request.requester}
                           </span>
-                          <Badge variant="outline">{request.id}</Badge>
+                          <span className="font-mono text-muted-foreground">
+                            {request.id}
+                          </span>
                         </div>
                         <div className="text-muted-foreground">
                           {request.team}
                         </div>
-                        <div className="line-clamp-2 max-w-[28ch] text-muted-foreground">
+                        <div className="line-clamp-1 max-w-[44ch] text-muted-foreground">
                           {request.rationale}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="space-y-1">
-                        <div className="font-mono text-[11px]">
+                        <div className="font-mono text-muted-foreground">
                           {request.resource}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline">
                             {formatScopeLabel(request.scope)}
                           </Badge>
-                          <Badge variant={getRiskBadgeVariant(request.risk)}>
+                          <Badge variant={getRiskVariant(request.risk)}>
                             {request.risk} risk
                           </Badge>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="flex max-w-[24ch] flex-wrap gap-1">
-                        {request.privileges.map((privilege) => (
-                          <Badge key={privilege} variant="outline">
-                            {privilege}
-                          </Badge>
-                        ))}
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -517,12 +447,19 @@ export default function PermissionsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
-                      <div className="space-y-1">
-                        <div className="font-medium">{request.reviewer}</div>
-                        <div className="inline-flex items-center gap-1 text-muted-foreground">
-                          <HugeiconsIcon icon={Mail01Icon} size={13} />
-                          Reviewer notified
-                        </div>
+                      <div className="flex max-w-[28ch] flex-wrap gap-1">
+                        {request.privileges.map((privilege) => (
+                          <Badge key={privilege} variant="outline">
+                            {privilege}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <div className="font-medium">{request.reviewer}</div>
+                      <div className="mt-1 inline-flex items-center gap-1 text-muted-foreground">
+                        <HugeiconsIcon icon={Mail01Icon} size={13} />
+                        Reviewer notified
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -553,7 +490,7 @@ export default function PermissionsPage() {
                         <DropdownMenuContent align="end" className="w-44">
                           <DropdownMenuItem>Approve request</DropdownMenuItem>
                           <DropdownMenuItem>
-                            Ask for more context
+                            Request more context
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             View entitlement history
@@ -563,78 +500,29 @@ export default function PermissionsPage() {
                     </TableCell>
                   </TableRow>
                 )
-              })}
-
-              {filteredRequests.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="py-10 text-center text-muted-foreground"
-                  >
-                    No permission requests match the current filters.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-3">
-          <IdeaCard
-            title="Policy templates"
-            description="Pre-fill privilege bundles by team and resource type so common requests can be approved with one click."
-          />
-          <IdeaCard
-            title="Blast-radius preview"
-            description="Show downstream tables, dashboards, and owners affected by each grant before approval."
-          />
-          <IdeaCard
-            title="Time-bound access"
-            description="Default high-risk grants to auto-expire, then highlight renewals separately from net-new access."
-          />
-        </section>
+              })
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  No permission requests match the current filters
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
-    </div>
-  )
-}
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ComponentProps<typeof HugeiconsIcon>["icon"]
-  label: string
-  value: number
-  hint: string
-}) {
-  return (
-    <div className="rounded-xl border bg-card px-3 py-3">
-      <div className="flex items-center justify-between text-muted-foreground">
-        <span className="text-[11px] font-medium">{label}</span>
-        <HugeiconsIcon icon={icon} size={14} />
+      <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
+        <div className="flex items-center gap-2">
+          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
+          Policy simulation: low-risk `SELECT` requests from approved teams can
+          be auto-granted.
+        </div>
+        <div>Mock queue for UI exploration</div>
       </div>
-      <div className="mt-2 text-xl font-semibold">{value}</div>
-      <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>
-    </div>
-  )
-}
-
-function IdeaCard({
-  title,
-  description,
-}: {
-  title: string
-  description: string
-}) {
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">{description}</p>
     </div>
   )
 }
