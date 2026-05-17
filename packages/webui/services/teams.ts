@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api-client"
 export type Team = {
   id: string
   name: string
+  workspace: string
   created_at: string
   updated_at: string
 }
@@ -36,11 +37,14 @@ export async function getTeam(id: string): Promise<Team> {
   return res.json()
 }
 
-export async function createTeam(name: string): Promise<Team> {
+export async function createTeam(
+  name: string,
+  workspace: string,
+): Promise<Team> {
   const res = await apiFetch("/api/teams", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, workspace }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

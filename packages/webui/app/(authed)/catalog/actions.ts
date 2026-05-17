@@ -17,22 +17,17 @@ import type {
 } from "@/services/permissions"
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
-const DEFAULT_REVIEWER_ID = "10000000-0000-0000-0000-000000000011"
-const DEFAULT_REVIEWER_NAME = "Data Steward"
-const DEFAULT_REQUEST_TEAM_ID = "10000000-0000-0000-0000-000000000006"
+const DEFAULT_REVIEWER_ID = "10000000-0000-0000-0000-000000000004"
+const DEFAULT_REVIEWER_NAME = "HDBank Data Steward"
+const DEFAULT_REQUEST_TEAM_ID = "10000000-0000-0000-0000-000000000002"
 
 const TEAM_IDS_BY_NAME: Record<string, string> = {
-  "Fraud Ops": "10000000-0000-0000-0000-000000000001",
-  "Growth Analytics": "10000000-0000-0000-0000-000000000002",
-  "Finance BI": "10000000-0000-0000-0000-000000000003",
-  "ML Platform": "10000000-0000-0000-0000-000000000004",
-  Operations: "10000000-0000-0000-0000-000000000005",
-  "Data Platform": "10000000-0000-0000-0000-000000000006",
-  "Executive Analytics": "10000000-0000-0000-0000-000000000007",
-  "Support Intelligence": "10000000-0000-0000-0000-000000000008",
-  Governance: "10000000-0000-0000-0000-000000000009",
-  Security: "10000000-0000-0000-0000-000000000010",
-  "Data Steward": "10000000-0000-0000-0000-000000000011",
+  "VietJetair Analytics": "10000000-0000-0000-0000-000000000001",
+  "VietJetair Data Platform": "10000000-0000-0000-0000-000000000002",
+  "HDBank Risk Analytics": "10000000-0000-0000-0000-000000000003",
+  "HDBank Data Steward": "10000000-0000-0000-0000-000000000004",
+  "HDBank Security": "10000000-0000-0000-0000-000000000005",
+  "Partnership Data Platform": "10000000-0000-0000-0000-000000000006",
 }
 
 function resolveRequesterTeamId(groups?: string[]) {
@@ -151,30 +146,31 @@ const permissionStore: StoredPermissionRequest[] = [
     id: "PR-1042",
     code: "PR-1042",
     submit_as: "team",
-    requester: "Annie Case",
-    team: "Fraud Ops",
-    resource: "risk.gold_chargebacks",
+    requester: "Khao Pad",
+    team: "HDBank Risk Analytics",
+    resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
     scope: "table",
     privileges: ["SELECT", "MODIFY"],
     submitted_at: "2026-05-16T01:12:00.000Z",
     expires_at: "2026-05-17T01:12:00.000Z",
     expires_in_days: 1,
     status: "pending",
-    reviewer: "Data Platform",
-    rationale: "Investigating a spike in dispute reversals for the Japan lane.",
+    reviewer: "HDBank Data Steward",
+    rationale:
+      "Temporary write access is needed to validate chargeback risk thresholds before the next fraud release.",
     risk: "high",
-    policy_template_id: "40000000-0000-0000-0000-000000000002",
-    policy_template_name: "Operational writeback",
-    policy_template_resource: "risk.gold_chargebacks",
-    policy_template_approval_mode: "review",
-    policy_template_owner_id: "10000000-0000-0000-0000-000000000011",
-    policy_template_owner: "Data Steward",
+    policy_template_id: "40000000-0000-0000-0000-000000000004",
+    policy_template_name: "HDBank chargeback writeback",
+    policy_template_resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
+    policy_template_approval_mode: "escalate",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000005",
+    policy_template_owner: "HDBank Security",
     approval_steps: [
       {
         id: "step-1042-1",
         stage_order: 1,
-        approver_team_id: "10000000-0000-0000-0000-000000000011",
-        approver_team: "Data Steward",
+        approver_team_id: "10000000-0000-0000-0000-000000000004",
+        approver_team: "HDBank Data Steward",
         approver_label: "Data steward review",
         status: "approved",
         acted_at: "2026-05-16T02:00:00.000Z",
@@ -183,8 +179,8 @@ const permissionStore: StoredPermissionRequest[] = [
       {
         id: "step-1042-2",
         stage_order: 2,
-        approver_team_id: "10000000-0000-0000-0000-000000000010",
-        approver_team: "Security",
+        approver_team_id: "10000000-0000-0000-0000-000000000005",
+        approver_team: "HDBank Security",
         approver_label: "Security sign-off",
         status: "pending",
         acted_at: null,
@@ -198,31 +194,32 @@ const permissionStore: StoredPermissionRequest[] = [
     id: "PR-1041",
     code: "PR-1041",
     submit_as: "team",
-    requester: "Mai Nguyen",
-    team: "Growth Analytics",
-    resource: "marketing",
-    scope: "catalog",
-    privileges: ["USE_CATALOG", "CREATE_SCHEMA"],
+    requester: "Linh Tran",
+    team: "VietJetair Analytics",
+    resource: "partnership_sandbox.analytics",
+    scope: "schema",
+    privileges: ["USE_SCHEMA", "SELECT"],
     submitted_at: "2026-05-15T06:30:00.000Z",
-    expires_at: "2026-05-20T06:30:00.000Z",
-    expires_in_days: 5,
+    expires_at: "2026-05-21T06:30:00.000Z",
+    expires_in_days: 6,
     status: "ready",
-    reviewer: "Governance",
-    rationale: "Standing up a campaign-attribution sandbox for a new partner.",
+    reviewer: "Partnership Data Platform",
+    rationale:
+      "Preparing a joint VietJet and HDBank partner performance readout for the weekly business review.",
     risk: "medium",
     policy_template_id: "40000000-0000-0000-0000-000000000003",
-    policy_template_name: "Catalog bootstrap",
-    policy_template_resource: "marketing",
+    policy_template_name: "Partner analytics read",
+    policy_template_resource: "partnership_sandbox.analytics",
     policy_template_approval_mode: "review",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
-    policy_template_owner: "Data Platform",
+    policy_template_owner: "Partnership Data Platform",
     approval_steps: [
       {
         id: "step-1041-1",
         stage_order: 1,
         approver_team_id: "10000000-0000-0000-0000-000000000006",
-        approver_team: "Data Platform",
-        approver_label: "Data owner approval",
+        approver_team: "Partnership Data Platform",
+        approver_label: "Workspace owner review",
         status: "pending",
         acted_at: null,
         is_current: true,
@@ -230,8 +227,8 @@ const permissionStore: StoredPermissionRequest[] = [
       {
         id: "step-1041-2",
         stage_order: 2,
-        approver_team_id: "10000000-0000-0000-0000-000000000011",
-        approver_team: "Data Steward",
+        approver_team_id: "10000000-0000-0000-0000-000000000004",
+        approver_team: "HDBank Data Steward",
         approver_label: "Data steward review",
         status: "waiting",
         acted_at: null,
@@ -245,24 +242,26 @@ const permissionStore: StoredPermissionRequest[] = [
     id: "PR-1039",
     code: "PR-1039",
     submit_as: "team",
-    requester: "Kenji Mori",
-    team: "Finance BI",
-    resource: "finance.ap_closure",
+    requester: "Khao Soi",
+    team: "VietJetair Analytics",
+    resource: "vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
     scope: "schema",
     privileges: ["USE_SCHEMA", "SELECT"],
     submitted_at: "2026-05-14T10:00:00.000Z",
-    expires_at: "2026-05-28T10:00:00.000Z",
+    expires_at: "2026-05-30T10:00:00.000Z",
     expires_in_days: 14,
     status: "approved",
-    reviewer: "Governance",
-    rationale: "Month-end close support for vendor accrual reconciliation.",
+    reviewer: "VietJetair Data Platform",
+    rationale:
+      "Sandbox access for route-performance experimentation during the fare optimization sprint.",
     risk: "low",
     policy_template_id: "40000000-0000-0000-0000-000000000001",
-    policy_template_name: "Analytics read sandbox",
-    policy_template_resource: null,
+    policy_template_name: "VietJet sandbox read",
+    policy_template_resource:
+      "vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
     policy_template_approval_mode: "auto",
-    policy_template_owner_id: "10000000-0000-0000-0000-000000000009",
-    policy_template_owner: "Governance",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000002",
+    policy_template_owner: "VietJetair Data Platform",
     approval_steps: [],
     current_approval_step_id: null,
     queue_decision: "auto-approved",
@@ -348,7 +347,7 @@ export async function listMyTeamsAction(): Promise<MyTeamOption[]> {
     const fallbackTeamName =
       Object.entries(TEAM_IDS_BY_NAME).find(
         ([, id]) => id === fallbackTeamId,
-      )?.[0] ?? "Data Platform"
+      )?.[0] ?? "VietJetair Data Platform"
     return [{ id: fallbackTeamId, name: fallbackTeamName }]
   }
 
@@ -376,7 +375,7 @@ export async function listMyTeamsAction(): Promise<MyTeamOption[]> {
   const fallbackTeamName =
     Object.entries(TEAM_IDS_BY_NAME).find(
       ([, id]) => id === fallbackTeamId,
-    )?.[0] ?? "Data Platform"
+    )?.[0] ?? "VietJetair Data Platform"
   return [{ id: fallbackTeamId, name: fallbackTeamName }]
 }
 

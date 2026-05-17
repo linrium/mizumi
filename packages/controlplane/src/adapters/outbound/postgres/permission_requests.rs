@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::permission::{PermissionApprovalStep, PermissionRequestView};
 
-const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000011";
+const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000004";
 const REQUEST_VIEW_SELECT: &str = r#"
     SELECT
         pr.id,

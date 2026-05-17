@@ -16,9 +16,10 @@ pub async fn get(db: &PgPool, id: Uuid) -> Result<Option<Team>, sqlx::Error> {
         .await
 }
 
-pub async fn create(db: &PgPool, name: &str) -> Result<Team, sqlx::Error> {
-    sqlx::query_as::<_, Team>("INSERT INTO teams (name) VALUES ($1) RETURNING *")
+pub async fn create(db: &PgPool, name: &str, workspace: &str) -> Result<Team, sqlx::Error> {
+    sqlx::query_as::<_, Team>("INSERT INTO teams (name, workspace) VALUES ($1, $2) RETURNING *")
         .bind(name)
+        .bind(workspace)
         .fetch_one(db)
         .await
 }

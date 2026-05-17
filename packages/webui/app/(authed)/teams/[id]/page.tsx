@@ -10,6 +10,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -167,6 +168,9 @@ export default function TeamDetailPage({
           <div className="flex items-center gap-2 min-w-0">
             <div className="min-w-0">
               <h1 className="text-sm font-semibold truncate">{team.name}</h1>
+              <div className="mt-1">
+                <Badge variant="outline">{team.workspace}</Badge>
+              </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Created{" "}
                 {formatDistanceToNowStrict(new Date(team.created_at), {

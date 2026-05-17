@@ -1,11 +1,11 @@
 CREATE TABLE policy_template_approval_steps
 (
-    id               UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
+    id                 UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
     policy_template_id UUID        NOT NULL REFERENCES policy_templates (id) ON DELETE CASCADE,
-    stage_order      INTEGER     NOT NULL CHECK (stage_order > 0),
-    approver_team_id UUID        NOT NULL REFERENCES teams (id),
-    approver_label   TEXT        NOT NULL DEFAULT '',
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    stage_order        INTEGER     NOT NULL CHECK (stage_order > 0),
+    approver_team_id   UUID        NOT NULL REFERENCES teams (id),
+    approver_label     TEXT        NOT NULL DEFAULT '',
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (policy_template_id, stage_order, approver_team_id)
 );
 
@@ -31,12 +31,11 @@ CREATE INDEX permission_request_approval_steps_request_idx
     ON permission_request_approval_steps (request_id, stage_order, status);
 
 INSERT INTO policy_template_approval_steps (policy_template_id, stage_order, approver_team_id, approver_label)
-VALUES ('40000000-0000-0000-0000-000000000002', 1, '10000000-0000-0000-0000-000000000011', 'Data steward review'),
-       ('40000000-0000-0000-0000-000000000002', 2, '10000000-0000-0000-0000-000000000010', 'Security sign-off'),
-       ('40000000-0000-0000-0000-000000000003', 1, '10000000-0000-0000-0000-000000000006', 'Data owner approval'),
-       ('40000000-0000-0000-0000-000000000003', 2, '10000000-0000-0000-0000-000000000011', 'Data steward review'),
-       ('40000000-0000-0000-0000-000000000004', 1, '10000000-0000-0000-0000-000000000010', 'Security review'),
-       ('40000000-0000-0000-0000-000000000004', 2, '10000000-0000-0000-0000-000000000011', 'Data steward review');
+VALUES ('40000000-0000-0000-0000-000000000002', 1, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
+       ('40000000-0000-0000-0000-000000000003', 1, '10000000-0000-0000-0000-000000000006', 'Workspace owner review'),
+       ('40000000-0000-0000-0000-000000000003', 2, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
+       ('40000000-0000-0000-0000-000000000004', 1, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
+       ('40000000-0000-0000-0000-000000000004', 2, '10000000-0000-0000-0000-000000000005', 'Security sign-off');
 
 WITH request_steps AS (
     SELECT
@@ -92,11 +91,6 @@ WITH request_steps AS (
         END AS acted_at
     FROM permission_requests pr
     WHERE pr.policy_template_id IS NULL
-       OR NOT EXISTS (
-            SELECT 1
-            FROM policy_template_approval_steps pts
-            WHERE pts.policy_template_id = pr.policy_template_id
-        )
 )
 INSERT INTO permission_request_approval_steps (
     request_id,

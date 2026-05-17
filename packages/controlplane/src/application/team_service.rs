@@ -36,14 +36,22 @@ impl TeamService {
         if name.is_empty() {
             return Err(AppError::QueryFailed("team name cannot be empty".into()));
         }
-        teams::create(&self.db, &name).await.map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.is_unique_violation() {
-                    return AppError::Conflict(format!("team '{name}' already exists"));
+
+        let workspace = body.workspace.trim().to_string();
+        if workspace.is_empty() {
+            return Err(AppError::QueryFailed("workspace is required".into()));
+        }
+
+        teams::create(&self.db, &name, &workspace)
+            .await
+            .map_err(|e| {
+                if let sqlx::Error::Database(ref db_err) = e {
+                    if db_err.is_unique_violation() {
+                        return AppError::Conflict(format!("team '{name}' already exists"));
+                    }
                 }
-            }
-            AppError::Sqlx(e)
-        })
+                AppError::Sqlx(e)
+            })
     }
 
     pub async fn list_members(&self, team_id: Uuid) -> Result<Vec<TeamMember>, AppError> {

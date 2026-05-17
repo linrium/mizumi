@@ -18,8 +18,8 @@ use crate::{
 };
 
 const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved", "cancelled"];
-const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000011";
-const SECURITY_TEAM_ID: &str = "10000000-0000-0000-0000-000000000010";
+const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000004";
+const SECURITY_TEAM_ID: &str = "10000000-0000-0000-0000-000000000005";
 
 #[derive(Clone)]
 struct RequestPolicyMatch {

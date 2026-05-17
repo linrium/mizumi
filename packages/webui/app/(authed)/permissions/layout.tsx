@@ -20,6 +20,9 @@ export default function PermissionsLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const nestedTabPaths = TABS.filter((tab) => tab.href !== "/permissions").map(
+    (tab) => tab.href,
+  )
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -28,7 +31,12 @@ export default function PermissionsLayout({
           const isActive =
             tab.href === "/permissions"
               ? pathname === "/permissions" ||
-                /^\/permissions\/[^/]+$/.test(pathname)
+                (/^\/permissions\/[^/]+$/.test(pathname) &&
+                  !nestedTabPaths.some(
+                    (nestedPath) =>
+                      pathname === nestedPath ||
+                      pathname.startsWith(`${nestedPath}/`),
+                  ))
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
 
           return (

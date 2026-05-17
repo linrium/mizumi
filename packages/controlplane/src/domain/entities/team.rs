@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub struct Team {
     pub id: Uuid,
     pub name: String,
+    pub workspace: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -23,6 +24,7 @@ pub struct TeamMember {
 #[derive(Debug, Deserialize)]
 pub struct CreateTeamBody {
     pub name: String,
+    pub workspace: String,
 }
 
 #[derive(Debug, Deserialize)]

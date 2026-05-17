@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -35,6 +36,7 @@ export default function TeamsPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [newName, setNewName] = useState("")
+  const [newWorkspace, setNewWorkspace] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -65,20 +67,26 @@ export default function TeamsPage() {
   async function handleCreate() {
     if (creating) return
     const name = newName.trim()
+    const workspace = newWorkspace.trim()
     if (!name) {
       setCreateError("Name is required")
       nameInputRef.current?.focus()
       return
     }
+    if (!workspace) {
+      setCreateError("Workspace is required")
+      return
+    }
     setCreating(true)
     setCreateError(null)
     try {
-      const team = await createTeam(name)
+      const team = await createTeam(name, workspace)
       setTeams((prev) =>
         [...prev, team].sort((a, b) => a.name.localeCompare(b.name)),
       )
       setCreateOpen(false)
       setNewName("")
+      setNewWorkspace("")
     } catch (err) {
       setCreateError(
         err instanceof Error ? err.message : "Failed to create team",
@@ -90,6 +98,7 @@ export default function TeamsPage() {
 
   function openCreate() {
     setNewName("")
+    setNewWorkspace("")
     setCreateError(null)
     setCreateOpen(true)
   }
@@ -118,6 +127,7 @@ export default function TeamsPage() {
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
               <TableHead>Name</TableHead>
+              <TableHead>Workspace</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
           </TableHeader>
@@ -125,7 +135,7 @@ export default function TeamsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={2}
+                  colSpan={3}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Loading…
@@ -142,6 +152,9 @@ export default function TeamsPage() {
                       {team.name}
                     </Link>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{team.workspace}</Badge>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDistanceToNowStrict(new Date(team.created_at), {
                       addSuffix: true,
@@ -152,7 +165,7 @@ export default function TeamsPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={2}
+                  colSpan={3}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No teams yet
@@ -192,6 +205,17 @@ export default function TeamsPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g. Data Engineering"
+              disabled={creating}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreate()
+              }}
+            />
+            <Label htmlFor="team-workspace">Workspace</Label>
+            <Input
+              id="team-workspace"
+              value={newWorkspace}
+              onChange={(e) => setNewWorkspace(e.target.value)}
+              placeholder="e.g. vietjetair"
               disabled={creating}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleCreate()
