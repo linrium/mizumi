@@ -59,6 +59,8 @@ function getStatusVariant(status: RequestStatus) {
       return "info"
     case "needs-info":
       return "warning"
+    case "cancelled":
+      return "error"
     default:
       return "default"
   }
