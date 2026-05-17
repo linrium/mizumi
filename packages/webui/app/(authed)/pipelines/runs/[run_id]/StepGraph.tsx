@@ -18,8 +18,14 @@ import {
 import dagre from "@dagrejs/dagre"
 import "@xyflow/react/dist/style.css"
 import { cn } from "@/lib/utils"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+type AssetNodeMinimal = {
+  path: string[]
+  dependency_keys: string[][]
+}
 
 export type RunEvent = {
   type: string
@@ -45,7 +51,19 @@ type StepInfo = {
 
 // ── Derive step statuses from events ─────────────────────────────────────────
 
-function deriveSteps(events: RunEvent[]): StepInfo[] {
+function deriveSteps(events: RunEvent[], assetNodes: AssetNodeMinimal[]): StepInfo[] {
+  // Build step ↔ asset key mappings from materialization events
+  const stepToAsset = new Map<string, string>()
+  const assetToStep = new Map<string, string>()
+  for (const e of events) {
+    if (e.step_key && e.asset_key && e.asset_key.length > 0) {
+      const ak = e.asset_key.join("/")
+      stepToAsset.set(e.step_key, ak)
+      assetToStep.set(ak, e.step_key)
+    }
+  }
+  const assetByKey = new Map(assetNodes.map((n) => [n.path.join("/"), n]))
+
   const steps = new Map<string, StepInfo>()
 
   const ensure = (key: string) => {
@@ -86,6 +104,18 @@ function deriveSteps(events: RunEvent[]): StepInfo[] {
       case "ExecutionStepUpForRetryEvent":
         s.status = "running"
         break
+    }
+  }
+
+  // Populate upstream using asset dependency_keys
+  for (const [stepKey, s] of steps) {
+    const assetKey = stepToAsset.get(stepKey)
+    if (!assetKey) continue
+    const asset = assetByKey.get(assetKey)
+    if (!asset) continue
+    for (const dep of asset.dependency_keys) {
+      const upStep = assetToStep.get(dep.join("/"))
+      if (upStep && steps.has(upStep)) s.upstream.push(upStep)
     }
   }
 
@@ -139,7 +169,7 @@ function StepNode({ data }: { data: StepNodeData }) {
         position={Position.Right}
         className="!w-1.5 !h-1.5 !bg-white/60 !border-0"
       />
-      <div>{info.key}</div>
+      <div className="truncate">{info.key}</div>
       {dur && (
         <div className="text-[10px] opacity-75 font-normal mt-0.5">{dur}</div>
       )}
@@ -151,6 +181,9 @@ const nodeTypes: NodeTypes = { step: StepNode as NodeTypes[string] }
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
+const NODE_W = 240
+const NODE_H = 48
+
 function buildLayout(
   steps: StepInfo[],
   selectedKey: string | null,
@@ -159,10 +192,10 @@ function buildLayout(
 
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 80 })
+  g.setGraph({ rankdir: "LR", nodesep: 24, ranksep: 60 })
 
   for (const s of steps) {
-    g.setNode(s.key, { width: 160, height: 48 })
+    g.setNode(s.key, { width: NODE_W, height: NODE_H })
   }
   for (const s of steps) {
     for (const up of s.upstream) {
@@ -176,7 +209,8 @@ function buildLayout(
     return {
       id: s.key,
       type: "step",
-      position: { x: x - 80, y: y - 24 },
+      position: { x: x - NODE_W / 2, y: y - NODE_H / 2 },
+      style: { width: NODE_W },
       data: { info: s, selected: s.key === selectedKey } satisfies StepNodeData,
       draggable: false,
     }
@@ -213,7 +247,16 @@ export function StepGraph({
   selectedKey: string | null
   onSelectStep: (key: string | null) => void
 }) {
-  const steps = useMemo(() => deriveSteps(events), [events])
+  const [assetNodes, setAssetNodes] = useState<AssetNodeMinimal[]>([])
+
+  useEffect(() => {
+    fetchWithAuth("/api/dagster/asset-nodes", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { nodes?: AssetNodeMinimal[] }) => setAssetNodes(d.nodes ?? []))
+      .catch(() => {})
+  }, [])
+
+  const steps = useMemo(() => deriveSteps(events, assetNodes), [events, assetNodes])
   const { rfNodes, rfEdges } = useMemo(
     () => buildLayout(steps, selectedKey),
     [steps, selectedKey],

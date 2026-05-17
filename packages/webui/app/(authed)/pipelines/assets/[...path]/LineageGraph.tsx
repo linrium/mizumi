@@ -198,8 +198,10 @@ function buildLayout(
   if (apiNodes.length === 0) return { rfNodes: [], rfEdges: [] }
 
   const pathIndex = new Set(apiNodes.map((n) => n.path.join("/")))
+  // Fast O(1) group lookup instead of repeated find()
+  const nodeByKey = new Map(apiNodes.map((n) => [n.path.join("/"), n]))
 
-  // Collect groups and build asset-to-group map
+  // Collect groups
   const groups = new Map<string, ApiAssetNode[]>()
   for (const n of apiNodes) {
     const g = n.group_name ?? "default"
@@ -207,18 +209,23 @@ function buildLayout(
     groups.get(g)!.push(n)
   }
 
-  // Build group-level dependency edges (for dagre rank assignment)
+  // Build group-level dependency edges from BOTH directions so dagre can rank
+  // groups correctly even when only one direction is populated by the backend.
   const groupEdgePairs = new Set<string>()
+  const addGroupEdge = (upKey: string, downKey: string) => {
+    const upGroup = nodeByKey.get(upKey)?.group_name ?? "default"
+    const downGroup = nodeByKey.get(downKey)?.group_name ?? "default"
+    if (upGroup !== downGroup) groupEdgePairs.add(`${upGroup}||${downGroup}`)
+  }
   for (const n of apiNodes) {
-    const srcGroup = n.group_name ?? "default"
+    const key = n.path.join("/")
     for (const dep of n.depended_by_keys) {
-      const tgtKey = dep.join("/")
-      if (!pathIndex.has(tgtKey)) continue
-      const tgt = apiNodes.find((x) => x.path.join("/") === tgtKey)
-      const tgtGroup = tgt?.group_name ?? "default"
-      if (srcGroup !== tgtGroup) {
-        groupEdgePairs.add(`${srcGroup}||${tgtGroup}`)
-      }
+      const tgt = dep.join("/")
+      if (pathIndex.has(tgt)) addGroupEdge(key, tgt)
+    }
+    for (const dep of n.dependency_keys) {
+      const up = dep.join("/")
+      if (pathIndex.has(up)) addGroupEdge(up, key)
     }
   }
 
@@ -250,7 +257,6 @@ function buildLayout(
 
   // Build RF nodes
   const rfNodes: Node[] = []
-  const assetPos = new Map<string, { x: number; y: number }>()
 
   for (const [gName, gnodes] of groups) {
     const gp = groupPos.get(gName)!
@@ -274,14 +280,13 @@ function buildLayout(
     for (let i = 0; i < gnodes.length; i++) {
       const n = gnodes[i]
       const key = n.path.join("/")
-      const ax = gp.x + GROUP_PAD
-      const ay = gp.y + GROUP_HEADER + GROUP_PAD + i * (CARD_H + CARD_GAP)
-      assetPos.set(key, { x: ax, y: ay })
-
       rfNodes.push({
         id: key,
         type: "assetCard",
-        position: { x: ax, y: ay },
+        position: {
+          x: gp.x + GROUP_PAD,
+          y: gp.y + GROUP_HEADER + GROUP_PAD + i * (CARD_H + CARD_GAP),
+        },
         style: { width: CARD_W },
         data: {
           name: n.path[n.path.length - 1],
@@ -296,26 +301,40 @@ function buildLayout(
     }
   }
 
-  // Build edges between individual assets
+  // Build edges from BOTH depended_by_keys and dependency_keys, deduplicating
+  // by edge ID. This ensures arrows appear even when the backend only populates
+  // one of the two direction fields (common for cross-job asset dependencies).
   const rfEdges: Edge[] = []
+  const edgeSet = new Set<string>()
+
+  const addEdge = (upKey: string, downKey: string) => {
+    const id = `${upKey}->${downKey}`
+    if (edgeSet.has(id)) return
+    edgeSet.add(id)
+    rfEdges.push({
+      id,
+      source: upKey,
+      target: downKey,
+      type: "default",
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 14,
+        height: 14,
+        color: "#94a3b8",
+      },
+      style: { stroke: "#94a3b8", strokeWidth: 1.5 },
+    })
+  }
+
   for (const n of apiNodes) {
-    const src = n.path.join("/")
+    const key = n.path.join("/")
     for (const dep of n.depended_by_keys) {
       const tgt = dep.join("/")
-      if (!pathIndex.has(tgt)) continue
-      rfEdges.push({
-        id: `${src}->${tgt}`,
-        source: src,
-        target: tgt,
-        type: "default",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 14,
-          height: 14,
-          color: "#94a3b8",
-        },
-        style: { stroke: "#94a3b8", strokeWidth: 1.5 },
-      })
+      if (pathIndex.has(tgt)) addEdge(key, tgt)
+    }
+    for (const dep of n.dependency_keys) {
+      const up = dep.join("/")
+      if (pathIndex.has(up)) addEdge(up, key)
     }
   }
 

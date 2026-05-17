@@ -331,9 +331,9 @@ export default function StreamingJobDetailPage() {
 
         {/* Right sidebar */}
         <div className="w-64 border-l shrink-0 overflow-y-auto">
-          <div className="px-4 py-4 flex flex-col gap-4">
+          <div className="flex flex-col">
             {/* Status */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-2">Status</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="State">
@@ -365,7 +365,7 @@ export default function StreamingJobDetailPage() {
             <div className="h-px bg-border" />
 
             {/* Job details */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-2">Details</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="Namespace">{job.namespace}</DetailRow>
@@ -382,7 +382,7 @@ export default function StreamingJobDetailPage() {
             <div className="h-px bg-border" />
 
             {/* Image */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-1">Image</p>
               <p className="text-[10px] font-mono text-muted-foreground break-all">
                 {job.image}
@@ -392,7 +392,7 @@ export default function StreamingJobDetailPage() {
             <div className="h-px bg-border" />
 
             {/* App file */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-1">Main File</p>
               <p className="text-[10px] font-mono text-muted-foreground break-all">
                 {job.main_application_file}
@@ -402,7 +402,7 @@ export default function StreamingJobDetailPage() {
             <div className="h-px bg-border" />
 
             {/* Resources */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-2">Resources</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="Driver Cores">{job.driver_cores}</DetailRow>
@@ -418,7 +418,7 @@ export default function StreamingJobDetailPage() {
             {sparkConfEntries.length > 0 && (
               <>
                 <div className="h-px bg-border" />
-                <div>
+                <div className="px-4 py-4">
                   <p className="text-xs font-semibold mb-2">Spark Config</p>
                   <div className="flex flex-col gap-1.5">
                     {sparkConfEntries.map(([k, v]) => (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
@@ -16,6 +16,12 @@ dayjs.extend(relativeTime)
 
 const StepGraph = dynamic(
   () => import("./StepGraph").then((m) => m.StepGraph),
+  { ssr: false },
+)
+
+const LineageGraph = dynamic(
+  () =>
+    import("../../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
   { ssr: false },
 )
 
@@ -375,7 +381,7 @@ export default function RunDetailPage() {
 
   const { run, events, loading, error } = useRunDetail(runId)
   const [selectedStep, setSelectedStep] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"events" | "config">("events")
+  const [activeTab, setActiveTab] = useState<"events" | "config" | "lineage">("events")
   const [graphHeight, setGraphHeight] = useState(208)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
 
@@ -397,6 +403,14 @@ export default function RunDetailPage() {
     window.addEventListener("mousemove", onMove)
     window.addEventListener("mouseup", onUp)
   }
+
+  const selectedStepAssetPath = useMemo(() => {
+    if (!selectedStep) return undefined
+    const e = events.find(
+      (ev) => ev.step_key === selectedStep && ev.asset_key && ev.asset_key.length > 0,
+    )
+    return e?.asset_key ?? undefined
+  }, [selectedStep, events])
 
   const filteredEvents = selectedStep
     ? events.filter((e) => !e.step_key || e.step_key === selectedStep)
@@ -478,7 +492,7 @@ export default function RunDetailPage() {
 
           {/* Tabs: Events / Config */}
           <div className="flex items-center border-b px-4 gap-4 shrink-0">
-            {(["events", "config"] as const).map((t) => (
+            {(["events", "config", "lineage"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -492,7 +506,9 @@ export default function RunDetailPage() {
               >
                 {t === "events"
                   ? `Events (${filteredEvents.length})`
-                  : "Config"}
+                  : t === "lineage"
+                    ? "Lineage"
+                    : "Config"}
               </button>
             ))}
             {selectedStep && (
@@ -559,13 +575,23 @@ export default function RunDetailPage() {
               )}
             </div>
           )}
+
+          {/* Lineage tab */}
+          {activeTab === "lineage" && (
+            <div className="flex-1 min-h-0 relative">
+              <LineageGraph
+                currentPath={selectedStepAssetPath ?? undefined}
+                neighborhoodOnly={false}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right sidebar */}
         <div className="w-64 border-l shrink-0 overflow-y-auto">
-          <div className="px-4 py-4 flex flex-col gap-4">
+          <div className="flex flex-col">
             {/* Step counts */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-2">Execution</p>
               <StepSummary stats={run.stats} />
             </div>
@@ -573,7 +599,7 @@ export default function RunDetailPage() {
             <div className="h-px bg-border" />
 
             {/* Run details */}
-            <div>
+            <div className="px-4 py-4">
               <p className="text-xs font-semibold mb-2">Details</p>
               <div className="flex flex-col gap-2 text-xs">
                 <div className="flex justify-between gap-2">
@@ -618,7 +644,7 @@ export default function RunDetailPage() {
             {run.tags.length > 0 && (
               <>
                 <div className="h-px bg-border" />
-                <div>
+                <div className="px-4 py-4">
                   <p className="text-xs font-semibold mb-2">Tags</p>
                   <div className="flex flex-col gap-1">
                     {run.tags
@@ -640,7 +666,9 @@ export default function RunDetailPage() {
             <div className="h-px bg-border" />
 
             {/* Re-executions */}
-            <ReExecutions rootRunId={run.root_run_id} runId={runId} />
+            <div className="px-4 py-4">
+              <ReExecutions rootRunId={run.root_run_id} runId={runId} />
+            </div>
           </div>
         </div>
       </div>

@@ -729,90 +729,96 @@ export default function AssetDetailPage() {
 
           {/* ── Sidebar ── */}
           <div className="w-64 border-l shrink-0 overflow-y-auto">
-            <div className="px-4 py-5 flex flex-col gap-5">
+            <div className="flex flex-col">
               {/* Definition */}
-              <SideSection title="Definition">
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                      Group
-                    </p>
-                    <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded">
-                      <span className="text-blue-400">▦</span>
-                      {detail.group_name ?? "—"}
-                    </span>
-                  </div>
-
-                  {detail.repository_location && (
+              <div className="px-4 py-5">
+                <SideSection title="Definition">
+                  <div className="flex flex-col gap-3">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                        Code location
+                        Group
                       </p>
-                      <span className="text-xs text-blue-500">
-                        {detail.repository_location}
+                      <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded">
+                        <span className="text-blue-400">▦</span>
+                        {detail.group_name ?? "—"}
                       </span>
                     </div>
-                  )}
 
-                  {kinds.length > 0 && (
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                        Kinds
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {kinds.map((kind) => (
-                          <span
-                            key={kind}
-                            className="inline-flex items-center text-[10px] border px-1.5 py-0.5 rounded-full font-medium capitalize"
-                          >
-                            {kind}
-                          </span>
-                        ))}
+                    {detail.repository_location && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                          Code location
+                        </p>
+                        <span className="text-xs text-blue-500">
+                          {detail.repository_location}
+                        </span>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {(detail.tags ?? []).length > 0 && (
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                        Tags
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {(detail.tags ?? []).map((tag, i) => (
-                          <span
-                            key={i}
-                            className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono break-all"
-                          >
-                            {tag.key}
-                            {tag.value ? `=${tag.value}` : ""}
-                          </span>
-                        ))}
+                    {kinds.length > 0 && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                          Kinds
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {kinds.map((kind) => (
+                            <span
+                              key={kind}
+                              className="inline-flex items-center text-[10px] border px-1.5 py-0.5 rounded-full font-medium capitalize"
+                            >
+                              {kind}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </SideSection>
+                    )}
+
+                    {(detail.tags ?? []).length > 0 && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                          Tags
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {(detail.tags ?? []).map((tag, i) => (
+                            <span
+                              key={i}
+                              className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono break-all"
+                            >
+                              {tag.key}
+                              {tag.value ? `=${tag.value}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </SideSection>
+              </div>
 
               <div className="h-px bg-border" />
 
               {/* Automation details */}
-              <SideSection title="Automation details">
-                <div className="rounded-md border px-3 py-3">
-                  <p className="text-xs font-medium">
-                    No automations found for this asset
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                    Dagster offers several ways to run data pipelines without
-                    manual intervention, including traditional scheduling and
-                    event-based triggers.
-                  </p>
-                </div>
-              </SideSection>
+              <div className="px-4 py-5">
+                <SideSection title="Automation details">
+                  <div className="rounded-md border px-3 py-3">
+                    <p className="text-xs font-medium">
+                      No automations found for this asset
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                      Dagster offers several ways to run data pipelines without
+                      manual intervention, including traditional scheduling and
+                      event-based triggers.
+                    </p>
+                  </div>
+                </SideSection>
+              </div>
 
               <div className="h-px bg-border" />
 
               {/* Compute details */}
-              <SideSection title="Compute details" collapsed />
+              <div className="px-4 py-5">
+                <SideSection title="Compute details" collapsed />
+              </div>
             </div>
           </div>
         </div>
