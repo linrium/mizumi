@@ -19,6 +19,7 @@ rustfs_values := "infra/k8s/rustfs/helm/values.yaml"
 
 keycloak_namespace := "keycloak"
 keycloak_manifests := "infra/k8s/keycloak"
+keycloak_image := "mizumi-keycloak:26.3.3"
 
 spark_operator_namespace := "spark-operator"
 spark_namespace := "spark"
@@ -139,7 +140,10 @@ rustfs-destroy:
     helm uninstall {{rustfs_release}} --namespace {{rustfs_namespace}} || true
     kubectl delete namespace {{rustfs_namespace}} --ignore-not-found --wait=false
 
-keycloak-deploy:
+keycloak-image-build:
+    docker build -t {{keycloak_image}} packages/keycloak
+
+keycloak-deploy: keycloak-image-build
     kubectl create namespace {{keycloak_namespace}} 2>/dev/null || true
     kubectl apply -f {{keycloak_manifests}}/postgres.yaml
     kubectl rollout status statefulset/keycloak-postgres -n {{keycloak_namespace}} --timeout=300s
@@ -293,9 +297,10 @@ unitycatalog-bootstrap:
     kubectl logs job/unitycatalog-bootstrap -n {{unitycatalog_namespace}}
 
 jobs-submit-all token:
-    just jobs-sumit-hdbank {{token}}
+    just jobs-submit-hdbank {{token}}
+    just jobs-submit-vietjetair {{token}}
 
-jobs-sumit-hdbank token:
+jobs-submit-hdbank token:
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{token}}" \
@@ -307,23 +312,61 @@ jobs-sumit-hdbank token:
       -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
       | jq
 
+jobs-submit-vietjetair token:
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
+      -d '{"name":"vietjetair-stream-raw-customer-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_customer_events_to_bronze.py"}' \
+      | jq
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
+      -d '{"name":"vietjetair-stream-raw-flight-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_flight_events_to_bronze.py"}' \
+      | jq
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{token}}" \
+      -d '{"name":"vietjetair-stream-raw-booking-events-to-bronze","image":"{{spark_image}}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_booking_events_to_bronze.py"}' \
+      | jq
+
 jobs-delete-hdbank token:
     #!/usr/bin/env bash
     set -euo pipefail
-    id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
-      -H 'Content-Type: application/json' \
-      -H "Authorization: Bearer {{token}}" \
-      | jq -r '.jobs[] | select(.job.name == "hdbank-stream-raw-customer-profile-events-to-bronze") | .job.id')
-    [[ -z "$id" ]] && { echo "job not found"; exit 1; }
-    curl -fsSL -X DELETE -H "Authorization: Bearer {{token}}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted"
+    for name in hdbank-stream-raw-card-payment-events-to-bronze hdbank-stream-raw-customer-profile-events-to-bronze; do
+      id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
+        -H "Authorization: Bearer {{token}}" \
+        | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
+      [[ -z "$id" ]] && { echo "job not found: $name"; continue; }
+      curl -fsSL -X DELETE -H "Authorization: Bearer {{token}}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted: $name"
+    done
+
+jobs-delete-vietjetair token:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for name in vietjetair-stream-raw-customer-events-to-bronze vietjetair-stream-raw-flight-events-to-bronze vietjetair-stream-raw-booking-events-to-bronze; do
+      id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
+        -H "Authorization: Bearer {{token}}" \
+        | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
+      [[ -z "$id" ]] && { echo "job not found: $name"; continue; }
+      curl -fsSL -X DELETE -H "Authorization: Bearer {{token}}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted: $name"
+    done
 
 controlplane-deploy:
     kubectl apply -f infra/k8s/controlplane/postgres.yaml
     kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n controlplane --timeout=120s
+    kubectl apply -f infra/k8s/controlplane/deployment.yaml
+    kubectl rollout status deployment/controlplane -n controlplane --timeout=120s
+    just controlplane-bootstrap
     kubectl get pods,svc -n controlplane
 
+controlplane-bootstrap:
+    kubectl delete job controlplane-bootstrap -n controlplane --ignore-not-found
+    kubectl apply -f infra/k8s/controlplane/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/controlplane-bootstrap -n controlplane --timeout=120s
+    kubectl logs job/controlplane-bootstrap -n controlplane
+
 controlplane-destroy:
-    kubectl delete -f infra/k8s/controlplane/postgres.yaml --ignore-not-found || true
+    kubectl delete -f infra/k8s/controlplane/ --ignore-not-found || true
     kubectl delete namespace controlplane --ignore-not-found --wait=false
 
 daft-distributed-deploy:
@@ -332,8 +375,8 @@ daft-distributed-deploy:
       --namespace {{daft_namespace}} \
       --create-namespace \
       --values {{daft_distributed_values}}
-    kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
-      -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
+    # kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
+    #   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
 
 daft-distributed-deploy-with-job:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true
@@ -342,8 +385,8 @@ daft-distributed-deploy-with-job:
       --create-namespace \
       --values {{daft_distributed_values}} \
       --set-file job.script={{daft_distributed_script}}
-    kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
-      -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
+    # kubectl patch deployment {{daft_distributed_release}}-worker -n {{daft_namespace}} --type=json \
+    #   -p='[{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/livenessProbe/periodSeconds","value":10},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":30},{"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/periodSeconds","value":10}]'
 
 daft-simple-deploy:
     kubectl create namespace {{daft_namespace}} 2>/dev/null || true

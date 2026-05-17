@@ -8,6 +8,24 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-redpanda
+          image: busybox:stable
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://redpanda-svc.redpanda.svc.cluster.local:9644/v1/cluster/health_overview; do
+                echo "waiting for redpanda..."; sleep 3
+              done
+              echo "redpanda ready"
       containers:
         - name: rpk
           image: docker.redpanda.com/redpandadata/redpanda:v24.3.11

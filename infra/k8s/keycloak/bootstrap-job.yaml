@@ -10,7 +10,11 @@ stringData:
   KEYCLOAK_CLIENT_ID: webui
   KEYCLOAK_CLIENT_SECRET: webui-secret
   KEYCLOAK_USER_PASSWORD: "123"
-  KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/auth/callback", "http://localhost:8082/auth/callback"]'
+  KEYCLOAK_USER_ID_LINH: "4faec421-980b-40e7-9997-ce2488ac5968"
+  KEYCLOAK_USER_ID_KHAOSOI: "f6138570-3008-4bcd-8c32-8ae72fce2ac7"
+  KEYCLOAK_USER_ID_KHAOPAD: "590df6ab-a6d9-418c-b89e-8ed3a26cdc7e"
+  KEYCLOAK_USER_ID_RIKKI: "508f5a7a-f4b4-421a-bbb0-5968f710bd50"
+  KEYCLOAK_CLIENT_REDIRECT_URIS: '["http://localhost:3000/api/auth/oauth2/callback/keycloak", "http://localhost:8082/auth/callback"]'
   KEYCLOAK_CLIENT_WEB_ORIGINS: '["http://localhost:3000","http://localhost:8082"]'
   KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS: '["http://localhost:3000/login"]'
 ---
@@ -25,6 +29,24 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-keycloak
+          image: busybox:stable
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/master; do
+                echo "waiting for keycloak..."; sleep 3
+              done
+              echo "keycloak ready"
       containers:
         - name: bootstrap
           image: quay.io/keycloak/keycloak:26.3.3
@@ -82,6 +104,26 @@ spec:
                 secretKeyRef:
                   name: keycloak-bootstrap-secret
                   key: KEYCLOAK_CLIENT_POST_LOGOUT_REDIRECT_URIS
+            - name: KEYCLOAK_USER_ID_LINH
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_USER_ID_LINH
+            - name: KEYCLOAK_USER_ID_KHAOSOI
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_USER_ID_KHAOSOI
+            - name: KEYCLOAK_USER_ID_KHAOPAD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_USER_ID_KHAOPAD
+            - name: KEYCLOAK_USER_ID_RIKKI
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-secret
+                  key: KEYCLOAK_USER_ID_RIKKI
           command:
             - /bin/bash
             - -ec
@@ -95,13 +137,6 @@ spec:
                   --user "$KEYCLOAK_ADMIN" \
                   --password "$KEYCLOAK_ADMIN_PASSWORD"
               }
-
-              for _ in $(seq 1 60); do
-                if login >/dev/null 2>&1; then
-                  break
-                fi
-                sleep 5
-              done
 
               login
 
@@ -148,21 +183,21 @@ spec:
                 user_id=$(get_user_id "$realm_name" "$username")
 
                 if [[ -z "$user_id" ]]; then
-                  user_id=$(/opt/keycloak/bin/kcadm.sh create users -r "$realm_name" \
+                  /opt/keycloak/bin/kcadm.sh create users -r "$realm_name" \
                     -s username="$username" \
                     -s email="$username" \
                     -s enabled=true \
                     -s emailVerified=true \
-                    -s requiredActions=[] \
-                    -i)
-                  echo "Created user $username"
+                    -s requiredActions=[]
+                  user_id=$(get_user_id "$realm_name" "$username")
+                  echo "Created user $username with id $user_id"
                 else
                   /opt/keycloak/bin/kcadm.sh update "users/$user_id" -r "$realm_name" \
                     -s email="$username" \
                     -s enabled=true \
                     -s emailVerified=true \
                     -s requiredActions=[]
-                  echo "Updated user $username"
+                  echo "Updated user $username (id $user_id)"
                 fi
 
                 /opt/keycloak/bin/kcadm.sh set-password -r "$realm_name" \
@@ -219,10 +254,10 @@ spec:
                 ensure_group "$KEYCLOAK_REALM" "$group_name"
               done
 
-              ensure_user "$KEYCLOAK_REALM" "rikki@gmail.com"
               ensure_user "$KEYCLOAK_REALM" "linh@gmail.com"
               ensure_user "$KEYCLOAK_REALM" "khaosoi@gmail.com"
               ensure_user "$KEYCLOAK_REALM" "khaopad@gmail.com"
+              ensure_user "$KEYCLOAK_REALM" "rikki@gmail.com"
               ensure_client "$KEYCLOAK_REALM"
 
               echo "Keycloak bootstrap complete."

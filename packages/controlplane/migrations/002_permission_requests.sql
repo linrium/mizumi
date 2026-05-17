@@ -87,13 +87,10 @@ CREATE TABLE time_bound_grants
 );
 
 INSERT INTO users (id, email, username, full_name, user_type)
-VALUES ('20000000-0000-0000-0000-000000000001', 'annie.case@example.com', 'annie.case', 'Annie Case', 'USER'),
-       ('20000000-0000-0000-0000-000000000002', 'mai.nguyen@example.com', 'mai.nguyen', 'Mai Nguyen', 'USER'),
-       ('20000000-0000-0000-0000-000000000003', 'kenji.mori@example.com', 'kenji.mori', 'Kenji Mori', 'USER'),
-       ('20000000-0000-0000-0000-000000000004', 'nora.patel@example.com', 'nora.patel', 'Nora Patel', 'USER'),
-       ('20000000-0000-0000-0000-000000000005', 'bao.ho@example.com', 'bao.ho', 'Bao Ho', 'USER'),
-       ('20000000-0000-0000-0000-000000000006', 'linh.vu@example.com', 'linh.vu', 'Linh Vu', 'USER'),
-       ('20000000-0000-0000-0000-000000000007', 'haruto.sato@example.com', 'haruto.sato', 'Haruto Sato', 'USER');
+VALUES ('4faec421-980b-40e7-9997-ce2488ac5968', 'linh@gmail.com', 'linh', 'Linh Tran', 'USER'),
+       ('f6138570-3008-4bcd-8c32-8ae72fce2ac7', 'khaosoi@gmail.com', 'khaosoi', 'Khao Soi', 'USER'),
+       ('590df6ab-a6d9-418c-b89e-8ed3a26cdc7e', 'khaopad@gmail.com', 'khaopad', 'Khao Pad', 'USER'),
+       ('508f5a7a-f4b4-421a-bbb0-5968f710bd50', 'rikki@gmail.com', 'rikki', 'Rikki Tarczaly', 'USER');
 
 INSERT INTO teams (id, name)
 VALUES ('10000000-0000-0000-0000-000000000001', 'Fraud Ops'),
@@ -128,38 +125,34 @@ VALUES ('40000000-0000-0000-0000-000000000001', 'Analytics read sandbox', 'schem
 
 INSERT INTO permission_requests (id, requester_id, team, resource, scope, privileges, submitted_at, expires_at, status,
                                  reviewer_id, rationale, risk, policy_template_id)
-VALUES ('30000000-0000-0000-0000-000000001042', '20000000-0000-0000-0000-000000000001',
+VALUES ('30000000-0000-0000-0000-000000001042', '508f5a7a-f4b4-421a-bbb0-5968f710bd50',
         '10000000-0000-0000-0000-000000000001', 'risk.gold_chargebacks', 'table', ARRAY ['SELECT','MODIFY'],
         '2026-05-16T01:12:00Z', '2026-05-17T01:12:00Z', 'ready', '10000000-0000-0000-0000-000000000011',
         'Investigating a spike in dispute reversals for the Japan lane.', 'high',
         '40000000-0000-0000-0000-000000000002'),
-       ('30000000-0000-0000-0000-000000001041', '20000000-0000-0000-0000-000000000002',
-        '10000000-0000-0000-0000-000000000002', 'marketing', 'catalog', ARRAY ['USE_CATALOG','CREATE_SCHEMA'],
+       ('30000000-0000-0000-0000-000000001041', '4faec421-980b-40e7-9997-ce2488ac5968',
+        '10000000-0000-0000-0000-000000000006', 'marketing', 'catalog', ARRAY ['USE_CATALOG','CREATE_SCHEMA'],
         '2026-05-15T06:30:00Z', '2026-05-21T06:30:00Z', 'ready', '10000000-0000-0000-0000-000000000006',
         'Standing up a campaign-attribution sandbox for a new partner.', 'medium',
         '40000000-0000-0000-0000-000000000003'),
-       ('30000000-0000-0000-0000-000000001039', '20000000-0000-0000-0000-000000000003',
+       ('30000000-0000-0000-0000-000000001039', '590df6ab-a6d9-418c-b89e-8ed3a26cdc7e',
         '10000000-0000-0000-0000-000000000003', 'finance.ap_closure', 'schema', ARRAY ['USE_SCHEMA','SELECT'],
         '2026-05-14T10:00:00Z', '2026-05-30T10:00:00Z', 'approved', '10000000-0000-0000-0000-000000000009',
         'Month-end close support for vendor accrual reconciliation.', 'low',
         '40000000-0000-0000-0000-000000000001'),
-       ('30000000-0000-0000-0000-000000001038', '20000000-0000-0000-0000-000000000004',
+       ('30000000-0000-0000-0000-000000001038', 'f6138570-3008-4bcd-8c32-8ae72fce2ac7',
         '10000000-0000-0000-0000-000000000004', 'feature_store.user_embeddings', 'table', ARRAY ['SELECT'],
         '2026-05-14T02:48:00Z', '2026-05-19T02:48:00Z', 'needs-info', '10000000-0000-0000-0000-000000000010',
         'Model retraining run needs a narrower cohort definition.', 'medium',
         '40000000-0000-0000-0000-000000000004'),
-       ('30000000-0000-0000-0000-000000001036', '20000000-0000-0000-0000-000000000005',
+       ('30000000-0000-0000-0000-000000001036', '508f5a7a-f4b4-421a-bbb0-5968f710bd50',
         '10000000-0000-0000-0000-000000000005', 'ops.runbooks', 'schema', ARRAY ['USE_SCHEMA','SELECT','MODIFY'],
         '2026-05-13T08:15:00Z', '2026-05-18T08:15:00Z', 'pending', '10000000-0000-0000-0000-000000000011',
         'Support rotation needs edit access for incident annotations.', 'high', NULL),
-       ('30000000-0000-0000-0000-000000001034', '20000000-0000-0000-0000-000000000006',
+       ('30000000-0000-0000-0000-000000001034', '4faec421-980b-40e7-9997-ce2488ac5968',
         '10000000-0000-0000-0000-000000000007', 'board_metrics', 'catalog', ARRAY ['USE_CATALOG','CREATE_SCHEMA'],
         '2026-05-12T09:10:00Z', '2026-05-23T09:10:00Z', 'pending', '10000000-0000-0000-0000-000000000006',
-        'Dedicated exec reporting workspace for Q2 operating review.', 'medium', NULL),
-       ('30000000-0000-0000-0000-000000001031', '20000000-0000-0000-0000-000000000007',
-        '10000000-0000-0000-0000-000000000008', 'support.ticket_embeddings', 'table', ARRAY ['SELECT'],
-        '2026-05-11T23:40:00Z', '2026-05-25T23:40:00Z', 'pending', '10000000-0000-0000-0000-000000000010',
-        'Case clustering pilot for deflection opportunities.', 'low', NULL);
+        'Dedicated exec reporting workspace for Q2 operating review.', 'medium', NULL);
 
 INSERT INTO blast_radius_previews (request_id, downstream_assets, dashboards, consumers, sensitive_domains,
                                    recommended_guardrail)
@@ -174,14 +167,14 @@ VALUES ('30000000-0000-0000-0000-000000001042', 14, 6, 3, ARRAY ['payments','fra
 
 INSERT INTO time_bound_grants (id, principal, team, resource, privilege, started_at, expires_at, reviewer_id,
                                renewal_status, reason)
-VALUES ('50000000-0000-0000-0000-000000000001', 'Annie Case', 'Fraud Ops', 'risk.gold_chargebacks', 'MODIFY',
+VALUES ('50000000-0000-0000-0000-000000000001', 'Rikki Tarczaly', 'Fraud Ops', 'risk.gold_chargebacks', 'MODIFY',
         '2026-05-15T00:00:00Z', '2026-05-17T00:00:00Z', 'Data Platform', 'expiring',
         'Chargeback investigation burst window.'),
-       ('50000000-0000-0000-0000-000000000002', 'Nora Patel', 'ML Platform', 'feature_store.user_embeddings', 'SELECT',
+       ('50000000-0000-0000-0000-000000000002', 'Khao Soi', 'ML Platform', 'feature_store.user_embeddings', 'SELECT',
         '2026-05-10T00:00:00Z', '2026-05-18T00:00:00Z', 'Security', 'healthy',
         'Model retraining run with approved cohort filter.'),
-       ('50000000-0000-0000-0000-000000000003', 'Bao Ho', 'Operations', 'ops.runbooks', 'MODIFY',
+       ('50000000-0000-0000-0000-000000000003', 'Khao Pad', 'Finance BI', 'finance.ap_closure', 'USE_SCHEMA',
         '2026-05-09T00:00:00Z', '2026-05-16T00:00:00Z', 'Data Steward', 'expired',
-        'Support rotation annotation backfill.'),
-       ('50000000-0000-0000-0000-000000000004', 'Linh Vu', 'Executive Analytics', 'board_metrics', 'CREATE_SCHEMA',
+        'Month-end close support window.'),
+       ('50000000-0000-0000-0000-000000000004', 'Linh Tran', 'Executive Analytics', 'board_metrics', 'CREATE_SCHEMA',
         '2026-05-12T00:00:00Z', '2026-05-22T00:00:00Z', 'Data Platform', 'healthy', 'Q2 operating review workspace.');

@@ -2,6 +2,7 @@ pub mod auth;
 pub mod catalog;
 pub mod error;
 pub mod function;
+pub mod health;
 pub mod metastore;
 pub mod middleware;
 pub mod model;
@@ -32,6 +33,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     ));
 
     Router::new()
+        // Health endpoints (no JWT required)
+        .route("/livez", get(health::livez))
+        .route("/readyz", get(health::readyz))
         // Public auth endpoints (no JWT required)
         .route("/auth/login", get(auth::login))
         .route("/auth/callback", get(auth::callback))

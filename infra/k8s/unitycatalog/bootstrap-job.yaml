@@ -77,214 +77,459 @@ data:
             },
         )
 
+    OWNERS = ["linh@gmail.com", "rikki@gmail.com"]
+
+    def owner_changes(others: list) -> list:
+        changes = [{"principal": p, "add": ["USE_CATALOG", "OWNER"], "remove": []} for p in OWNERS]
+        changes.extend(others)
+        return changes
+
+    def schema_owner_changes(others: list) -> list:
+        changes = [{"principal": p, "add": ["USE_SCHEMA", "OWNER"], "remove": []} for p in OWNERS]
+        changes.extend(others)
+        return changes
+
+    def table_owner_changes(others: list) -> list:
+        changes = [{"principal": p, "add": ["SELECT", "OWNER"], "remove": []} for p in OWNERS]
+        changes.extend(others)
+        return changes
+
     catalog_permissions = [
         (
             "/api/2.1/unity-catalog/permissions/catalog/hdbank",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                    {"principal": "rikki@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                ]
-            },
+            {"changes": owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/catalog/vietjetair",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_CATALOG", "OWNER"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                ]
-            },
+            {"changes": owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/catalog/hdbank_sandbox",
+            {"changes": owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/catalog/vietjetair_sandbox",
+            {"changes": owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/catalog/partnership_sandbox",
+            {"changes": owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
+            ])},
         ),
     ]
 
     schema_permissions = [
+        # hdbank prod schemas
         (
             "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_bronze",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                    {"principal": "rikki@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_silver",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_gold",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
+        # vietjetair prod schemas
         (
             "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_bronze",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_silver",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_gold",
-            {
-                "changes": [
-                    {"principal": "linh@gmail.com", "add": ["USE_SCHEMA", "OWNER"], "remove": []},
-                    {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                    {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                ]
-            },
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        # hdbank_sandbox schemas
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_bronze",
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_silver",
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_gold",
+            {"changes": schema_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        # vietjetair_sandbox schemas
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_silver",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        # partnership_sandbox schemas
+        (
+            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.credit_risk",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.cross_promotion",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.analytics",
+            {"changes": schema_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
+            ])},
         ),
     ]
 
     table_permissions = [
+        # hdbank prod tables
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.card_payment_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.customers_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.risk_detection_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.merchant_revenue_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.user_spend_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
+        # vietjetair prod tables
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.ticket_bookings_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.customers_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.flights_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.booking_revenue_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
         ),
         (
             "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.customer_spend_v1",
-            {"changes": [
-                {"principal": "linh@gmail.com", "add": ["SELECT", "OWNER"], "remove": []},
+            {"changes": table_owner_changes([
                 {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
                 {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ]},
+            ])},
+        ),
+        # hdbank_sandbox tables
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_bronze.raw_card_payment_events_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_bronze.raw_loan_application_events_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.card_payment_events_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.customers_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.loan_applications_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.user_spend_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.bnpl_exposure_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.credit_risk_features_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        # vietjetair_sandbox tables
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze.raw_booking_events_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze.raw_ancillary_events_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.ticket_bookings_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.customers_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.flights_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.ancillary_purchases_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.booking_revenue_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.customer_spend_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.ancillary_revenue_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.route_performance_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        # partnership_sandbox tables
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.travel_credit_features_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.bnpl_decisions_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.loan_decision_log_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.cross_promotion.vietjet_to_hdbank_prospects_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.cross_promotion.hdbank_to_vietjet_prospects_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.analytics.customer_360_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
+        ),
+        (
+            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.analytics.partnership_revenue_v1",
+            {"changes": table_owner_changes([
+                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
+                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
+            ])},
         ),
     ]
 
@@ -337,14 +582,31 @@ spec:
       restartPolicy: OnFailure
       serviceAccountName: unitycatalog-bootstrap-sa
       initContainers:
+        - name: wait-for-uc
+          image: busybox:stable
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/readyz; do
+                echo "waiting for unitycatalog..."; sleep 3
+              done
+              echo "unitycatalog ready"
         - name: fetch-token
           image: bitnami/kubectl:latest
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
           command:
             - sh
@@ -360,10 +622,10 @@ spec:
           image: minio/mc:latest
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
           command:
             - /bin/sh
@@ -372,23 +634,46 @@ spec:
               mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
               mc mb --ignore-existing rustfs/unitycatalog
               echo "buckets ready"
+        - name: create-topics
+          image: redpandadata/redpanda:latest
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 50m
+              memory: 128Mi
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              BROKERS="redpanda-svc.redpanda.svc.cluster.local:9092"
+              for topic in \
+                hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1 \
+                hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1 \
+                vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1 \
+                vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1 \
+                vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1; do
+                rpk topic create "$topic" --brokers "$BROKERS" || true
+              done
+              echo "topics ready"
 
       containers:
         - name: bootstrap
           image: python:3.11-alpine
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
           command:
             - sh
             - -c
             - |
               cat > /tmp/bootstrap.py << 'PYEOF'
-              import json, os, time, sys, urllib.request, urllib.error
+              import json, os, sys, urllib.request, urllib.error
 
               UC = "http://unitycatalog-svc:8080/api/2.1/unity-catalog"
               TOKEN = os.environ.get("UC_TOKEN", "")
@@ -574,6 +859,151 @@ spec:
                   ("currency", "STRING", "string", "string"),
               ])
 
+              # ── Sandbox column schemas ───────────────────────────────────────────
+
+              HDBANK_LOAN_APPLICATIONS_V1 = build_cols([
+                  ("loan_application_id", "STRING", "string", "string"),
+                  ("customer_id", "STRING", "string", "string"),
+                  ("loan_type", "STRING", "string", "string"),
+                  ("requested_amount_vnd", "DOUBLE", "double", "double"),
+                  ("vietjet_booking_reference", "STRING", "string", "string"),
+                  ("kyc_score", "DOUBLE", "double", "double"),
+                  ("status", "STRING", "string", "string"),
+                  ("applied_at", "TIMESTAMP", "timestamp", "timestamp"),
+              ])
+
+              HDBANK_BNPL_EXPOSURE_V1 = build_cols([
+                  ("business_date", "DATE", "date", "date"),
+                  ("customer_id", "STRING", "string", "string"),
+                  ("active_bnpl_count", "INT", "int", "integer"),
+                  ("total_outstanding_vnd", "DOUBLE", "double", "double"),
+                  ("avg_ticket_vnd", "DOUBLE", "double", "double"),
+                  ("currency", "STRING", "string", "string"),
+              ])
+
+              HDBANK_CREDIT_RISK_FEATURES_V1 = build_cols([
+                  ("snapshot_date", "DATE", "date", "date"),
+                  ("customer_id", "STRING", "string", "string"),
+                  ("avg_monthly_spend", "DOUBLE", "double", "double"),
+                  ("num_transactions_90d", "INT", "int", "integer"),
+                  ("num_declined_90d", "INT", "int", "integer"),
+                  ("travel_frequency_score", "DOUBLE", "double", "double"),
+                  ("top_merchant_category", "STRING", "string", "string"),
+                  ("credit_utilization_pct", "DOUBLE", "double", "double"),
+              ])
+
+              VIETJETAIR_ANCILLARY_PURCHASES_V1 = build_cols([
+                  ("ancillary_id", "STRING", "string", "string"),
+                  ("booking_id", "STRING", "string", "string"),
+                  ("customer_id", "STRING", "string", "string"),
+                  ("ancillary_type", "STRING", "string", "string"),
+                  ("item_name", "STRING", "string", "string"),
+                  ("amount", "DOUBLE", "double", "double"),
+                  ("currency", "STRING", "string", "string"),
+                  ("purchased_at", "TIMESTAMP", "timestamp", "timestamp"),
+              ])
+
+              VIETJETAIR_ANCILLARY_REVENUE_V1 = build_cols([
+                  ("business_date", "DATE", "date", "date"),
+                  ("route_code", "STRING", "string", "string"),
+                  ("ancillary_type", "STRING", "string", "string"),
+                  ("purchase_count", "INT", "int", "integer"),
+                  ("total_revenue", "DOUBLE", "double", "double"),
+                  ("avg_item_price", "DOUBLE", "double", "double"),
+                  ("currency", "STRING", "string", "string"),
+              ])
+
+              VIETJETAIR_ROUTE_PERFORMANCE_V1 = build_cols([
+                  ("flight_date", "DATE", "date", "date"),
+                  ("route_code", "STRING", "string", "string"),
+                  ("scheduled_flights", "INT", "int", "integer"),
+                  ("avg_load_factor", "DOUBLE", "double", "double"),
+                  ("avg_ticket_price", "DOUBLE", "double", "double"),
+                  ("on_time_rate", "DOUBLE", "double", "double"),
+                  ("currency", "STRING", "string", "string"),
+              ])
+
+              PARTNERSHIP_TRAVEL_CREDIT_FEATURES_V1 = build_cols([
+                  ("feature_date", "DATE", "date", "date"),
+                  ("hdbank_customer_id", "STRING", "string", "string"),
+                  ("vietjet_customer_id", "STRING", "string", "string"),
+                  ("travel_frequency_score", "DOUBLE", "double", "double"),
+                  ("avg_booking_value", "DOUBLE", "double", "double"),
+                  ("loyalty_tier", "STRING", "string", "string"),
+                  ("distinct_routes_count", "INT", "int", "integer"),
+                  ("ancillary_spend_ratio", "DOUBLE", "double", "double"),
+              ])
+
+              PARTNERSHIP_BNPL_DECISIONS_V1 = build_cols([
+                  ("decision_id", "STRING", "string", "string"),
+                  ("booking_id", "STRING", "string", "string"),
+                  ("vietjet_customer_id", "STRING", "string", "string"),
+                  ("hdbank_customer_id", "STRING", "string", "string"),
+                  ("booking_amount", "DOUBLE", "double", "double"),
+                  ("approved_credit_line", "DOUBLE", "double", "double"),
+                  ("bnpl_term_months", "INT", "int", "integer"),
+                  ("interest_rate_bps", "INT", "int", "integer"),
+                  ("decision", "STRING", "string", "string"),
+                  ("decided_at", "TIMESTAMP", "timestamp", "timestamp"),
+              ])
+
+              PARTNERSHIP_LOAN_DECISION_LOG_V1 = build_cols([
+                  ("decision_id", "STRING", "string", "string"),
+                  ("customer_id", "STRING", "string", "string"),
+                  ("loan_type", "STRING", "string", "string"),
+                  ("features_snapshot_date", "DATE", "date", "date"),
+                  ("model_version", "STRING", "string", "string"),
+                  ("probability_default", "DOUBLE", "double", "double"),
+                  ("decision", "STRING", "string", "string"),
+                  ("credit_limit_vnd", "DOUBLE", "double", "double"),
+                  ("decided_at", "TIMESTAMP", "timestamp", "timestamp"),
+              ])
+
+              PARTNERSHIP_VJ_TO_HD_PROSPECTS_V1 = build_cols([
+                  ("prospect_id", "STRING", "string", "string"),
+                  ("vietjet_customer_id", "STRING", "string", "string"),
+                  ("customer_name", "STRING", "string", "string"),
+                  ("home_airport", "STRING", "string", "string"),
+                  ("membership_tier", "STRING", "string", "string"),
+                  ("annual_flight_spend_vnd", "DOUBLE", "double", "double"),
+                  ("recommended_product", "STRING", "string", "string"),
+                  ("propensity_score", "DOUBLE", "double", "double"),
+                  ("campaign_id", "STRING", "string", "string"),
+              ])
+
+              PARTNERSHIP_HD_TO_VJ_PROSPECTS_V1 = build_cols([
+                  ("prospect_id", "STRING", "string", "string"),
+                  ("hdbank_customer_id", "STRING", "string", "string"),
+                  ("customer_name", "STRING", "string", "string"),
+                  ("travel_spend_share", "DOUBLE", "double", "double"),
+                  ("top_airline_merchant", "STRING", "string", "string"),
+                  ("recommended_tier", "STRING", "string", "string"),
+                  ("propensity_score", "DOUBLE", "double", "double"),
+                  ("campaign_id", "STRING", "string", "string"),
+              ])
+
+              PARTNERSHIP_CUSTOMER_360_V1 = build_cols([
+                  ("snapshot_date", "DATE", "date", "date"),
+                  ("unified_customer_id", "STRING", "string", "string"),
+                  ("hdbank_customer_id", "STRING", "string", "string"),
+                  ("vietjet_customer_id", "STRING", "string", "string"),
+                  ("total_card_spend_vnd", "DOUBLE", "double", "double"),
+                  ("total_flight_spend_vnd", "DOUBLE", "double", "double"),
+                  ("bnpl_outstanding_vnd", "DOUBLE", "double", "double"),
+                  ("loyalty_tier", "STRING", "string", "string"),
+                  ("segment", "STRING", "string", "string"),
+                  ("last_activity_at", "TIMESTAMP", "timestamp", "timestamp"),
+              ])
+
+              PARTNERSHIP_REVENUE_V1 = build_cols([
+                  ("business_month", "STRING", "string", "string"),
+                  ("revenue_type", "STRING", "string", "string"),
+                  ("product", "STRING", "string", "string"),
+                  ("customer_count", "INT", "int", "integer"),
+                  ("total_revenue_vnd", "DOUBLE", "double", "double"),
+                  ("avg_revenue_per_customer", "DOUBLE", "double", "double"),
+              ])
+
               CATALOGS = {
                   "hdbank": {
                       "comment": "HDBank demo catalog with Kafka bronze events and banking silver/gold marts",
@@ -720,20 +1150,244 @@ spec:
                           },
                       },
                   },
+                  "hdbank_sandbox": {
+                      "comment": "HDBank sandbox with synthetic payment, loan, BNPL, and credit-risk data for cross-company analytics",
+                      "schemas": {
+                          "hdbank_payments_sandbox_bronze": {
+                              "comment": "Synthetic raw HDBank events for payments and loan applications",
+                              "tables": [
+                                  {
+                                      "name": "raw_card_payment_events_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_bronze/raw_card_payment_events_v1",
+                                      "columns": HDBANK_RAW_CARD_PAYMENT_EVENTS_V1,
+                                      "comment": "Synthetic raw card payment events for sandbox development",
+                                  },
+                                  {
+                                      "name": "raw_loan_application_events_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_bronze/raw_loan_application_events_v1",
+                                      "columns": HDBANK_RAW_CARD_PAYMENT_EVENTS_V1,
+                                      "comment": "Synthetic raw loan application events with VietJet booking references",
+                                  },
+                              ],
+                          },
+                          "hdbank_payments_sandbox_silver": {
+                              "comment": "Conformed sandbox payment, customer, and loan entities",
+                              "tables": [
+                                  {
+                                      "name": "card_payment_events_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/card_payment_events_v1",
+                                      "columns": HDBANK_CARD_PAYMENT_EVENTS_V1,
+                                      "comment": "Synthetic conformed card payment events for sandbox development",
+                                  },
+                                  {
+                                      "name": "customers_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/customers_v1",
+                                      "columns": HDBANK_CUSTOMER_PROFILE_V1,
+                                      "comment": "Synthetic HDBank customer profiles shared with VietJet sandbox customers",
+                                  },
+                                  {
+                                      "name": "loan_applications_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/loan_applications_v1",
+                                      "columns": HDBANK_LOAN_APPLICATIONS_V1,
+                                      "comment": "Conformed loan applications with VietJet booking references for BNPL workflows",
+                                  },
+                              ],
+                          },
+                          "hdbank_payments_sandbox_gold": {
+                              "comment": "Sandbox monetization and credit-risk gold marts",
+                              "tables": [
+                                  {
+                                      "name": "user_spend_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/user_spend_v1",
+                                      "columns": HDBANK_USER_SPEND_V1,
+                                      "comment": "Sandbox user spend mart by customer and account",
+                                  },
+                                  {
+                                      "name": "bnpl_exposure_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/bnpl_exposure_v1",
+                                      "columns": HDBANK_BNPL_EXPOSURE_V1,
+                                      "comment": "Daily BNPL outstanding exposure per customer for VietJet flight purchases",
+                                  },
+                                  {
+                                      "name": "credit_risk_features_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/credit_risk_features_v1",
+                                      "columns": HDBANK_CREDIT_RISK_FEATURES_V1,
+                                      "comment": "Cross-company credit risk feature snapshot combining banking and travel signals",
+                                  },
+                              ],
+                          },
+                      },
+                  },
+                  "vietjetair_sandbox": {
+                      "comment": "VietJet Air sandbox with synthetic booking, ancillary, and route performance data",
+                      "schemas": {
+                          "vietjetair_bookings_sandbox_bronze": {
+                              "comment": "Synthetic raw VietJet events for bookings and ancillary purchases",
+                              "tables": [
+                                  {
+                                      "name": "raw_booking_events_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_bronze/raw_booking_events_v1",
+                                      "columns": VIETJETAIR_RAW_BOOKING_EVENTS_V1,
+                                      "comment": "Synthetic raw booking events for sandbox development",
+                                  },
+                                  {
+                                      "name": "raw_ancillary_events_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_bronze/raw_ancillary_events_v1",
+                                      "columns": VIETJETAIR_RAW_BOOKING_EVENTS_V1,
+                                      "comment": "Synthetic raw ancillary purchase events (baggage, meals, seat upgrades)",
+                                  },
+                              ],
+                          },
+                          "vietjetair_bookings_sandbox_silver": {
+                              "comment": "Conformed sandbox booking, customer, flight, and ancillary entities",
+                              "tables": [
+                                  {
+                                      "name": "ticket_bookings_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/ticket_bookings_v1",
+                                      "columns": VIETJETAIR_TICKET_BOOKINGS_V1,
+                                      "comment": "Synthetic conformed ticket bookings for sandbox development",
+                                  },
+                                  {
+                                      "name": "customers_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/customers_v1",
+                                      "columns": VIETJETAIR_CUSTOMERS_V1,
+                                      "comment": "Synthetic VietJet customer dimension shared with HDBank sandbox customers",
+                                  },
+                                  {
+                                      "name": "flights_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/flights_v1",
+                                      "columns": VIETJETAIR_FLIGHTS_V1,
+                                      "comment": "Synthetic VietJet flight dimension with Vietnam domestic routes",
+                                  },
+                                  {
+                                      "name": "ancillary_purchases_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/ancillary_purchases_v1",
+                                      "columns": VIETJETAIR_ANCILLARY_PURCHASES_V1,
+                                      "comment": "Conformed ancillary purchases with type and booking linkage",
+                                  },
+                              ],
+                          },
+                          "vietjetair_bookings_sandbox_gold": {
+                              "comment": "Sandbox revenue and operational performance gold marts",
+                              "tables": [
+                                  {
+                                      "name": "booking_revenue_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/booking_revenue_v1",
+                                      "columns": VIETJETAIR_BOOKING_REVENUE_V1,
+                                      "comment": "Sandbox booking revenue mart by route and business date",
+                                  },
+                                  {
+                                      "name": "customer_spend_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/customer_spend_v1",
+                                      "columns": VIETJETAIR_CUSTOMER_SPEND_V1,
+                                      "comment": "Sandbox customer spend mart across bookings and routes",
+                                  },
+                                  {
+                                      "name": "ancillary_revenue_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/ancillary_revenue_v1",
+                                      "columns": VIETJETAIR_ANCILLARY_REVENUE_V1,
+                                      "comment": "Gold ancillary revenue mart by type and route for margin analysis",
+                                  },
+                                  {
+                                      "name": "route_performance_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/route_performance_v1",
+                                      "columns": VIETJETAIR_ROUTE_PERFORMANCE_V1,
+                                      "comment": "Gold route performance mart with load factor and on-time rate metrics",
+                                  },
+                              ],
+                          },
+                      },
+                  },
+                  "partnership_sandbox": {
+                      "comment": "Cross-company sandbox combining HDBank and VietJet data for BNPL, credit risk, and cross-sell analytics",
+                      "schemas": {
+                          "credit_risk": {
+                              "comment": "Cross-company credit risk and BNPL decision features",
+                              "tables": [
+                                  {
+                                      "name": "travel_credit_features_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/travel_credit_features_v1",
+                                      "columns": PARTNERSHIP_TRAVEL_CREDIT_FEATURES_V1,
+                                      "comment": "VietJet travel behavior features joined to HDBank customer IDs for credit scoring",
+                                  },
+                                  {
+                                      "name": "bnpl_decisions_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/bnpl_decisions_v1",
+                                      "columns": PARTNERSHIP_BNPL_DECISIONS_V1,
+                                      "comment": "HDBank BNPL approval decisions on VietJet flight bookings with credit line and terms",
+                                  },
+                                  {
+                                      "name": "loan_decision_log_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/loan_decision_log_v1",
+                                      "columns": PARTNERSHIP_LOAN_DECISION_LOG_V1,
+                                      "comment": "Loan decision audit log with model version, PD score, and approved credit limit",
+                                  },
+                              ],
+                          },
+                          "cross_promotion": {
+                              "comment": "Cross-sell prospect lists and campaign definitions",
+                              "tables": [
+                                  {
+                                      "name": "vietjet_to_hdbank_prospects_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/cross_promotion/vietjet_to_hdbank_prospects_v1",
+                                      "columns": PARTNERSHIP_VJ_TO_HD_PROSPECTS_V1,
+                                      "comment": "VietJet frequent flyers scored for HDBank travel card cross-sell campaigns",
+                                  },
+                                  {
+                                      "name": "hdbank_to_vietjet_prospects_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/cross_promotion/hdbank_to_vietjet_prospects_v1",
+                                      "columns": PARTNERSHIP_HD_TO_VJ_PROSPECTS_V1,
+                                      "comment": "HDBank cardholders with travel spend scored for VietJet loyalty membership upsell",
+                                  },
+                              ],
+                          },
+                          "analytics": {
+                              "comment": "Unified partnership analytics and P&L reporting",
+                              "tables": [
+                                  {
+                                      "name": "customer_360_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/analytics/customer_360_v1",
+                                      "columns": PARTNERSHIP_CUSTOMER_360_V1,
+                                      "comment": "Unified customer view combining HDBank card spend, VietJet flight spend, and BNPL exposure",
+                                  },
+                                  {
+                                      "name": "partnership_revenue_v1",
+                                      "data_source_format": "DELTA",
+                                      "url": "s3://unitycatalog/partnership_sandbox/analytics/partnership_revenue_v1",
+                                      "columns": PARTNERSHIP_REVENUE_V1,
+                                      "comment": "Monthly partnership P&L by revenue type (BNPL interest, card fee, referral, ancillary commission)",
+                                  },
+                              ],
+                          },
+                      },
+                  },
               }
 
               # ── Bootstrap ─────────────────────────────────────────────────────────
-
-              print("Waiting for UC server...")
-              for _ in range(60):
-                  try:
-                      urllib.request.urlopen(urllib.request.Request(f"{UC}/catalogs", headers=_headers()))
-                      print("UC server ready")
-                      break
-                  except:
-                      time.sleep(5)
-              else:
-                  sys.exit("UC did not start in time")
 
               for catalog_name, catalog in CATALOGS.items():
                   print(f"\nCreating catalog: {catalog_name}")

@@ -98,10 +98,10 @@ spec:
             periodSeconds: 20
           resources:
             requests:
-              cpu: 250m
+              cpu: 100m
               memory: 1Gi
             limits:
-              cpu: "1"
+              cpu: 500m
               memory: 2Gi
           volumeMounts:
             - name: redpanda-data

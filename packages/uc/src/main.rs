@@ -148,6 +148,7 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(UserService::new(user_repo));
 
     let state = Arc::new(AppState {
+        pool: pool.clone(),
         catalog_service,
         schema_service,
         table_service,

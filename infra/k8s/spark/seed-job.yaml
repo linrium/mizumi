@@ -13,10 +13,10 @@ spec:
           image: minio/mc:latest
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 64Mi
             limits:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
           command:
             - /bin/sh

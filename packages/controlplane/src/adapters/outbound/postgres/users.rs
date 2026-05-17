@@ -16,8 +16,8 @@ pub async fn upsert(
         r#"
         INSERT INTO users (id, email, username, full_name, roles, user_type)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (id) DO UPDATE
-            SET email     = EXCLUDED.email,
+        ON CONFLICT (email) DO UPDATE
+            SET id        = EXCLUDED.id,
                 username  = EXCLUDED.username,
                 full_name = EXCLUDED.full_name,
                 roles     = EXCLUDED.roles,

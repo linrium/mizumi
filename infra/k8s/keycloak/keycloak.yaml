@@ -25,10 +25,11 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:26.3.3
+          image: mizumi-keycloak:26.3.3
           imagePullPolicy: IfNotPresent
           args:
-            - start-dev
+            - start
+            - --optimized
             - --http-port=8080
             - --hostname-strict=false
             - --proxy-headers=xforwarded
@@ -49,10 +50,10 @@ spec:
                 secretKeyRef:
                   name: keycloak-postgres-secret
                   key: POSTGRES_PASSWORD
-            - name: KC_HEALTH_ENABLED
-              value: "true"
             - name: KC_HTTP_ENABLED
               value: "true"
+            - name: KC_CACHE
+              value: "local"
             - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:
@@ -77,10 +78,10 @@ spec:
             periodSeconds: 20
           resources:
             requests:
-              cpu: 250m
+              cpu: 500m
               memory: 768Mi
             limits:
-              cpu: 1
+              cpu: 2000m
               memory: 1536Mi
 ---
 apiVersion: v1

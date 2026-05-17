@@ -3,9 +3,11 @@ use crate::{
     domain::ports::outbound::AuthorizerPort,
     infrastructure::{auth::JwtValidator, token_manager::TokenManager},
 };
+use sqlx::PgPool;
 use std::sync::Arc;
 
 pub struct AppState {
+    pub pool: Arc<PgPool>,
     pub catalog_service: Arc<dyn CatalogUseCase>,
     pub schema_service: Arc<dyn SchemaUseCase>,
     pub table_service: Arc<dyn TableUseCase>,

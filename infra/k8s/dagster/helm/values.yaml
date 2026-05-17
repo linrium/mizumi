@@ -11,30 +11,30 @@ dagster-user-deployments:
       port: 3030
       resources:
         requests:
-          cpu: 200m
+          cpu: 100m
           memory: 512Mi
         limits:
-          cpu: 500m
+          cpu: 250m
           memory: 1Gi
 
 dagsterWebserver:
   replicaCount: 1
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
     limits:
-      cpu: 250m
+      cpu: 125m
       memory: 512Mi
 
 dagsterDaemon:
   enabled: true
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
     limits:
-      cpu: 250m
+      cpu: 125m
       memory: 512Mi
 
 runLauncher:
@@ -43,10 +43,10 @@ runLauncher:
     k8sRunLauncher:
       resources:
         requests:
-          cpu: 250m
+          cpu: 125m
           memory: 512Mi
         limits:
-          cpu: 500m
+          cpu: 250m
           memory: 1Gi
 
 postgresql:
@@ -56,8 +56,8 @@ postgresql:
       size: 1Gi
     resources:
       requests:
-        cpu: 50m
+        cpu: 25m
         memory: 128Mi
       limits:
-        cpu: 250m
+        cpu: 125m
         memory: 256Mi
