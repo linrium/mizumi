@@ -38,6 +38,37 @@ pub async fn list_members(db: &PgPool, team_id: Uuid) -> Result<Vec<TeamMember>,
     .await
 }
 
+pub async fn list_for_user(db: &PgPool, user_id: Uuid) -> Result<Vec<Team>, sqlx::Error> {
+    sqlx::query_as::<_, Team>(
+        r#"
+        SELECT t.*
+        FROM teams t
+        JOIN team_members tm ON tm.team_id = t.id
+        WHERE tm.user_id = $1
+        ORDER BY t.name ASC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await
+}
+
+pub async fn is_member(db: &PgPool, team_id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM team_members
+                WHERE team_id = $1 AND user_id = $2
+            )
+            "#,
+    )
+    .bind(team_id)
+    .bind(user_id)
+    .fetch_one(db)
+    .await?)
+}
+
 pub async fn add_member(
     db: &PgPool,
     team_id: Uuid,
@@ -62,16 +93,11 @@ pub async fn add_member(
     .await
 }
 
-pub async fn remove_member(
-    db: &PgPool,
-    team_id: Uuid,
-    user_id: Uuid,
-) -> Result<bool, sqlx::Error> {
-    let result =
-        sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
-            .bind(team_id)
-            .bind(user_id)
-            .execute(db)
-            .await?;
+pub async fn remove_member(db: &PgPool, team_id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM team_members WHERE team_id = $1 AND user_id = $2")
+        .bind(team_id)
+        .bind(user_id)
+        .execute(db)
+        .await?;
     Ok(result.rows_affected() > 0)
 }

@@ -25,3 +25,17 @@ pub async fn list_users(State(state): State<Arc<AppState>>) -> impl IntoResponse
         Err(err) => err.into_response(),
     }
 }
+
+pub async fn my_teams(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<KeycloakClaims>,
+) -> impl IntoResponse {
+    let id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => return axum::http::StatusCode::UNAUTHORIZED.into_response(),
+    };
+    match state.team_service.list_user_teams(id).await {
+        Ok(teams) => Json(serde_json::json!({ "teams": teams })).into_response(),
+        Err(err) => err.into_response(),
+    }
+}

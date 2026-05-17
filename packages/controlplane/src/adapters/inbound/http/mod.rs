@@ -64,7 +64,10 @@ fn extract_bearer(headers: &HeaderMap) -> Option<String> {
 
 pub fn create_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
-        .route("/api/teams", get(teams::list_teams).post(teams::create_team))
+        .route(
+            "/api/teams",
+            get(teams::list_teams).post(teams::create_team),
+        )
         .route("/api/teams/{id}", get(teams::get_team))
         .route(
             "/api/teams/{id}/members",
@@ -76,6 +79,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         .route("/api/users", get(users::list_users))
         .route("/api/users/me", get(users::me))
+        .route("/api/users/me/teams", get(users::my_teams))
         .route("/api/query", post(k8s::run_query))
         .route(
             "/api/sessions",

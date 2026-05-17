@@ -1,6 +1,7 @@
 "use client"
 
 import { formatDistanceToNowStrict } from "date-fns"
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -103,7 +104,12 @@ export default function PolicyTemplatesPage() {
                   <TableCell className="align-top">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{template.name}</span>
+                        <Link
+                          href={`/permissions/policy-templates/${template.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {template.name}
+                        </Link>
                       </div>
                       <div className="text-muted-foreground">
                         Updated{" "}
@@ -146,7 +152,18 @@ export default function PolicyTemplatesPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {formatApprovalMode(template.approval_mode)}
+                    <div className="space-y-1">
+                      <div>{formatApprovalMode(template.approval_mode)}</div>
+                      {template.approval_steps.length > 0 && (
+                        <div className="flex max-w-[28ch] flex-wrap gap-1">
+                          {template.approval_steps.map((step) => (
+                            <Badge key={step.id} variant="outline">
+                              {`S${step.stage_order} · ${step.approver_team}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{template.usage_30d} requests / 30d</TableCell>
                   <TableCell>

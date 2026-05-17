@@ -23,6 +23,13 @@ export async function listTeams(): Promise<Team[]> {
   return body.teams
 }
 
+export async function listMyTeams(): Promise<Team[]> {
+  const res = await apiFetch("/api/users/me/teams")
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const body = await res.json()
+  return body.teams
+}
+
 export async function getTeam(id: string): Promise<Team> {
   const res = await apiFetch(`/api/teams/${encodeURIComponent(id)}`)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

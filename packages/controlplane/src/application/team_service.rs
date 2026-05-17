@@ -23,6 +23,10 @@ impl TeamService {
         Ok(teams::list(&self.db).await?)
     }
 
+    pub async fn list_user_teams(&self, user_id: Uuid) -> Result<Vec<Team>, AppError> {
+        Ok(teams::list_for_user(&self.db, user_id).await?)
+    }
+
     pub async fn get_team(&self, id: Uuid) -> Result<Team, AppError> {
         teams::get(&self.db, id).await?.ok_or(AppError::NotFound)
     }

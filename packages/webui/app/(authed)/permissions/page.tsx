@@ -6,6 +6,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
+import Link from "next/link"
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -102,6 +103,14 @@ function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   }
 }
 
+function formatApprovalStep(step: PermissionRequest["approval_steps"][number]) {
+  return `S${step.stage_order} · ${step.approver_team}`
+}
+
+function formatSubmitter(request: PermissionRequest) {
+  return request.submit_as === "team" ? (request.team ?? "Team") : "Personal"
+}
+
 export default function PermissionsPage() {
   const [requests, setRequests] = useState<PermissionRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,9 +121,10 @@ export default function PermissionsPage() {
     useState<(typeof FILTERS)[number]["key"]>("all")
   const [approving, setApproving] = useState(false)
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null)
-  const [approveTarget, setApproveTarget] = useState<PermissionRequest | null>(
-    null,
-  )
+  const [approveTarget, setApproveTarget] = useState<{
+    request: PermissionRequest
+    stepId?: string
+  } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -161,7 +171,8 @@ export default function PermissionsPage() {
           : [
               request.code,
               request.requester,
-              request.team,
+              request.team ?? "",
+              request.submit_as,
               request.resource,
               request.reviewer,
               request.rationale,
@@ -196,7 +207,11 @@ export default function PermissionsPage() {
     setApproving(true)
     setError(null)
     try {
-      const updated = await updateRequestStatus(approveTarget.id, "approved")
+      const updated = await updateRequestStatus(
+        approveTarget.request.id,
+        "approved",
+        approveTarget.stepId,
+      )
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
       )
@@ -211,13 +226,14 @@ export default function PermissionsPage() {
   async function handleDropdownAction(
     id: string,
     action: "approve" | "needs-info",
+    approvalStepId?: string,
   ) {
     const status: RequestStatus =
       action === "approve" ? "approved" : "needs-info"
     setActiveRequestId(id)
     setError(null)
     try {
-      const updated = await updateRequestStatus(id, status)
+      const updated = await updateRequestStatus(id, status, approvalStepId)
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
       )
@@ -321,6 +337,9 @@ export default function PermissionsPage() {
                   { addSuffix: true },
                 )
                 const isActioning = activeRequestId === request.id
+                const currentSteps = request.approval_steps.filter(
+                  (step) => step.is_current,
+                )
 
                 return (
                   <TableRow
@@ -334,15 +353,21 @@ export default function PermissionsPage() {
                     <TableCell className="align-top">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">
+                          <Link
+                            href={`/permissions/${request.id}`}
+                            className="font-medium hover:underline"
+                          >
                             {request.requester}
-                          </span>
-                          <span className="font-mono text-muted-foreground">
+                          </Link>
+                          <Link
+                            href={`/permissions/${request.id}`}
+                            className="font-mono text-muted-foreground hover:underline"
+                          >
                             {request.code}
-                          </span>
+                          </Link>
                         </div>
                         <div className="text-muted-foreground">
-                          {request.team}
+                          {formatSubmitter(request)}
                         </div>
                         <div className="line-clamp-1 max-w-[44ch] text-muted-foreground">
                           {request.rationale}
@@ -409,6 +434,18 @@ export default function PermissionsPage() {
                     <TableCell className="align-top">
                       <div className="space-y-1">
                         <div className="font-medium">{request.reviewer}</div>
+                        <div className="flex max-w-[28ch] flex-wrap gap-1">
+                          {request.approval_steps.map((step) => (
+                            <Badge
+                              key={step.id}
+                              variant={
+                                step.is_current ? "secondary" : "outline"
+                              }
+                            >
+                              {formatApprovalStep(step)}
+                            </Badge>
+                          ))}
+                        </div>
                         {request.policy_template_owner ? (
                           <div className="text-muted-foreground">
                             Template owner {request.policy_template_owner}
@@ -442,26 +479,56 @@ export default function PermissionsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem
-                            disabled={
-                              isActioning || request.status === "approved"
-                            }
-                            onClick={() => setApproveTarget(request)}
-                          >
-                            {isActioning && request.status !== "approved"
-                              ? "Approving…"
-                              : "Approve request"}
-                          </DropdownMenuItem>
+                          {currentSteps.length <= 1 ? (
+                            <DropdownMenuItem
+                              disabled={
+                                isActioning || request.status === "approved"
+                              }
+                              onClick={() =>
+                                setApproveTarget({
+                                  request,
+                                  stepId: currentSteps[0]?.id,
+                                })
+                              }
+                            >
+                              {isActioning && request.status !== "approved"
+                                ? "Approving…"
+                                : "Approve request"}
+                            </DropdownMenuItem>
+                          ) : (
+                            currentSteps.map((step) => (
+                              <DropdownMenuItem
+                                key={step.id}
+                                disabled={
+                                  isActioning || request.status === "approved"
+                                }
+                                onClick={() =>
+                                  setApproveTarget({
+                                    request,
+                                    stepId: step.id,
+                                  })
+                                }
+                              >
+                                {`Approve ${step.approver_team}`}
+                              </DropdownMenuItem>
+                            ))
+                          )}
                           <DropdownMenuItem
                             disabled={isActioning}
                             onClick={() =>
-                              handleDropdownAction(request.id, "needs-info")
+                              handleDropdownAction(
+                                request.id,
+                                "needs-info",
+                                currentSteps[0]?.id,
+                              )
                             }
                           >
                             Request more context
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            View entitlement history
+                          <DropdownMenuItem asChild>
+                            <Link href={`/permissions/${request.id}`}>
+                              View details
+                            </Link>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -524,15 +591,19 @@ export default function PermissionsPage() {
                   Requester
                 </p>
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="font-medium">{approveTarget.requester}</span>
+                  <span className="font-medium">
+                    {approveTarget.request.requester}
+                  </span>
                   <span className="font-mono text-xs text-muted-foreground shrink-0">
-                    {approveTarget.code}
+                    {approveTarget.request.code}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">{approveTarget.team}</p>
-                {approveTarget.rationale && (
+                <p className="text-xs text-muted-foreground">
+                  {formatSubmitter(approveTarget.request)}
+                </p>
+                {approveTarget.request.rationale && (
                   <p className="text-xs text-muted-foreground line-clamp-2 pt-0.5">
-                    {approveTarget.rationale}
+                    {approveTarget.request.rationale}
                   </p>
                 )}
               </div>
@@ -542,12 +613,14 @@ export default function PermissionsPage() {
                   Resource
                 </p>
                 <p className="font-mono text-xs break-all leading-relaxed">
-                  {approveTarget.resource}
+                  {approveTarget.request.resource}
                 </p>
                 <div className="flex flex-wrap items-center gap-1">
-                  <Badge variant="outline">{formatScopeLabel(approveTarget.scope)}</Badge>
-                  <Badge variant={getRiskVariant(approveTarget.risk)}>
-                    {approveTarget.risk} risk
+                  <Badge variant="outline">
+                    {formatScopeLabel(approveTarget.request.scope)}
+                  </Badge>
+                  <Badge variant={getRiskVariant(approveTarget.request.risk)}>
+                    {approveTarget.request.risk} risk
                   </Badge>
                 </div>
               </div>
@@ -557,7 +630,7 @@ export default function PermissionsPage() {
                   Privileges to grant
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {approveTarget.privileges.map((p) => (
+                  {approveTarget.request.privileges.map((p) => (
                     <Badge key={p} variant="secondary">
                       {p}
                     </Badge>
@@ -569,12 +642,28 @@ export default function PermissionsPage() {
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   Reviewer
                 </p>
-                <p className="font-medium">{approveTarget.reviewer}</p>
-                {approveTarget.policy_template_name && (
+                <p className="font-medium">{approveTarget.request.reviewer}</p>
+                {approveTarget.request.approval_steps.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {approveTarget.request.approval_steps.map((step) => (
+                      <Badge
+                        key={step.id}
+                        variant={
+                          approveTarget.stepId === step.id || step.is_current
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {`${formatApprovalStep(step)} · ${step.status}`}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {approveTarget.request.policy_template_name && (
                   <p className="text-xs text-muted-foreground">
-                    Template: {approveTarget.policy_template_name}
-                    {approveTarget.policy_template_owner
-                      ? ` · ${approveTarget.policy_template_owner}`
+                    Template: {approveTarget.request.policy_template_name}
+                    {approveTarget.request.policy_template_owner
+                      ? ` · ${approveTarget.request.policy_template_owner}`
                       : ""}
                   </p>
                 )}

@@ -9,6 +9,13 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -16,6 +23,9 @@ import type { RequestScope, RequestStatus } from "@/services/permissions"
 import {
   cancelPermissionRequestAction,
   getMyPrivilegesAction,
+  listMyTeamsAction,
+  type MyTeamOption,
+  type RequestSubmitAs,
   listPermissionRequestsAction,
   type StoredPermissionRequest,
   submitPermissionRequestAction,
@@ -108,6 +118,8 @@ function parseResource(resource: string, scope: RequestScope) {
 export function RequestPermissionsPanel({ resource, scope }: Props) {
   const [history, setHistory] = useState<StoredPermissionRequest[]>([])
   const [loadingHistory, setLoadingHistory] = useState(true)
+  const [myTeams, setMyTeams] = useState<MyTeamOption[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [grantedPrivileges, setGrantedPrivileges] = useState<Set<string>>(
@@ -131,11 +143,18 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
 
   const form = useForm({
     defaultValues: {
+      submitAs: "personal" as RequestSubmitAs,
+      teamId: "",
       privileges: [] as string[],
       rationale: "",
     },
     validators: {
       onSubmit: ({ value }) => {
+        if (value.submitAs === "team" && !value.teamId) {
+          return {
+            fields: { teamId: "Choose the team submitting this request." },
+          }
+        }
         if (value.privileges.length === 0) {
           return { fields: { privileges: "Select at least one privilege." } }
         }
@@ -144,6 +163,8 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
     onSubmit: async ({ value, formApi }) => {
       setServerError(null)
       const result = await submitPermissionRequestAction({
+        submitAs: value.submitAs,
+        teamId: value.submitAs === "team" ? value.teamId : undefined,
         resource,
         scope,
         privileges: value.privileges
@@ -159,15 +180,32 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         setServerError("Request submission failed.")
         return
       }
-      setHistory((prev) => [result.data, ...prev])
+      const data = result.data
+      setHistory((prev) => [data, ...prev])
       toast.success("Request submitted", {
-        description: result.data.policy_template_name
-          ? `${result.data.code} - ${formatQueueDecision(result.data.queue_decision)}`
-          : `${result.data.code} - Manual review`,
+        description: data.policy_template_name
+          ? `${data.code} - ${formatQueueDecision(data.queue_decision)}`
+          : `${data.code} - Manual review`,
       })
       formApi.reset()
+      formApi.setFieldValue("submitAs", value.submitAs)
+      formApi.setFieldValue("teamId", value.teamId)
     },
   })
+
+  useEffect(() => {
+    setLoadingTeams(true)
+    listMyTeamsAction()
+      .then((teams) => {
+        setMyTeams(teams)
+        const firstTeamId = teams[0]?.id
+        if (firstTeamId) {
+          form.setFieldValue("teamId", firstTeamId)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTeams(false))
+  }, [form])
 
   async function handleCancel(id: string) {
     setCancellingId(id)
@@ -181,7 +219,8 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
       toast.error("Failed to cancel", { description: "Request not found." })
       return
     }
-    setHistory((prev) => prev.map((r) => (r.id === id ? result.data : r)))
+    const data = result.data
+    setHistory((prev) => prev.map((r) => (r.id === id ? data : r)))
     toast.success("Request cancelled")
   }
 
@@ -195,6 +234,70 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         }}
         className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5"
       >
+        <form.Field name="submitAs">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Submit as
+              </Label>
+              <Select
+                value={field.state.value}
+                onValueChange={(value) =>
+                  field.handleChange(value as RequestSubmitAs)
+                }
+              >
+                <SelectTrigger className="text-xs">
+                  <SelectValue placeholder="Choose request identity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">Personal</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="teamId">
+          {(field) => (
+            <div
+              className={cn(
+                "space-y-1.5",
+                form.state.values.submitAs !== "team" && "opacity-60",
+              )}
+            >
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Submit as team
+              </Label>
+              <Select
+                value={field.state.value}
+                onValueChange={(value) => field.handleChange(value)}
+                disabled={form.state.values.submitAs !== "team"}
+              >
+                <SelectTrigger className="text-xs">
+                  <SelectValue
+                    placeholder={
+                      loadingTeams ? "Loading teams…" : "Select a team"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {myTeams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {field.state.meta.errors.length > 0 && (
+                <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  {String(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+
         <div className="space-y-3">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">
             Privileges
@@ -400,10 +503,28 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     {formatQueueDecision(req.queue_decision)}
                   </p>
 
+                  {req.approval_steps.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {req.approval_steps.map((step) => (
+                        <Badge
+                          key={step.id}
+                          variant={step.is_current ? "secondary" : "outline"}
+                          className="text-[11px]"
+                        >
+                          {`S${step.stage_order} · ${step.approver_team} · ${step.status}`}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span>
                       {req.requester}
-                      {req.team ? ` · ${req.team}` : ""}
+                      {req.submit_as === "team"
+                        ? req.team
+                          ? ` · ${req.team}`
+                          : ""
+                        : " · Personal"}
                     </span>
                     <span>
                       {formatDistanceToNowStrict(new Date(req.submitted_at), {

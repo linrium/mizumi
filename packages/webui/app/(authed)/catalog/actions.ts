@@ -10,6 +10,7 @@ import {
   patchPermissions,
 } from "@/services/catalog"
 import type {
+  PermissionApprovalStep,
   RequestScope,
   RequestStatus,
   RiskLevel,
@@ -109,8 +110,10 @@ export async function patchPermissionsAction(input: {
 export type StoredPermissionRequest = {
   id: string
   code: string
+  submit_as?: "personal" | "team"
   requester: string
-  team: string
+  team_id?: string | null
+  team: string | null
   resource: string
   scope: RequestScope
   privileges: string[]
@@ -127,6 +130,8 @@ export type StoredPermissionRequest = {
   policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_owner_id: string | null
   policy_template_owner: string | null
+  approval_steps: PermissionApprovalStep[]
+  current_approval_step_id: string | null
   queue_decision:
     | "auto-approved"
     | "reviewer-gate"
@@ -134,10 +139,18 @@ export type StoredPermissionRequest = {
     | "manual-review"
 }
 
+export type MyTeamOption = {
+  id: string
+  name: string
+}
+
+export type RequestSubmitAs = "personal" | "team"
+
 const permissionStore: StoredPermissionRequest[] = [
   {
     id: "PR-1042",
     code: "PR-1042",
+    submit_as: "team",
     requester: "Annie Case",
     team: "Fraud Ops",
     resource: "risk.gold_chargebacks",
@@ -156,11 +169,35 @@ const permissionStore: StoredPermissionRequest[] = [
     policy_template_approval_mode: "review",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000011",
     policy_template_owner: "Data Steward",
+    approval_steps: [
+      {
+        id: "step-1042-1",
+        stage_order: 1,
+        approver_team_id: "10000000-0000-0000-0000-000000000011",
+        approver_team: "Data Steward",
+        approver_label: "Data steward review",
+        status: "approved",
+        acted_at: "2026-05-16T02:00:00.000Z",
+        is_current: false,
+      },
+      {
+        id: "step-1042-2",
+        stage_order: 2,
+        approver_team_id: "10000000-0000-0000-0000-000000000010",
+        approver_team: "Security",
+        approver_label: "Security sign-off",
+        status: "pending",
+        acted_at: null,
+        is_current: true,
+      },
+    ],
+    current_approval_step_id: "step-1042-2",
     queue_decision: "reviewer-gate",
   },
   {
     id: "PR-1041",
     code: "PR-1041",
+    submit_as: "team",
     requester: "Mai Nguyen",
     team: "Growth Analytics",
     resource: "marketing",
@@ -179,11 +216,35 @@ const permissionStore: StoredPermissionRequest[] = [
     policy_template_approval_mode: "review",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
     policy_template_owner: "Data Platform",
+    approval_steps: [
+      {
+        id: "step-1041-1",
+        stage_order: 1,
+        approver_team_id: "10000000-0000-0000-0000-000000000006",
+        approver_team: "Data Platform",
+        approver_label: "Data owner approval",
+        status: "pending",
+        acted_at: null,
+        is_current: true,
+      },
+      {
+        id: "step-1041-2",
+        stage_order: 2,
+        approver_team_id: "10000000-0000-0000-0000-000000000011",
+        approver_team: "Data Steward",
+        approver_label: "Data steward review",
+        status: "waiting",
+        acted_at: null,
+        is_current: false,
+      },
+    ],
+    current_approval_step_id: "step-1041-1",
     queue_decision: "reviewer-gate",
   },
   {
     id: "PR-1039",
     code: "PR-1039",
+    submit_as: "team",
     requester: "Kenji Mori",
     team: "Finance BI",
     resource: "finance.ap_closure",
@@ -202,6 +263,8 @@ const permissionStore: StoredPermissionRequest[] = [
     policy_template_approval_mode: "auto",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000009",
     policy_template_owner: "Governance",
+    approval_steps: [],
+    current_approval_step_id: null,
     queue_decision: "auto-approved",
   },
 ]
@@ -209,11 +272,12 @@ const permissionStore: StoredPermissionRequest[] = [
 type PermissionRequestApiResponse = {
   id: string
   code: string
+  submit_as: "personal" | "team"
   requester_id: string
   requester: string
   requester_email: string
-  team_id: string
-  team: string
+  team_id: string | null
+  team: string | null
   resource: string
   scope: RequestScope
   privileges: string[]
@@ -231,6 +295,8 @@ type PermissionRequestApiResponse = {
   policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_owner_id: string | null
   policy_template_owner: string | null
+  approval_steps: PermissionApprovalStep[]
+  current_approval_step_id: string | null
   queue_decision:
     | "auto-approved"
     | "reviewer-gate"
@@ -244,7 +310,9 @@ function mapPermissionRequest(
   return {
     id: request.id,
     code: request.code,
+    submit_as: request.submit_as,
     requester: request.requester,
+    team_id: request.team_id,
     team: request.team,
     resource: request.resource,
     scope: request.scope,
@@ -266,8 +334,50 @@ function mapPermissionRequest(
     policy_template_approval_mode: request.policy_template_approval_mode,
     policy_template_owner_id: request.policy_template_owner_id,
     policy_template_owner: request.policy_template_owner,
+    approval_steps: request.approval_steps,
+    current_approval_step_id: request.current_approval_step_id,
     queue_decision: request.queue_decision,
   }
+}
+
+export async function listMyTeamsAction(): Promise<MyTeamOption[]> {
+  const session = await getServerSession()
+
+  if (!session?.idToken) {
+    const fallbackTeamId = resolveRequesterTeamId(session?.groups)
+    const fallbackTeamName =
+      Object.entries(TEAM_IDS_BY_NAME).find(
+        ([, id]) => id === fallbackTeamId,
+      )?.[0] ?? "Data Platform"
+    return [{ id: fallbackTeamId, name: fallbackTeamName }]
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/users/me/teams`, {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${session.idToken}`,
+      },
+    })
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`)
+    }
+
+    const body = (await res.json()) as { teams: MyTeamOption[] }
+    if (body.teams.length > 0) {
+      return body.teams
+    }
+  } catch {
+    // Fall through to session-group fallback when the API is unavailable.
+  }
+
+  const fallbackTeamId = resolveRequesterTeamId(session.groups)
+  const fallbackTeamName =
+    Object.entries(TEAM_IDS_BY_NAME).find(
+      ([, id]) => id === fallbackTeamId,
+    )?.[0] ?? "Data Platform"
+  return [{ id: fallbackTeamId, name: fallbackTeamName }]
 }
 
 export async function listPermissionRequestsAction(
@@ -303,6 +413,8 @@ export async function listPermissionRequestsAction(
 }
 
 export async function submitPermissionRequestAction(body: {
+  submitAs: RequestSubmitAs
+  teamId?: string
   resource: string
   scope: RequestScope
   privileges: string[]
@@ -320,7 +432,6 @@ export async function submitPermissionRequestAction(body: {
   }
 
   try {
-    const requesterTeamId = resolveRequesterTeamId(session.groups)
     const res = await fetch(`${API_BASE_URL}/api/permissions/requests`, {
       method: "POST",
       cache: "no-store",
@@ -330,12 +441,12 @@ export async function submitPermissionRequestAction(body: {
       },
       body: JSON.stringify({
         requester_id: session.sub,
-        team: requesterTeamId,
+        submit_as: body.submitAs,
+        team: body.submitAs === "team" ? body.teamId : null,
         resource: body.resource,
         scope: body.scope,
         privileges: body.privileges,
         rationale: body.rationale,
-        reviewer_id: DEFAULT_REVIEWER_ID,
       }),
     })
 

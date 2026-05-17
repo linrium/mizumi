@@ -2,14 +2,36 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PermissionApprovalStep {
+    pub id: Uuid,
+    pub stage_order: i32,
+    pub approver_team_id: Uuid,
+    pub approver_team: String,
+    pub approver_label: String,
+    pub status: String,
+    pub acted_at: Option<DateTime<Utc>>,
+    pub is_current: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PolicyTemplateApprovalStep {
+    pub id: Uuid,
+    pub stage_order: i32,
+    pub approver_team_id: Uuid,
+    pub approver_team: String,
+    pub approver_label: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PermissionRequestView {
     pub id: Uuid,
+    pub submit_as: String,
     pub requester_id: Uuid,
     pub requester: String,
     pub requester_email: String,
-    pub team_id: Uuid,
-    pub team: String,
+    pub team_id: Option<Uuid>,
+    pub team: Option<String>,
     pub resource: String,
     pub scope: String,
     pub privileges: Vec<String>,
@@ -28,16 +50,18 @@ pub struct PermissionRequestView {
     pub policy_template_owner: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub approval_steps: Vec<PermissionApprovalStep>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PermissionRequestResponse {
     pub id: Uuid,
+    pub submit_as: String,
     pub requester_id: Uuid,
     pub requester: String,
     pub requester_email: String,
-    pub team_id: Uuid,
-    pub team: String,
+    pub team_id: Option<Uuid>,
+    pub team: Option<String>,
     pub resource: String,
     pub scope: String,
     pub privileges: Vec<String>,
@@ -55,6 +79,8 @@ pub struct PermissionRequestResponse {
     pub policy_template_owner_id: Option<Uuid>,
     pub policy_template_owner: Option<String>,
     pub queue_decision: String,
+    pub approval_steps: Vec<PermissionApprovalStep>,
+    pub current_approval_step_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub code: String,
@@ -64,6 +90,7 @@ pub struct PermissionRequestResponse {
 #[derive(Debug, Deserialize)]
 pub struct UpdateRequestStatusBody {
     pub status: String,
+    pub approval_step_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,6 +101,7 @@ pub struct BulkApproveBody {
 #[derive(Debug, Deserialize)]
 pub struct CreatePermissionRequestBody {
     pub requester_id: Uuid,
+    pub submit_as: String,
     pub team: Option<Uuid>,
     pub resource: String,
     pub scope: String,
@@ -81,7 +109,7 @@ pub struct CreatePermissionRequestBody {
     pub rationale: String,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PolicyTemplate {
     pub id: Uuid,
     pub name: String,
@@ -98,6 +126,7 @@ pub struct PolicyTemplate {
     pub last_updated: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub approval_steps: Vec<PolicyTemplateApprovalStep>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]

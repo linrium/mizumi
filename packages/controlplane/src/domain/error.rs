@@ -23,6 +23,8 @@ pub enum AppError {
     NotFound,
     #[error("{0}")]
     Conflict(String),
+    #[error("session has expired or been terminated")]
+    SessionDied(String),
 }
 
 impl IntoResponse for AppError {
@@ -30,7 +32,7 @@ impl IntoResponse for AppError {
         let status = match &self {
             AppError::Timeout => StatusCode::GATEWAY_TIMEOUT,
             AppError::QueryFailed(_) => StatusCode::BAD_REQUEST,
-            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::NotFound | AppError::SessionDied(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };

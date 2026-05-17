@@ -51,7 +51,7 @@ impl K8sQueryService {
     pub async fn delete_session(&self, id: &str) -> Result<(), AppError> {
         let pod_name = self.sessions.remove(id).ok_or(AppError::NotFound)?;
         let client = duckdb::client().await?;
-        duckdb::delete_session_pod(&client, &pod_name).await?;
+        duckdb::delete_session(&client, &pod_name).await?;
         Ok(())
     }
 
@@ -61,7 +61,13 @@ impl K8sQueryService {
         req: QueryRequest,
     ) -> Result<QueryResponse, AppError> {
         let pod_name = self.sessions.get(id).ok_or(AppError::NotFound)?;
-        let client = duckdb::client().await?;
-        duckdb::session_query(&client, &pod_name, &req.sql, req.id_token.as_deref()).await
+        match duckdb::session_query(&pod_name, &req.sql, req.id_token.as_deref()).await {
+            Ok(resp) => Ok(resp),
+            Err(AppError::SessionDied(_)) => {
+                self.sessions.remove(id);
+                Err(AppError::NotFound)
+            }
+            Err(e) => Err(e),
+        }
     }
 }

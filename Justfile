@@ -29,6 +29,7 @@ spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
 spark_image := "mizumi-spark-rustfs:4.1.1"
 duckdb_image := "mizumi-duckdb:1.1.5"
+duckdb_server_image := "mizumi-duckdb-server:0.1.0"
 daft_image := "mizumi-daft:0.7.10"
 
 daft_namespace := "daft"
@@ -46,7 +47,7 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-unitycatalog-anon-read-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build
+deploy: rustfs-deploy rustfs-s3-proxy-deploy redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-server-image-build
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
@@ -59,7 +60,7 @@ forward:
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{redpanda_namespace}} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{keycloak_namespace}} svc/keycloak-svc 8083:8080 &
-    kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
+    # kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -210,6 +211,9 @@ spark-hello-world: spark-image-build
 
 duckdb-image-build:
     docker build -t {{duckdb_image}} -f packages/duckdb/Dockerfile .
+
+duckdb-server-image-build:
+    docker build -t {{duckdb_server_image}} packages/duckdb-server
 
 duckdb-test-job:
     kubectl delete job duckdb-rustfs-query -n {{spark_namespace}} --ignore-not-found

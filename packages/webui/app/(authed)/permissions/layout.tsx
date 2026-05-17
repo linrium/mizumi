@@ -27,7 +27,8 @@ export default function PermissionsLayout({
         {TABS.map((tab) => {
           const isActive =
             tab.href === "/permissions"
-              ? pathname === "/permissions"
+              ? pathname === "/permissions" ||
+                /^\/permissions\/[^/]+$/.test(pathname)
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
 
           return (
