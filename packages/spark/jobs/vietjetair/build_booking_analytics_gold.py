@@ -103,15 +103,15 @@ def main() -> None:
         spend_rows = customer_spend_df.count()
         spark.stop()
 
-        pipes.report_asset_materialization(
-            metadata={
-                "booking_rows": booking_rows,
-                "customer_rows": customer_rows,
-                "flight_rows": flight_rows,
-                "booking_revenue_rows": revenue_rows,
-                "customer_spend_rows": spend_rows,
-            }
-        )
+        # pipes.report_asset_materialization(
+        #     metadata={
+        #         "booking_rows": booking_rows,
+        #         "customer_rows": customer_rows,
+        #         "flight_rows": flight_rows,
+        #         "booking_revenue_rows": revenue_rows,
+        #         "customer_spend_rows": spend_rows,
+        #     }
+        # )
 
 
 if __name__ == "__main__":

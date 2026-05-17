@@ -71,8 +71,13 @@ export default function TablePreviewPage() {
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fetchedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
+    const key = `${catalog}.${schema}.${table}`
+    if (fetchedKeyRef.current === key) return
+    fetchedKeyRef.current = key
+
     let cancelled = false
     async function load() {
       setLoading(true)

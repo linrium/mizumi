@@ -1,12 +1,9 @@
 # /// script
-# dependencies = ["daft[deltalake]", "ray[client]==2.46.0"]
+# dependencies = ["daft[deltalake]"]
 # ///
-import argparse
-
 import daft
 import daft.expressions as col
 import deltalake
-import ray
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
@@ -32,14 +29,7 @@ IO_CONFIG = IOConfig(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--ray-address", required=True)
-    args = parser.parse_args()
-
     with open_dagster_pipes() as pipes:
-        ray.init(args.ray_address, runtime_env={"pip": ["daft[deltalake]==0.7.10"]})
-        daft.set_runner_ray(args.ray_address)
-
         all_txns = (
             daft.read_deltalake(SILVER_TRANSACTIONS, io_config=IO_CONFIG)
             .with_column("transaction_date", daft.col("payment_timestamp").cast(daft.DataType.date()))
@@ -105,7 +95,6 @@ def main() -> None:
                 ],
                 "source": SILVER_TRANSACTIONS,
                 "target": TARGET_PATH,
-                "ray_address": args.ray_address,
             }
         )
 

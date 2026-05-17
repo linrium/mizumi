@@ -144,6 +144,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "driver": {
                 "serviceAccount": "spark-operator-spark",
                 "cores": job.driver_cores,
+                "coreRequest": "500m",
                 "memory": job.driver_memory,
                 "labels": {
                     "app": job.name,
@@ -153,6 +154,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "executor": {
                 "instances": job.executor_instances,
                 "cores": job.executor_cores,
+                "coreRequest": "500m",
                 "memory": job.executor_memory,
                 "labels": { "app": job.name }
             }

@@ -46,9 +46,9 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build daft-distributed-deploy
+deploy: rustfs-deploy rustfs-s3-proxy-deploy redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build
 
-destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy daft-destroy
+destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -62,7 +62,6 @@ forward:
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{unitycatalog_namespace}} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
-    kubectl port-forward -n daft svc/daft-ray-cluster-head 8265:8265 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -73,7 +72,6 @@ forward:
     echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "Controlplane Postgres: localhost:5433"
-    echo "Daft UI:          http://127.0.0.1:8265"
     wait
 
 caddy-s3-proxy:
@@ -103,6 +101,7 @@ rustfs-deploy: rustfs-helm-repo
 
 rustfs-s3-proxy-deploy:
     kubectl create namespace {{rustfs_namespace}} 2>/dev/null || true
+    kubectl create namespace {{spark_namespace}} 2>/dev/null || true
     kubectl apply -f infra/k8s/rustfs/s3-proxy.yaml
     kubectl rollout status deployment/rustfs-s3-proxy -n {{rustfs_namespace}} --timeout=120s
     kubectl get pods,svc,secret,configmap -n {{rustfs_namespace}} | rg rustfs-s3-proxy

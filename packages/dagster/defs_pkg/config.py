@@ -1,15 +1,9 @@
-import os
-
 S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
 S3A_ACCESS_KEY = "rustfsadmin"
 S3A_SECRET_KEY = "rustfsadmin"
 
 SPARK_IMAGE = "mizumi-spark-rustfs:4.1.1"
 DAFT_IMAGE = "mizumi-daft:0.7.10"
-DAFT_RAY_ADDRESS = os.getenv(
-    "DAFT_RAY_ADDRESS",
-    "ray://daft-ray-cluster-head.daft.svc.cluster.local:10001",
-)
 
 S3A_CONF = [
     "--conf",
