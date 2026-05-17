@@ -180,8 +180,32 @@ function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) 
         return { suggestions: [] }
       }
 
-      // Ctrl+Space explicit invoke — show only columns from tables in scope
+      // Ctrl+Space explicit invoke — branch on whether cursor is in table or column position
       if (context.triggerKind === monaco.languages.CompletionTriggerKind.Invoke) {
+        const textBeforeCursor = model.getValueInRange({
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column,
+        })
+        // Strip the word currently being typed to find what keyword precedes it
+        const beforeWord = textBeforeCursor.slice(0, textBeforeCursor.length - wordInfo.word.length)
+        const isTableContext = /\b(FROM|JOIN)\s*$/i.test(beforeWord)
+
+        if (isTableContext) {
+          // Suggest catalogs and full FQNs; dot trigger handles the drill-down
+          const suggestions: { label: string; kind: number; insertText: string; range: typeof range; detail?: string }[] = []
+          for (const catalog of data.catalogs) {
+            suggestions.push({ label: catalog, kind: CIK.Module, insertText: catalog, range })
+          }
+          for (const table of data.tables) {
+            const fqn = `${table.catalog}.${table.schema}.${table.name}`
+            suggestions.push({ label: fqn, kind: CIK.Class, insertText: fqn, range, detail: "table" })
+          }
+          return { suggestions }
+        }
+
+        // Column context: only columns from tables referenced in the query
         const scopedTables = tablesInScope(model.getValue(), data.tables)
         const seen = new Set<string>()
         const suggestions: { label: string; kind: number; insertText: string; range: typeof range; detail: string }[] = []
@@ -189,13 +213,7 @@ function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) 
           for (const col of table.columns) {
             if (!seen.has(col.name)) {
               seen.add(col.name)
-              suggestions.push({
-                label: col.name,
-                kind: CIK.Field,
-                insertText: col.name,
-                range,
-                detail: col.type,
-              })
+              suggestions.push({ label: col.name, kind: CIK.Field, insertText: col.name, range, detail: col.type })
             }
           }
         }
