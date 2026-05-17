@@ -815,7 +815,7 @@ def seed_partnership_analytics(spark, customers, bookings, r):
     snapshot = BASE_DATE + timedelta(days=N_DAYS - 1)
     c360_rows = []
     for c in customers:
-        vj_spend = sum(b["ticket_amount"] for b in bookings if b["customer_id"] == c["vietjet_id"])
+        vj_spend = sum((b["ticket_amount"] for b in bookings if b["customer_id"] == c["vietjet_id"]), 0.0)
         c360_rows.append({
             "snapshot_date": snapshot,
             "unified_customer_id": uid(),
