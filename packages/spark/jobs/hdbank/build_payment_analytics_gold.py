@@ -162,22 +162,22 @@ def main() -> None:
         risk_rows = risk_detection_df.count()
         spark.stop()
 
-        pipes.report_asset_materialization(
-            asset_key="banking_gold_risk_detection",
-            metadata={
-                "payment_event_rows": payment_event_rows,
-                "customer_profile_rows": customer_profile_rows,
-                "risk_rows": risk_rows,
-            },
-        )
-        pipes.report_asset_materialization(
-            asset_key="banking_gold_merchant_revenue",
-            metadata={"merchant_rows": merchant_rows},
-        )
-        pipes.report_asset_materialization(
-            asset_key="banking_gold_user_spend",
-            metadata={"user_spend_rows": user_spend_rows},
-        )
+        # pipes.report_asset_materialization(
+        #     asset_key="banking_gold_risk_detection",
+        #     metadata={
+        #         "payment_event_rows": payment_event_rows,
+        #         "customer_profile_rows": customer_profile_rows,
+        #         "risk_rows": risk_rows,
+        #     },
+        # )
+        # pipes.report_asset_materialization(
+        #     asset_key="banking_gold_merchant_revenue",
+        #     metadata={"merchant_rows": merchant_rows},
+        # )
+        # pipes.report_asset_materialization(
+        #     asset_key="banking_gold_user_spend",
+        #     metadata={"user_spend_rows": user_spend_rows},
+        # )
 
 
 if __name__ == "__main__":

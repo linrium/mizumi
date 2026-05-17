@@ -26,7 +26,7 @@ spark_operator_release := "spark-operator"
 spark_operator_chart := "spark-operator/spark-operator"
 spark_operator_chart_version := "2.5.0"
 spark_operator_values := "infra/k8s/spark/helm/values.yaml"
-spark_image := "mizumi-spark-rustfs:4.1.2"
+spark_image := "mizumi-spark-rustfs:4.1.1"
 duckdb_image := "mizumi-duckdb:1.1.5"
 daft_image := "mizumi-daft:0.7.10"
 
@@ -196,6 +196,14 @@ spark-operator-deploy: spark-helm-repo
 
 spark-image-build:
     docker build -t {{spark_image}} packages/spark
+
+spark-hello-world: spark-image-build
+    kubectl delete sparkapplication hello-world -n {{spark_namespace}} --ignore-not-found
+    kubectl apply -f infra/k8s/spark/hello-world-app.yaml
+    kubectl wait sparkapplication/hello-world -n {{spark_namespace}} \
+      --for=jsonpath='{.status.applicationState.state}'=COMPLETED \
+      --timeout=120s
+    kubectl logs -n {{spark_namespace}} -l spark-role=driver,spark-app-name=hello-world --tail=50
 
 duckdb-image-build:
     docker build -t {{duckdb_image}} -f packages/duckdb/Dockerfile .

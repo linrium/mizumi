@@ -1,0 +1,35 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: hello-world
+  namespace: spark
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: mizumi-spark-rustfs:4.1.1
+  imagePullPolicy: IfNotPresent
+  mainApplicationFile: local:///opt/spark/jobs/hello_world.py
+  sparkVersion: "4.1.1"
+  restartPolicy:
+    type: Never
+  sparkConf:
+    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.hadoop.fs.s3a.endpoint": "http://rustfs-svc.rustfs.svc.cluster.local:9000"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.access.key": "rustfsadmin"
+    "spark.hadoop.fs.s3a.secret.key": "rustfsadmin"
+    "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+    "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+  driver:
+    serviceAccount: spark-operator-spark
+    cores: 1
+    memory: 512m
+    labels:
+      app: hello-world
+  executor:
+    instances: 1
+    cores: 1
+    memory: 512m
+    labels:
+      app: hello-world

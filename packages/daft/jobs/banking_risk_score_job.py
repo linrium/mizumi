@@ -70,6 +70,7 @@ def main() -> None:
             arrow_table,
             storage_options=S3_STORAGE_OPTIONS,
             mode="overwrite",
+            schema_mode="overwrite",
         )
 
         pipes.report_asset_materialization(
