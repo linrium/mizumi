@@ -74,8 +74,7 @@ def main() -> None:
             ENDPOINT '{sql_quote(endpoint_host)}',
             USE_SSL {use_ssl},
             URL_STYLE 'path',
-            REGION '{sql_quote(S3_REGION)}',
-            SCOPE '{sql_quote(S3_SCOPE)}'
+            REGION '{sql_quote(S3_REGION)}'
         )
         """
         debug_log("Creating S3 secret for UC storage", sql=create_s3_secret_sql)

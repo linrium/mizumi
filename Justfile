@@ -46,7 +46,7 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build
+deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-unitycatalog-anon-read-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
