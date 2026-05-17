@@ -139,7 +139,7 @@ export default function PolicyTemplateDetailPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-3 py-2.5 shrink-0">
+      <div className="border-b px-3 py-2 shrink-0">
         <div className="min-w-0">
           <Link
             href="/permissions/policy-templates"
@@ -147,7 +147,7 @@ export default function PolicyTemplateDetailPage() {
           >
             Back to policy templates
           </Link>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             <h1 className="text-sm font-semibold">{template.name}</h1>
             <Badge variant="outline">{formatScopeLabel(template.scope)}</Badge>
             <Badge variant={getRiskVariant(template.risk)}>
@@ -157,7 +157,7 @@ export default function PolicyTemplateDetailPage() {
               {formatApprovalMode(template.approval_mode)}
             </Badge>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {template.owner} owns this reusable access path for{" "}
             <span className="font-mono">
               {formatResourceLabel(template.resource)}
@@ -168,29 +168,31 @@ export default function PolicyTemplateDetailPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
-          <div className="space-y-4">
+        <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1.7fr)_320px]">
+          <div className="space-y-3">
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Template summary</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Scope, owner, update cadence, and usage footprint.
                 </p>
               </div>
               <Separator />
-              <div className="grid gap-4 px-4 py-4 md:grid-cols-2">
-                <div className="space-y-3">
+              <div className="grid gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-2">
+                <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Owner
                     </p>
-                    <p className="mt-1 text-sm font-medium">{template.owner}</p>
+                    <p className="mt-0.5 text-sm font-medium">
+                      {template.owner}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Resource target
                     </p>
-                    <p className="mt-1 font-mono text-xs break-all text-muted-foreground">
+                    <p className="mt-0.5 font-mono text-xs break-all text-muted-foreground">
                       {formatResourceLabel(template.resource)}
                     </p>
                   </div>
@@ -198,18 +200,18 @@ export default function PolicyTemplateDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Approval mode
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {formatApprovalMode(template.approval_mode)}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Updated
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(template.last_updated)}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -225,7 +227,7 @@ export default function PolicyTemplateDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Usage
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {template.usage_30d} request
                       {template.usage_30d === 1 ? "" : "s"} in the last 30 days
                     </p>
@@ -234,67 +236,69 @@ export default function PolicyTemplateDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Matched requests in queue
                     </p>
-                    <p className="mt-1 text-sm">{requests.length}</p>
+                    <p className="mt-0.5 text-sm">{requests.length}</p>
                   </div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Access envelope</h2>
               </div>
               <Separator />
-              <div className="space-y-4 px-4 py-4">
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Eligible teams
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {template.teams.map((team) => (
-                      <Badge key={team} variant="outline">
-                        {team}
-                      </Badge>
-                    ))}
+              <div className="space-y-3 px-3 py-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Eligible teams
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {template.teams.map((team) => (
+                        <Badge key={team} variant="outline">
+                          {team}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Allowed privileges
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {template.privileges.map((privilege) => (
-                      <Badge key={privilege} variant="outline">
-                        {privilege}
-                      </Badge>
-                    ))}
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Allowed privileges
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {template.privileges.map((privilege) => (
+                        <Badge key={privilege} variant="outline">
+                          {privilege}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">
                   Recent matched requests
                 </h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Requests currently carrying this template in the queue.
                 </p>
               </div>
               <Separator />
-              <div className="px-4 py-4">
+              <div className="px-3 py-3">
                 {recentRequests.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-1.5">
                     {recentRequests.map((request) => (
                       <Link
                         key={request.id}
                         href={`/permissions/${request.id}`}
-                        className="block rounded-md border px-3 py-3 transition-colors hover:bg-accent/30"
+                        className="block rounded-md border px-3 py-2 transition-colors hover:bg-accent/30"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <span className="font-medium">
                                 {request.code}
                               </span>
@@ -303,7 +307,7 @@ export default function PolicyTemplateDetailPage() {
                                 {formatSubmitter(request)}
                               </Badge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-0.5 text-xs text-muted-foreground">
                               {request.requester} ·{" "}
                               <span className="font-mono">
                                 {request.resource}
@@ -331,26 +335,23 @@ export default function PolicyTemplateDetailPage() {
             </section>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Approval flow</h2>
               </div>
               <Separator />
-              <div className="px-4 py-4">
+              <div className="px-3 py-3">
                 {template.approval_steps.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-1.5">
                     {template.approval_steps.map((step) => (
-                      <div
-                        key={step.id}
-                        className="rounded-md border px-3 py-3"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div key={step.id} className="rounded-md border px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-medium">
                             {`Stage ${step.stage_order} · ${step.approver_team}`}
                           </span>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {step.approver_label || "Approval required"}
                         </p>
                       </div>
@@ -366,11 +367,11 @@ export default function PolicyTemplateDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Design intent</h2>
               </div>
               <Separator />
-              <div className="space-y-3 px-4 py-4 text-sm text-muted-foreground">
+              <div className="space-y-2.5 px-3 py-3 text-sm text-muted-foreground">
                 <p>
                   This template standardizes a recurring access path so teams
                   can request a known privilege set without manual policy
