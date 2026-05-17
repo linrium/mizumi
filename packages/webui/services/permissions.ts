@@ -124,6 +124,7 @@ export async function listPermissionRequests(params?: {
   resource?: string
   status?: string
   search?: string
+  all?: boolean
 }): Promise<PermissionRequest[]> {
   const url = new URL("/api/permissions/requests", window.location.origin)
   if (params?.resource) url.searchParams.set("resource", params.resource)
@@ -131,6 +132,7 @@ export async function listPermissionRequests(params?: {
     url.searchParams.set("status", params.status)
   }
   if (params?.search) url.searchParams.set("search", params.search)
+  if (params?.all) url.searchParams.set("all", "true")
   const res = await apiFetch(url.toString())
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()

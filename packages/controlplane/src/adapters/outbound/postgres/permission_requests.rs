@@ -145,9 +145,19 @@ async fn attach_approval_steps(
 pub async fn list(
     db: &PgPool,
     resource: Option<&str>,
+    viewer_id: Option<Uuid>,
 ) -> Result<Vec<PermissionRequestView>, sqlx::Error> {
-    let requests = match resource {
-        Some(r) => {
+    let requests = match (resource, viewer_id) {
+        (Some(r), Some(uid)) => {
+            sqlx::query_as::<_, PermissionRequestRow>(&format!(
+                "{REQUEST_VIEW_SELECT} WHERE (pr.requester_id = $1 OR pr.team IN (SELECT team_id FROM team_members WHERE user_id = $1)) AND pr.resource = $2 ORDER BY pr.submitted_at DESC"
+            ))
+            .bind(uid)
+            .bind(r)
+            .fetch_all(db)
+            .await?
+        }
+        (Some(r), None) => {
             sqlx::query_as::<_, PermissionRequestRow>(&format!(
                 "{REQUEST_VIEW_SELECT} WHERE pr.resource = $1 ORDER BY pr.submitted_at DESC"
             ))
@@ -155,7 +165,15 @@ pub async fn list(
             .fetch_all(db)
             .await?
         }
-        None => {
+        (None, Some(uid)) => {
+            sqlx::query_as::<_, PermissionRequestRow>(&format!(
+                "{REQUEST_VIEW_SELECT} WHERE (pr.requester_id = $1 OR pr.team IN (SELECT team_id FROM team_members WHERE user_id = $1)) ORDER BY pr.submitted_at DESC"
+            ))
+            .bind(uid)
+            .fetch_all(db)
+            .await?
+        }
+        (None, None) => {
             sqlx::query_as::<_, PermissionRequestRow>(&format!(
                 "{REQUEST_VIEW_SELECT} ORDER BY pr.submitted_at DESC"
             ))

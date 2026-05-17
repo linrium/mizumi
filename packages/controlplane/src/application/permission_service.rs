@@ -326,8 +326,9 @@ impl PermissionService {
         resource: Option<&str>,
         status: Option<&str>,
         search: Option<&str>,
+        viewer_id: Option<Uuid>,
     ) -> Result<Vec<PermissionRequestResponse>, AppError> {
-        let requests = permission_requests::list(&self.db, resource).await?;
+        let requests = permission_requests::list(&self.db, resource, viewer_id).await?;
 
         let filtered = requests
             .into_iter()

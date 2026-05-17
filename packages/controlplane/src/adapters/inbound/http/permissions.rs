@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
@@ -13,7 +13,7 @@ use crate::{
     domain::entities::permission::{
         BulkApproveBody, CreatePermissionRequestBody, UpdateRequestStatusBody,
     },
-    infrastructure::server::AppState,
+    infrastructure::{auth::KeycloakClaims, server::AppState},
 };
 
 #[derive(Deserialize)]
@@ -21,18 +21,30 @@ pub struct ListQuery {
     pub resource: Option<String>,
     pub status: Option<String>,
     pub search: Option<String>,
+    #[serde(default)]
+    pub all: bool,
 }
 
 pub async fn list_requests(
     State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<KeycloakClaims>,
     Query(params): Query<ListQuery>,
 ) -> impl IntoResponse {
+    let viewer_id = if params.all {
+        None
+    } else {
+        match Uuid::parse_str(&claims.sub) {
+            Ok(id) => Some(id),
+            Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+        }
+    };
     match state
         .permission_service
         .list_requests(
             params.resource.as_deref(),
             params.status.as_deref(),
             params.search.as_deref(),
+            viewer_id,
         )
         .await
     {

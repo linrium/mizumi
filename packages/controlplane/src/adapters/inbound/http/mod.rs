@@ -51,6 +51,7 @@ async fn require_auth(
 
     if let Err(e) = state.user_service.ensure_registered(&claims).await {
         tracing::error!("user registration failed: {}", e);
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
 
     req.extensions_mut().insert(claims);

@@ -33,7 +33,7 @@ CREATE INDEX permission_request_approval_steps_request_idx
 INSERT INTO policy_template_approval_steps (policy_template_id, stage_order, approver_team_id, approver_label)
 VALUES ('40000000-0000-0000-0000-000000000002', 1, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
        ('40000000-0000-0000-0000-000000000003', 1, '10000000-0000-0000-0000-000000000006', 'Workspace owner review'),
-       ('40000000-0000-0000-0000-000000000003', 2, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
+       ('40000000-0000-0000-0000-000000000003', 2, '10000000-0000-0000-0000-000000000002', 'VietJetair platform review'),
        ('40000000-0000-0000-0000-000000000004', 1, '10000000-0000-0000-0000-000000000004', 'Data steward review'),
        ('40000000-0000-0000-0000-000000000004', 2, '10000000-0000-0000-0000-000000000005', 'Security sign-off');
 

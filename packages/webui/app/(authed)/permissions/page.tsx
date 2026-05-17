@@ -133,7 +133,7 @@ export default function PermissionsPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await listPermissionRequests()
+        const data = await listPermissionRequests({ all: true })
         if (!cancelled) {
           setRequests(data)
         }
