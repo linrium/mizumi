@@ -3,12 +3,14 @@
 import { Copy01Icon, PlayIcon, SqlIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
+import type { Monaco } from "@monaco-editor/react"
 import { useForm } from "@tanstack/react-form"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { Button } from "@/components/ui/button"
 import { useDataGrid } from "@/hooks/use-data-grid"
+import type { CatalogCompletionSchema } from "@/app/api/catalog/completions/route"
 import {
   executeSqlQuery,
   formatQueryResultsAsTsv,
@@ -74,6 +76,187 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   )
 }
 
+// ── Catalog autocomplete ──────────────────────────────────────────────────────
+
+function tablesInScope(
+  sql: string,
+  all: CatalogCompletionSchema["tables"],
+): CatalogCompletionSchema["tables"] {
+  const refs = new Set<string>()
+  const re = /(?:FROM|JOIN)\s+([\w.]+)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(sql)) !== null) refs.add(m[1].toLowerCase())
+  if (refs.size === 0) return all
+  return all.filter((t) => {
+    const lc = (s: string) => s.toLowerCase()
+    return (
+      refs.has(lc(`${t.catalog}.${t.schema}.${t.name}`)) ||
+      refs.has(lc(`${t.schema}.${t.name}`)) ||
+      refs.has(lc(t.name))
+    )
+  })
+}
+
+function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) {
+  const CIK = monaco.languages.CompletionItemKind
+  return {
+    triggerCharacters: ["."],
+    provideCompletionItems(
+      model: Parameters<
+        Monaco["languages"]["registerCompletionItemProvider"]
+      >[1]["provideCompletionItems"] extends (
+        m: infer M,
+        ...rest: unknown[]
+      ) => unknown
+        ? M
+        : never,
+      position: Parameters<
+        Monaco["languages"]["registerCompletionItemProvider"]
+      >[1]["provideCompletionItems"] extends (
+        _m: unknown,
+        p: infer P,
+        ...rest: unknown[]
+      ) => unknown
+        ? P
+        : never,
+      context: { triggerKind: number },
+    ) {
+      const wordInfo = model.getWordUntilPosition(position)
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: wordInfo.startColumn,
+        endColumn: position.column,
+      }
+
+      const lineText = model.getValueInRange({
+        startLineNumber: position.lineNumber,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      })
+
+      // Detect dot-chain: e.g. "catalog." or "catalog.schema."
+      const chainMatch = lineText.match(/(\w+\.)+(\w*)$/)
+      if (chainMatch) {
+        const chain = chainMatch[0]
+        const parts = chain.split(".").slice(0, -1) // drop trailing empty part
+
+        if (parts.length === 1) {
+          // catalog. → suggest schemas
+          const schemas = [
+            ...new Set(
+              data.tables
+                .filter((t) => t.catalog === parts[0])
+                .map((t) => t.schema),
+            ),
+          ]
+          return {
+            suggestions: schemas.map((s) => ({
+              label: s,
+              kind: CIK.Module,
+              insertText: s,
+              range,
+            })),
+          }
+        }
+
+        if (parts.length === 2) {
+          // catalog.schema. → suggest tables
+          const tables = data.tables.filter(
+            (t) => t.catalog === parts[0] && t.schema === parts[1],
+          )
+          return {
+            suggestions: tables.map((t) => ({
+              label: t.name,
+              kind: CIK.Class,
+              insertText: t.name,
+              range,
+              detail: `${t.catalog}.${t.schema}`,
+            })),
+          }
+        }
+
+        return { suggestions: [] }
+      }
+
+      // Ctrl+Space explicit invoke — show only columns from tables in scope
+      if (context.triggerKind === monaco.languages.CompletionTriggerKind.Invoke) {
+        const scopedTables = tablesInScope(model.getValue(), data.tables)
+        const seen = new Set<string>()
+        const suggestions: { label: string; kind: number; insertText: string; range: typeof range; detail: string }[] = []
+        for (const table of scopedTables) {
+          for (const col of table.columns) {
+            if (!seen.has(col.name)) {
+              seen.add(col.name)
+              suggestions.push({
+                label: col.name,
+                kind: CIK.Field,
+                insertText: col.name,
+                range,
+                detail: col.type,
+              })
+            }
+          }
+        }
+        return { suggestions }
+      }
+
+      // Triggered by typing — suggest catalogs, full table FQNs, and all column names
+      const suggestions: {
+        label: string
+        kind: number
+        insertText: string
+        range: typeof range
+        sortText: string
+        detail?: string
+      }[] = []
+
+      for (const catalog of data.catalogs) {
+        suggestions.push({
+          label: catalog,
+          kind: CIK.Module,
+          insertText: catalog,
+          range,
+          sortText: `0${catalog}`,
+        })
+      }
+
+      for (const table of data.tables) {
+        const fqn = `${table.catalog}.${table.schema}.${table.name}`
+        suggestions.push({
+          label: fqn,
+          kind: CIK.Class,
+          insertText: fqn,
+          range,
+          sortText: `1${fqn}`,
+          detail: "table",
+        })
+      }
+
+      const scopedTables = tablesInScope(model.getValue(), data.tables)
+      const seen = new Set<string>()
+      for (const table of scopedTables) {
+        for (const col of table.columns) {
+          if (!seen.has(col.name)) {
+            seen.add(col.name)
+            suggestions.push({
+              label: col.name,
+              kind: CIK.Field,
+              insertText: col.name,
+              range,
+              sortText: `2${col.name}`,
+              detail: col.type,
+            })
+          }
+        }
+      }
+
+      return { suggestions }
+    },
+  }
+}
+
 // ── SQL editor ────────────────────────────────────────────────────────────────
 
 const RESULTS_MIN = 80
@@ -84,6 +267,33 @@ export function SqlEditor() {
   const [result, setResult] = useState<SqlQueryResult | null>(null)
   const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+  const monacoRef = useRef<Monaco | null>(null)
+  const completionDataRef = useRef<CatalogCompletionSchema | null>(null)
+  const disposeCompletionsRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/catalog/completions")
+      .then((r) => r.json())
+      .then((data: CatalogCompletionSchema) => {
+        if (cancelled) return
+        completionDataRef.current = data
+        if (monacoRef.current) {
+          disposeCompletionsRef.current?.()
+          const { dispose } = monacoRef.current.languages.registerCompletionItemProvider(
+            "sql",
+            buildCompletionProvider(monacoRef.current, data),
+          )
+          disposeCompletionsRef.current = dispose
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      disposeCompletionsRef.current?.()
+      disposeCompletionsRef.current = null
+    }
+  }, [])
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -166,6 +376,16 @@ export function SqlEditor() {
                       monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
                       () => form.handleSubmit(),
                     )
+                    monacoRef.current = monaco
+                    if (completionDataRef.current) {
+                      disposeCompletionsRef.current?.()
+                      const { dispose } =
+                        monaco.languages.registerCompletionItemProvider(
+                          "sql",
+                          buildCompletionProvider(monaco, completionDataRef.current),
+                        )
+                      disposeCompletionsRef.current = dispose
+                    }
                   }}
                   options={{
                     minimap: { enabled: false },
