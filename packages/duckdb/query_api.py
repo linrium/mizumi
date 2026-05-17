@@ -115,6 +115,36 @@ def main() -> None:
         )
         con.execute(vietjetair_attach_sql)
 
+        hdbank_sandbox_attach_sql = """
+        ATTACH 'hdbank_sandbox' AS hdbank_sandbox (
+            TYPE unity_catalog,
+            READ_ONLY,
+            DEFAULT_SCHEMA 'hdbank_payments_sandbox_bronze'
+        )
+        """
+        debug_log("Attaching Unity Catalog catalog", catalog="hdbank_sandbox", sql=hdbank_sandbox_attach_sql)
+        con.execute(hdbank_sandbox_attach_sql)
+
+        vietjetair_sandbox_attach_sql = """
+        ATTACH 'vietjetair_sandbox' AS vietjetair_sandbox (
+            TYPE unity_catalog,
+            READ_ONLY,
+            DEFAULT_SCHEMA 'vietjetair_bookings_sandbox_bronze'
+        )
+        """
+        debug_log("Attaching Unity Catalog catalog", catalog="vietjetair_sandbox", sql=vietjetair_sandbox_attach_sql)
+        con.execute(vietjetair_sandbox_attach_sql)
+
+        partnership_sandbox_attach_sql = """
+        ATTACH 'partnership_sandbox' AS partnership_sandbox (
+            TYPE unity_catalog,
+            READ_ONLY,
+            DEFAULT_SCHEMA 'credit_risk'
+        )
+        """
+        debug_log("Attaching Unity Catalog catalog", catalog="partnership_sandbox", sql=partnership_sandbox_attach_sql)
+        con.execute(partnership_sandbox_attach_sql)
+
         debug_log("Executing query", sql=SQL)
         result = con.execute(SQL).fetchdf()
         debug_log(

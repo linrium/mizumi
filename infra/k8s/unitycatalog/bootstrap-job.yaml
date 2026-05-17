@@ -765,9 +765,9 @@ spec:
                   ("payment_event_id", "STRING", "string", "string"),
                   ("customer_id", "STRING", "string", "string"),
                   ("account_id", "STRING", "string", "string"),
-                  ("risk_label", "STRING", "string", "string"),
-                  ("risk_score", "DOUBLE", "double", "double"),
                   ("note_signal", "STRING", "string", "string"),
+                  ("risk_score", "DOUBLE", "double", "double"),
+                  ("risk_label", "STRING", "string", "string"),
                   ("model_version", "STRING", "string", "string"),
               ])
 
@@ -775,21 +775,21 @@ spec:
                   ("business_date", "DATE", "date", "date"),
                   ("merchant_name", "STRING", "string", "string"),
                   ("merchant_category", "STRING", "string", "string"),
+                  ("currency", "STRING", "string", "string"),
                   ("transaction_count", "INT", "int", "integer"),
                   ("gross_payment_volume", "DOUBLE", "double", "double"),
                   ("fee_revenue", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
               ])
 
               HDBANK_USER_SPEND_V1 = build_cols([
                   ("business_date", "DATE", "date", "date"),
                   ("customer_id", "STRING", "string", "string"),
                   ("account_id", "STRING", "string", "string"),
+                  ("currency", "STRING", "string", "string"),
                   ("transaction_count", "INT", "int", "integer"),
                   ("total_spend", "DOUBLE", "double", "double"),
                   ("avg_ticket_size", "DOUBLE", "double", "double"),
                   ("top_merchant_category", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
               ])
 
               VIETJETAIR_RAW_CUSTOMER_EVENTS_V1 = build_cols([
@@ -843,20 +843,20 @@ spec:
               VIETJETAIR_BOOKING_REVENUE_V1 = build_cols([
                   ("business_date", "DATE", "date", "date"),
                   ("route_code", "STRING", "string", "string"),
+                  ("currency", "STRING", "string", "string"),
                   ("booking_count", "INT", "int", "integer"),
                   ("ticket_revenue", "DOUBLE", "double", "double"),
                   ("ancillary_revenue", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
               ])
 
               VIETJETAIR_CUSTOMER_SPEND_V1 = build_cols([
                   ("business_date", "DATE", "date", "date"),
                   ("customer_id", "STRING", "string", "string"),
+                  ("currency", "STRING", "string", "string"),
                   ("booking_count", "INT", "int", "integer"),
                   ("total_ticket_spend", "DOUBLE", "double", "double"),
                   ("avg_booking_value", "DOUBLE", "double", "double"),
                   ("favorite_route_code", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
               ])
 
               # ── Sandbox column schemas ───────────────────────────────────────────
