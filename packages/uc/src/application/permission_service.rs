@@ -1,7 +1,10 @@
 use crate::domain::{
     error::DomainError,
     permissions::{PermissionsList, Privilege, SecurableType, UpdatePermissions},
-    ports::{inbound::PermissionUseCase, outbound::AuthorizerPort},
+    ports::{
+        inbound::PermissionUseCase,
+        outbound::AuthorizerPort,
+    },
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -85,5 +88,16 @@ impl PermissionUseCase for PermissionService {
             }
         }
         self.authorizer.list_grants(securable_type, full_name).await
+    }
+
+    async fn get_effective_privileges(
+        &self,
+        principal: &str,
+        securable_type: SecurableType,
+        full_name: &str,
+    ) -> Result<Vec<Privilege>, DomainError> {
+        self.authorizer
+            .list_grants_for_principal(principal, securable_type, full_name)
+            .await
     }
 }

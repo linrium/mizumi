@@ -18,8 +18,18 @@ use crate::{
 };
 
 const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved", "cancelled"];
-const DEFAULT_REVIEWER_ID: &str = "10000000-0000-0000-0000-000000000004";
+const REVIEWER_VIETJETAIR: &str = "10000000-0000-0000-0000-000000000002"; // VietJetair Data Platform
+const REVIEWER_DEFAULT: &str = "10000000-0000-0000-0000-000000000004"; // HDBank Data Steward
 const SECURITY_TEAM_ID: &str = "10000000-0000-0000-0000-000000000005";
+
+fn default_reviewer_id(resource: &str) -> Uuid {
+    let id = if resource.contains("vietjetair") {
+        REVIEWER_VIETJETAIR
+    } else {
+        REVIEWER_DEFAULT
+    };
+    Uuid::parse_str(id).expect("reviewer UUID is valid")
+}
 
 #[derive(Clone)]
 struct RequestPolicyMatch {
@@ -119,15 +129,34 @@ impl PermissionService {
     }
 
     async fn grant_request(&self, request: &PermissionRequestView) -> Result<(), AppError> {
-        self.uc_service
-            .grant_permissions(
-                &request.scope,
-                &request.resource,
-                &request.requester_email,
-                &request.privileges,
-            )
-            .await
-            .map_err(AppError::QueryFailed)
+        let principals: Vec<String> = if request.submit_as == "team" {
+            if let Some(team_id) = request.team_id {
+                teams::list_members(&self.db, team_id)
+                    .await
+                    .map_err(AppError::Sqlx)?
+                    .into_iter()
+                    .map(|m| m.email)
+                    .collect()
+            } else {
+                vec![request.requester_email.clone()]
+            }
+        } else {
+            vec![request.requester_email.clone()]
+        };
+
+        for principal in &principals {
+            self.uc_service
+                .grant_permissions(
+                    &request.scope,
+                    &request.resource,
+                    principal,
+                    &request.privileges,
+                )
+                .await
+                .map_err(AppError::QueryFailed)?;
+        }
+
+        Ok(())
     }
 
     fn best_template_match(
@@ -212,16 +241,13 @@ impl PermissionService {
         }
     }
 
-    fn manual_review_chain() -> Vec<(i32, Uuid, String)> {
-        vec![(
-            1,
-            Uuid::parse_str(DEFAULT_REVIEWER_ID).expect("DEFAULT_REVIEWER_ID must be a valid UUID"),
-            "Manual review".to_string(),
-        )]
+    fn manual_review_chain(resource: &str) -> Vec<(i32, Uuid, String)> {
+        vec![(1, default_reviewer_id(resource), "Manual review".to_string())]
     }
 
     fn approval_chain_from_policy_match(
         policy_match: Option<&RequestPolicyMatch>,
+        resource: &str,
     ) -> Vec<(i32, Uuid, String)> {
         match policy_match {
             Some(policy_match) if !policy_match.approval_steps.is_empty() => policy_match
@@ -236,16 +262,13 @@ impl PermissionService {
                 })
                 .collect(),
             Some(policy_match) => Self::default_approval_steps_for_mode(policy_match),
-            None => Self::manual_review_chain(),
+            None => Self::manual_review_chain(resource),
         }
     }
 
-    fn derive_request_state(steps: &[PermissionApprovalStep]) -> (String, Uuid) {
-        let default_reviewer_id =
-            Uuid::parse_str(DEFAULT_REVIEWER_ID).expect("DEFAULT_REVIEWER_ID must be a valid UUID");
-
+    fn derive_request_state(steps: &[PermissionApprovalStep], resource: &str) -> (String, Uuid) {
         if steps.is_empty() {
-            return ("approved".to_string(), default_reviewer_id);
+            return ("approved".to_string(), default_reviewer_id(resource));
         }
 
         if let Some(step) = steps.iter().find(|step| step.status == "needs-info") {
@@ -265,7 +288,7 @@ impl PermissionService {
             let reviewer_id = steps
                 .last()
                 .map(|step| step.approver_team_id)
-                .unwrap_or(default_reviewer_id);
+                .unwrap_or_else(|| default_reviewer_id(resource));
             return ("approved".to_string(), reviewer_id);
         }
 
@@ -273,7 +296,7 @@ impl PermissionService {
             let reviewer_id = steps
                 .last()
                 .map(|step| step.approver_team_id)
-                .unwrap_or(default_reviewer_id);
+                .unwrap_or_else(|| default_reviewer_id(resource));
             return ("cancelled".to_string(), reviewer_id);
         }
 
@@ -281,7 +304,7 @@ impl PermissionService {
             .iter()
             .find(|step| step.status == "waiting")
             .map(|step| step.approver_team_id)
-            .unwrap_or(default_reviewer_id);
+            .unwrap_or_else(|| default_reviewer_id(resource));
 
         ("pending".to_string(), reviewer_id)
     }
@@ -289,12 +312,13 @@ impl PermissionService {
     async fn sync_request_state(
         &self,
         request_id: Uuid,
+        resource: &str,
     ) -> Result<PermissionRequestView, AppError> {
         let steps = permission_requests::list_approval_steps(&self.db, &[request_id])
             .await?
             .remove(&request_id)
             .unwrap_or_default();
-        let (status, reviewer_id) = Self::derive_request_state(&steps);
+        let (status, reviewer_id) = Self::derive_request_state(&steps, resource);
         permission_requests::update_status_and_reviewer(&self.db, request_id, &status, reviewer_id)
             .await?
             .ok_or(AppError::NotFound)
@@ -421,16 +445,14 @@ impl PermissionService {
 
         let templates = policy_templates::list(&self.db).await?;
         let matched_template = Self::best_template_match(&request, &templates);
-        let approval_chain = Self::approval_chain_from_policy_match(matched_template.as_ref());
+        let approval_chain =
+            Self::approval_chain_from_policy_match(matched_template.as_ref(), &request.resource);
 
         let mut request = if approval_chain.is_empty() {
             let reviewer_id = matched_template
                 .as_ref()
                 .map(|policy_match| policy_match.owner_id)
-                .unwrap_or_else(|| {
-                    Uuid::parse_str(DEFAULT_REVIEWER_ID)
-                        .expect("DEFAULT_REVIEWER_ID must be a valid UUID")
-                });
+                .unwrap_or_else(|| default_reviewer_id(&request.resource));
             permission_requests::update_policy_metadata(
                 &self.db,
                 request.id,
@@ -460,7 +482,7 @@ impl PermissionService {
             let inserted_steps =
                 permission_requests::replace_approval_steps(&self.db, request.id, &new_steps)
                     .await?;
-            let (status, reviewer_id) = Self::derive_request_state(&inserted_steps);
+            let (status, reviewer_id) = Self::derive_request_state(&inserted_steps, &request.resource);
             permission_requests::update_policy_metadata(
                 &self.db,
                 request.id,
@@ -520,7 +542,7 @@ impl PermissionService {
         let updated = match body.status.as_str() {
             "cancelled" => {
                 permission_requests::cancel_open_steps(&self.db, id).await?;
-                self.sync_request_state(id).await?
+                self.sync_request_state(id, &existing.resource).await?
             }
             "approved" => {
                 if existing.approval_steps.is_empty() {
@@ -548,7 +570,7 @@ impl PermissionService {
                         ));
                     }
                     permission_requests::activate_next_stage_if_ready(&self.db, id).await?;
-                    let request = self.sync_request_state(id).await?;
+                    let request = self.sync_request_state(id, &existing.resource).await?;
                     if request.status == "approved" {
                         self.grant_request(&request).await?;
                     }
@@ -565,7 +587,7 @@ impl PermissionService {
                         "approval step is not currently actionable".into(),
                     ));
                 }
-                self.sync_request_state(id).await?
+                self.sync_request_state(id, &existing.resource).await?
             }
             other => permission_requests::update_status_and_reviewer(
                 &self.db,
@@ -596,11 +618,8 @@ impl PermissionService {
             }
         }
 
-        let reviewer_id =
-            Uuid::parse_str(DEFAULT_REVIEWER_ID).expect("DEFAULT_REVIEWER_ID must be a valid UUID");
         let requests =
-            permission_requests::bulk_update_status(&self.db, &body.ids, "approved", reviewer_id)
-                .await?;
+            permission_requests::bulk_update_status(&self.db, &body.ids, "approved").await?;
         Ok(requests.into_iter().map(Self::into_response).collect())
     }
 

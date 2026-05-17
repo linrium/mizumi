@@ -90,6 +90,20 @@ export async function getPermissions(
   )
 }
 
+export async function getEffectivePrivileges(
+  resourceType: ResourceType,
+  catalog: string,
+  schema?: string,
+  table?: string,
+): Promise<string[]> {
+  const path = getPermissionsPath(resourceType, catalog, schema, table).replace(
+    "/permissions/",
+    "/effective-permissions/",
+  )
+  const data = await ucFetch<{ privileges: string[] }>(path)
+  return data.privileges
+}
+
 export async function patchPermissions(input: {
   resourceType: ResourceType
   catalog: string

@@ -260,41 +260,45 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
 
         <form.Field name="teamId">
           {(field) => (
-            <div
-              className={cn(
-                "space-y-1.5",
-                form.state.values.submitAs !== "team" && "opacity-60",
+            <form.Subscribe selector={(s) => s.values.submitAs}>
+              {(submitAs) => (
+                <div
+                  className={cn(
+                    "space-y-1.5",
+                    submitAs !== "team" && "opacity-60",
+                  )}
+                >
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Submit as team
+                  </Label>
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value)}
+                    disabled={submitAs !== "team"}
+                  >
+                    <SelectTrigger className="text-xs">
+                      <SelectValue
+                        placeholder={
+                          loadingTeams ? "Loading teams…" : "Select a team"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {myTeams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {field.state.meta.errors.length > 0 && (
+                    <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                      {String(field.state.meta.errors[0])}
+                    </p>
+                  )}
+                </div>
               )}
-            >
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Submit as team
-              </Label>
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value)}
-                disabled={form.state.values.submitAs !== "team"}
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue
-                    placeholder={
-                      loadingTeams ? "Loading teams…" : "Select a team"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {myTeams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {field.state.meta.errors.length > 0 && (
-                <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  {String(field.state.meta.errors[0])}
-                </p>
-              )}
-            </div>
+            </form.Subscribe>
           )}
         </form.Field>
 

@@ -209,4 +209,12 @@ pub trait AuthorizerPort: Send + Sync {
         securable_type: SecurableType,
         object_id: &str,
     ) -> Result<(), DomainError>;
+
+    /// List privileges granted directly to a specific principal on an object.
+    async fn list_grants_for_principal(
+        &self,
+        principal: &str,
+        securable_type: SecurableType,
+        object_id: &str,
+    ) -> Result<Vec<Privilege>, DomainError>;
 }

@@ -142,4 +142,8 @@ fn api_routes() -> Router<Arc<AppState>> {
             "/permissions/:securable_type/:full_name",
             get(permissions::get_permissions).patch(permissions::update_permissions),
         )
+        .route(
+            "/effective-permissions/:securable_type/:full_name",
+            get(permissions::get_effective_privileges),
+        )
 }

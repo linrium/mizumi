@@ -9,7 +9,7 @@ use crate::domain::entities::{
     volume::*,
 };
 use crate::domain::error::DomainError;
-use crate::domain::permissions::{PermissionsList, SecurableType, UpdatePermissions};
+use crate::domain::permissions::{PermissionsList, Privilege, SecurableType, UpdatePermissions};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -241,4 +241,11 @@ pub trait PermissionUseCase: Send + Sync {
         full_name: &str,
         changes: UpdatePermissions,
     ) -> Result<PermissionsList, DomainError>;
+    /// Return only the privileges granted directly to `principal` — no owner check required.
+    async fn get_effective_privileges(
+        &self,
+        principal: &str,
+        securable_type: SecurableType,
+        full_name: &str,
+    ) -> Result<Vec<Privilege>, DomainError>;
 }

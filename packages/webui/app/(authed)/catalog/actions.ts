@@ -3,6 +3,7 @@
 import { getServerSession } from "@/lib/auth"
 import {
   getCatalogs,
+  getEffectivePrivileges,
   getPermissions,
   getSchemas,
   getTable,
@@ -75,14 +76,8 @@ export async function getMyPrivilegesAction(
   schema?: string,
   table?: string,
 ): Promise<string[]> {
-  const session = await getServerSession()
-  if (!session?.email) return []
   try {
-    const data = await getPermissions(resourceType, catalog, schema, table)
-    const assignment = (data.privilege_assignments ?? []).find(
-      (a) => a.principal.toLowerCase() === session.email?.toLowerCase(),
-    )
-    return assignment?.privileges ?? []
+    return await getEffectivePrivileges(resourceType, catalog, schema, table)
   } catch {
     return []
   }

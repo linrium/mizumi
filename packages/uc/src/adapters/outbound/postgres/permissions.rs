@@ -253,6 +253,30 @@ impl AuthorizerPort for PgAuthorizer {
             .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(())
     }
+
+    async fn list_grants_for_principal(
+        &self,
+        principal: &str,
+        securable_type: SecurableType,
+        object_id: &str,
+    ) -> Result<Vec<Privilege>, DomainError> {
+        let rows: Vec<String> = sqlx::query_scalar(
+            "SELECT privilege FROM uc_grants
+             WHERE securable_type = $1 AND securable_id = $2 AND principal = $3
+             ORDER BY privilege",
+        )
+        .bind(securable_type.as_str())
+        .bind(object_id)
+        .bind(principal)
+        .fetch_all(&*self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|s| s.parse::<Privilege>().ok())
+            .collect())
+    }
 }
 
 /// No-op authorizer: always allows everything. Used when authorization is disabled.
@@ -336,5 +360,14 @@ impl AuthorizerPort for NoOpAuthorizer {
         _object_id: &str,
     ) -> Result<(), DomainError> {
         Ok(())
+    }
+
+    async fn list_grants_for_principal(
+        &self,
+        _principal: &str,
+        _securable_type: SecurableType,
+        _object_id: &str,
+    ) -> Result<Vec<Privilege>, DomainError> {
+        Ok(vec![])
     }
 }

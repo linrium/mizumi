@@ -348,14 +348,13 @@ pub async fn bulk_update_status(
     db: &PgPool,
     ids: &[Uuid],
     status: &str,
-    reviewer_id: Uuid,
 ) -> Result<Vec<PermissionRequestView>, sqlx::Error> {
     let requests = sqlx::query_as::<_, PermissionRequestRow>(&format!(
         r#"
         WITH updated AS (
             UPDATE permission_requests
-            SET status = $1, reviewer_id = $2, updated_at = NOW()
-            WHERE id = ANY($3)
+            SET status = $1, updated_at = NOW()
+            WHERE id = ANY($2)
             RETURNING *
         )
         SELECT
@@ -394,7 +393,6 @@ pub async fn bulk_update_status(
         "#
     ))
     .bind(status)
-    .bind(reviewer_id)
     .bind(ids)
     .fetch_all(db)
     .await?
