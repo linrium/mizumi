@@ -249,7 +249,7 @@ export default function PermissionRequestDetailPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-3 py-2.5 shrink-0">
+      <div className="border-b px-3 py-2 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <Link
@@ -258,7 +258,7 @@ export default function PermissionRequestDetailPage() {
             >
               Back to request queue
             </Link>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <h1 className="text-sm font-semibold">{request.code}</h1>
               <Status variant={getStatusVariant(request.status)}>
                 <StatusIndicator />
@@ -269,14 +269,14 @@ export default function PermissionRequestDetailPage() {
               </Badge>
               <Badge variant="outline">{formatScopeLabel(request.scope)}</Badge>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {request.requester} submitted this as {formatSubmitter(request)}{" "}
               for <span className="font-mono">{request.resource}</span>.
             </p>
             {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {currentSteps.length <= 1 && currentSteps[0] ? (
               <Button
                 size="sm"
@@ -334,23 +334,23 @@ export default function PermissionRequestDetailPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]">
-          <div className="space-y-4">
+        <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1.7fr)_320px]">
+          <div className="space-y-3">
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Request summary</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Request details, access scope, and routing context.
                 </p>
               </div>
               <Separator />
-              <div className="grid gap-4 px-4 py-4 md:grid-cols-2">
-                <div className="space-y-3">
+              <div className="grid gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-2">
+                <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Requester
                     </p>
-                    <p className="mt-1 text-sm font-medium">
+                    <p className="mt-0.5 text-sm font-medium">
                       {request.requester}
                     </p>
                     {request.requester_email && (
@@ -363,24 +363,24 @@ export default function PermissionRequestDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Submission target
                     </p>
-                    <p className="mt-1 text-sm">{formatSubmitter(request)}</p>
+                    <p className="mt-0.5 text-sm">{formatSubmitter(request)}</p>
                   </div>
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Queue decision
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {formatQueueDecision(request.queue_decision)}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Submitted
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(request.submitted_at)}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -396,7 +396,7 @@ export default function PermissionRequestDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Expires
                     </p>
-                    <p className="mt-1 text-sm">
+                    <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(request.expires_at)}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -409,43 +409,45 @@ export default function PermissionRequestDetailPage() {
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Current reviewer
                     </p>
-                    <p className="mt-1 text-sm">{request.reviewer}</p>
+                    <p className="mt-0.5 text-sm">{request.reviewer}</p>
                   </div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Access requested</h2>
               </div>
               <Separator />
-              <div className="space-y-4 px-4 py-4">
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Resource
-                  </p>
-                  <p className="mt-1 font-mono text-sm break-all">
-                    {request.resource}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Privileges
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {request.privileges.map((privilege) => (
-                      <Badge key={privilege} variant="outline">
-                        {privilege}
-                      </Badge>
-                    ))}
+              <div className="space-y-3 px-3 py-3">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Resource
+                    </p>
+                    <p className="mt-0.5 font-mono text-sm break-all">
+                      {request.resource}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Privileges
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {request.privileges.map((privilege) => (
+                        <Badge key={privilege} variant="outline">
+                          {privilege}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div>
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Rationale
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-0.5 text-sm text-muted-foreground">
                     {request.rationale || "No rationale provided."}
                   </p>
                 </div>
@@ -453,29 +455,29 @@ export default function PermissionRequestDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Approval flow</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Stage-by-stage approver routing for this request.
                 </p>
               </div>
               <Separator />
-              <div className="px-4 py-4">
+              <div className="px-3 py-3">
                 {request.approval_steps.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {request.approval_steps.map((step, index) => (
                       <div
                         key={step.id}
                         className={cn(
-                          "rounded-xl border p-3 transition-colors",
+                          "rounded-lg border px-3 py-2 transition-colors",
                           getApprovalStepPanelClass(
                             step.status,
                             step.is_current,
                           ),
                         )}
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 space-y-0.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="outline">
                                 Stage {step.stage_order}
@@ -504,7 +506,7 @@ export default function PermissionRequestDetailPage() {
                                   `Stage ${step.stage_order} approval`}
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-[11px] text-muted-foreground">
                               {getApprovalStepDescription(
                                 step.status,
                                 step.is_current,
@@ -512,7 +514,7 @@ export default function PermissionRequestDetailPage() {
                             </p>
                           </div>
 
-                          <div className="text-right text-xs text-muted-foreground">
+                          <div className="text-right text-[11px] text-muted-foreground">
                             <p>
                               {step.acted_at
                                 ? formatAbsoluteDate(step.acted_at)
@@ -538,7 +540,7 @@ export default function PermissionRequestDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-green-500/20 bg-green-500/[0.06] p-3">
+                  <div className="rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold">Direct handling</h3>
                       <Status variant="success">
@@ -546,7 +548,7 @@ export default function PermissionRequestDetailPage() {
                         <StatusLabel>Completed</StatusLabel>
                       </Status>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       No explicit approval chain. This request was handled
                       directly.
                     </p>
@@ -556,20 +558,20 @@ export default function PermissionRequestDetailPage() {
             </section>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Policy template</h2>
               </div>
               <Separator />
-              <div className="space-y-3 px-4 py-4 text-sm">
+              <div className="space-y-2.5 px-3 py-3 text-sm">
                 {request.policy_template_name ? (
                   <>
                     <div>
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Matched template
                       </p>
-                      <p className="mt-1 font-medium">
+                      <p className="mt-0.5 font-medium">
                         {request.policy_template_name}
                       </p>
                     </div>
@@ -577,7 +579,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Approval mode
                       </p>
-                      <p className="mt-1">
+                      <p className="mt-0.5">
                         {request.policy_template_approval_mode ?? "Not set"}
                       </p>
                     </div>
@@ -585,7 +587,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Template owner
                       </p>
-                      <p className="mt-1">
+                      <p className="mt-0.5">
                         {request.policy_template_owner ?? "Unassigned"}
                       </p>
                     </div>
@@ -593,7 +595,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Template resource
                       </p>
-                      <p className="mt-1 font-mono text-xs break-all text-muted-foreground">
+                      <p className="mt-0.5 font-mono text-xs break-all text-muted-foreground">
                         {request.policy_template_resource ?? "Any resource"}
                       </p>
                     </div>
@@ -608,35 +610,35 @@ export default function PermissionRequestDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-4 py-3">
+              <div className="px-3 py-2">
                 <h2 className="text-sm font-semibold">Blast radius</h2>
               </div>
               <Separator />
-              <div className="space-y-3 px-4 py-4 text-sm">
+              <div className="space-y-2.5 px-3 py-3 text-sm">
                 {blastRadius ? (
                   <>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-md border px-3 py-2">
+                      <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           Assets
                         </p>
-                        <p className="mt-1 text-base font-semibold">
+                        <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_assets}
                         </p>
                       </div>
-                      <div className="rounded-md border px-3 py-2">
+                      <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           Dashboards
                         </p>
-                        <p className="mt-1 text-base font-semibold">
+                        <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.dashboards}
                         </p>
                       </div>
-                      <div className="rounded-md border px-3 py-2">
+                      <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           Consumers
                         </p>
-                        <p className="mt-1 text-base font-semibold">
+                        <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.consumers}
                         </p>
                       </div>
@@ -645,7 +647,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Sensitive domains
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-1">
+                      <div className="mt-1.5 flex flex-wrap gap-1">
                         {blastRadius.sensitive_domains.map((domain) => (
                           <Badge key={domain} variant="outline">
                             {domain}
@@ -657,7 +659,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Recommended guardrail
                       </p>
-                      <p className="mt-1 text-muted-foreground">
+                      <p className="mt-0.5 text-muted-foreground">
                         {blastRadius.recommended_guardrail}
                       </p>
                     </div>
