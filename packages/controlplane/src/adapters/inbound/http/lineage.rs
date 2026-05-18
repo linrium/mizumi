@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
 };
 
@@ -47,6 +47,16 @@ pub async fn get_blast_radius(
     Query(query): Query<GraphQuery>,
 ) -> impl IntoResponse {
     match state.lineage_service.blast_radius(&query.root).await {
+        Ok(response) => Json(response).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+pub async fn get_lineage_node(
+    State(state): State<Arc<AppState>>,
+    Path(token): Path<String>,
+) -> impl IntoResponse {
+    match state.lineage_service.node_detail(&token).await {
         Ok(response) => Json(response).into_response(),
         Err(err) => err.into_response(),
     }

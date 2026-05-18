@@ -1,7 +1,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::lineage::{LineageEdge, LineageNode, LineageSyncRun};
+use crate::domain::entities::lineage::{
+    LineageEdge, LineageNode, LineageNodeRuntime, LineageSyncRun,
+};
 
 #[derive(Debug, Clone)]
 pub struct NewLineageNode {
@@ -21,6 +23,32 @@ pub struct NewLineageEdge {
     pub edge_type: String,
     pub confidence: f64,
     pub properties: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewLineageRun {
+    pub run_id: String,
+    pub node_id: Option<Uuid>,
+    pub source_system: String,
+    pub status: String,
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub ended_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub properties: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewLineageNodeRuntime {
+    pub node_id: Uuid,
+    pub source_system: String,
+    pub latest_run_id: Option<String>,
+    pub latest_run_status: Option<String>,
+    pub latest_run_started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub latest_run_ended_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub latest_materialization_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub latest_materialization_run_id: Option<String>,
+    pub unstarted_run_ids: serde_json::Value,
+    pub in_progress_run_ids: serde_json::Value,
+    pub metadata: serde_json::Value,
 }
 
 pub async fn start_sync_run(db: &PgPool) -> Result<LineageSyncRun, sqlx::Error> {
@@ -138,6 +166,68 @@ pub async fn replace_graph(
     Ok(())
 }
 
+pub async fn replace_runtime(
+    db: &PgPool,
+    runs: &[NewLineageRun],
+    runtimes: &[NewLineageNodeRuntime],
+) -> Result<(), sqlx::Error> {
+    let mut tx = db.begin().await?;
+
+    sqlx::query("DELETE FROM lineage_node_runtime")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM lineage_runs")
+        .execute(&mut *tx)
+        .await?;
+
+    for run in runs {
+        sqlx::query(
+            r#"
+            INSERT INTO lineage_runs (
+                run_id, node_id, source_system, status, started_at, ended_at, properties
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+        )
+        .bind(&run.run_id)
+        .bind(run.node_id)
+        .bind(&run.source_system)
+        .bind(&run.status)
+        .bind(run.started_at)
+        .bind(run.ended_at)
+        .bind(&run.properties)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for runtime in runtimes {
+        sqlx::query(
+            r#"
+            INSERT INTO lineage_node_runtime (
+                node_id, source_system, latest_run_id, latest_run_status,
+                latest_run_started_at, latest_run_ended_at, latest_materialization_at,
+                latest_materialization_run_id, unstarted_run_ids, in_progress_run_ids, metadata
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "#,
+        )
+        .bind(runtime.node_id)
+        .bind(&runtime.source_system)
+        .bind(&runtime.latest_run_id)
+        .bind(&runtime.latest_run_status)
+        .bind(runtime.latest_run_started_at)
+        .bind(runtime.latest_run_ended_at)
+        .bind(runtime.latest_materialization_at)
+        .bind(&runtime.latest_materialization_run_id)
+        .bind(&runtime.unstarted_run_ids)
+        .bind(&runtime.in_progress_run_ids)
+        .bind(&runtime.metadata)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn list_nodes(db: &PgPool) -> Result<Vec<LineageNode>, sqlx::Error> {
     sqlx::query_as::<_, LineageNode>("SELECT * FROM lineage_nodes ORDER BY display_name ASC")
         .fetch_all(db)
@@ -147,6 +237,24 @@ pub async fn list_nodes(db: &PgPool) -> Result<Vec<LineageNode>, sqlx::Error> {
 pub async fn list_edges(db: &PgPool) -> Result<Vec<LineageEdge>, sqlx::Error> {
     sqlx::query_as::<_, LineageEdge>("SELECT * FROM lineage_edges ORDER BY edge_type ASC")
         .fetch_all(db)
+        .await
+}
+
+pub async fn list_runtime(db: &PgPool) -> Result<Vec<LineageNodeRuntime>, sqlx::Error> {
+    sqlx::query_as::<_, LineageNodeRuntime>(
+        "SELECT * FROM lineage_node_runtime ORDER BY observed_at DESC",
+    )
+    .fetch_all(db)
+    .await
+}
+
+pub async fn get_runtime(
+    db: &PgPool,
+    node_id: Uuid,
+) -> Result<Option<LineageNodeRuntime>, sqlx::Error> {
+    sqlx::query_as::<_, LineageNodeRuntime>("SELECT * FROM lineage_node_runtime WHERE node_id = $1")
+        .bind(node_id)
+        .fetch_optional(db)
         .await
 }
 

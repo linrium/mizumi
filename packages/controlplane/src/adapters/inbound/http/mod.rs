@@ -151,6 +151,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         .route("/api/lineage/rebuild", post(lineage::rebuild_lineage))
         .route("/api/lineage/search", get(lineage::search_lineage))
+        .route("/api/lineage/nodes/{token}", get(lineage::get_lineage_node))
         .route("/api/lineage/graph", get(lineage::get_lineage_graph))
         .route("/api/lineage/blast-radius", get(lineage::get_blast_radius))
         .route("/dagster/assets", get(dagster::list_assets))

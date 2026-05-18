@@ -5,6 +5,7 @@ use std::{
     sync::OnceLock,
 };
 
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
@@ -13,11 +14,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    adapters::outbound::postgres::lineage::{self, NewLineageEdge, NewLineageNode},
+    adapters::outbound::postgres::lineage::{
+        self, NewLineageEdge, NewLineageNode, NewLineageNodeRuntime, NewLineageRun,
+    },
     domain::{
         entities::lineage::{
             BlastRadiusSummary, GraphQuery, LineageEdge, LineageEdgeResponse, LineageGraphResponse,
-            LineageNode, LineageNodeResponse, LineageSearchResponse, RebuildLineageResponse,
+            LineageNode, LineageNodeDetailResponse, LineageNodeResponse, LineageNodeRuntime,
+            LineageRuntimeResponse, LineageSearchResponse, RebuildLineageResponse,
         },
         error::AppError,
     },
@@ -113,7 +117,7 @@ impl LineageService {
             })
             .collect::<Vec<_>>();
 
-        let aliases = graph.aliases.into_iter().collect::<Vec<_>>();
+        let aliases = graph.aliases.iter().cloned().collect::<Vec<_>>();
         let edges = graph
             .edges
             .values()
@@ -128,6 +132,7 @@ impl LineageService {
             .collect::<Vec<_>>();
 
         lineage::replace_graph(&self.db, &nodes, &aliases, &edges).await?;
+        self.sync_runtime(&graph).await?;
 
         Ok(GraphSummary {
             nodes_count: nodes.len(),
@@ -143,7 +148,7 @@ impl LineageService {
     ) -> Result<LineageSearchResponse, AppError> {
         let nodes = lineage::search_nodes(&self.db, query, limit as i64).await?;
         Ok(LineageSearchResponse {
-            results: nodes.into_iter().map(node_to_response).collect(),
+            results: self.hydrate_nodes(nodes).await?,
         })
     }
 
@@ -192,7 +197,7 @@ impl LineageService {
         }
 
         Ok(BlastRadiusSummary {
-            root: node_to_response(root),
+            root: node_to_response(root, None),
             total_downstream_nodes: graph.nodes.len().saturating_sub(1),
             direct_downstream_nodes: direct,
             downstream_datasets: datasets,
@@ -200,6 +205,16 @@ impl LineageService {
             downstream_assets: assets,
             downstream_schedules: schedules,
             graph,
+        })
+    }
+
+    pub async fn node_detail(&self, token: &str) -> Result<LineageNodeDetailResponse, AppError> {
+        let node = lineage::resolve_node_by_token(&self.db, token)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        let runtime = lineage::get_runtime(&self.db, node.id).await?;
+        Ok(LineageNodeDetailResponse {
+            node: node_to_response(node, runtime),
         })
     }
 
@@ -267,13 +282,43 @@ impl LineageService {
             .collect::<Vec<_>>();
         graph_edges.sort_by(|a, b| a.edge_type.cmp(&b.edge_type));
 
+        let runtime_rows = lineage::list_runtime(&self.db).await?;
+        let runtime_by_id = runtime_rows
+            .into_iter()
+            .map(|row| (row.node_id, row))
+            .collect::<HashMap<_, _>>();
+
         Ok(LineageGraphResponse {
-            root: node_to_response(root),
+            root: node_to_response(root.clone(), runtime_by_id.get(&root.id).cloned()),
             direction: direction.to_string(),
             depth,
-            nodes: graph_nodes.into_iter().map(node_to_response).collect(),
+            nodes: graph_nodes
+                .into_iter()
+                .map(|node| {
+                    let runtime = runtime_by_id.get(&node.id).cloned();
+                    node_to_response(node, runtime)
+                })
+                .collect(),
             edges: graph_edges.into_iter().map(edge_to_response).collect(),
         })
+    }
+
+    async fn hydrate_nodes(
+        &self,
+        nodes: Vec<LineageNode>,
+    ) -> Result<Vec<LineageNodeResponse>, AppError> {
+        let runtime_rows = lineage::list_runtime(&self.db).await?;
+        let runtime_by_id = runtime_rows
+            .into_iter()
+            .map(|row| (row.node_id, row))
+            .collect::<HashMap<_, _>>();
+        Ok(nodes
+            .into_iter()
+            .map(|node| {
+                let runtime = runtime_by_id.get(&node.id).cloned();
+                node_to_response(node, runtime)
+            })
+            .collect())
     }
 
     async fn ingest_unity_catalog(&self, graph: &mut GraphBuilder) -> Result<(), AppError> {
@@ -512,6 +557,131 @@ impl LineageService {
             }
         }
 
+        Ok(())
+    }
+
+    async fn sync_runtime(&self, graph: &GraphBuilder) -> Result<(), AppError> {
+        let asset_nodes = graph
+            .nodes
+            .values()
+            .filter(|node| node.node_type == "dagster_asset")
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if asset_nodes.is_empty() {
+            lineage::replace_runtime(&self.db, &[], &[]).await?;
+            return Ok(());
+        }
+
+        let asset_keys = asset_nodes
+            .iter()
+            .map(|node| {
+                json!({
+                    "path": node.name.split('/').map(str::to_string).collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let runtime_data = self
+            .dagster_query_with_variables::<DagsterAssetLatestInfoData>(
+                DAGSTER_ASSET_LATEST_INFO_QUERY,
+                json!({ "assetKeys": asset_keys }),
+            )
+            .await?;
+
+        let dagster_key_to_node = asset_nodes
+            .iter()
+            .map(|node| (node.name.clone(), node.id))
+            .collect::<HashMap<_, _>>();
+
+        let edges_from_asset = graph
+            .edges
+            .values()
+            .filter(|edge| {
+                dagster_key_to_node
+                    .values()
+                    .any(|node_id| *node_id == edge.src)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let mut runtime_by_node = HashMap::<Uuid, RuntimeAccumulator>::new();
+        let mut runs = HashMap::<String, NewLineageRun>::new();
+
+        for info in runtime_data.assets_latest_info {
+            let path_key = info.asset_key.path.join("/");
+            let Some(asset_node_id) = dagster_key_to_node.get(&path_key).copied() else {
+                continue;
+            };
+
+            let runtime = RuntimeAccumulator::from_dagster(&info);
+            runtime_by_node.insert(asset_node_id, runtime.clone());
+
+            if let Some(run_id) = runtime.latest_run_id.clone() {
+                runs.insert(
+                    run_id.clone(),
+                    NewLineageRun {
+                        run_id,
+                        node_id: Some(asset_node_id),
+                        source_system: "dagster".to_string(),
+                        status: runtime
+                            .latest_run_status
+                            .clone()
+                            .unwrap_or_else(|| "UNKNOWN".to_string()),
+                        started_at: runtime.latest_run_started_at,
+                        ended_at: runtime.latest_run_ended_at,
+                        properties: json!({ "asset_path": path_key }),
+                    },
+                );
+            }
+
+            for edge in edges_from_asset
+                .iter()
+                .filter(|edge| edge.src == asset_node_id)
+            {
+                if !matches!(edge.edge_type.as_str(), "materializes" | "orchestrates") {
+                    continue;
+                }
+                runtime_by_node
+                    .entry(edge.dst)
+                    .and_modify(|existing| existing.merge_from(&runtime))
+                    .or_insert_with(|| runtime.clone());
+                if let Some(run_id) = runtime.latest_run_id.clone() {
+                    runs.entry(run_id.clone()).or_insert(NewLineageRun {
+                        run_id,
+                        node_id: Some(edge.dst),
+                        source_system: "dagster".to_string(),
+                        status: runtime
+                            .latest_run_status
+                            .clone()
+                            .unwrap_or_else(|| "UNKNOWN".to_string()),
+                        started_at: runtime.latest_run_started_at,
+                        ended_at: runtime.latest_run_ended_at,
+                        properties: json!({ "derived_from_asset": path_key }),
+                    });
+                }
+            }
+        }
+
+        let runtime_rows = runtime_by_node
+            .into_iter()
+            .map(|(node_id, runtime)| NewLineageNodeRuntime {
+                node_id,
+                source_system: "dagster".to_string(),
+                latest_run_id: runtime.latest_run_id,
+                latest_run_status: runtime.latest_run_status,
+                latest_run_started_at: runtime.latest_run_started_at,
+                latest_run_ended_at: runtime.latest_run_ended_at,
+                latest_materialization_at: runtime.latest_materialization_at,
+                latest_materialization_run_id: runtime.latest_materialization_run_id,
+                unstarted_run_ids: json!(runtime.unstarted_run_ids),
+                in_progress_run_ids: json!(runtime.in_progress_run_ids),
+                metadata: runtime.metadata,
+            })
+            .collect::<Vec<_>>();
+
+        let run_rows = runs.into_values().collect::<Vec<_>>();
+        lineage::replace_runtime(&self.db, &run_rows, &runtime_rows).await?;
         Ok(())
     }
 
@@ -832,7 +1002,7 @@ impl LineageService {
     }
 }
 
-fn node_to_response(node: LineageNode) -> LineageNodeResponse {
+fn node_to_response(node: LineageNode, runtime: Option<LineageNodeRuntime>) -> LineageNodeResponse {
     LineageNodeResponse {
         id: node.id,
         node_type: node.node_type,
@@ -841,6 +1011,7 @@ fn node_to_response(node: LineageNode) -> LineageNodeResponse {
         name: node.name,
         display_name: node.display_name,
         properties: node.properties,
+        runtime: runtime.map(runtime_to_response),
     }
 }
 
@@ -855,11 +1026,98 @@ fn edge_to_response(edge: LineageEdge) -> LineageEdgeResponse {
     }
 }
 
+fn runtime_to_response(runtime: LineageNodeRuntime) -> LineageRuntimeResponse {
+    LineageRuntimeResponse {
+        source_system: runtime.source_system,
+        latest_run_id: runtime.latest_run_id,
+        latest_run_status: runtime.latest_run_status,
+        latest_run_started_at: runtime.latest_run_started_at,
+        latest_run_ended_at: runtime.latest_run_ended_at,
+        latest_materialization_at: runtime.latest_materialization_at,
+        latest_materialization_run_id: runtime.latest_materialization_run_id,
+        unstarted_run_ids: serde_json::from_value(runtime.unstarted_run_ids).unwrap_or_default(),
+        in_progress_run_ids: serde_json::from_value(runtime.in_progress_run_ids)
+            .unwrap_or_default(),
+        metadata: runtime.metadata,
+        observed_at: runtime.observed_at,
+    }
+}
+
 #[derive(Default)]
 struct GraphSummary {
     nodes_count: usize,
     edges_count: usize,
     aliases_count: usize,
+}
+
+#[derive(Clone, Default)]
+struct RuntimeAccumulator {
+    latest_run_id: Option<String>,
+    latest_run_status: Option<String>,
+    latest_run_started_at: Option<DateTime<Utc>>,
+    latest_run_ended_at: Option<DateTime<Utc>>,
+    latest_materialization_at: Option<DateTime<Utc>>,
+    latest_materialization_run_id: Option<String>,
+    unstarted_run_ids: Vec<String>,
+    in_progress_run_ids: Vec<String>,
+    metadata: serde_json::Value,
+}
+
+impl RuntimeAccumulator {
+    fn from_dagster(info: &DagsterAssetLatestInfo) -> Self {
+        let latest_run_started_at = info
+            .latest_run
+            .as_ref()
+            .and_then(|run| run.start_time)
+            .and_then(seconds_to_datetime);
+        let latest_run_ended_at = info
+            .latest_run
+            .as_ref()
+            .and_then(|run| run.end_time)
+            .and_then(seconds_to_datetime);
+        let latest_materialization_at = info
+            .latest_materialization
+            .as_ref()
+            .and_then(|mat| parse_dagster_timestamp(&mat.timestamp));
+
+        Self {
+            latest_run_id: info.latest_run.as_ref().map(|run| run.run_id.clone()),
+            latest_run_status: info.latest_run.as_ref().map(|run| run.status.clone()),
+            latest_run_started_at,
+            latest_run_ended_at,
+            latest_materialization_at,
+            latest_materialization_run_id: info
+                .latest_materialization
+                .as_ref()
+                .map(|mat| mat.run_id.clone()),
+            unstarted_run_ids: info.unstarted_run_ids.clone(),
+            in_progress_run_ids: info.in_progress_run_ids.clone(),
+            metadata: json!({
+                "asset_path": info.asset_key.path,
+                "queued_runs": info.unstarted_run_ids.len(),
+                "in_progress_runs": info.in_progress_run_ids.len(),
+            }),
+        }
+    }
+
+    fn merge_from(&mut self, other: &RuntimeAccumulator) {
+        if is_newer_run(self.latest_run_started_at, other.latest_run_started_at) {
+            self.latest_run_id = other.latest_run_id.clone();
+            self.latest_run_status = other.latest_run_status.clone();
+            self.latest_run_started_at = other.latest_run_started_at;
+            self.latest_run_ended_at = other.latest_run_ended_at;
+        }
+        if is_newer_mat(
+            self.latest_materialization_at,
+            other.latest_materialization_at,
+        ) {
+            self.latest_materialization_at = other.latest_materialization_at;
+            self.latest_materialization_run_id = other.latest_materialization_run_id.clone();
+        }
+        self.unstarted_run_ids = other.unstarted_run_ids.clone();
+        self.in_progress_run_ids = other.in_progress_run_ids.clone();
+        self.metadata = other.metadata.clone();
+    }
 }
 
 #[derive(Default)]
@@ -1024,6 +1282,37 @@ enum AliasPriority {
     SchemaFqn = 60,
     TableFqn = 70,
     StoragePath = 80,
+}
+
+fn seconds_to_datetime(ts: f64) -> Option<DateTime<Utc>> {
+    let secs = ts.trunc() as i64;
+    let nanos = ((ts.fract() * 1_000_000_000.0).round() as u32).min(999_999_999);
+    DateTime::<Utc>::from_timestamp(secs, nanos)
+}
+
+fn parse_dagster_timestamp(ts: &str) -> Option<DateTime<Utc>> {
+    let numeric = ts.parse::<f64>().ok()?;
+    seconds_to_datetime(if numeric > 1e12 {
+        numeric / 1000.0
+    } else {
+        numeric
+    })
+}
+
+fn is_newer_run(current: Option<DateTime<Utc>>, candidate: Option<DateTime<Utc>>) -> bool {
+    match (current, candidate) {
+        (None, Some(_)) => true,
+        (Some(cur), Some(next)) => next > cur,
+        _ => false,
+    }
+}
+
+fn is_newer_mat(current: Option<DateTime<Utc>>, candidate: Option<DateTime<Utc>>) -> bool {
+    match (current, candidate) {
+        (None, Some(_)) => true,
+        (Some(cur), Some(next)) => next > cur,
+        _ => false,
+    }
 }
 
 fn stable_uuid(key: &str) -> Uuid {
@@ -1399,6 +1688,44 @@ struct DagsterScheduleState {
     status: String,
 }
 
+#[derive(Deserialize)]
+struct DagsterAssetLatestInfoData {
+    #[serde(rename = "assetsLatestInfo")]
+    assets_latest_info: Vec<DagsterAssetLatestInfo>,
+}
+
+#[derive(Deserialize)]
+struct DagsterAssetLatestInfo {
+    #[serde(rename = "assetKey")]
+    asset_key: DagsterAssetKey,
+    #[serde(rename = "latestRun")]
+    latest_run: Option<DagsterLatestRun>,
+    #[serde(rename = "latestMaterialization")]
+    latest_materialization: Option<DagsterLatestMaterialization>,
+    #[serde(rename = "unstartedRunIds", default)]
+    unstarted_run_ids: Vec<String>,
+    #[serde(rename = "inProgressRunIds", default)]
+    in_progress_run_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct DagsterLatestRun {
+    #[serde(rename = "runId")]
+    run_id: String,
+    status: String,
+    #[serde(rename = "startTime")]
+    start_time: Option<f64>,
+    #[serde(rename = "endTime")]
+    end_time: Option<f64>,
+}
+
+#[derive(Deserialize)]
+struct DagsterLatestMaterialization {
+    timestamp: String,
+    #[serde(rename = "runId")]
+    run_id: String,
+}
+
 const DAGSTER_ASSET_NODES_QUERY: &str = r#"
 query {
   assetNodes {
@@ -1448,6 +1775,26 @@ query Schedules($selector: RepositorySelector!) {
         }
       }
     }
+  }
+}
+"#;
+
+const DAGSTER_ASSET_LATEST_INFO_QUERY: &str = r#"
+query AssetLatestInfo($assetKeys: [AssetKeyInput!]!) {
+  assetsLatestInfo(assetKeys: $assetKeys) {
+    assetKey { path }
+    latestRun {
+      runId
+      status
+      startTime
+      endTime
+    }
+    latestMaterialization {
+      timestamp
+      runId
+    }
+    unstartedRunIds
+    inProgressRunIds
   }
 }
 "#;

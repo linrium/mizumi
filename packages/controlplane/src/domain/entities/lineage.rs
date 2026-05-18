@@ -39,6 +39,50 @@ pub struct LineageSyncRun {
     pub message: Option<String>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LineageRun {
+    pub run_id: String,
+    pub node_id: Option<Uuid>,
+    pub source_system: String,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub properties: serde_json::Value,
+    pub observed_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LineageNodeRuntime {
+    pub node_id: Uuid,
+    pub source_system: String,
+    pub latest_run_id: Option<String>,
+    pub latest_run_status: Option<String>,
+    pub latest_run_started_at: Option<DateTime<Utc>>,
+    pub latest_run_ended_at: Option<DateTime<Utc>>,
+    pub latest_materialization_at: Option<DateTime<Utc>>,
+    pub latest_materialization_run_id: Option<String>,
+    pub unstarted_run_ids: serde_json::Value,
+    pub in_progress_run_ids: serde_json::Value,
+    pub metadata: serde_json::Value,
+    pub observed_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LineageRuntimeResponse {
+    pub source_system: String,
+    pub latest_run_id: Option<String>,
+    pub latest_run_status: Option<String>,
+    pub latest_run_started_at: Option<DateTime<Utc>>,
+    pub latest_run_ended_at: Option<DateTime<Utc>>,
+    pub latest_materialization_at: Option<DateTime<Utc>>,
+    pub latest_materialization_run_id: Option<String>,
+    pub unstarted_run_ids: Vec<String>,
+    pub in_progress_run_ids: Vec<String>,
+    pub metadata: serde_json::Value,
+    pub observed_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct LineageGraphResponse {
     pub root: LineageNodeResponse,
@@ -57,6 +101,7 @@ pub struct LineageNodeResponse {
     pub name: String,
     pub display_name: String,
     pub properties: serde_json::Value,
+    pub runtime: Option<LineageRuntimeResponse>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -109,4 +154,9 @@ pub struct SearchQuery {
     pub q: String,
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LineageNodeDetailResponse {
+    pub node: LineageNodeResponse,
 }
