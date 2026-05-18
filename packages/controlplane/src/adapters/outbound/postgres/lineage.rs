@@ -289,7 +289,7 @@ pub async fn resolve_node_by_token(
         return Ok(Some(node));
     }
 
-    sqlx::query_as::<_, LineageNode>(
+    if let Some(node) = sqlx::query_as::<_, LineageNode>(
         r#"
         SELECT *
         FROM lineage_nodes
@@ -300,7 +300,50 @@ pub async fn resolve_node_by_token(
     )
     .bind(token)
     .fetch_optional(db)
-    .await
+    .await?
+    {
+        return Ok(Some(node));
+    }
+
+    // Accept slash-separated catalog/schema/table (e.g. "mycat/myschema/mytable")
+    // as an alternative to the canonical dot-separated FQN.
+    if token.matches('/').count() == 2 && !token.contains("://") {
+        let dot_fqn = token.replace('/', ".");
+
+        if let Some(node) = sqlx::query_as::<_, LineageNode>(
+            r#"
+            SELECT n.*
+            FROM lineage_nodes n
+            JOIN lineage_node_aliases a ON a.node_id = n.id
+            WHERE a.alias = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(&dot_fqn)
+        .fetch_optional(db)
+        .await?
+        {
+            return Ok(Some(node));
+        }
+
+        if let Some(node) = sqlx::query_as::<_, LineageNode>(
+            r#"
+            SELECT *
+            FROM lineage_nodes
+            WHERE name = $1 OR display_name = $1
+            ORDER BY display_name ASC
+            LIMIT 1
+            "#,
+        )
+        .bind(&dot_fqn)
+        .fetch_optional(db)
+        .await?
+        {
+            return Ok(Some(node));
+        }
+    }
+
+    Ok(None)
 }
 
 pub async fn search_nodes(

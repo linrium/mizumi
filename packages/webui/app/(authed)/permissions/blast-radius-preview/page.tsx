@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import {
   type BlastRadiusPreview,
+  type LlmRiskStatus,
   listBlastRadius,
   type RiskLevel,
 } from "@/services/permissions"
@@ -33,6 +34,33 @@ function formatRiskLabel(risk: RiskLevel) {
 
 function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1)
+}
+
+function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
+  if (status === "processing") {
+    return (
+      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+        LLM analysing…
+      </Badge>
+    )
+  }
+  if (status === "failed") {
+    return (
+      <Badge variant="outline" className="text-destructive border-destructive/40">
+        LLM failed
+      </Badge>
+    )
+  }
+  if (status === "unknown") {
+    return null
+  }
+  const variant =
+    status === "high" ? "destructive" : status === "medium" ? "secondary" : "outline"
+  return (
+    <Badge variant={variant}>
+      LLM {status[0]?.toUpperCase() + status.slice(1)} risk
+    </Badge>
+  )
 }
 
 export default function BlastRadiusPreviewPage() {
@@ -73,14 +101,15 @@ export default function BlastRadiusPreviewPage() {
               <TableHead>Resource</TableHead>
               <TableHead>Impact</TableHead>
               <TableHead>Sensitive domains</TableHead>
-              <TableHead>Recommended guardrail</TableHead>
+              <TableHead>Guardrail</TableHead>
+              <TableHead>LLM assessment</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Loading…
@@ -146,8 +175,20 @@ export default function BlastRadiusPreviewPage() {
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell className="align-top text-muted-foreground">
-                    {item.recommended_guardrail}
+                  <TableCell className="align-top text-muted-foreground text-xs max-w-56">
+                    {item.recommended_guardrail || (
+                      <span className="italic">None</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="space-y-1.5">
+                      <LlmRiskBadge status={item.llm_risk} />
+                      {item.llm_recommended_guardrail && (
+                        <p className="text-xs text-muted-foreground max-w-56">
+                          {item.llm_recommended_guardrail}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

@@ -14,6 +14,7 @@ import {
   type BlastRadiusPreview,
   getBlastRadius,
   getPermissionRequest,
+  type LlmRiskStatus,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
@@ -149,6 +150,33 @@ function getApprovalStepPanelClass(status: string, isCurrent: boolean) {
     return "border-blue-500/20 bg-blue-500/[0.06] shadow-sm"
   }
   return "border-border/70 bg-muted/30"
+}
+
+function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
+  if (status === "processing") {
+    return (
+      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+        LLM analysing…
+      </Badge>
+    )
+  }
+  if (status === "failed") {
+    return (
+      <Badge variant="outline" className="text-destructive border-destructive/40">
+        LLM failed
+      </Badge>
+    )
+  }
+  if (status === "unknown") {
+    return null
+  }
+  const variant =
+    status === "high" ? "destructive" : status === "medium" ? "secondary" : "outline"
+  return (
+    <Badge variant={variant}>
+      LLM {status[0]?.toUpperCase() + status.slice(1)} risk
+    </Badge>
+  )
 }
 
 export default function PermissionRequestDetailPage() {
@@ -644,6 +672,7 @@ export default function PermissionRequestDetailPage() {
                     <Badge variant={getRiskVariant(blastRadius.derived_risk)}>
                       Derived {formatRiskLabel(blastRadius.derived_risk)}
                     </Badge>
+                    <LlmRiskBadge status={blastRadius.llm_risk} />
                     {blastRadius.lineage_root_display_name && (
                       <span className="text-[11px] text-muted-foreground ml-1">
                         root:{" "}
@@ -699,7 +728,8 @@ export default function PermissionRequestDetailPage() {
               {/* Sensitive domains + guardrail footer */}
               {blastRadius &&
                 (blastRadius.sensitive_domains.length > 0 ||
-                  blastRadius.recommended_guardrail) && (
+                  blastRadius.recommended_guardrail ||
+                  blastRadius.llm_recommended_guardrail) && (
                   <div className="flex flex-wrap gap-6 border-t px-4 py-3">
                     {blastRadius.sensitive_domains.length > 0 && (
                       <div>
@@ -722,6 +752,16 @@ export default function PermissionRequestDetailPage() {
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {blastRadius.recommended_guardrail}
+                        </p>
+                      </div>
+                    )}
+                    {blastRadius.llm_recommended_guardrail && (
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          LLM guardrail
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {blastRadius.llm_recommended_guardrail}
                         </p>
                       </div>
                     )}

@@ -8,6 +8,13 @@ export type RequestStatus =
   | "cancelled"
 export type RequestScope = "catalog" | "schema" | "table"
 export type RiskLevel = "low" | "medium" | "high"
+export type LlmRiskStatus =
+  | "processing"
+  | "failed"
+  | "unknown"
+  | "low"
+  | "medium"
+  | "high"
 export type ApprovalStepStatus =
   | "waiting"
   | "pending"
@@ -106,6 +113,8 @@ export type BlastRadiusPreview = {
   consumers: number
   sensitive_domains: string[]
   recommended_guardrail: string
+  llm_risk: LlmRiskStatus
+  llm_recommended_guardrail: string
 }
 
 export type TimeBoundGrant = {
