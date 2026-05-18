@@ -1,11 +1,11 @@
-"use client";
+"use client"
 
-import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import dynamic from "next/dynamic"
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Command,
   CommandEmpty,
@@ -14,21 +14,19 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
+} from "@/components/ui/command"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { apiFetch as fetchWithAuth } from "@/lib/api-client";
+} from "@/components/ui/popover"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 const LineageGraph = dynamic(
   () => import("../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
   { ssr: false },
-);
+)
 
 const NODE_TYPE_OPTIONS = [
   { value: "table", label: "tables" },
@@ -41,15 +39,15 @@ const NODE_TYPE_OPTIONS = [
   { value: "schedule", label: "schedules" },
   { value: "catalog", label: "catalogs" },
   { value: "schema", label: "schemas" },
-] as const;
+] as const
 
 export default function LineagePage() {
-  const [query, setQuery] = useState("");
-  const [runtimeOnly, setRuntimeOnly] = useState(false);
-  const [includeContains, setIncludeContains] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [rebuilding, setRebuilding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [query, setQuery] = useState("")
+  const [runtimeOnly, setRuntimeOnly] = useState(false)
+  const [includeContains, setIncludeContains] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [rebuilding, setRebuilding] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [selectedNodeTypes, setSelectedNodeTypes] = useState<string[]>([
     "table",
     "topic",
@@ -59,7 +57,7 @@ export default function LineagePage() {
     "daft_job",
     "dagster_job",
     "schedule",
-  ]);
+  ])
 
   const filters = useMemo(
     () => ({
@@ -69,29 +67,29 @@ export default function LineagePage() {
       nodeTypes: selectedNodeTypes,
     }),
     [query, runtimeOnly, includeContains, selectedNodeTypes],
-  );
+  )
 
   const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (query.trim()) count += 1;
-    if (runtimeOnly) count += 1;
-    if (includeContains) count += 1;
-    if (selectedNodeTypes.length !== 8) count += 1;
-    return count;
-  }, [includeContains, query, runtimeOnly, selectedNodeTypes.length]);
+    let count = 0
+    if (query.trim()) count += 1
+    if (runtimeOnly) count += 1
+    if (includeContains) count += 1
+    if (selectedNodeTypes.length !== 8) count += 1
+    return count
+  }, [includeContains, query, runtimeOnly, selectedNodeTypes.length])
 
   function toggleNodeType(nodeType: string) {
     setSelectedNodeTypes((current) =>
       current.includes(nodeType)
         ? current.filter((value) => value !== nodeType)
         : [...current, nodeType],
-    );
+    )
   }
 
   function resetFilters() {
-    setQuery("");
-    setRuntimeOnly(false);
-    setIncludeContains(false);
+    setQuery("")
+    setRuntimeOnly(false)
+    setIncludeContains(false)
     setSelectedNodeTypes([
       "table",
       "topic",
@@ -101,27 +99,27 @@ export default function LineagePage() {
       "daft_job",
       "dagster_job",
       "schedule",
-    ]);
+    ])
   }
 
   async function handleRebuild() {
-    setRebuilding(true);
+    setRebuilding(true)
     try {
       const res = await fetchWithAuth("/api/lineage/rebuild", {
         method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setRefreshKey((value) => value + 1);
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      setRefreshKey((value) => value + 1)
       toast.success("Lineage rebuilt", {
         description: `${json.nodes_count ?? 0} nodes, ${json.edges_count ?? 0} edges`,
-      });
+      })
     } catch (err) {
       toast.error("Failed to rebuild lineage", {
         description: (err as Error).message,
-      });
+      })
     } finally {
-      setRebuilding(false);
+      setRebuilding(false)
     }
   }
 
@@ -159,7 +157,7 @@ export default function LineagePage() {
                   <CommandEmpty>No filter options found.</CommandEmpty>
                   <CommandGroup heading="Node types">
                     {NODE_TYPE_OPTIONS.map((option) => {
-                      const checked = selectedNodeTypes.includes(option.value);
+                      const checked = selectedNodeTypes.includes(option.value)
                       return (
                         <CommandItem
                           key={option.value}
@@ -169,7 +167,7 @@ export default function LineagePage() {
                           <Checkbox checked={checked} />
                           <span>{option.label}</span>
                         </CommandItem>
-                      );
+                      )
                     })}
                   </CommandGroup>
                   <CommandSeparator />
@@ -234,8 +232,12 @@ export default function LineagePage() {
       </div>
 
       <div className="flex-1 min-h-0 relative">
-        <LineageGraph key={refreshKey} filters={filters} />
+        <LineageGraph
+          key={refreshKey}
+          filters={filters}
+          enableNeighborhoodSelection
+        />
       </div>
     </div>
-  );
+  )
 }

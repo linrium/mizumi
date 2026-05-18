@@ -83,6 +83,9 @@ type LineageNodeData = {
   runtime: RuntimeInfo | null
   isCurrent: boolean
   href: string | null
+  canExpand: boolean
+  isExpanded: boolean
+  onExpand: ((id: string) => void) | null
   [key: string]: unknown
 }
 
@@ -158,6 +161,9 @@ function latestTimestamp(runtime: RuntimeInfo | null) {
 }
 
 function nodeHref(node: ApiLineageNode) {
+  if (node.properties.__disableLink) {
+    return null
+  }
   if (node.node_type === "dagster_asset") {
     return `/pipelines/assets/${node.name}`
   }
@@ -271,6 +277,25 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
             {fmtAbsTime(latest)}
           </span>
         </div>
+        {data.canExpand && (
+          <div className="px-3 py-2 flex justify-end bg-white/80">
+            <button
+              type="button"
+              className={cn(
+                "rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-wide transition-colors",
+                data.isExpanded
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900",
+              )}
+              onClick={(event) => {
+                event.stopPropagation()
+                data.onExpand?.(data.id)
+              }}
+            >
+              {data.isExpanded ? "Expanded" : "Expand"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -292,7 +317,12 @@ const nodeTypes: NodeTypes = {
 }
 
 const CARD_W = 290
-const CARD_H = 190
+const BASE_CARD_H = 190
+const EXPANDABLE_CARD_H = 228
+
+function cardHeight(node: ApiLineageNode) {
+  return node.properties.__canExpand ? EXPANDABLE_CARD_H : BASE_CARD_H
+}
 
 function buildLayout(
   graph: ApiLineageGraph,
@@ -303,7 +333,7 @@ function buildLayout(
   g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 })
 
   for (const node of graph.nodes) {
-    g.setNode(node.id, { width: CARD_W, height: CARD_H })
+    g.setNode(node.id, { width: CARD_W, height: cardHeight(node) })
   }
   for (const edge of graph.edges) {
     g.setEdge(edge.source, edge.target)
@@ -313,14 +343,15 @@ function buildLayout(
 
   const rfNodes: Node[] = graph.nodes.map((node) => {
     const pos = g.node(node.id)
+    const height = cardHeight(node)
     return {
       id: node.id,
       type: "lineageCard",
       position: {
         x: pos.x - CARD_W / 2,
-        y: pos.y - CARD_H / 2,
+        y: pos.y - height / 2,
       },
-      style: { width: CARD_W },
+      style: { width: CARD_W, height },
       data: {
         id: node.id,
         displayName: node.display_name,
@@ -367,10 +398,12 @@ function buildLayout(
 export function LineageGraph({
   currentPath,
   neighborhoodOnly = false,
+  enableNeighborhoodSelection = false,
   filters,
 }: {
   currentPath?: string[]
   neighborhoodOnly?: boolean
+  enableNeighborhoodSelection?: boolean
   filters?: LineageFilters
 }) {
   const rootToken = currentPath?.join("/") ?? null
@@ -378,6 +411,8 @@ export function LineageGraph({
   const [graph, setGraph] = useState<ApiLineageGraph | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -477,11 +512,108 @@ export function LineageGraph({
     } satisfies ApiLineageGraph
   }, [filters, graph])
 
-  const currentId = filteredGraph?.root?.id ?? null
+  const focusedGraph = useMemo(() => {
+    if (!filteredGraph || !enableNeighborhoodSelection || !selectedNodeId) {
+      return filteredGraph
+    }
+
+    const selectedExists = filteredGraph.nodes.some(
+      (node) => node.id === selectedNodeId,
+    )
+    if (!selectedExists) return filteredGraph
+
+    const expansionSeeds = new Set<string>([
+      selectedNodeId,
+      ...expandedNodeIds.filter((nodeId) =>
+        filteredGraph.nodes.some((node) => node.id === nodeId),
+      ),
+    ])
+    const focusedEdges = filteredGraph.edges.filter(
+      (edge) =>
+        expansionSeeds.has(edge.source) || expansionSeeds.has(edge.target),
+    )
+    const focusedIds = new Set<string>([selectedNodeId])
+    for (const edge of focusedEdges) {
+      focusedIds.add(edge.source)
+      focusedIds.add(edge.target)
+    }
+
+    const focusedNodes = filteredGraph.nodes.filter((node) =>
+      focusedIds.has(node.id),
+    )
+    const focusedRoot =
+      filteredGraph.root && focusedIds.has(filteredGraph.root.id)
+        ? filteredGraph.root
+        : (filteredGraph.nodes.find((node) => node.id === selectedNodeId) ??
+          null)
+
+    return {
+      ...filteredGraph,
+      nodes: focusedNodes,
+      edges: focusedEdges,
+      root: focusedRoot,
+    } satisfies ApiLineageGraph
+  }, [
+    enableNeighborhoodSelection,
+    expandedNodeIds,
+    filteredGraph,
+    selectedNodeId,
+  ])
+
+  const currentId =
+    enableNeighborhoodSelection && selectedNodeId
+      ? selectedNodeId
+      : (focusedGraph?.root?.id ?? null)
   const { rfNodes, rfEdges } = useMemo(() => {
-    if (!filteredGraph) return { rfNodes: [], rfEdges: [] }
-    return buildLayout(filteredGraph, currentId)
-  }, [filteredGraph, currentId])
+    if (!focusedGraph) return { rfNodes: [], rfEdges: [] }
+
+    const expandedIds = new Set(expandedNodeIds)
+    const graphForLayout = {
+      ...focusedGraph,
+      nodes: focusedGraph.nodes.map((node) => ({
+        ...node,
+        properties: {
+          ...node.properties,
+          __disableLink: enableNeighborhoodSelection,
+          __canExpand:
+            enableNeighborhoodSelection &&
+            !!selectedNodeId &&
+            node.id !== selectedNodeId,
+        },
+      })),
+    } satisfies ApiLineageGraph
+    const layout = buildLayout(graphForLayout, currentId)
+
+    return {
+      rfNodes: layout.rfNodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          canExpand:
+            enableNeighborhoodSelection &&
+            !!selectedNodeId &&
+            node.id !== selectedNodeId,
+          isExpanded: expandedIds.has(node.id),
+          onExpand: enableNeighborhoodSelection
+            ? (nodeId: string) => {
+                setExpandedNodeIds((current) =>
+                  current.includes(nodeId)
+                    ? current.filter((value) => value !== nodeId)
+                    : [...current, nodeId],
+                )
+              }
+            : null,
+        } satisfies LineageNodeData,
+      })),
+      rfEdges: layout.rfEdges,
+    }
+  }, [
+    currentId,
+    enableNeighborhoodSelection,
+    expandedNodeIds,
+    focusedGraph,
+    selectedNodeId,
+  ])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges)
@@ -509,7 +641,7 @@ export function LineageGraph({
     )
   }
 
-  if (!filteredGraph || filteredGraph.nodes.length === 0) {
+  if (!focusedGraph || focusedGraph.nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
         No lineage matches the current filters
@@ -523,6 +655,19 @@ export function LineageGraph({
       edges={edges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onNodeClick={(_, node) => {
+        if (!enableNeighborhoodSelection) return
+        setSelectedNodeId((current) => {
+          const nextId = current === node.id ? null : node.id
+          setExpandedNodeIds([])
+          return nextId
+        })
+      }}
+      onPaneClick={() => {
+        if (!enableNeighborhoodSelection) return
+        setSelectedNodeId(null)
+        setExpandedNodeIds([])
+      }}
       nodeTypes={nodeTypes}
       fitView
       fitViewOptions={{ padding: 0.15 }}
