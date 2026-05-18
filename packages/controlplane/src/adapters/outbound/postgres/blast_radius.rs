@@ -7,7 +7,8 @@ use uuid::Uuid;
 pub struct BlastRadiusLlmData {
     pub recommended_guardrail: String,
     pub llm_risk: String,
-    pub llm_recommended_guardrail: String,
+    pub llm_recommendation: String,
+    pub llm_explanation: String,
 }
 
 pub async fn upsert_processing(db: &PgPool, request_id: Uuid) -> Result<(), sqlx::Error> {
@@ -28,21 +29,24 @@ pub async fn upsert_processing(db: &PgPool, request_id: Uuid) -> Result<(), sqlx
 pub async fn update_llm_result(
     db: &PgPool,
     request_id: Uuid,
-    llm_guardrail: &str,
+    llm_recommendation: &str,
     llm_risk: &str,
+    llm_explanation: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         UPDATE blast_radius_previews
         SET llm_recommended_guardrail = $2,
             llm_risk                  = $3,
+            llm_explanation           = $4,
             updated_at                = NOW()
         WHERE request_id = $1
         "#,
     )
     .bind(request_id)
-    .bind(llm_guardrail)
+    .bind(llm_recommendation)
     .bind(llm_risk)
+    .bind(llm_explanation)
     .execute(db)
     .await?;
     Ok(())
@@ -52,9 +56,9 @@ pub async fn get_llm_data(
     db: &PgPool,
     request_id: Uuid,
 ) -> Result<Option<BlastRadiusLlmData>, sqlx::Error> {
-    sqlx::query_as::<_, (String, String, String)>(
+    sqlx::query_as::<_, (String, String, String, String)>(
         r#"
-        SELECT recommended_guardrail, llm_risk, llm_recommended_guardrail
+        SELECT recommended_guardrail, llm_risk, llm_recommended_guardrail, llm_explanation
         FROM blast_radius_previews
         WHERE request_id = $1
         "#,
@@ -63,20 +67,21 @@ pub async fn get_llm_data(
     .fetch_optional(db)
     .await
     .map(|row| {
-        row.map(|(recommended_guardrail, llm_risk, llm_recommended_guardrail)| {
+        row.map(|(recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
             BlastRadiusLlmData {
                 recommended_guardrail,
                 llm_risk,
-                llm_recommended_guardrail,
+                llm_recommendation,
+                llm_explanation,
             }
         })
     })
 }
 
 pub async fn list_llm_data(db: &PgPool) -> Result<HashMap<Uuid, BlastRadiusLlmData>, sqlx::Error> {
-    let rows = sqlx::query_as::<_, (Uuid, String, String, String)>(
+    let rows = sqlx::query_as::<_, (Uuid, String, String, String, String)>(
         r#"
-        SELECT request_id, recommended_guardrail, llm_risk, llm_recommended_guardrail
+        SELECT request_id, recommended_guardrail, llm_risk, llm_recommended_guardrail, llm_explanation
         FROM blast_radius_previews
         "#,
     )
@@ -85,13 +90,14 @@ pub async fn list_llm_data(db: &PgPool) -> Result<HashMap<Uuid, BlastRadiusLlmDa
 
     Ok(rows
         .into_iter()
-        .map(|(id, recommended_guardrail, llm_risk, llm_recommended_guardrail)| {
+        .map(|(id, recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
             (
                 id,
                 BlastRadiusLlmData {
                     recommended_guardrail,
                     llm_risk,
-                    llm_recommended_guardrail,
+                    llm_recommendation,
+                    llm_explanation,
                 },
             )
         })

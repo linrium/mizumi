@@ -92,6 +92,11 @@ export type PolicyTemplate = {
   approval_steps: PolicyTemplateApprovalStep[]
 }
 
+export type AffectedComponent = {
+  display_name: string
+  node_type: string
+}
+
 export type BlastRadiusPreview = {
   request_id: string
   code: string
@@ -115,7 +120,9 @@ export type BlastRadiusPreview = {
   sensitive_domains: string[]
   recommended_guardrail: string
   llm_risk: LlmRiskStatus
-  llm_recommended_guardrail: string
+  llm_recommendation: string
+  llm_explanation: string
+  affected_nodes: AffectedComponent[]
 }
 
 export type TimeBoundGrant = {

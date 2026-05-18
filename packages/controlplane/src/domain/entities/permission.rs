@@ -130,6 +130,12 @@ pub struct PolicyTemplate {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AffectedComponent {
+    pub display_name: String,
+    pub node_type: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct BlastRadiusPreview {
     pub request_id: Uuid,
     pub code: String,
@@ -153,7 +159,9 @@ pub struct BlastRadiusPreview {
     pub sensitive_domains: Vec<String>,
     pub recommended_guardrail: String,
     pub llm_risk: String,
-    pub llm_recommended_guardrail: String,
+    pub llm_recommendation: String,
+    pub llm_explanation: String,
+    pub affected_nodes: Vec<AffectedComponent>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]

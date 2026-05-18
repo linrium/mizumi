@@ -14,7 +14,7 @@ use crate::{
     domain::{
         entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
-            BlastRadiusPreview, BulkApproveBody, CreatePermissionRequestBody,
+            AffectedComponent, BlastRadiusPreview, BulkApproveBody, CreatePermissionRequestBody,
             PermissionApprovalStep, PermissionRequestResponse, PermissionRequestView,
             PolicyTemplate, PolicyTemplateApprovalStep, TimeBoundGrant, UpdateRequestStatusBody,
         },
@@ -314,9 +314,13 @@ impl PermissionService {
                 llm_risk: llm_data
                     .map(|d| d.llm_risk.clone())
                     .unwrap_or_else(|| "unknown".to_string()),
-                llm_recommended_guardrail: llm_data
-                    .map(|d| d.llm_recommended_guardrail.clone())
+                llm_recommendation: llm_data
+                    .map(|d| d.llm_recommendation.clone())
                     .unwrap_or_default(),
+                llm_explanation: llm_data
+                    .map(|d| d.llm_explanation.clone())
+                    .unwrap_or_default(),
+                affected_nodes: Vec::new(),
             };
             preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
             return preview;
@@ -402,9 +406,19 @@ impl PermissionService {
             llm_risk: llm_data
                 .map(|d| d.llm_risk.clone())
                 .unwrap_or_else(|| "unknown".to_string()),
-            llm_recommended_guardrail: llm_data
-                .map(|d| d.llm_recommended_guardrail.clone())
+            llm_recommendation: llm_data
+                .map(|d| d.llm_recommendation.clone())
                 .unwrap_or_default(),
+            llm_explanation: llm_data
+                .map(|d| d.llm_explanation.clone())
+                .unwrap_or_default(),
+            affected_nodes: downstream_nodes
+                .iter()
+                .map(|n| AffectedComponent {
+                    display_name: n.display_name.clone(),
+                    node_type: n.node_type.clone(),
+                })
+                .collect(),
         };
         preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
         preview
@@ -668,7 +682,7 @@ impl PermissionService {
                 Ok(p) => p,
                 Err(e) => {
                     tracing::warn!(request_id = %request_id, error = %e, "LLM task: lineage query failed");
-                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed").await;
+                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
                     return;
                 }
             };
@@ -692,14 +706,15 @@ impl PermissionService {
                     let _ = blast_radius::update_llm_result(
                         &db,
                         request_id,
-                        &analysis.recommended_guardrail,
+                        &analysis.recommendation,
                         &analysis.risk_level,
+                        &analysis.explanation,
                     )
                     .await;
                 }
                 Err(e) => {
                     tracing::warn!(request_id = %request_id, error = %e, "LLM blast-radius analysis failed");
-                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed").await;
+                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
                 }
             }
         });

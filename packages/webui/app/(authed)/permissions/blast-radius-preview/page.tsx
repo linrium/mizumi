@@ -143,11 +143,21 @@ export default function BlastRadiusPreviewPage() {
                   <TableCell className="align-top max-w-56">
                     <div className="space-y-1.5">
                       <LlmRiskBadge status={item.llm_risk} />
-                      <p className="text-xs text-muted-foreground whitespace-normal">
-                        {item.llm_recommended_guardrail || item.recommended_guardrail || (
-                          <span className="italic">None</span>
-                        )}
-                      </p>
+                      {item.llm_recommendation && (
+                        <p className="text-xs font-medium whitespace-normal">
+                          {item.llm_recommendation}
+                        </p>
+                      )}
+                      {item.llm_explanation && (
+                        <p className="text-xs text-muted-foreground whitespace-normal">
+                          {item.llm_explanation}
+                        </p>
+                      )}
+                      {!item.llm_recommendation && !item.llm_explanation && item.recommended_guardrail && (
+                        <p className="text-xs text-muted-foreground whitespace-normal">
+                          {item.recommended_guardrail}
+                        </p>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

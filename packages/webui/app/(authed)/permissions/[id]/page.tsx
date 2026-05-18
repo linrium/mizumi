@@ -1,5 +1,7 @@
 "use client";
 
+import { Shield01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -186,6 +188,17 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   );
 }
 
+function nodeTypeToCategory(type: string): string {
+  if (type === "table" || type === "topic") return "Datasets";
+  if (type === "dagster_asset") return "Assets";
+  if (["spark_job", "streaming_job", "daft_job", "dagster_job"].includes(type))
+    return "Jobs";
+  if (type === "schedule") return "Schedules";
+  if (type === "dashboard") return "Dashboards";
+  if (type === "consumer") return "Consumers";
+  return "Other";
+}
+
 export default function PermissionRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const requestId = typeof params.id === "string" ? params.id : "";
@@ -196,9 +209,20 @@ export default function PermissionRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actioningKey, setActioningKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"guardrail" | "domains">(
+  const [activeTab, setActiveTab] = useState<"guardrail" | "components">(
     "guardrail",
   );
+
+  const groupedComponents = useMemo(() => {
+    if (!blastRadius) return {} as Record<string, string[]>;
+    const map: Record<string, string[]> = {};
+    for (const node of blastRadius.affected_nodes) {
+      const cat = nodeTypeToCategory(node.node_type);
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(node.display_name);
+    }
+    return map;
+  }, [blastRadius]);
 
   useEffect(() => {
     let cancelled = false;
@@ -666,120 +690,127 @@ export default function PermissionRequestDetailPage() {
           </div>
           <Separator />
 
-          {/* Blast radius summary — LLM risk + root only */}
-          {blastRadius && (
-            <div className="px-6 py-3 flex flex-wrap items-center gap-1.5 shrink-0 border-b">
-              <LlmRiskBadge status={blastRadius.llm_risk} />
-              {blastRadius.lineage_root_display_name && (
-                <span className="text-[11px] text-muted-foreground">
-                  root:{" "}
-                  <span className="font-mono">
-                    {blastRadius.lineage_root_display_name}
-                  </span>
-                </span>
-              )}
+          {/* Lineage graph + right sidebar */}
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            {/* Lineage graph */}
+            <div className="flex-1 min-w-0 relative">
+              <LineageGraph
+                currentPath={request.resource.split(".")}
+                neighborhoodOnly
+              />
             </div>
-          )}
 
-          {/* Lineage graph — fills remaining space */}
-          <div className="flex-1 min-h-0 relative">
-            <LineageGraph
-              currentPath={request.resource.split(".")}
-              neighborhoodOnly
-            />
-          </div>
+            {/* Right sidebar: Guardrail / Components */}
+            {blastRadius && (
+              <div className="w-64 shrink-0 border-l flex flex-col overflow-hidden">
+                {/* Risk + root resource */}
+                <div className="px-4 py-3 flex flex-wrap items-center gap-1.5 shrink-0 border-b">
+                  <LlmRiskBadge status={blastRadius.llm_risk} />
+                  {blastRadius.lineage_root_display_name && (
+                    <span className="text-[11px] text-muted-foreground font-mono break-all">
+                      {blastRadius.lineage_root_display_name}
+                    </span>
+                  )}
+                </div>
 
-          {/* Bottom tabs */}
-          {blastRadius && (
-            <div className="border-t shrink-0">
-              <div className="flex border-b px-6">
-                {(["guardrail", "domains"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    className={cn(
-                      "py-2.5 text-xs font-medium border-b-2 -mb-px mr-6 capitalize transition-colors",
-                      activeTab === tab
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => setActiveTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
+                <div className="flex border-b px-4">
+                  {(["guardrail", "components"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      className={cn(
+                        "py-2.5 text-xs font-medium border-b-2 -mb-px mr-4 capitalize transition-colors",
+                        activeTab === tab
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setActiveTab(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="px-6 py-4">
-                {activeTab === "guardrail" && (
-                  <div className="space-y-3">
-                    {blastRadius.recommended_guardrail ? (
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Recommended
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {blastRadius.recommended_guardrail}
-                        </p>
-                      </div>
-                    ) : null}
-                    {blastRadius.llm_recommended_guardrail ? (
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          LLM recommendation
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {blastRadius.llm_recommended_guardrail}
-                        </p>
-                      </div>
-                    ) : null}
-                    {!blastRadius.recommended_guardrail &&
-                      !blastRadius.llm_recommended_guardrail && (
+                <div className="flex-1 overflow-y-auto px-4 py-4">
+                  {activeTab === "guardrail" && (
+                    <div className="space-y-4">
+                      {blastRadius.recommended_guardrail ? (
+                        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-background border">
+                              <HugeiconsIcon
+                                icon={Shield01Icon}
+                                className="h-3.5 w-3.5 text-foreground"
+                              />
+                            </div>
+                            <p className="text-xs font-semibold">Recommended</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {blastRadius.recommended_guardrail}
+                          </p>
+                        </div>
+                      ) : null}
+                      {blastRadius.llm_recommendation ? (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            LLM recommendation
+                          </p>
+                          <p className="text-sm text-foreground/90 leading-relaxed">
+                            {blastRadius.llm_recommendation}
+                          </p>
+                          {blastRadius.llm_explanation && (
+                            <p className="text-sm text-muted-foreground italic leading-relaxed">
+                              {blastRadius.llm_explanation}
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+                      {!blastRadius.recommended_guardrail &&
+                        !blastRadius.llm_recommendation && (
+                          <div className="flex flex-col items-center gap-2 py-6 text-center">
+                            <HugeiconsIcon
+                              icon={Shield01Icon}
+                              className="h-8 w-8 text-muted-foreground/30"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              No guardrail recommendations.
+                            </p>
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {activeTab === "components" && (
+                    <div className="space-y-4">
+                      {Object.entries(groupedComponents).map(
+                        ([category, names]) => (
+                          <div key={category}>
+                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {category}
+                            </p>
+                            <ul className="space-y-0.5">
+                              {names.map((name) => (
+                                <li
+                                  key={name}
+                                  className="break-all font-mono text-xs"
+                                >
+                                  {name}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ),
+                      )}
+                      {blastRadius.affected_nodes.length === 0 && (
                         <p className="text-xs text-muted-foreground">
-                          No guardrail recommendations.
+                          No affected components.
                         </p>
                       )}
-                  </div>
-                )}
-
-                {activeTab === "domains" && (
-                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {[
-                      {
-                        label: "Nodes",
-                        value: blastRadius.total_downstream_nodes,
-                      },
-                      {
-                        label: "Datasets",
-                        value: blastRadius.downstream_tables,
-                      },
-                      {
-                        label: "Assets",
-                        value: blastRadius.downstream_assets,
-                      },
-                      { label: "Jobs", value: blastRadius.downstream_jobs },
-                      {
-                        label: "Schedules",
-                        value: blastRadius.downstream_schedules,
-                      },
-                      {
-                        label: "Direct",
-                        value: blastRadius.direct_downstream_nodes,
-                      },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="flex items-baseline gap-1.5">
-                        <span className="text-sm font-semibold tabular-nums">
-                          {value}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </div>
     </div>

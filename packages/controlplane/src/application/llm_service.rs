@@ -3,10 +3,11 @@ use async_openai::{
     config::OpenAIConfig,
     types::{
         ChatCompletionRequestSystemMessage, ChatCompletionRequestUserMessage,
-        CreateChatCompletionRequestArgs, ResponseFormat,
+        CreateChatCompletionRequestArgs, ResponseFormat, ResponseFormatJsonSchema,
     },
 };
 use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
     domain::{entities::permission::BlastRadiusPreview, error::AppError},
@@ -21,14 +22,16 @@ pub struct LlmService {
 
 #[derive(Debug, Clone)]
 pub struct LlmBlastRadiusAnalysis {
-    pub recommended_guardrail: String,
+    pub recommendation: String,
     pub risk_level: String,
+    pub explanation: String,
 }
 
 #[derive(Deserialize)]
 struct LlmAnalysisResponse {
-    recommended_guardrail: String,
+    recommendation: String,
     risk_level: String,
+    explanation: String,
 }
 
 impl LlmService {
@@ -47,7 +50,7 @@ impl LlmService {
         })
     }
 
-    /// Analyze a blast-radius preview and return a recommended guardrail and risk level.
+    /// Analyze a blast-radius preview and return a recommendation, risk level, and explanation.
     ///
     /// `risk_level` is guaranteed to be one of `"low"`, `"medium"`, or `"high"`.
     pub async fn analyze_blast_radius(
@@ -58,13 +61,9 @@ impl LlmService {
         rationale: &str,
         preview: &BlastRadiusPreview,
     ) -> Result<LlmBlastRadiusAnalysis, AppError> {
-        let system_prompt = "\
-You are a data-governance risk analyst. \
-Given a data-access request and its blast-radius impact, respond with a JSON object \
-containing exactly two keys:\n\
-  \"recommended_guardrail\": a concise, actionable guardrail recommendation (max 120 chars),\n\
-  \"risk_level\": one of exactly \"low\", \"medium\", or \"high\".\n\
-Respond with raw JSON only — no markdown fences, no explanation.";
+        let system_prompt = "You are a data-governance risk analyst. \
+Analyze the provided data-access request and its blast-radius impact. \
+Respond using the required JSON schema.";
 
         let sensitive_domains = preview.sensitive_domains.join(", ");
         let user_content = format!(
@@ -97,9 +96,40 @@ Blast-radius stats:\n\
             derived = preview.derived_risk,
         );
 
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "recommendation": {
+                    "type": "string",
+                    "description": "A concise, actionable guardrail recommendation (max 120 characters)."
+                },
+                "risk_level": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                    "description": "The assessed risk level of this access request."
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "A brief explanation (2-3 sentences) of the risk assessment and recommendation."
+                }
+            },
+            "required": ["recommendation", "risk_level", "explanation"],
+            "additionalProperties": false
+        });
+
         let request = CreateChatCompletionRequestArgs::default()
             .model(&self.model)
-            .response_format(ResponseFormat::JsonObject)
+            .response_format(ResponseFormat::JsonSchema {
+                json_schema: ResponseFormatJsonSchema {
+                    name: "blast_radius_analysis".to_string(),
+                    description: Some(
+                        "Risk assessment and guardrail recommendation for a data-access request."
+                            .to_string(),
+                    ),
+                    schema: Some(schema),
+                    strict: Some(true),
+                },
+            })
             .messages([
                 ChatCompletionRequestSystemMessage::from(system_prompt).into(),
                 ChatCompletionRequestUserMessage::from(user_content.as_str()).into(),
@@ -138,11 +168,10 @@ Blast-radius stats:\n\
         }
         .to_string();
 
-        let recommended_guardrail = parsed.recommended_guardrail.chars().take(240).collect();
-
         Ok(LlmBlastRadiusAnalysis {
-            recommended_guardrail,
+            recommendation: parsed.recommendation.chars().take(240).collect(),
             risk_level,
+            explanation: parsed.explanation,
         })
     }
 }
