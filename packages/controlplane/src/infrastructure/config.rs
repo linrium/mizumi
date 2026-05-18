@@ -34,6 +34,16 @@ pub struct KeycloakConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct OpenAiConfig {
+    #[serde(default)]
+    pub api_key: String,
+    #[serde(default = "default_openai_model")]
+    pub model: String,
+    #[serde(default = "default_openai_base_url")]
+    pub base_url: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
     #[serde(default)]
@@ -44,6 +54,8 @@ pub struct Config {
     pub kafka: KafkaConfig,
     pub unity_catalog: UnityCatalogConfig,
     pub keycloak: KeycloakConfig,
+    #[serde(default)]
+    pub openai: OpenAiConfig,
 }
 
 impl Config {
@@ -64,6 +76,24 @@ impl Default for DagsterConfig {
     fn default() -> Self {
         Self {
             base_url: default_dagster_base_url(),
+        }
+    }
+}
+
+fn default_openai_model() -> String {
+    "gpt-4o-mini".to_string()
+}
+
+fn default_openai_base_url() -> String {
+    "https://api.openai.com/v1".to_string()
+}
+
+impl Default for OpenAiConfig {
+    fn default() -> Self {
+        Self {
+            api_key: String::new(),
+            model: default_openai_model(),
+            base_url: default_openai_base_url(),
         }
     }
 }

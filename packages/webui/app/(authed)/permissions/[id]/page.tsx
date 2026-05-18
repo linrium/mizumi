@@ -1,6 +1,7 @@
 "use client"
 
 import { format, formatDistanceToNowStrict } from "date-fns"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
@@ -18,6 +19,14 @@ import {
   type RiskLevel,
   updateRequestStatus,
 } from "@/services/permissions"
+
+const LineageGraph = dynamic(
+  () =>
+    import(
+      "@/app/(authed)/pipelines/assets/[...path]/LineageGraph"
+    ).then((m) => m.LineageGraph),
+  { ssr: false },
+)
 
 const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"]
 
@@ -336,11 +345,9 @@ export default function PermissionRequestDetailPage() {
         </div>
       </div>
 
-      {/* Body: scrollable main content + sticky rightbar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Main content */}
-        <div className="flex-1 min-w-0 overflow-auto">
-          <div className="max-w-2xl mx-auto px-6 py-5 space-y-4">
+      {/* Body: single scrollable main column */}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="max-w-3xl mx-auto px-6 py-5 space-y-4">
             <section className="rounded-lg border bg-card">
               <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Request summary</h2>
@@ -561,27 +568,24 @@ export default function PermissionRequestDetailPage() {
                 )}
               </div>
             </section>
-          </div>
-        </div>
 
-        {/* Right sidebar */}
-        <aside className="hidden lg:flex w-72 shrink-0 flex-col border-l overflow-auto">
-          <div className="space-y-0 divide-y">
             {/* Policy template */}
-            <div>
+            <section className="rounded-lg border bg-card">
               <div className="px-4 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Policy template
-                </h2>
+                <h2 className="text-sm font-semibold">Policy template</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Template match and routing configuration for this request.
+                </p>
               </div>
-              <div className="space-y-3 px-4 pb-4 text-sm">
+              <Separator />
+              <div className="px-4 py-4">
                 {request.policy_template_name ? (
-                  <>
+                  <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
                     <div>
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Matched template
                       </p>
-                      <p className="mt-0.5 font-medium">
+                      <p className="mt-0.5 text-sm font-medium">
                         {request.policy_template_name}
                       </p>
                     </div>
@@ -589,7 +593,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Approval mode
                       </p>
-                      <p className="mt-0.5 capitalize">
+                      <p className="mt-0.5 text-sm capitalize">
                         {request.policy_template_approval_mode ?? "Not set"}
                       </p>
                     </div>
@@ -597,7 +601,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Template owner
                       </p>
-                      <p className="mt-0.5">
+                      <p className="mt-0.5 text-sm">
                         {request.policy_template_owner ?? "Unassigned"}
                       </p>
                     </div>
@@ -609,110 +613,108 @@ export default function PermissionRequestDetailPage() {
                         {request.policy_template_resource ?? "Any resource"}
                       </p>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No template match. This request is following a manual review
-                    path.
+                  <p className="text-sm text-muted-foreground">
+                    This request did not match a policy template and is
+                    following a manual review path.
                   </p>
                 )}
               </div>
-            </div>
+            </section>
 
-            {/* Blast radius */}
-            <div>
+            {/* Impact & lineage */}
+            <section className="rounded-lg border bg-card overflow-hidden">
               <div className="px-4 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Blast radius
-                </h2>
+                <h2 className="text-sm font-semibold">Impact & lineage</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Downstream blast radius and data lineage for the requested
+                  resource.
+                </p>
               </div>
-              <div className="space-y-3 px-4 pb-4 text-sm">
-                {blastRadius ? (
-                  <>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant={getRiskVariant(request.risk)}>
-                        Request {formatRiskLabel(request.risk)}
-                      </Badge>
-                      <Badge variant={getRiskVariant(blastRadius.derived_risk)}>
-                        Derived {formatRiskLabel(blastRadius.derived_risk)}
-                      </Badge>
-                    </div>
+              <Separator />
 
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <div className="rounded-md border px-2 py-1.5">
+              {/* Blast radius stats */}
+              {blastRadius && (
+                <div className="px-4 py-3 border-b">
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <Badge variant={getRiskVariant(request.risk)}>
+                      Request {formatRiskLabel(request.risk)}
+                    </Badge>
+                    <Badge variant={getRiskVariant(blastRadius.derived_risk)}>
+                      Derived {formatRiskLabel(blastRadius.derived_risk)}
+                    </Badge>
+                    {blastRadius.lineage_root_display_name && (
+                      <span className="text-[11px] text-muted-foreground ml-1">
+                        root:{" "}
+                        <span className="font-mono">
+                          {blastRadius.lineage_root_display_name}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {[
+                      {
+                        label: "Nodes",
+                        value: blastRadius.total_downstream_nodes,
+                      },
+                      {
+                        label: "Datasets",
+                        value: blastRadius.downstream_tables,
+                      },
+                      {
+                        label: "Assets",
+                        value: blastRadius.downstream_assets,
+                      },
+                      { label: "Jobs", value: blastRadius.downstream_jobs },
+                      {
+                        label: "Schedules",
+                        value: blastRadius.downstream_schedules,
+                      },
+                      {
+                        label: "Direct",
+                        value: blastRadius.direct_downstream_nodes,
+                      },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="rounded-md border px-2.5 py-2">
                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Nodes
+                          {label}
                         </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.total_downstream_nodes}
-                        </p>
+                        <p className="mt-0.5 text-sm font-semibold">{value}</p>
                       </div>
-                      <div className="rounded-md border px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Datasets
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.downstream_tables}
-                        </p>
-                      </div>
-                      <div className="rounded-md border px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Assets
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.downstream_assets}
-                        </p>
-                      </div>
-                      <div className="rounded-md border px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Jobs
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.downstream_jobs}
-                        </p>
-                      </div>
-                      <div className="rounded-md border px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Schedules
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.downstream_schedules}
-                        </p>
-                      </div>
-                      <div className="rounded-md border px-2 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Direct
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.direct_downstream_nodes}
-                        </p>
-                      </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Lineage root
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {blastRadius.lineage_root_display_name ?? "Unresolved"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Sensitive domains
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {blastRadius.sensitive_domains.length > 0 ? (
-                          blastRadius.sensitive_domains.map((domain) => (
+              {/* Lineage graph */}
+              <div className="h-[400px] relative">
+                <LineageGraph
+                  currentPath={request.resource.split(".")}
+                  neighborhoodOnly
+                />
+              </div>
+
+              {/* Sensitive domains + guardrail footer */}
+              {blastRadius &&
+                (blastRadius.sensitive_domains.length > 0 ||
+                  blastRadius.recommended_guardrail) && (
+                  <div className="flex flex-wrap gap-6 border-t px-4 py-3">
+                    {blastRadius.sensitive_domains.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Sensitive domains
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {blastRadius.sensitive_domains.map((domain) => (
                             <Badge key={domain} variant="outline">
                               {domain}
                             </Badge>
-                          ))
-                        ) : (
-                          <p className="text-xs text-muted-foreground">None</p>
-                        )}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {blastRadius.recommended_guardrail && (
                       <div>
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -723,17 +725,11 @@ export default function PermissionRequestDetailPage() {
                         </p>
                       </div>
                     )}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No blast-radius preview available for this request.
-                  </p>
+                  </div>
                 )}
-              </div>
-            </div>
+            </section>
           </div>
-        </aside>
-      </div>
+        </div>
     </div>
   )
 }

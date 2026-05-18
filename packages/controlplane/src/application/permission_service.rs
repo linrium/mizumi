@@ -5,9 +5,12 @@ use uuid::Uuid;
 
 use crate::{
     adapters::outbound::postgres::{
-        lineage, permission_requests, policy_templates, teams, time_bound_grants,
+        blast_radius, lineage, permission_requests, policy_templates, teams, time_bound_grants,
     },
-    application::uc_service::UnityCatalogProxyService,
+    application::{
+        llm_service::LlmService,
+        uc_service::UnityCatalogProxyService,
+    },
     domain::{
         entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
@@ -48,11 +51,20 @@ struct RequestPolicyMatch {
 pub struct PermissionService {
     db: PgPool,
     uc_service: UnityCatalogProxyService,
+    llm_service: Option<LlmService>,
 }
 
 impl PermissionService {
-    pub fn new(db: PgPool, uc_service: UnityCatalogProxyService) -> Self {
-        Self { db, uc_service }
+    pub fn new(
+        db: PgPool,
+        uc_service: UnityCatalogProxyService,
+        llm_service: Option<LlmService>,
+    ) -> Self {
+        Self {
+            db,
+            uc_service,
+            llm_service,
+        }
     }
 
     fn request_code(id: Uuid) -> String {
@@ -263,6 +275,7 @@ impl PermissionService {
         nodes_by_id: &HashMap<Uuid, LineageNode>,
         downstream_edges_by_src: &HashMap<Uuid, Vec<LineageEdge>>,
         aliases: &HashMap<String, Uuid>,
+        llm_data: Option<&blast_radius::BlastRadiusLlmData>,
     ) -> BlastRadiusPreview {
         let root = Self::scope_root_aliases(request)
             .into_iter()
@@ -294,7 +307,15 @@ impl PermissionService {
                 consumers: 0,
                 sensitive_domains: Vec::new(),
                 derived_risk: String::new(),
-                recommended_guardrail: String::new(),
+                recommended_guardrail: llm_data
+                    .map(|d| d.recommended_guardrail.clone())
+                    .unwrap_or_default(),
+                llm_risk: llm_data
+                    .map(|d| d.llm_risk.clone())
+                    .unwrap_or_else(|| "unknown".to_string()),
+                llm_recommended_guardrail: llm_data
+                    .map(|d| d.llm_recommended_guardrail.clone())
+                    .unwrap_or_default(),
             };
             preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
             return preview;
@@ -373,7 +394,15 @@ impl PermissionService {
             dashboards,
             consumers,
             sensitive_domains: Self::collect_sensitive_domains(&domain_nodes),
-            recommended_guardrail: String::new(),
+            recommended_guardrail: llm_data
+                .map(|d| d.recommended_guardrail.clone())
+                .unwrap_or_default(),
+            llm_risk: llm_data
+                .map(|d| d.llm_risk.clone())
+                .unwrap_or_else(|| "unknown".to_string()),
+            llm_recommended_guardrail: llm_data
+                .map(|d| d.llm_recommended_guardrail.clone())
+                .unwrap_or_default(),
         };
         preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
         preview
@@ -600,6 +629,80 @@ impl PermissionService {
         ))
     }
 
+    /// Spawn a background Tokio task that calls the LLM to analyze the request's blast radius
+    /// and updates `blast_radius_previews` with the result.
+    fn spawn_llm_analysis(&self, request: PermissionRequestView) {
+        let Some(llm) = self.llm_service.clone() else {
+            return;
+        };
+        let db = self.db.clone();
+        let request_id = request.id;
+
+        tokio::spawn(async move {
+            tracing::info!(request_id = %request_id, "starting LLM blast-radius analysis");
+
+            // Build blast-radius preview from current lineage data.
+            let preview = async {
+                let nodes = lineage::list_nodes(&db).await?;
+                let edges = lineage::list_edges(&db).await?;
+                let aliases = lineage::list_aliases(&db).await?;
+                let nodes_by_id = nodes.into_iter().map(|n| (n.id, n)).collect::<HashMap<_, _>>();
+                let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+                for edge in edges {
+                    downstream_edges_by_src.entry(edge.src_node_id).or_default().push(edge);
+                }
+                let aliases_map = aliases.into_iter().collect::<HashMap<_, _>>();
+                Ok::<_, sqlx::Error>(Self::build_blast_radius_preview(
+                    &request,
+                    &nodes_by_id,
+                    &downstream_edges_by_src,
+                    &aliases_map,
+                    None,
+                ))
+            }
+            .await;
+
+            let preview = match preview {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::warn!(request_id = %request_id, error = %e, "LLM task: lineage query failed");
+                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed").await;
+                    return;
+                }
+            };
+
+            match llm
+                .analyze_blast_radius(
+                    &request.resource,
+                    &request.scope,
+                    &request.privileges,
+                    &request.rationale,
+                    &preview,
+                )
+                .await
+            {
+                Ok(analysis) => {
+                    tracing::info!(
+                        request_id = %request_id,
+                        risk = %analysis.risk_level,
+                        "LLM blast-radius analysis complete"
+                    );
+                    let _ = blast_radius::update_llm_result(
+                        &db,
+                        request_id,
+                        &analysis.recommended_guardrail,
+                        &analysis.risk_level,
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    tracing::warn!(request_id = %request_id, error = %e, "LLM blast-radius analysis failed");
+                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed").await;
+                }
+            }
+        });
+    }
+
     pub async fn list_requests(
         &self,
         resource: Option<&str>,
@@ -768,6 +871,15 @@ impl PermissionService {
             self.grant_request(&request).await?;
         }
 
+        // Insert the blast-radius preview row with llm_risk = 'processing' and
+        // spawn a background task that calls the LLM to fill in the guardrail and risk.
+        let request_id = request.id;
+        if let Err(e) = blast_radius::upsert_processing(&self.db, request_id).await {
+            tracing::warn!(request_id = %request_id, error = %e, "failed to upsert blast_radius_previews row");
+        } else {
+            self.spawn_llm_analysis(request.clone());
+        }
+
         Ok(Self::into_response(request))
     }
 
@@ -888,6 +1000,7 @@ impl PermissionService {
         let nodes = lineage::list_nodes(&self.db).await?;
         let edges = lineage::list_edges(&self.db).await?;
         let aliases = lineage::list_aliases(&self.db).await?;
+        let llm_map = blast_radius::list_llm_data(&self.db).await?;
 
         let nodes_by_id = nodes
             .into_iter()
@@ -905,11 +1018,13 @@ impl PermissionService {
         Ok(requests
             .iter()
             .map(|request| {
+                let llm_data = llm_map.get(&request.id);
                 Self::build_blast_radius_preview(
                     request,
                     &nodes_by_id,
                     &downstream_edges_by_src,
                     &aliases,
+                    llm_data,
                 )
             })
             .collect())
@@ -922,6 +1037,7 @@ impl PermissionService {
         let nodes = lineage::list_nodes(&self.db).await?;
         let edges = lineage::list_edges(&self.db).await?;
         let aliases = lineage::list_aliases(&self.db).await?;
+        let llm_data = blast_radius::get_llm_data(&self.db, request_id).await?;
 
         let nodes_by_id = nodes
             .into_iter()
@@ -941,6 +1057,7 @@ impl PermissionService {
             &nodes_by_id,
             &downstream_edges_by_src,
             &aliases,
+            llm_data.as_ref(),
         ))
     }
 

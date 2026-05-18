@@ -13,9 +13,10 @@ use adapters::inbound::http::create_router;
 use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
 use application::{
     dagster_service::DagsterService, k8s_service::K8sQueryService, lineage_service::LineageService,
-    permission_service::PermissionService, streaming_service::StreamingJobService,
-    team_service::TeamService, test_event_service::TestEventService,
-    uc_service::UnityCatalogProxyService, user_service::UserService,
+    llm_service::LlmService, permission_service::PermissionService,
+    streaming_service::StreamingJobService, team_service::TeamService,
+    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
+    user_service::UserService,
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
@@ -62,6 +63,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("failed to run migrations");
 
     let session_store = SessionStore::new();
+    let llm_service = LlmService::new(&config.openai);
+    if llm_service.is_none() {
+        tracing::warn!("OpenAI API key not configured; LLM blast-radius analysis is disabled");
+    }
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(session_store)),
@@ -77,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.unity_catalog.base_url.clone(),
                 uc_admin_token.clone(),
             )),
+            llm_service,
         )),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         team_service: Arc::new(TeamService::new(db.clone())),

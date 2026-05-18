@@ -151,6 +151,8 @@ pub struct BlastRadiusPreview {
     pub consumers: i32,
     pub sensitive_domains: Vec<String>,
     pub recommended_guardrail: String,
+    pub llm_risk: String,
+    pub llm_recommended_guardrail: String,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
