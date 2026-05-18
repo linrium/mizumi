@@ -138,6 +138,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(permissions::get_request).patch(permissions::update_request_status),
         )
         .route(
+            "/api/permissions/requests/{id}/blast-radius",
+            get(permissions::get_blast_radius),
+        )
+        .route(
             "/api/permissions/policy-templates",
             get(permissions::list_policy_templates),
         )

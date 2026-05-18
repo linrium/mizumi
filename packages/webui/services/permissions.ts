@@ -91,7 +91,16 @@ export type BlastRadiusPreview = {
   resource: string
   scope: RequestScope
   risk: RiskLevel
+  lineage_resolved: boolean
+  lineage_root_id: string | null
+  lineage_root_display_name: string | null
+  lineage_root_type: string | null
+  total_downstream_nodes: number
+  direct_downstream_nodes: number
+  downstream_tables: number
   downstream_assets: number
+  downstream_jobs: number
+  downstream_schedules: number
   dashboards: number
   consumers: number
   sensitive_domains: string[]
@@ -222,6 +231,16 @@ export async function listBlastRadius(): Promise<BlastRadiusPreview[]> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.previews
+}
+
+export async function getBlastRadius(
+  requestId: string,
+): Promise<BlastRadiusPreview> {
+  const res = await apiFetch(
+    `/api/permissions/requests/${encodeURIComponent(requestId)}/blast-radius`,
+  )
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
 }
 
 export async function listTimeBoundGrants(): Promise<TimeBoundGrant[]> {

@@ -129,14 +129,23 @@ pub struct PolicyTemplate {
     pub approval_steps: Vec<PolicyTemplateApprovalStep>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-pub struct BlastRadiusPreviewRow {
+#[derive(Debug, Clone, Serialize)]
+pub struct BlastRadiusPreview {
     pub request_id: Uuid,
-    pub requester_id: Uuid,
+    pub requester: String,
     pub resource: String,
     pub scope: String,
     pub risk: String,
+    pub lineage_resolved: bool,
+    pub lineage_root_id: Option<Uuid>,
+    pub lineage_root_display_name: Option<String>,
+    pub lineage_root_type: Option<String>,
+    pub total_downstream_nodes: i32,
+    pub direct_downstream_nodes: i32,
+    pub downstream_tables: i32,
     pub downstream_assets: i32,
+    pub downstream_jobs: i32,
+    pub downstream_schedules: i32,
     pub dashboards: i32,
     pub consumers: i32,
     pub sensitive_domains: Vec<String>,

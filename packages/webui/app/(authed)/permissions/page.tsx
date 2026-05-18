@@ -36,6 +36,8 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import {
+  type BlastRadiusPreview,
+  listBlastRadius,
   listPermissionRequests,
   type PermissionRequest,
   type RequestStatus,
@@ -115,6 +117,9 @@ function formatSubmitter(request: PermissionRequest) {
 
 export default function PermissionsPage() {
   const [requests, setRequests] = useState<PermissionRequest[]>([])
+  const [blastRadiusByRequestId, setBlastRadiusByRequestId] = useState<
+    Record<string, BlastRadiusPreview>
+  >({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
@@ -135,9 +140,17 @@ export default function PermissionsPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await listPermissionRequests({ all: true })
+        const [data, blastRadius] = await Promise.all([
+          listPermissionRequests({ all: true }),
+          listBlastRadius(),
+        ])
         if (!cancelled) {
           setRequests(data)
+          setBlastRadiusByRequestId(
+            Object.fromEntries(
+              blastRadius.map((item) => [item.request_id, item]),
+            ),
+          )
         }
       } catch (err) {
         if (!cancelled) {
@@ -316,6 +329,7 @@ export default function PermissionsPage() {
               <TableHead>Request</TableHead>
               <TableHead>Resource</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Impact</TableHead>
               <TableHead>Privileges</TableHead>
               <TableHead>Reviewer</TableHead>
               {/*<TableHead>SLA</TableHead>*/}
@@ -342,6 +356,7 @@ export default function PermissionsPage() {
                 const currentSteps = request.approval_steps.filter(
                   (step) => step.is_current,
                 )
+                const blastRadius = blastRadiusByRequestId[request.id]
 
                 return (
                   <TableRow
@@ -423,6 +438,47 @@ export default function PermissionsPage() {
                       <div className="mt-2 text-muted-foreground">
                         Submitted {submittedLabel}
                       </div>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      {blastRadius ? (
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline">
+                              {blastRadius.total_downstream_nodes} nodes
+                            </Badge>
+                            <Badge variant="outline">
+                              {blastRadius.downstream_tables} datasets
+                            </Badge>
+                            <Badge variant="outline">
+                              {blastRadius.downstream_assets} assets
+                            </Badge>
+                          </div>
+                          <div className="text-muted-foreground">
+                            {blastRadius.downstream_jobs} jobs ·{" "}
+                            {blastRadius.downstream_schedules} schedules
+                          </div>
+                          {blastRadius.lineage_resolved ? (
+                            <div className="line-clamp-1 max-w-[28ch] text-muted-foreground">
+                              Root {blastRadius.lineage_root_display_name}
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground">
+                              No lineage root resolved
+                            </div>
+                          )}
+                          {blastRadius.sensitive_domains.length > 0 && (
+                            <div className="flex max-w-[28ch] flex-wrap gap-1">
+                              {blastRadius.sensitive_domains.map((domain) => (
+                                <Badge key={domain} variant="secondary">
+                                  {domain}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground">Loading…</div>
+                      )}
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="flex max-w-[28ch] flex-wrap gap-1">

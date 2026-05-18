@@ -11,8 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  listBlastRadius,
   type BlastRadiusPreview,
+  listBlastRadius,
   type RiskLevel,
 } from "@/services/permissions"
 
@@ -41,7 +41,7 @@ export default function BlastRadiusPreviewPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const highGuardrailCount = previews.filter((p) => p.risk === "high").length
+  const resolvedCount = previews.filter((p) => p.lineage_resolved).length
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -55,9 +55,8 @@ export default function BlastRadiusPreviewPage() {
             </p>
           </div>
           <div className="text-xs text-muted-foreground">
-            {highGuardrailCount} request
-            {highGuardrailCount === 1 ? "" : "s"} should ship with extra
-            guardrails
+            {resolvedCount} request{resolvedCount === 1 ? "" : "s"} resolved to
+            lineage
           </div>
         </div>
       </div>
@@ -115,9 +114,19 @@ export default function BlastRadiusPreviewPage() {
                     </div>
                   </TableCell>
                   <TableCell className="align-top text-muted-foreground">
-                    <div>{item.downstream_assets} downstream assets</div>
-                    <div>{item.dashboards} dashboards</div>
-                    <div>{item.consumers} direct consumers</div>
+                    {item.lineage_resolved ? (
+                      <>
+                        <div>
+                          {item.total_downstream_nodes} downstream nodes
+                        </div>
+                        <div>{item.downstream_tables} datasets</div>
+                        <div>{item.downstream_assets} assets</div>
+                        <div>{item.downstream_jobs} jobs</div>
+                        <div>{item.downstream_schedules} schedules</div>
+                      </>
+                    ) : (
+                      <div>No lineage root resolved</div>
+                    )}
                   </TableCell>
                   <TableCell className="align-top">
                     <div className="flex flex-wrap gap-1">

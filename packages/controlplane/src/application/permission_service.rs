@@ -1,15 +1,17 @@
 use chrono::Utc;
 use sqlx::PgPool;
+use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
 use crate::{
     adapters::outbound::postgres::{
-        blast_radius, permission_requests, policy_templates, teams, time_bound_grants,
+        lineage, permission_requests, policy_templates, teams, time_bound_grants,
     },
     application::uc_service::UnityCatalogProxyService,
     domain::{
+        entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
-            BlastRadiusPreviewRow, BulkApproveBody, CreatePermissionRequestBody,
+            BlastRadiusPreview, BulkApproveBody, CreatePermissionRequestBody,
             PermissionApprovalStep, PermissionRequestResponse, PermissionRequestView,
             PolicyTemplate, PolicyTemplateApprovalStep, TimeBoundGrant, UpdateRequestStatusBody,
         },
@@ -125,6 +127,207 @@ impl PermissionService {
             updated_at: request.updated_at,
             code,
             expires_in_days,
+        }
+    }
+
+    fn scope_root_aliases(request: &PermissionRequestView) -> Vec<String> {
+        match request.scope.as_str() {
+            "table" => vec![request.resource.clone()],
+            "schema" => vec![request.resource.clone()],
+            "catalog" => vec![request.resource.clone()],
+            _ => vec![request.resource.clone()],
+        }
+    }
+
+    fn business_tokens(value: &str) -> Vec<String> {
+        const STOPWORDS: &[&str] = &[
+            "hdbank",
+            "vietjetair",
+            "partnership",
+            "sandbox",
+            "prod",
+            "bronze",
+            "silver",
+            "gold",
+            "unitycatalog",
+            "raw",
+            "table",
+            "schema",
+            "catalog",
+            "dagster",
+            "spark",
+            "streaming",
+            "job",
+            "events",
+            "event",
+            "build",
+            "analytics",
+            "data",
+            "asset",
+            "v1",
+            "v2",
+        ];
+
+        value
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter_map(|token| {
+                let token = token.trim().to_lowercase();
+                if token.len() < 4
+                    || STOPWORDS.contains(&token.as_str())
+                    || token.chars().all(|c| c.is_ascii_digit())
+                {
+                    return None;
+                }
+                Some(token)
+            })
+            .collect()
+    }
+
+    fn collect_sensitive_domains(nodes: &[&LineageNode]) -> Vec<String> {
+        let mut counts = HashMap::<String, usize>::new();
+
+        for node in nodes {
+            for value in [
+                node.display_name.as_str(),
+                node.name.as_str(),
+                node.properties
+                    .get("schema_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+                node.properties
+                    .get("catalog_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+            ] {
+                for token in Self::business_tokens(value) {
+                    *counts.entry(token).or_insert(0) += 1;
+                }
+            }
+        }
+
+        let mut ranked = counts.into_iter().collect::<Vec<_>>();
+        ranked.sort_by(|(left_token, left_count), (right_token, right_count)| {
+            right_count
+                .cmp(left_count)
+                .then_with(|| left_token.cmp(right_token))
+        });
+        ranked.into_iter().take(5).map(|(token, _)| token).collect()
+    }
+
+    fn build_blast_radius_preview(
+        request: &PermissionRequestView,
+        nodes_by_id: &HashMap<Uuid, LineageNode>,
+        downstream_edges_by_src: &HashMap<Uuid, Vec<LineageEdge>>,
+        aliases: &HashMap<String, Uuid>,
+    ) -> BlastRadiusPreview {
+        let root = Self::scope_root_aliases(request)
+            .into_iter()
+            .find_map(|alias| {
+                aliases
+                    .get(&alias)
+                    .and_then(|id| nodes_by_id.get(id))
+                    .cloned()
+            });
+
+        let Some(root) = root else {
+            return BlastRadiusPreview {
+                request_id: request.id,
+                requester: request.requester.clone(),
+                resource: request.resource.clone(),
+                scope: request.scope.clone(),
+                risk: request.risk.clone(),
+                lineage_resolved: false,
+                lineage_root_id: None,
+                lineage_root_display_name: None,
+                lineage_root_type: None,
+                total_downstream_nodes: 0,
+                direct_downstream_nodes: 0,
+                downstream_tables: 0,
+                downstream_assets: 0,
+                downstream_jobs: 0,
+                downstream_schedules: 0,
+                dashboards: 0,
+                consumers: 0,
+                sensitive_domains: Vec::new(),
+                recommended_guardrail: String::new(),
+            };
+        };
+
+        let mut visited = HashSet::from([root.id]);
+        let mut selected_edges = Vec::<LineageEdge>::new();
+        let mut queue = VecDeque::from([root.id]);
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(edges) = downstream_edges_by_src.get(&current) {
+                for edge in edges {
+                    selected_edges.push(edge.clone());
+                    if visited.insert(edge.dst_node_id) {
+                        queue.push_back(edge.dst_node_id);
+                    }
+                }
+            }
+        }
+
+        let direct_downstream_nodes = downstream_edges_by_src
+            .get(&root.id)
+            .map(|edges| {
+                edges
+                    .iter()
+                    .map(|edge| edge.dst_node_id)
+                    .collect::<HashSet<_>>()
+                    .len() as i32
+            })
+            .unwrap_or(0);
+
+        let downstream_nodes = visited
+            .into_iter()
+            .filter(|node_id| *node_id != root.id)
+            .filter_map(|node_id| nodes_by_id.get(&node_id))
+            .collect::<Vec<_>>();
+
+        let mut downstream_tables = 0i32;
+        let mut downstream_assets = 0i32;
+        let mut downstream_jobs = 0i32;
+        let mut downstream_schedules = 0i32;
+        let mut dashboards = 0i32;
+        let mut consumers = 0i32;
+
+        for node in &downstream_nodes {
+            match node.node_type.as_str() {
+                "table" | "topic" => downstream_tables += 1,
+                "dagster_asset" => downstream_assets += 1,
+                "spark_job" | "streaming_job" | "daft_job" | "dagster_job" => downstream_jobs += 1,
+                "schedule" => downstream_schedules += 1,
+                "dashboard" => dashboards += 1,
+                "consumer" => consumers += 1,
+                _ => {}
+            }
+        }
+
+        let mut domain_nodes = Vec::with_capacity(downstream_nodes.len() + 1);
+        domain_nodes.push(&root);
+        domain_nodes.extend(downstream_nodes.iter().copied());
+
+        BlastRadiusPreview {
+            request_id: request.id,
+            requester: request.requester.clone(),
+            resource: request.resource.clone(),
+            scope: request.scope.clone(),
+            risk: request.risk.clone(),
+            lineage_resolved: true,
+            lineage_root_id: Some(root.id),
+            lineage_root_display_name: Some(root.display_name.clone()),
+            lineage_root_type: Some(root.node_type.clone()),
+            total_downstream_nodes: downstream_nodes.len() as i32,
+            direct_downstream_nodes,
+            downstream_tables,
+            downstream_assets,
+            downstream_jobs,
+            downstream_schedules,
+            dashboards,
+            consumers,
+            sensitive_domains: Self::collect_sensitive_domains(&domain_nodes),
+            recommended_guardrail: String::new(),
         }
     }
 
@@ -632,8 +835,65 @@ impl PermissionService {
         Ok(policy_templates::list(&self.db).await?)
     }
 
-    pub async fn list_blast_radius(&self) -> Result<Vec<BlastRadiusPreviewRow>, AppError> {
-        Ok(blast_radius::list(&self.db).await?)
+    pub async fn list_blast_radius(&self) -> Result<Vec<BlastRadiusPreview>, AppError> {
+        let requests = permission_requests::list(&self.db, None, None).await?;
+        let nodes = lineage::list_nodes(&self.db).await?;
+        let edges = lineage::list_edges(&self.db).await?;
+        let aliases = lineage::list_aliases(&self.db).await?;
+
+        let nodes_by_id = nodes
+            .into_iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+        for edge in edges {
+            downstream_edges_by_src
+                .entry(edge.src_node_id)
+                .or_default()
+                .push(edge);
+        }
+        let aliases = aliases.into_iter().collect::<HashMap<_, _>>();
+
+        Ok(requests
+            .iter()
+            .map(|request| {
+                Self::build_blast_radius_preview(
+                    request,
+                    &nodes_by_id,
+                    &downstream_edges_by_src,
+                    &aliases,
+                )
+            })
+            .collect())
+    }
+
+    pub async fn get_blast_radius(&self, request_id: Uuid) -> Result<BlastRadiusPreview, AppError> {
+        let request = permission_requests::get(&self.db, request_id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        let nodes = lineage::list_nodes(&self.db).await?;
+        let edges = lineage::list_edges(&self.db).await?;
+        let aliases = lineage::list_aliases(&self.db).await?;
+
+        let nodes_by_id = nodes
+            .into_iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+        for edge in edges {
+            downstream_edges_by_src
+                .entry(edge.src_node_id)
+                .or_default()
+                .push(edge);
+        }
+        let aliases = aliases.into_iter().collect::<HashMap<_, _>>();
+
+        Ok(Self::build_blast_radius_preview(
+            &request,
+            &nodes_by_id,
+            &downstream_edges_by_src,
+            &aliases,
+        ))
     }
 
     pub async fn list_time_bound_grants(&self) -> Result<Vec<TimeBoundGrant>, AppError> {

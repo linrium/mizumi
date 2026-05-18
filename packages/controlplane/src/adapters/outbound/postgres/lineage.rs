@@ -327,3 +327,15 @@ pub async fn search_nodes(
     .fetch_all(db)
     .await
 }
+
+pub async fn list_aliases(db: &PgPool) -> Result<Vec<(String, Uuid)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, Uuid)>(
+        r#"
+        SELECT alias, node_id
+        FROM lineage_node_aliases
+        ORDER BY alias ASC
+        "#,
+    )
+    .fetch_all(db)
+    .await
+}

@@ -10,9 +10,9 @@ import { Separator } from "@/components/ui/separator"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { cn } from "@/lib/utils"
 import {
-  getPermissionRequest,
-  listBlastRadius,
   type BlastRadiusPreview,
+  getBlastRadius,
+  getPermissionRequest,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
@@ -158,17 +158,15 @@ export default function PermissionRequestDetailPage() {
       setError(null)
 
       try {
-        const [requestData, previews] = await Promise.all([
+        const [requestData, blastRadiusData] = await Promise.all([
           getPermissionRequest(requestId),
-          listBlastRadius(),
+          getBlastRadius(requestId),
         ])
 
         if (cancelled) return
 
         setRequest(requestData)
-        setBlastRadius(
-          previews.find((preview) => preview.request_id === requestId) ?? null,
-        )
+        setBlastRadius(blastRadiusData)
       } catch (err) {
         if (cancelled) return
         setError(
@@ -620,28 +618,62 @@ export default function PermissionRequestDetailPage() {
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Nodes
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold">
+                          {blastRadius.total_downstream_nodes}
+                        </p>
+                      </div>
+                      <div className="rounded-md border px-2.5 py-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Datasets
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold">
+                          {blastRadius.downstream_tables}
+                        </p>
+                      </div>
+                      <div className="rounded-md border px-2.5 py-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           Assets
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_assets}
                         </p>
                       </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Dashboards
+                          Jobs
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.dashboards}
+                          {blastRadius.downstream_jobs}
                         </p>
                       </div>
                       <div className="rounded-md border px-2.5 py-2">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Consumers
+                          Schedules
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
-                          {blastRadius.consumers}
+                          {blastRadius.downstream_schedules}
                         </p>
                       </div>
+                      <div className="rounded-md border px-2.5 py-2">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Direct
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold">
+                          {blastRadius.direct_downstream_nodes}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Lineage root
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {blastRadius.lineage_root_display_name ?? "Unresolved"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

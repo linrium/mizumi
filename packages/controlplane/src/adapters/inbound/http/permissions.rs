@@ -112,6 +112,16 @@ pub async fn list_blast_radius(State(state): State<Arc<AppState>>) -> impl IntoR
     }
 }
 
+pub async fn get_blast_radius(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    match state.permission_service.get_blast_radius(id).await {
+        Ok(preview) => Json(preview).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
 pub async fn list_time_bound_grants(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match state.permission_service.list_time_bound_grants().await {
         Ok(grants) => Json(serde_json::json!({ "grants": grants })).into_response(),
