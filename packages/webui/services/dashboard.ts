@@ -18,14 +18,20 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-async function ensureSession(sessionId: string | null, token?: string): Promise<string> {
+async function ensureSession(
+  sessionId: string | null,
+  token?: string,
+): Promise<string> {
   if (sessionId) {
     return sessionId
   }
 
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API_BASE}/api/sessions`, { method: "POST", headers })
+  const res = await fetch(`${API_BASE}/api/sessions`, {
+    method: "POST",
+    headers,
+  })
   if (!res.ok) {
     throw new Error(`Failed to create session: HTTP ${res.status}`)
   }

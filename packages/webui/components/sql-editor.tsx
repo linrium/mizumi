@@ -97,7 +97,10 @@ function tablesInScope(
   })
 }
 
-function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) {
+function buildCompletionProvider(
+  monaco: Monaco,
+  data: CatalogCompletionSchema,
+) {
   const CIK = monaco.languages.CompletionItemKind
   return {
     triggerCharacters: ["."],
@@ -181,7 +184,9 @@ function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) 
       }
 
       // Ctrl+Space explicit invoke — branch on whether cursor is in table or column position
-      if (context.triggerKind === monaco.languages.CompletionTriggerKind.Invoke) {
+      if (
+        context.triggerKind === monaco.languages.CompletionTriggerKind.Invoke
+      ) {
         const textBeforeCursor = model.getValueInRange({
           startLineNumber: 1,
           startColumn: 1,
@@ -189,18 +194,38 @@ function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) 
           endColumn: position.column,
         })
         // Strip the word currently being typed to find what keyword precedes it
-        const beforeWord = textBeforeCursor.slice(0, textBeforeCursor.length - wordInfo.word.length)
+        const beforeWord = textBeforeCursor.slice(
+          0,
+          textBeforeCursor.length - wordInfo.word.length,
+        )
         const isTableContext = /\b(FROM|JOIN)\s*$/i.test(beforeWord)
 
         if (isTableContext) {
           // Suggest catalogs and full FQNs; dot trigger handles the drill-down
-          const suggestions: { label: string; kind: number; insertText: string; range: typeof range; detail?: string }[] = []
+          const suggestions: {
+            label: string
+            kind: number
+            insertText: string
+            range: typeof range
+            detail?: string
+          }[] = []
           for (const catalog of data.catalogs) {
-            suggestions.push({ label: catalog, kind: CIK.Module, insertText: catalog, range })
+            suggestions.push({
+              label: catalog,
+              kind: CIK.Module,
+              insertText: catalog,
+              range,
+            })
           }
           for (const table of data.tables) {
             const fqn = `${table.catalog}.${table.schema}.${table.name}`
-            suggestions.push({ label: fqn, kind: CIK.Class, insertText: fqn, range, detail: "table" })
+            suggestions.push({
+              label: fqn,
+              kind: CIK.Class,
+              insertText: fqn,
+              range,
+              detail: "table",
+            })
           }
           return { suggestions }
         }
@@ -208,12 +233,24 @@ function buildCompletionProvider(monaco: Monaco, data: CatalogCompletionSchema) 
         // Column context: only columns from tables referenced in the query
         const scopedTables = tablesInScope(model.getValue(), data.tables)
         const seen = new Set<string>()
-        const suggestions: { label: string; kind: number; insertText: string; range: typeof range; detail: string }[] = []
+        const suggestions: {
+          label: string
+          kind: number
+          insertText: string
+          range: typeof range
+          detail: string
+        }[] = []
         for (const table of scopedTables) {
           for (const col of table.columns) {
             if (!seen.has(col.name)) {
               seen.add(col.name)
-              suggestions.push({ label: col.name, kind: CIK.Field, insertText: col.name, range, detail: col.type })
+              suggestions.push({
+                label: col.name,
+                kind: CIK.Field,
+                insertText: col.name,
+                range,
+                detail: col.type,
+              })
             }
           }
         }
@@ -298,10 +335,11 @@ export function SqlEditor() {
         completionDataRef.current = data
         if (monacoRef.current) {
           disposeCompletionsRef.current?.()
-          const { dispose } = monacoRef.current.languages.registerCompletionItemProvider(
-            "sql",
-            buildCompletionProvider(monacoRef.current, data),
-          )
+          const { dispose } =
+            monacoRef.current.languages.registerCompletionItemProvider(
+              "sql",
+              buildCompletionProvider(monacoRef.current, data),
+            )
           disposeCompletionsRef.current = dispose
         }
       })
@@ -400,7 +438,10 @@ export function SqlEditor() {
                       const { dispose } =
                         monaco.languages.registerCompletionItemProvider(
                           "sql",
-                          buildCompletionProvider(monaco, completionDataRef.current),
+                          buildCompletionProvider(
+                            monaco,
+                            completionDataRef.current,
+                          ),
                         )
                       disposeCompletionsRef.current = dispose
                     }

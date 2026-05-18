@@ -13,7 +13,7 @@ use crate::{
 };
 
 const DEFAULT_NAMESPACE: &str = "spark";
-const DEFAULT_SPARK_VERSION: &str = "4.1.1";
+const DEFAULT_SPARK_VERSION: &str = "4.1.3";
 const DEFAULT_DRIVER_MEMORY: &str = "512m";
 const DEFAULT_EXECUTOR_MEMORY: &str = "512m";
 

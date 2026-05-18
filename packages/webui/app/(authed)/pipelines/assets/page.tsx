@@ -96,9 +96,12 @@ async function apiFetch<T>(
 }
 
 async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
-  const res = await fetchWithAuth(`/api/dagster/materialize/${path.join("/")}`, {
-    method: "POST",
-  })
+  const res = await fetchWithAuth(
+    `/api/dagster/materialize/${path.join("/")}`,
+    {
+      method: "POST",
+    },
+  )
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
   return json as { run_id: string }
@@ -310,18 +313,26 @@ export default function AssetsPage() {
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex items-center gap-3 px-4 h-10 border-b bg-muted/50 text-sm shrink-0">
         {selectedCount > 0 ? (
-          <span className="text-muted-foreground">{selectedCount} selected</span>
+          <span className="text-muted-foreground">
+            {selectedCount} selected
+          </span>
         ) : (
           <div className="flex items-center gap-3 text-muted-foreground">
             <span>{nodes.length} assets</span>
             {freshCount > 0 && (
-              <span className="text-green-600 dark:text-green-400">{freshCount} fresh</span>
+              <span className="text-green-600 dark:text-green-400">
+                {freshCount} fresh
+              </span>
             )}
             {staleCount > 0 && (
-              <span className="text-yellow-600 dark:text-yellow-400">{staleCount} stale</span>
+              <span className="text-yellow-600 dark:text-yellow-400">
+                {staleCount} stale
+              </span>
             )}
             {missingCount > 0 && (
-              <span className="text-red-600 dark:text-red-400">{missingCount} missing</span>
+              <span className="text-red-600 dark:text-red-400">
+                {missingCount} missing
+              </span>
             )}
           </div>
         )}

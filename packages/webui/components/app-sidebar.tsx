@@ -4,6 +4,7 @@ import {
   Airplane01Icon,
   BankIcon,
   Book03Icon,
+  ShoppingBag01Icon,
   Chart01Icon,
   CodeIcon,
   Copy01Icon,

@@ -30,9 +30,9 @@ export default function TableLayout({
     ? "preview"
     : pathname.endsWith("/request-permissions")
       ? "request-permissions"
-    : pathname.endsWith("/permissions")
-      ? "permissions"
-      : "schema"
+      : pathname.endsWith("/permissions")
+        ? "permissions"
+        : "schema"
 
   useEffect(() => {
     setDetail(null)

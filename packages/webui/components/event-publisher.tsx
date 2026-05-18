@@ -1,10 +1,6 @@
 "use client"
 
-import {
-  DiceFaces04Icon,
-  LiveStreaming01Icon,
-  MailSend02Icon,
-} from "@hugeicons/core-free-icons"
+import { LiveStreaming01Icon, MailSend02Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
 import Image, { type StaticImageData } from "next/image"
@@ -51,30 +47,12 @@ export function EventPublisher({
   const [sending, setSending] = useState<Record<string, boolean>>({})
   const [results, setResults] = useState<Record<string, SendResult | null>>({})
 
-  const handleGenerate = (option: EventOption) => {
-    setValues((current) => ({
-      ...current,
-      [option.id]: prettyJson(option.createSample()),
-    }))
-    setResults((current) => ({ ...current, [option.id]: null }))
-  }
-
   const handleSend = async (option: EventOption) => {
-    const value = values[option.id] ?? ""
+    const sample = option.createSample()
+    const value = prettyJson(sample)
+    setValues((current) => ({ ...current, [option.id]: value }))
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(value)
-    } catch {
-      setResults((current) => ({
-        ...current,
-        [option.id]: {
-          ok: false,
-          error: "Invalid JSON. Fix the payload before sending.",
-        },
-      }))
-      return
-    }
+    const parsed = sample
 
     setSending((current) => ({ ...current, [option.id]: true }))
     setResults((current) => ({ ...current, [option.id]: null }))
@@ -165,15 +143,6 @@ export function EventPublisher({
                     {option.label}
                   </div>
                   <div className="ml-auto flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleGenerate(option)}
-                      className="h-7 gap-1.5 px-2.5 text-[11px]"
-                    >
-                      <HugeiconsIcon icon={DiceFaces04Icon} size={11} />
-                      Generate
-                    </Button>
                     <Button
                       size="sm"
                       disabled={isSending}

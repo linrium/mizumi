@@ -1,17 +1,17 @@
-"use client";
+"use client"
 
-import { Shield01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { format, formatDistanceToNowStrict } from "date-fns";
-import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status";
-import { cn } from "@/lib/utils";
+import { Shield01Icon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { format, formatDistanceToNowStrict } from "date-fns"
+import dynamic from "next/dynamic"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { cn } from "@/lib/utils"
 import {
   type BlastRadiusPreview,
   getBlastRadius,
@@ -21,7 +21,7 @@ import {
   type RequestStatus,
   type RiskLevel,
   updateRequestStatus,
-} from "@/services/permissions";
+} from "@/services/permissions"
 
 const LineageGraph = dynamic(
   () =>
@@ -29,129 +29,129 @@ const LineageGraph = dynamic(
       (m) => m.LineageGraph,
     ),
   { ssr: false },
-);
+)
 
-const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"];
+const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"]
 
 function getStatusVariant(status: RequestStatus) {
   switch (status) {
     case "approved":
-      return "success";
+      return "success"
     case "ready":
-      return "info";
+      return "info"
     case "needs-info":
-      return "warning";
+      return "warning"
     case "cancelled":
-      return "error";
+      return "error"
     default:
-      return "default";
+      return "default"
   }
 }
 
 function getRiskVariant(risk: RiskLevel) {
   switch (risk) {
     case "high":
-      return "destructive";
+      return "destructive"
     case "medium":
-      return "secondary";
+      return "secondary"
     default:
-      return "outline";
+      return "outline"
   }
 }
 
 function formatRiskLabel(risk: RiskLevel) {
-  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`;
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
 }
 
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
     case "ready":
-      return "Grant-ready";
+      return "Grant-ready"
     case "needs-info":
-      return "Needs info";
+      return "Needs info"
     default:
-      return status[0]?.toUpperCase() + status.slice(1);
+      return status[0]?.toUpperCase() + status.slice(1)
   }
 }
 
 function formatScopeLabel(scope: string) {
-  return scope[0]?.toUpperCase() + scope.slice(1);
+  return scope[0]?.toUpperCase() + scope.slice(1)
 }
 
 function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   switch (decision) {
     case "auto-approved":
-      return "Auto-approved by template";
+      return "Auto-approved by template"
     case "reviewer-gate":
-      return "Matched template, routed to reviewer chain";
+      return "Matched template, routed to reviewer chain"
     case "security-escalation":
-      return "Matched template, escalated through security review";
+      return "Matched template, escalated through security review"
     default:
-      return "No template match, manual triage";
+      return "No template match, manual triage"
   }
 }
 
 function formatAbsoluteDate(value: string) {
-  return format(new Date(value), "MMM d, yyyy HH:mm");
+  return format(new Date(value), "MMM d, yyyy HH:mm")
 }
 
 function formatSubmitter(request: PermissionRequest) {
-  return request.submit_as === "team" ? (request.team ?? "Team") : "Personal";
+  return request.submit_as === "team" ? (request.team ?? "Team") : "Personal"
 }
 
 function formatApprovalStepStatus(status: string) {
   switch (status) {
     case "approved":
-      return "Completed";
+      return "Completed"
     case "pending":
-      return "In review";
+      return "In review"
     case "needs-info":
-      return "Needs info";
+      return "Needs info"
     case "cancelled":
-      return "Cancelled";
+      return "Cancelled"
     default:
-      return "Queued";
+      return "Queued"
   }
 }
 
 function getApprovalStepDescription(status: string, isCurrent: boolean) {
   if (status === "approved") {
-    return "This approval stage has been completed successfully.";
+    return "This approval stage has been completed successfully."
   }
   if (status === "needs-info") {
-    return "This stage is waiting on the requester to provide more context.";
+    return "This stage is waiting on the requester to provide more context."
   }
   if (status === "cancelled") {
-    return "This stage will not continue because the request was cancelled.";
+    return "This stage will not continue because the request was cancelled."
   }
   if (isCurrent || status === "pending") {
-    return "Reviewing requested privileges and verifying risk posture.";
+    return "Reviewing requested privileges and verifying risk posture."
   }
-  return "This approver will be engaged after the current stage completes.";
+  return "This approver will be engaged after the current stage completes."
 }
 
 function getApprovalStepVariant(status: string, isCurrent: boolean) {
-  if (status === "approved") return "success";
-  if (status === "needs-info") return "warning";
-  if (status === "cancelled") return "error";
-  if (isCurrent || status === "pending") return "info";
-  return "default";
+  if (status === "approved") return "success"
+  if (status === "needs-info") return "warning"
+  if (status === "cancelled") return "error"
+  if (isCurrent || status === "pending") return "info"
+  return "default"
 }
 
 function getApprovalStepPanelClass(status: string, isCurrent: boolean) {
   if (status === "approved") {
-    return "border-green-500/20 bg-green-500/[0.06]";
+    return "border-green-500/20 bg-green-500/[0.06]"
   }
   if (status === "needs-info") {
-    return "border-orange-500/20 bg-orange-500/[0.06]";
+    return "border-orange-500/20 bg-orange-500/[0.06]"
   }
   if (status === "cancelled") {
-    return "border-destructive/20 bg-destructive/[0.06]";
+    return "border-destructive/20 bg-destructive/[0.06]"
   }
   if (isCurrent || status === "pending") {
-    return "border-blue-500/20 bg-blue-500/[0.06] shadow-sm";
+    return "border-blue-500/20 bg-blue-500/[0.06] shadow-sm"
   }
-  return "border-border/70 bg-muted/30";
+  return "border-border/70 bg-muted/30"
 }
 
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
@@ -160,7 +160,7 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
       <Badge variant="outline" className="animate-pulse text-muted-foreground">
         LLM analysing…
       </Badge>
-    );
+    )
   }
   if (status === "failed") {
     return (
@@ -170,129 +170,129 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
       >
         LLM failed
       </Badge>
-    );
+    )
   }
   if (status === "unknown") {
-    return null;
+    return null
   }
   const variant =
     status === "high"
       ? "destructive"
       : status === "medium"
         ? "secondary"
-        : "outline";
+        : "outline"
   return (
     <Badge variant={variant}>
       LLM {status[0]?.toUpperCase() + status.slice(1)} risk
     </Badge>
-  );
+  )
 }
 
 function nodeTypeToCategory(type: string): string {
-  if (type === "table" || type === "topic") return "Datasets";
-  if (type === "dagster_asset") return "Assets";
+  if (type === "table" || type === "topic") return "Datasets"
+  if (type === "dagster_asset") return "Assets"
   if (["spark_job", "streaming_job", "daft_job", "dagster_job"].includes(type))
-    return "Jobs";
-  if (type === "schedule") return "Schedules";
-  if (type === "dashboard") return "Dashboards";
-  if (type === "consumer") return "Consumers";
-  return "Other";
+    return "Jobs"
+  if (type === "schedule") return "Schedules"
+  if (type === "dashboard") return "Dashboards"
+  if (type === "consumer") return "Consumers"
+  return "Other"
 }
 
 export default function PermissionRequestDetailPage() {
-  const params = useParams<{ id: string }>();
-  const requestId = typeof params.id === "string" ? params.id : "";
-  const [request, setRequest] = useState<PermissionRequest | null>(null);
+  const params = useParams<{ id: string }>()
+  const requestId = typeof params.id === "string" ? params.id : ""
+  const [request, setRequest] = useState<PermissionRequest | null>(null)
   const [blastRadius, setBlastRadius] = useState<BlastRadiusPreview | null>(
     null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actioningKey, setActioningKey] = useState<string | null>(null);
+  )
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actioningKey, setActioningKey] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"guardrail" | "components">(
     "guardrail",
-  );
+  )
 
   const groupedComponents = useMemo(() => {
-    if (!blastRadius) return {} as Record<string, string[]>;
-    const map: Record<string, string[]> = {};
+    if (!blastRadius) return {} as Record<string, string[]>
+    const map: Record<string, string[]> = {}
     for (const node of blastRadius.affected_nodes) {
-      const cat = nodeTypeToCategory(node.node_type);
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(node.display_name);
+      const cat = nodeTypeToCategory(node.node_type)
+      if (!map[cat]) map[cat] = []
+      map[cat].push(node.display_name)
     }
-    return map;
-  }, [blastRadius]);
+    return map
+  }, [blastRadius])
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     async function load() {
-      if (!requestId) return;
-      setLoading(true);
-      setError(null);
+      if (!requestId) return
+      setLoading(true)
+      setError(null)
 
       try {
         const [requestData, blastRadiusData] = await Promise.all([
           getPermissionRequest(requestId),
           getBlastRadius(requestId),
-        ]);
+        ])
 
-        if (cancelled) return;
+        if (cancelled) return
 
-        setRequest(requestData);
-        setBlastRadius(blastRadiusData);
+        setRequest(requestData)
+        setBlastRadius(blastRadiusData)
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled) return
         setError(
           err instanceof Error
             ? err.message
             : "Failed to load permission request",
-        );
+        )
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setLoading(false)
         }
       }
     }
 
-    void load();
+    void load()
 
     return () => {
-      cancelled = true;
-    };
-  }, [requestId]);
+      cancelled = true
+    }
+  }, [requestId])
 
   const currentSteps = useMemo(
     () => request?.approval_steps.filter((step) => step.is_current) ?? [],
     [request],
-  );
+  )
 
   async function handleStatusUpdate(
     status: RequestStatus,
     approvalStepId?: string,
   ) {
-    if (!request) return;
+    if (!request) return
 
-    const key = `${status}:${approvalStepId ?? "request"}`;
-    setActioningKey(key);
-    setError(null);
+    const key = `${status}:${approvalStepId ?? "request"}`
+    setActioningKey(key)
+    setError(null)
 
     try {
       const updated = await updateRequestStatus(
         request.id,
         status,
         approvalStepId,
-      );
-      setRequest(updated);
+      )
+      setRequest(updated)
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Failed to update permission request",
-      );
+      )
     } finally {
-      setActioningKey(null);
+      setActioningKey(null)
     }
   }
 
@@ -301,7 +301,7 @@ export default function PermissionRequestDetailPage() {
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         Loading request…
       </div>
-    );
+    )
   }
 
   if (error || !request) {
@@ -317,7 +317,7 @@ export default function PermissionRequestDetailPage() {
           <Link href="/permissions">Back to queue</Link>
         </Button>
       </div>
-    );
+    )
   }
 
   return (
@@ -814,5 +814,5 @@ export default function PermissionRequestDetailPage() {
         </section>
       </div>
     </div>
-  );
+  )
 }

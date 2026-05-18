@@ -1,8 +1,8 @@
-"use client";
+"use client"
 
-import { formatDistanceToNowStrict } from "date-fns";
-import { useEffect, useState } from "react";
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status";
+import { formatDistanceToNowStrict } from "date-fns"
+import { useEffect, useState } from "react"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
   TableBody,
@@ -10,45 +10,45 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 import {
   listTimeBoundGrants,
   type TimeBoundGrant,
-} from "@/services/permissions";
+} from "@/services/permissions"
 
 function getRenewalVariant(status: "healthy" | "expiring" | "expired") {
   switch (status) {
     case "healthy":
-      return "success";
+      return "success"
     case "expiring":
-      return "warning";
+      return "warning"
     default:
-      return "error";
+      return "error"
   }
 }
 
 function formatRenewalLabel(status: "healthy" | "expiring" | "expired") {
-  if (status === "healthy") return "Healthy";
-  if (status === "expiring") return "Expiring";
-  return "Expired";
+  if (status === "healthy") return "Healthy"
+  if (status === "expiring") return "Expiring"
+  return "Expired"
 }
 
 export default function TimeBoundAccessPage() {
-  const [grants, setGrants] = useState<TimeBoundGrant[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [grants, setGrants] = useState<TimeBoundGrant[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     listTimeBoundGrants()
       .then(setGrants)
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLoading(false))
+  }, [])
 
   const expiringToday = grants.filter((g) => {
-    const diff = new Date(g.expires_at).getTime() - Date.now();
-    return diff >= 0 && diff < 86_400_000;
-  }).length;
+    const diff = new Date(g.expires_at).getTime() - Date.now()
+    return diff >= 0 && diff < 86_400_000
+  }).length
 
-  const expired = grants.filter((g) => g.renewal_status === "expired").length;
+  const expired = grants.filter((g) => g.renewal_status === "expired").length
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -140,5 +140,5 @@ export default function TimeBoundAccessPage() {
         </Table>
       </div>
     </div>
-  );
+  )
 }

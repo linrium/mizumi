@@ -13,21 +13,40 @@ export default function SchemaRequestPermissionsPage() {
       <div className="px-6 pt-4 shrink-0">
         <div className="flex items-baseline gap-1.5">
           <h1 className="text-sm font-semibold">{schema}</h1>
-          <span className="text-xs text-muted-foreground font-mono">{catalog}</span>
+          <span className="text-xs text-muted-foreground font-mono">
+            {catalog}
+          </span>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           Request access to this schema
         </p>
         <CatalogTabs
           tabs={[
-            { href: `/catalog/${catalog}/${schema}`, label: "tables", active: false },
-            { href: `/catalog/${catalog}/${schema}/permissions`, label: "permissions", active: false, icon: SecurityIcon },
-            { href: `/catalog/${catalog}/${schema}/request-permissions`, label: "request access", active: true, icon: SecurityIcon },
+            {
+              href: `/catalog/${catalog}/${schema}`,
+              label: "tables",
+              active: false,
+            },
+            {
+              href: `/catalog/${catalog}/${schema}/permissions`,
+              label: "permissions",
+              active: false,
+              icon: SecurityIcon,
+            },
+            {
+              href: `/catalog/${catalog}/${schema}/request-permissions`,
+              label: "request access",
+              active: true,
+              icon: SecurityIcon,
+            },
           ]}
         />
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <RequestPermissionsPanel resource={`${catalog}.${schema}`} scope="schema" />
+        <RequestPermissionsPanel
+          resource={`${catalog}.${schema}`}
+          scope="schema"
+        />
       </div>
     </div>
   )

@@ -22,7 +22,7 @@ use uuid::Uuid;
 use crate::domain::{entities::query::QueryResponse, error::AppError};
 
 const NAMESPACE: &str = "spark";
-const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.5";
+const DUCKDB_IMAGE: &str = "mizumi-duckdb:1.1.6";
 const DUCKDB_SERVER_IMAGE: &str = "mizumi-duckdb-server:0.1.0";
 const S3_PROXY_TLS_SECRET: &str = "rustfs-s3-proxy-tls";
 const S3_PROXY_TLS_MOUNT_PATH: &str = "/etc/rustfs-s3-proxy";

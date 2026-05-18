@@ -156,7 +156,8 @@ const permissionStore: StoredPermissionRequest[] = [
     risk: "high",
     policy_template_id: "40000000-0000-0000-0000-000000000004",
     policy_template_name: "HDBank chargeback writeback",
-    policy_template_resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
+    policy_template_resource:
+      "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
     policy_template_approval_mode: "escalate",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000005",
     policy_template_owner: "HDBank Security",

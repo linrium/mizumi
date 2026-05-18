@@ -353,7 +353,10 @@ export default function PolicyTemplateDetailPage() {
                 {template.approval_steps.length > 0 ? (
                   <div className="space-y-1.5">
                     {template.approval_steps.map((step) => (
-                      <div key={step.id} className="rounded-md border px-3 py-2">
+                      <div
+                        key={step.id}
+                        className="rounded-md border px-3 py-2"
+                      >
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-medium">
                             {`Stage ${step.stage_order} · ${step.approver_team}`}

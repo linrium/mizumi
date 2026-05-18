@@ -1,6 +1,6 @@
 "use client"
 
-import {Key01Icon, SecurityIcon, TableIcon} from "@hugeicons/core-free-icons"
+import { Key01Icon, SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"

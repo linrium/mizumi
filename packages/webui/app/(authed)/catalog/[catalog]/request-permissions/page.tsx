@@ -18,8 +18,18 @@ export default function CatalogRequestPermissionsPage() {
         <CatalogTabs
           tabs={[
             { href: `/catalog/${catalog}`, label: "schemas", active: false },
-            { href: `/catalog/${catalog}/permissions`, label: "permissions", active: false, icon: SecurityIcon },
-            { href: `/catalog/${catalog}/request-permissions`, label: "request access", active: true, icon: SecurityIcon },
+            {
+              href: `/catalog/${catalog}/permissions`,
+              label: "permissions",
+              active: false,
+              icon: SecurityIcon,
+            },
+            {
+              href: `/catalog/${catalog}/request-permissions`,
+              label: "request access",
+              active: true,
+              icon: SecurityIcon,
+            },
           ]}
         />
       </div>
