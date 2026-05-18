@@ -21,6 +21,6 @@ realm = "sovico"
 audiences = []
 
 [openai]
-api_key = "wovey_0baN4Uis9HEJz41W0Kl0zt6LhdgIISiXkPqLEik"
+api_key = "wovey_VbQaGZ7V-uIhLOba6NaBtuhz2CgJaNAjQYZSZwzUGSw"
 model = "gpt-5.4-mini"
 base_url = "https://wovey-api.woven.tech/openai/project/linh_project/v1"

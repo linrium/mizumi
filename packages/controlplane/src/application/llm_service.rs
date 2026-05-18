@@ -1,45 +1,28 @@
-use std::time::Duration;
-
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    types::{
+        ChatCompletionRequestSystemMessage, ChatCompletionRequestUserMessage,
+        CreateChatCompletionRequestArgs, ResponseFormat,
+    },
+};
 use serde::Deserialize;
-use serde_json::json;
 
 use crate::{
-    domain::{
-        entities::permission::BlastRadiusPreview,
-        error::AppError,
-    },
+    domain::{entities::permission::BlastRadiusPreview, error::AppError},
     infrastructure::config::OpenAiConfig,
 };
 
-const REQUEST_TIMEOUT_SECS: u64 = 30;
-
 #[derive(Clone)]
 pub struct LlmService {
-    client: reqwest::Client,
-    api_key: String,
+    client: Client<OpenAIConfig>,
     model: String,
-    chat_completions_url: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct LlmBlastRadiusAnalysis {
     pub recommended_guardrail: String,
     pub risk_level: String,
-}
-
-#[derive(Deserialize)]
-struct ChatChoice {
-    message: ChatMessage,
-}
-
-#[derive(Deserialize)]
-struct ChatMessage {
-    content: String,
-}
-
-#[derive(Deserialize)]
-struct ChatResponse {
-    choices: Vec<ChatChoice>,
 }
 
 #[derive(Deserialize)]
@@ -55,16 +38,12 @@ impl LlmService {
         if api_key.is_empty() {
             return None;
         }
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
-            .build()
-            .expect("failed to build reqwest client for LLM service");
-        let base_url = config.base_url.trim_end_matches('/');
+        let openai_config = OpenAIConfig::new()
+            .with_api_key(api_key)
+            .with_api_base(config.base_url.trim_end_matches('/'));
         Some(Self {
-            client,
-            api_key,
+            client: Client::with_config(openai_config),
             model: config.model.clone(),
-            chat_completions_url: format!("{base_url}/chat/completions"),
         })
     }
 
@@ -105,10 +84,7 @@ Blast-radius stats:\n\
   consumers: {consumers}\n\
   sensitive_domains: [{sensitive}]\n\
   derived_risk: {derived}",
-            resource = resource,
-            scope = scope,
             privs = privileges.join(", "),
-            rationale = rationale,
             total = preview.total_downstream_nodes,
             direct = preview.direct_downstream_nodes,
             tables = preview.downstream_tables,
@@ -121,42 +97,28 @@ Blast-radius stats:\n\
             derived = preview.derived_risk,
         );
 
-        let body = json!({
-            "model": self.model,
-            "response_format": { "type": "json_object" },
-            "messages": [
-                { "role": "system", "content": system_prompt },
-                { "role": "user",   "content": user_content }
-            ]
-        });
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.model)
+            .response_format(ResponseFormat::JsonObject)
+            .messages([
+                ChatCompletionRequestSystemMessage::from(system_prompt).into(),
+                ChatCompletionRequestUserMessage::from(user_content.as_str()).into(),
+            ])
+            .build()
+            .map_err(|e| AppError::QueryFailed(format!("LLM request build error: {e}")))?;
 
         let response = self
             .client
-            .post(&self.chat_completions_url)
-            .bearer_auth(&self.api_key)
-            .json(&body)
-            .send()
+            .chat()
+            .create(request)
             .await
-            .map_err(|e| AppError::QueryFailed(format!("LLM request failed: {e}")))?;
+            .map_err(|e| AppError::QueryFailed(format!("LLM API error: {e}")))?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(AppError::QueryFailed(format!(
-                "LLM API error {status}: {text}"
-            )));
-        }
-
-        let chat: ChatResponse = response
-            .json()
-            .await
-            .map_err(|e| AppError::QueryFailed(format!("LLM response parse error: {e}")))?;
-
-        let content = chat
+        let content = response
             .choices
             .into_iter()
             .next()
-            .map(|c| c.message.content)
+            .and_then(|c| c.message.content)
             .unwrap_or_default();
 
         let parsed: LlmAnalysisResponse = serde_json::from_str(&content)
@@ -167,7 +129,10 @@ Blast-radius stats:\n\
             "medium" => "medium",
             "high" => "high",
             other => {
-                tracing::warn!(risk = other, "LLM returned unknown risk level, defaulting to medium");
+                tracing::warn!(
+                    risk = other,
+                    "LLM returned unknown risk level, defaulting to medium"
+                );
                 "medium"
             }
         }
