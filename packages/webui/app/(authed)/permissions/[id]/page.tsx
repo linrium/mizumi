@@ -47,6 +47,10 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
+function formatRiskLabel(risk: RiskLevel) {
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+}
+
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
     case "ready":
@@ -247,7 +251,8 @@ export default function PermissionRequestDetailPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-3 py-2 shrink-0">
+      {/* Page header */}
+      <div className="border-b px-6 py-3 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <Link
@@ -331,18 +336,20 @@ export default function PermissionRequestDetailPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1.7fr)_320px]">
-          <div className="space-y-3">
+      {/* Body: scrollable main content + sticky rightbar */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Main content */}
+        <div className="flex-1 min-w-0 overflow-auto">
+          <div className="max-w-2xl mx-auto px-6 py-5 space-y-4">
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Request summary</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Request details, access scope, and routing context.
                 </p>
               </div>
               <Separator />
-              <div className="grid gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-2">
+              <div className="grid gap-x-4 gap-y-3 px-4 py-4 md:grid-cols-2">
                 <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -414,11 +421,11 @@ export default function PermissionRequestDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Access requested</h2>
               </div>
               <Separator />
-              <div className="space-y-3 px-3 py-3">
+              <div className="space-y-3 px-4 py-4">
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -453,14 +460,14 @@ export default function PermissionRequestDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Approval flow</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Stage-by-stage approver routing for this request.
                 </p>
               </div>
               <Separator />
-              <div className="px-3 py-3">
+              <div className="px-4 py-4">
                 {request.approval_steps.length > 0 ? (
                   <div className="space-y-1.5">
                     {request.approval_steps.map((step, index) => (
@@ -555,14 +562,19 @@ export default function PermissionRequestDetailPage() {
               </div>
             </section>
           </div>
+        </div>
 
-          <div className="space-y-3">
-            <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
-                <h2 className="text-sm font-semibold">Policy template</h2>
+        {/* Right sidebar */}
+        <aside className="hidden lg:flex w-72 shrink-0 flex-col border-l overflow-auto">
+          <div className="space-y-0 divide-y">
+            {/* Policy template */}
+            <div>
+              <div className="px-4 py-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Policy template
+                </h2>
               </div>
-              <Separator />
-              <div className="space-y-2.5 px-3 py-3 text-sm">
+              <div className="space-y-3 px-4 pb-4 text-sm">
                 {request.policy_template_name ? (
                   <>
                     <div>
@@ -577,7 +589,7 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Approval mode
                       </p>
-                      <p className="mt-0.5">
+                      <p className="mt-0.5 capitalize">
                         {request.policy_template_approval_mode ?? "Not set"}
                       </p>
                     </div>
@@ -593,73 +605,82 @@ export default function PermissionRequestDetailPage() {
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Template resource
                       </p>
-                      <p className="mt-0.5 font-mono text-xs break-all text-muted-foreground">
+                      <p className="mt-0.5 break-all font-mono text-xs text-muted-foreground">
                         {request.policy_template_resource ?? "Any resource"}
                       </p>
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    This request did not match a policy template and is
-                    following a manual review path.
+                  <p className="text-xs text-muted-foreground">
+                    No template match. This request is following a manual review
+                    path.
                   </p>
                 )}
               </div>
-            </section>
+            </div>
 
-            <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
-                <h2 className="text-sm font-semibold">Blast radius</h2>
+            {/* Blast radius */}
+            <div>
+              <div className="px-4 py-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Blast radius
+                </h2>
               </div>
-              <Separator />
-              <div className="space-y-2.5 px-3 py-3 text-sm">
+              <div className="space-y-3 px-4 pb-4 text-sm">
                 {blastRadius ? (
                   <>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={getRiskVariant(request.risk)}>
+                        Request {formatRiskLabel(request.risk)}
+                      </Badge>
+                      <Badge variant={getRiskVariant(blastRadius.derived_risk)}>
+                        Derived {formatRiskLabel(blastRadius.derived_risk)}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Nodes
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.total_downstream_nodes}
                         </p>
                       </div>
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Datasets
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_tables}
                         </p>
                       </div>
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Assets
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_assets}
                         </p>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Jobs
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_jobs}
                         </p>
                       </div>
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Schedules
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
                           {blastRadius.downstream_schedules}
                         </p>
                       </div>
-                      <div className="rounded-md border px-2.5 py-2">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-md border px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           Direct
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">
@@ -667,11 +688,12 @@ export default function PermissionRequestDetailPage() {
                         </p>
                       </div>
                     </div>
+
                     <div>
                       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Lineage root
                       </p>
-                      <p className="mt-0.5 text-muted-foreground">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         {blastRadius.lineage_root_display_name ?? "Unresolved"}
                       </p>
                     </div>
@@ -680,31 +702,37 @@ export default function PermissionRequestDetailPage() {
                         Sensitive domains
                       </p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {blastRadius.sensitive_domains.map((domain) => (
-                          <Badge key={domain} variant="outline">
-                            {domain}
-                          </Badge>
-                        ))}
+                        {blastRadius.sensitive_domains.length > 0 ? (
+                          blastRadius.sensitive_domains.map((domain) => (
+                            <Badge key={domain} variant="outline">
+                              {domain}
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground">None</p>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Recommended guardrail
-                      </p>
-                      <p className="mt-0.5 text-muted-foreground">
-                        {blastRadius.recommended_guardrail}
-                      </p>
-                    </div>
+                    {blastRadius.recommended_guardrail && (
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Recommended guardrail
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {blastRadius.recommended_guardrail}
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No blast-radius preview is available for this request.
+                  <p className="text-xs text-muted-foreground">
+                    No blast-radius preview available for this request.
                   </p>
                 )}
               </div>
-            </section>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

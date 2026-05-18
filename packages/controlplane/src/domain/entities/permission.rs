@@ -136,6 +136,7 @@ pub struct BlastRadiusPreview {
     pub resource: String,
     pub scope: String,
     pub risk: String,
+    pub derived_risk: String,
     pub lineage_resolved: bool,
     pub lineage_root_id: Option<Uuid>,
     pub lineage_root_display_name: Option<String>,

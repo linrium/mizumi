@@ -91,6 +91,7 @@ export type BlastRadiusPreview = {
   resource: string
   scope: RequestScope
   risk: RiskLevel
+  derived_risk: RiskLevel
   lineage_resolved: boolean
   lineage_root_id: string | null
   lineage_root_display_name: string | null

@@ -214,6 +214,50 @@ impl PermissionService {
         ranked.into_iter().take(5).map(|(token, _)| token).collect()
     }
 
+    fn derived_blast_radius_risk(
+        request: &PermissionRequestView,
+        preview: &BlastRadiusPreview,
+    ) -> String {
+        let mutating = request.privileges.iter().any(|privilege| {
+            matches!(
+                privilege.as_str(),
+                "MODIFY" | "UPDATE" | "DELETE" | "INSERT" | "MERGE" | "WRITE" | "ALTER"
+            )
+        });
+
+        let resource = request.resource.to_lowercase();
+        let bronze_or_raw = resource.contains("bronze") || resource.contains("raw");
+        let has_large_downstream = preview.total_downstream_nodes >= 10
+            || preview.downstream_tables >= 3
+            || preview.downstream_assets > 0
+            || preview.downstream_jobs > 0
+            || preview.downstream_schedules > 0;
+
+        if mutating {
+            if bronze_or_raw
+                || preview
+                    .lineage_root_type
+                    .as_deref()
+                    .is_some_and(|ty| ty == "table" || ty == "schema")
+                || has_large_downstream
+            {
+                return "high".to_string();
+            }
+
+            return "medium".to_string();
+        }
+
+        if preview.downstream_schedules > 0 || preview.total_downstream_nodes >= 15 {
+            return "medium".to_string();
+        }
+
+        if has_large_downstream {
+            return "medium".to_string();
+        }
+
+        "low".to_string()
+    }
+
     fn build_blast_radius_preview(
         request: &PermissionRequestView,
         nodes_by_id: &HashMap<Uuid, LineageNode>,
@@ -230,7 +274,7 @@ impl PermissionService {
             });
 
         let Some(root) = root else {
-            return BlastRadiusPreview {
+            let mut preview = BlastRadiusPreview {
                 request_id: request.id,
                 requester: request.requester.clone(),
                 resource: request.resource.clone(),
@@ -249,18 +293,19 @@ impl PermissionService {
                 dashboards: 0,
                 consumers: 0,
                 sensitive_domains: Vec::new(),
+                derived_risk: String::new(),
                 recommended_guardrail: String::new(),
             };
+            preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
+            return preview;
         };
 
         let mut visited = HashSet::from([root.id]);
-        let mut selected_edges = Vec::<LineageEdge>::new();
         let mut queue = VecDeque::from([root.id]);
 
         while let Some(current) = queue.pop_front() {
             if let Some(edges) = downstream_edges_by_src.get(&current) {
                 for edge in edges {
-                    selected_edges.push(edge.clone());
                     if visited.insert(edge.dst_node_id) {
                         queue.push_back(edge.dst_node_id);
                     }
@@ -308,12 +353,13 @@ impl PermissionService {
         domain_nodes.push(&root);
         domain_nodes.extend(downstream_nodes.iter().copied());
 
-        BlastRadiusPreview {
+        let mut preview = BlastRadiusPreview {
             request_id: request.id,
             requester: request.requester.clone(),
             resource: request.resource.clone(),
             scope: request.scope.clone(),
             risk: request.risk.clone(),
+            derived_risk: String::new(),
             lineage_resolved: true,
             lineage_root_id: Some(root.id),
             lineage_root_display_name: Some(root.display_name.clone()),
@@ -328,7 +374,9 @@ impl PermissionService {
             consumers,
             sensitive_domains: Self::collect_sensitive_domains(&domain_nodes),
             recommended_guardrail: String::new(),
-        }
+        };
+        preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
+        preview
     }
 
     async fn grant_request(&self, request: &PermissionRequestView) -> Result<(), AppError> {

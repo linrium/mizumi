@@ -79,6 +79,10 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
+function formatRiskLabel(risk: RiskLevel) {
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+}
+
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
     case "ready":
@@ -401,7 +405,7 @@ export default function PermissionsPage() {
                             {formatScopeLabel(request.scope)}
                           </Badge>
                           <Badge variant={getRiskVariant(request.risk)}>
-                            {request.risk} risk
+                            Request {formatRiskLabel(request.risk)}
                           </Badge>
                         </div>
                       </div>
@@ -443,6 +447,12 @@ export default function PermissionsPage() {
                       {blastRadius ? (
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-1">
+                            <Badge
+                              variant={getRiskVariant(blastRadius.derived_risk)}
+                            >
+                              Derived{" "}
+                              {formatRiskLabel(blastRadius.derived_risk)}
+                            </Badge>
                             <Badge variant="outline">
                               {blastRadius.total_downstream_nodes} nodes
                             </Badge>

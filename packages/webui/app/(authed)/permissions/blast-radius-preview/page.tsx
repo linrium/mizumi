@@ -27,6 +27,10 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
+function formatRiskLabel(risk: RiskLevel) {
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+}
+
 function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1)
 }
@@ -108,14 +112,19 @@ export default function BlastRadiusPreviewPage() {
                           {formatScopeLabel(item.scope)}
                         </Badge>
                         <Badge variant={getRiskVariant(item.risk)}>
-                          {item.risk} risk
+                          Request {formatRiskLabel(item.risk)}
                         </Badge>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="align-top text-muted-foreground">
                     {item.lineage_resolved ? (
-                      <>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant={getRiskVariant(item.derived_risk)}>
+                            Derived {formatRiskLabel(item.derived_risk)}
+                          </Badge>
+                        </div>
                         <div>
                           {item.total_downstream_nodes} downstream nodes
                         </div>
@@ -123,7 +132,7 @@ export default function BlastRadiusPreviewPage() {
                         <div>{item.downstream_assets} assets</div>
                         <div>{item.downstream_jobs} jobs</div>
                         <div>{item.downstream_schedules} schedules</div>
-                      </>
+                      </div>
                     ) : (
                       <div>No lineage root resolved</div>
                     )}
