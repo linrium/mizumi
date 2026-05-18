@@ -503,6 +503,9 @@ impl LineageService {
             }
 
             for job_name in asset.job_names {
+                if is_internal_dagster_job(&job_name) {
+                    continue;
+                }
                 let job_id = graph.ensure_node(
                     "dagster_job",
                     "dagster",
@@ -534,6 +537,9 @@ impl LineageService {
             .flat_map(|location| location.repositories.unwrap_or_default().into_iter())
             .flat_map(|repo| repo.jobs.into_iter())
         {
+            if is_internal_dagster_job(&job.name) {
+                continue;
+            }
             let job_id = graph.ensure_node(
                 "dagster_job",
                 "dagster",
@@ -1833,3 +1839,7 @@ query AssetLatestInfo($assetKeys: [AssetKeyInput!]!) {
   }
 }
 "#;
+
+fn is_internal_dagster_job(name: &str) -> bool {
+    name == "__ASSET_JOB" || name.starts_with("__")
+}

@@ -67,6 +67,13 @@ type ApiLineageGraph = {
   edges: ApiLineageEdge[]
 }
 
+export type LineageFilters = {
+  query?: string
+  nodeTypes?: string[]
+  runtimeOnly?: boolean
+  includeContains?: boolean
+}
+
 type LineageNodeData = {
   id: string
   displayName: string
@@ -360,9 +367,11 @@ function buildLayout(
 export function LineageGraph({
   currentPath,
   neighborhoodOnly = false,
+  filters,
 }: {
   currentPath?: string[]
   neighborhoodOnly?: boolean
+  filters?: LineageFilters
 }) {
   const rootToken = currentPath?.join("/") ?? null
 
@@ -405,11 +414,74 @@ export function LineageGraph({
     }
   }, [rootToken, neighborhoodOnly])
 
-  const currentId = graph?.root?.id ?? null
+  const filteredGraph = useMemo(() => {
+    if (!graph) return null
+
+    const query = filters?.query?.trim().toLowerCase() ?? ""
+    const allowedNodeTypes = new Set(filters?.nodeTypes ?? [])
+    const enforceNodeTypes = allowedNodeTypes.size > 0
+    const includeContains = filters?.includeContains ?? true
+    const runtimeOnly = filters?.runtimeOnly ?? false
+
+    const visibleNodes = graph.nodes.filter((node) => {
+      const matchesQuery =
+        query.length === 0 ||
+        node.display_name.toLowerCase().includes(query) ||
+        node.name.toLowerCase().includes(query) ||
+        node.node_type.toLowerCase().includes(query) ||
+        node.platform.toLowerCase().includes(query)
+
+      const matchesType =
+        !enforceNodeTypes || allowedNodeTypes.has(node.node_type)
+
+      const matchesRuntime =
+        !runtimeOnly ||
+        !!(
+          node.runtime?.latest_materialization_at ||
+          node.runtime?.latest_run_started_at ||
+          (node.runtime?.in_progress_run_ids.length ?? 0) > 0 ||
+          (node.runtime?.unstarted_run_ids.length ?? 0) > 0
+        )
+
+      return matchesQuery && matchesType && matchesRuntime
+    })
+
+    const visibleIds = new Set(visibleNodes.map((node) => node.id))
+    const visibleEdges = graph.edges.filter((edge) => {
+      if (!includeContains && edge.edge_type === "contains") return false
+      return visibleIds.has(edge.source) && visibleIds.has(edge.target)
+    })
+
+    const connectedIds = new Set<string>()
+    for (const edge of visibleEdges) {
+      connectedIds.add(edge.source)
+      connectedIds.add(edge.target)
+    }
+    for (const node of visibleNodes) {
+      if (node.id === graph.root?.id) connectedIds.add(node.id)
+    }
+
+    const finalNodes =
+      visibleEdges.length === 0
+        ? visibleNodes
+        : visibleNodes.filter((node) => connectedIds.has(node.id))
+
+    return {
+      ...graph,
+      nodes: finalNodes,
+      edges: visibleEdges,
+      root:
+        graph.root && finalNodes.some((node) => node.id === graph.root?.id)
+          ? graph.root
+          : null,
+    } satisfies ApiLineageGraph
+  }, [filters, graph])
+
+  const currentId = filteredGraph?.root?.id ?? null
   const { rfNodes, rfEdges } = useMemo(() => {
-    if (!graph) return { rfNodes: [], rfEdges: [] }
-    return buildLayout(graph, currentId)
-  }, [graph, currentId])
+    if (!filteredGraph) return { rfNodes: [], rfEdges: [] }
+    return buildLayout(filteredGraph, currentId)
+  }, [filteredGraph, currentId])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges)
@@ -437,10 +509,10 @@ export function LineageGraph({
     )
   }
 
-  if (!graph || graph.nodes.length === 0) {
+  if (!filteredGraph || filteredGraph.nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        No lineage found
+        No lineage matches the current filters
       </div>
     )
   }

@@ -4,7 +4,7 @@ dagster-user-deployments:
       image:
         repository: mizumi-dagster
         tag: "1.13.4"
-        pullPolicy: IfNotPresent
+        pullPolicy: Always
       dagsterApiGrpcArgs:
         - "--python-file"
         - "/app/definitions.py"
