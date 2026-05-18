@@ -52,7 +52,8 @@ spec:
       containers:
         - name: unitycatalog
           image: mizumi-uc:0.1.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
+          # imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: 100m

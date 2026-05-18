@@ -3,6 +3,8 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$/packages/uc-java/clients/python">
       <sourceFolder url="file://$MODULE_DIR$/packages/uc-java/clients/python/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/uc-java/clients/python/target/src" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/clients/python/target" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>

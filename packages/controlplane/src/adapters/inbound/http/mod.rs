@@ -1,5 +1,6 @@
 pub mod dagster;
 pub mod k8s;
+pub mod lineage;
 pub mod permissions;
 pub mod streaming;
 pub mod teams;
@@ -148,6 +149,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/api/permissions/grants",
             get(permissions::list_time_bound_grants),
         )
+        .route("/api/lineage/rebuild", post(lineage::rebuild_lineage))
+        .route("/api/lineage/search", get(lineage::search_lineage))
+        .route("/api/lineage/graph", get(lineage::get_lineage_graph))
+        .route("/api/lineage/blast-radius", get(lineage::get_blast_radius))
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))

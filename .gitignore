@@ -11,3 +11,6 @@ wheels/
 target
 .next
 packages/uc-java
+
+packages/uc-java/
+packages/duckdb_uc/

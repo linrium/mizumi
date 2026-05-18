@@ -2,7 +2,23 @@
 <module external.system.id="pyproject.toml" type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/controlplane/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/duckdb_uc/build" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/api/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/clients/java/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/connectors/hadoop/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/connectors/spark/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/etc/logs" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/examples/cli/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/project/project/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/project/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/server/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc-java/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/uc/target" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/webui/.next" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/webui/node_modules" />
     </content>
     <orderEntry type="jdk" jdkName="uv (mizumi)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

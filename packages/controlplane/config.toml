@@ -4,6 +4,9 @@ bypass_token = "test"
 [database]
 url = "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
 
+[dagster]
+base_url = "http://localhost:8080"
+
 [kafka]
 bootstrap_servers = "127.0.0.1:19092"
 

@@ -357,9 +357,9 @@ jobs-delete-vietjetair token:
 controlplane-deploy:
     kubectl apply -f infra/k8s/controlplane/postgres.yaml
     kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n controlplane --timeout=120s
-    kubectl apply -f infra/k8s/controlplane/deployment.yaml
+    # kubectl apply -f infra/k8s/controlplane/deployment.yaml
     kubectl rollout status deployment/controlplane -n controlplane --timeout=120s
-    just controlplane-bootstrap
+    # just controlplane-bootstrap
     kubectl get pods,svc -n controlplane
 
 controlplane-bootstrap:

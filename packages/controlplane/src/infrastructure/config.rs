@@ -20,6 +20,12 @@ pub struct UnityCatalogConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct DagsterConfig {
+    #[serde(default = "default_dagster_base_url")]
+    pub base_url: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct KeycloakConfig {
     pub url: String,
     pub realm: String,
@@ -33,6 +39,8 @@ pub struct Config {
     #[serde(default)]
     pub bypass_token: String,
     pub database: DatabaseConfig,
+    #[serde(default)]
+    pub dagster: DagsterConfig,
     pub kafka: KafkaConfig,
     pub unity_catalog: UnityCatalogConfig,
     pub keycloak: KeycloakConfig,
@@ -45,5 +53,17 @@ impl Config {
             .add_source(Environment::default().separator("__").list_separator(","))
             .build()?
             .try_deserialize()
+    }
+}
+
+fn default_dagster_base_url() -> String {
+    "http://localhost:8080".to_string()
+}
+
+impl Default for DagsterConfig {
+    fn default() -> Self {
+        Self {
+            base_url: default_dagster_base_url(),
+        }
     }
 }

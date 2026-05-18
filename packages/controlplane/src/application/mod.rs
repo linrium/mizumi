@@ -1,5 +1,6 @@
 pub mod dagster_service;
 pub mod k8s_service;
+pub mod lineage_service;
 pub mod permission_service;
 pub mod streaming_service;
 pub mod team_service;

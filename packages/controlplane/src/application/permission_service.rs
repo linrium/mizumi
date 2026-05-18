@@ -242,7 +242,11 @@ impl PermissionService {
     }
 
     fn manual_review_chain(resource: &str) -> Vec<(i32, Uuid, String)> {
-        vec![(1, default_reviewer_id(resource), "Manual review".to_string())]
+        vec![(
+            1,
+            default_reviewer_id(resource),
+            "Manual review".to_string(),
+        )]
     }
 
     fn approval_chain_from_policy_match(
@@ -482,7 +486,8 @@ impl PermissionService {
             let inserted_steps =
                 permission_requests::replace_approval_steps(&self.db, request.id, &new_steps)
                     .await?;
-            let (status, reviewer_id) = Self::derive_request_state(&inserted_steps, &request.resource);
+            let (status, reviewer_id) =
+                Self::derive_request_state(&inserted_steps, &request.resource);
             permission_requests::update_policy_metadata(
                 &self.db,
                 request.id,

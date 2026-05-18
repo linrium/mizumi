@@ -12,7 +12,7 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use adapters::inbound::http::create_router;
 use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
 use application::{
-    dagster_service::DagsterService, k8s_service::K8sQueryService,
+    dagster_service::DagsterService, k8s_service::K8sQueryService, lineage_service::LineageService,
     permission_service::PermissionService, streaming_service::StreamingJobService,
     team_service::TeamService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService, user_service::UserService,
@@ -65,6 +65,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(session_store)),
+        lineage_service: Arc::new(LineageService::new(
+            db.clone(),
+            config.unity_catalog.base_url.clone(),
+            uc_admin_token.clone(),
+            config.dagster.base_url.clone(),
+        )),
         permission_service: Arc::new(PermissionService::new(
             db.clone(),
             UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
