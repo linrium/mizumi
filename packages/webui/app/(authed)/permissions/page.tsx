@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
 import {
   CheckmarkCircle01Icon,
   MoreHorizontalIcon,
-} from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { formatDistanceToNowStrict } from "date-fns"
-import Link from "next/link"
-import { useDeferredValue, useEffect, useMemo, useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { formatDistanceToNowStrict } from "date-fns";
+import Link from "next/link";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,15 +17,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status";
 import {
   Table,
   TableBody,
@@ -33,17 +33,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
   type BlastRadiusPreview,
   listBlastRadius,
   listPermissionRequests,
+  type LlmRiskStatus,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
   updateRequestStatus,
-} from "@/services/permissions"
+} from "@/services/permissions";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -51,110 +52,144 @@ const FILTERS = [
   { key: "ready", label: "Grant-ready" },
   { key: "needs-info", label: "Needs info" },
   { key: "approved", label: "Approved" },
-] as const
+] as const;
 
 function getStatusVariant(status: RequestStatus) {
   switch (status) {
     case "approved":
-      return "success"
+      return "success";
     case "ready":
-      return "info"
+      return "info";
     case "needs-info":
-      return "warning"
+      return "warning";
     case "cancelled":
-      return "error"
+      return "error";
     default:
-      return "default"
+      return "default";
   }
 }
 
 function getRiskVariant(risk: RiskLevel) {
   switch (risk) {
     case "high":
-      return "destructive"
+      return "destructive";
     case "medium":
-      return "secondary"
+      return "secondary";
     default:
-      return "outline"
+      return "outline";
   }
 }
 
 function formatRiskLabel(risk: RiskLevel) {
-  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`;
 }
 
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
     case "ready":
-      return "Grant-ready"
+      return "Grant-ready";
     case "needs-info":
-      return "Needs info"
+      return "Needs info";
     default:
-      return status[0]?.toUpperCase() + status.slice(1)
+      return status[0]?.toUpperCase() + status.slice(1);
   }
 }
 
 function formatScopeLabel(scope: string) {
-  return scope[0]?.toUpperCase() + scope.slice(1)
+  return scope[0]?.toUpperCase() + scope.slice(1);
 }
 
 function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   switch (decision) {
     case "auto-approved":
-      return "Auto-approved by template"
+      return "Auto-approved by template";
     case "reviewer-gate":
-      return "Matched template, routed to reviewer"
+      return "Matched template, routed to reviewer";
     case "security-escalation":
-      return "Matched template, escalated"
+      return "Matched template, escalated";
     default:
-      return "No template match, manual triage"
+      return "No template match, manual triage";
   }
 }
 
 function formatApprovalStep(step: PermissionRequest["approval_steps"][number]) {
-  return `S${step.stage_order} · ${step.approver_team}`
+  return `S${step.stage_order} · ${step.approver_team}`;
 }
 
 function formatSubmitter(request: PermissionRequest) {
-  return request.submit_as === "team" ? (request.team ?? "Team") : "Personal"
+  return request.submit_as === "team" ? (request.team ?? "Team") : "Personal";
+}
+
+function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
+  if (status === "processing") {
+    return (
+      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+        LLM analysing…
+      </Badge>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <Badge
+        variant="outline"
+        className="text-destructive border-destructive/40"
+      >
+        LLM failed
+      </Badge>
+    );
+  }
+  if (status === "unknown") {
+    return null;
+  }
+  const variant =
+    status === "high"
+      ? "destructive"
+      : status === "medium"
+        ? "secondary"
+        : "outline";
+  return (
+    <Badge variant={variant}>
+      LLM {status[0]?.toUpperCase() + status.slice(1)} risk
+    </Badge>
+  );
 }
 
 export default function PermissionsPage() {
-  const [requests, setRequests] = useState<PermissionRequest[]>([])
+  const [requests, setRequests] = useState<PermissionRequest[]>([]);
   const [blastRadiusByRequestId, setBlastRadiusByRequestId] = useState<
     Record<string, BlastRadiusPreview>
-  >({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [query, setQuery] = useState("")
-  const deferredQuery = useDeferredValue(query)
+  >({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [activeFilter, setActiveFilter] =
-    useState<(typeof FILTERS)[number]["key"]>("all")
-  const [approving, setApproving] = useState(false)
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null)
+    useState<(typeof FILTERS)[number]["key"]>("all");
+  const [approving, setApproving] = useState(false);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [approveTarget, setApproveTarget] = useState<{
-    request: PermissionRequest
-    stepId?: string
-  } | null>(null)
+    request: PermissionRequest;
+    stepId?: string;
+  } | null>(null);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     async function load() {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
       try {
         const [data, blastRadius] = await Promise.all([
           listPermissionRequests({ all: true }),
           listBlastRadius(),
-        ])
+        ]);
         if (!cancelled) {
-          setRequests(data)
+          setRequests(data);
           setBlastRadiusByRequestId(
             Object.fromEntries(
               blastRadius.map((item) => [item.request_id, item]),
             ),
-          )
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -162,28 +197,28 @@ export default function PermissionsPage() {
             err instanceof Error
               ? err.message
               : "Failed to load permission requests",
-          )
+          );
         }
       } finally {
         if (!cancelled) {
-          setLoading(false)
+          setLoading(false);
         }
       }
     }
 
-    void load()
+    void load();
 
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
   const filteredRequests = useMemo(() => {
-    const search = deferredQuery.trim().toLowerCase()
+    const search = deferredQuery.trim().toLowerCase();
 
     return requests.filter((request) => {
       const matchesFilter =
-        activeFilter === "all" ? true : request.status === activeFilter
+        activeFilter === "all" ? true : request.status === activeFilter;
       const matchesSearch =
         search.length === 0
           ? true
@@ -199,18 +234,18 @@ export default function PermissionsPage() {
               request.policy_template_owner ?? "",
               request.queue_decision,
               ...request.privileges,
-            ].some((value) => value.toLowerCase().includes(search))
+            ].some((value) => value.toLowerCase().includes(search));
 
-      return matchesFilter && matchesSearch
-    })
-  }, [requests, activeFilter, deferredQuery])
+      return matchesFilter && matchesSearch;
+    });
+  }, [requests, activeFilter, deferredQuery]);
 
   const stats = useMemo(() => {
-    const pending = requests.filter((item) => item.status === "pending")
-    const ready = requests.filter((item) => item.status === "ready")
-    const expiringSoon = requests.filter((item) => item.expires_in_days <= 3)
-    const highRisk = requests.filter((item) => item.risk === "high")
-    const matchedTemplates = requests.filter((item) => item.policy_template_id)
+    const pending = requests.filter((item) => item.status === "pending");
+    const ready = requests.filter((item) => item.status === "ready");
+    const expiringSoon = requests.filter((item) => item.expires_in_days <= 3);
+    const highRisk = requests.filter((item) => item.risk === "high");
+    const matchedTemplates = requests.filter((item) => item.policy_template_id);
 
     return {
       pending: pending.length,
@@ -218,27 +253,29 @@ export default function PermissionsPage() {
       expiringSoon: expiringSoon.length,
       highRisk: highRisk.length,
       matchedTemplates: matchedTemplates.length,
-    }
-  }, [requests])
+    };
+  }, [requests]);
 
   async function handleApprove() {
-    if (!approveTarget || approving) return
-    setApproving(true)
-    setError(null)
+    if (!approveTarget || approving) return;
+    setApproving(true);
+    setError(null);
     try {
       const updated = await updateRequestStatus(
         approveTarget.request.id,
         "approved",
         approveTarget.stepId,
-      )
+      );
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
-      )
-      setApproveTarget(null)
+      );
+      setApproveTarget(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve request")
+      setError(
+        err instanceof Error ? err.message : "Failed to approve request",
+      );
     } finally {
-      setApproving(false)
+      setApproving(false);
     }
   }
 
@@ -248,28 +285,28 @@ export default function PermissionsPage() {
     approvalStepId?: string,
   ) {
     const status: RequestStatus =
-      action === "approve" ? "approved" : "needs-info"
-    setActiveRequestId(id)
-    setError(null)
+      action === "approve" ? "approved" : "needs-info";
+    setActiveRequestId(id);
+    setError(null);
     try {
-      const updated = await updateRequestStatus(id, status, approvalStepId)
+      const updated = await updateRequestStatus(id, status, approvalStepId);
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
-      )
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update request")
+      setError(err instanceof Error ? err.message : "Failed to update request");
     } finally {
-      setActiveRequestId(null)
+      setActiveRequestId(null);
     }
   }
 
   const filterCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: requests.length }
+    const counts: Record<string, number> = { all: requests.length };
     for (const r of requests) {
-      counts[r.status] = (counts[r.status] ?? 0) + 1
+      counts[r.status] = (counts[r.status] ?? 0) + 1;
     }
-    return counts
-  }, [requests])
+    return counts;
+  }, [requests]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -288,7 +325,7 @@ export default function PermissionsPage() {
         <div className="flex items-center justify-between gap-4 overflow-x-auto border-t px-3">
           <div className="flex items-center -mb-px">
             {FILTERS.map((filter) => {
-              const count = filterCounts[filter.key] ?? 0
+              const count = filterCounts[filter.key] ?? 0;
               return (
                 <button
                   key={filter.key}
@@ -313,7 +350,7 @@ export default function PermissionsPage() {
                     {count}
                   </span>
                 </button>
-              )
+              );
             })}
           </div>
 
@@ -355,12 +392,12 @@ export default function PermissionsPage() {
                 const submittedLabel = formatDistanceToNowStrict(
                   new Date(request.submitted_at),
                   { addSuffix: true },
-                )
-                const isActioning = activeRequestId === request.id
+                );
+                const isActioning = activeRequestId === request.id;
                 const currentSteps = request.approval_steps.filter(
                   (step) => step.is_current,
-                )
-                const blastRadius = blastRadiusByRequestId[request.id]
+                );
+                const blastRadius = blastRadiusByRequestId[request.id];
 
                 return (
                   <TableRow
@@ -390,9 +427,6 @@ export default function PermissionsPage() {
                         <div className="text-muted-foreground">
                           {formatSubmitter(request)}
                         </div>
-                        <div className="line-clamp-1 max-w-[44ch] text-muted-foreground">
-                          {request.rationale}
-                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -404,10 +438,12 @@ export default function PermissionsPage() {
                           <Badge variant="outline">
                             {formatScopeLabel(request.scope)}
                           </Badge>
-                          <Badge variant={getRiskVariant(request.risk)}>
-                            Request {formatRiskLabel(request.risk)}
-                          </Badge>
                         </div>
+                        {request.rationale && (
+                          <div className="line-clamp-2 max-w-[44ch] text-xs text-muted-foreground">
+                            {request.rationale}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -446,43 +482,43 @@ export default function PermissionsPage() {
                     <TableCell className="align-top">
                       {blastRadius ? (
                         <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-1">
+                          {blastRadius.llm_risk !== "unknown" ? (
+                            <LlmRiskBadge status={blastRadius.llm_risk} />
+                          ) : (
                             <Badge
                               variant={getRiskVariant(blastRadius.derived_risk)}
                             >
-                              Derived{" "}
                               {formatRiskLabel(blastRadius.derived_risk)}
                             </Badge>
-                            <Badge variant="outline">
-                              {blastRadius.total_downstream_nodes} nodes
-                            </Badge>
-                            <Badge variant="outline">
-                              {blastRadius.downstream_tables} datasets
-                            </Badge>
-                            <Badge variant="outline">
-                              {blastRadius.downstream_assets} assets
-                            </Badge>
-                          </div>
-                          <div className="text-muted-foreground">
-                            {blastRadius.downstream_jobs} jobs ·{" "}
-                            {blastRadius.downstream_schedules} schedules
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {[
+                              {
+                                v: blastRadius.total_downstream_nodes,
+                                l: "nodes",
+                              },
+                              {
+                                v: blastRadius.downstream_tables,
+                                l: "datasets",
+                              },
+                              { v: blastRadius.downstream_assets, l: "assets" },
+                              { v: blastRadius.downstream_jobs, l: "jobs" },
+                              {
+                                v: blastRadius.downstream_schedules,
+                                l: "schedules",
+                              },
+                            ]
+                              .filter(({ v }) => v > 0)
+                              .map(({ v, l }) => `${v} ${l}`)
+                              .join(" · ")}
                           </div>
                           {blastRadius.lineage_resolved ? (
-                            <div className="line-clamp-1 max-w-[28ch] text-muted-foreground">
+                            <div className="line-clamp-1 max-w-[28ch] text-xs text-muted-foreground">
                               Root {blastRadius.lineage_root_display_name}
                             </div>
                           ) : (
-                            <div className="text-muted-foreground">
-                              No lineage root resolved
-                            </div>
-                          )}
-                          {blastRadius.sensitive_domains.length > 0 && (
-                            <div className="flex max-w-[28ch] flex-wrap gap-1">
-                              {blastRadius.sensitive_domains.map((domain) => (
-                                <Badge key={domain} variant="secondary">
-                                  {domain}
-                                </Badge>
-                              ))}
+                            <div className="text-xs text-muted-foreground">
+                              No lineage root
                             </div>
                           )}
                         </div>
@@ -501,7 +537,7 @@ export default function PermissionsPage() {
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="space-y-1">
-                        <div className="font-medium">{request.reviewer}</div>
+                        {/*<div className="font-medium">{request.reviewer}</div>*/}
                         <div className="flex max-w-[28ch] flex-wrap gap-1">
                           {request.approval_steps.map((step) => (
                             <Badge
@@ -602,7 +638,7 @@ export default function PermissionsPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                )
+                );
               })
             ) : (
               <TableRow>
@@ -640,7 +676,7 @@ export default function PermissionsPage() {
         open={approveTarget != null}
         onOpenChange={(open) => {
           if (!open && !approving) {
-            setApproveTarget(null)
+            setApproveTarget(null);
           }
         }}
       >
@@ -755,5 +791,5 @@ export default function PermissionsPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

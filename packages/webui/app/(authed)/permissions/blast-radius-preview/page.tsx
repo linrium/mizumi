@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -9,31 +9,31 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   type BlastRadiusPreview,
   type LlmRiskStatus,
   listBlastRadius,
   type RiskLevel,
-} from "@/services/permissions"
+} from "@/services/permissions";
 
 function getRiskVariant(risk: RiskLevel) {
   switch (risk) {
     case "high":
-      return "destructive"
+      return "destructive";
     case "medium":
-      return "secondary"
+      return "secondary";
     default:
-      return "outline"
+      return "outline";
   }
 }
 
 function formatRiskLabel(risk: RiskLevel) {
-  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`;
 }
 
 function formatScopeLabel(scope: string) {
-  return scope[0]?.toUpperCase() + scope.slice(1)
+  return scope[0]?.toUpperCase() + scope.slice(1);
 }
 
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
@@ -42,38 +42,45 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
       <Badge variant="outline" className="animate-pulse text-muted-foreground">
         LLM analysing…
       </Badge>
-    )
+    );
   }
   if (status === "failed") {
     return (
-      <Badge variant="outline" className="text-destructive border-destructive/40">
+      <Badge
+        variant="outline"
+        className="text-destructive border-destructive/40"
+      >
         LLM failed
       </Badge>
-    )
+    );
   }
   if (status === "unknown") {
-    return null
+    return null;
   }
   const variant =
-    status === "high" ? "destructive" : status === "medium" ? "secondary" : "outline"
+    status === "high"
+      ? "destructive"
+      : status === "medium"
+        ? "secondary"
+        : "outline";
   return (
     <Badge variant={variant}>
       LLM {status[0]?.toUpperCase() + status.slice(1)} risk
     </Badge>
-  )
+  );
 }
 
 export default function BlastRadiusPreviewPage() {
-  const [previews, setPreviews] = useState<BlastRadiusPreview[]>([])
-  const [loading, setLoading] = useState(true)
+  const [previews, setPreviews] = useState<BlastRadiusPreview[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     listBlastRadius()
       .then(setPreviews)
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => setLoading(false));
+  }, []);
 
-  const resolvedCount = previews.filter((p) => p.lineage_resolved).length
+  const resolvedCount = previews.filter((p) => p.lineage_resolved).length;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -197,5 +204,5 @@ export default function BlastRadiusPreviewPage() {
         </Table>
       </div>
     </div>
-  )
+  );
 }
