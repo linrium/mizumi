@@ -14,6 +14,7 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
 import "@xyflow/react/dist/style.css";
@@ -270,10 +271,14 @@ export function StepGraph({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
 
   useEffect(() => {
     setNodes(rfNodes);
-  }, [rfNodes, setNodes]);
+    if (rfInstance && rfNodes.length > 0) {
+      setTimeout(() => rfInstance.fitView({ padding: 0.08, minZoom: 0.5 }), 0);
+    }
+  }, [rfNodes, setNodes, rfInstance]);
   useEffect(() => {
     setEdges(rfEdges);
   }, [rfEdges, setEdges]);
@@ -296,8 +301,7 @@ export function StepGraph({
       onNodeClick={(_, node) =>
         onSelectStep(node.id === selectedKey ? null : node.id)
       }
-      fitView
-      fitViewOptions={{ padding: 0.2 }}
+      onInit={setRfInstance}
       minZoom={0.1}
       maxZoom={2}
       nodesDraggable={false}

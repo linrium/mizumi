@@ -113,14 +113,22 @@ rustfs-s3-proxy-destroy:
 rustfs-s3-proxy-dns-enable:
     #!/usr/bin/env bash
     set -euo pipefail
-    patch='{"data":{"s3-proxy.override":"rewrite name exact s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local\nrewrite name exact unitycatalog.s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local\n"}}'
-    kubectl create configmap coredns-custom -n kube-system --dry-run=client -o yaml | kubectl apply -f -
-    kubectl patch configmap coredns-custom -n kube-system --type merge -p "$patch"
+    corefile=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
+    if echo "$corefile" | grep -q 'rustfs-s3-proxy'; then
+        echo "CoreDNS rewrite rules already present, skipping"
+        exit 0
+    fi
+    patched=$(echo "$corefile" | awk '/^\s*ready$/{print; print "    rewrite name exact s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; print "    rewrite name exact unitycatalog.s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; next}1')
+    kubectl patch configmap coredns -n kube-system --patch "{\"data\":{\"Corefile\":$(printf '%s' "$patched" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}}"
     kubectl rollout restart deployment/coredns -n kube-system
     kubectl rollout status deployment/coredns -n kube-system --timeout=120s
 
 rustfs-s3-proxy-dns-disable:
-    kubectl patch configmap coredns-custom -n kube-system --type json -p='[{"op":"remove","path":"/data/s3-proxy.override"}]' || true
+    #!/usr/bin/env bash
+    set -euo pipefail
+    corefile=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
+    patched=$(echo "$corefile" | grep -v 'rustfs-s3-proxy')
+    kubectl patch configmap coredns -n kube-system --patch "{\"data\":{\"Corefile\":$(printf '%s' "$patched" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}}"
     kubectl rollout restart deployment/coredns -n kube-system
     kubectl rollout status deployment/coredns -n kube-system --timeout=120s
 
