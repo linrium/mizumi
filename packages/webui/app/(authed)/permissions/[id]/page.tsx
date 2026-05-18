@@ -466,7 +466,7 @@ export default function PermissionRequestDetailPage() {
             </div>
             <Separator />
             <div className="space-y-3 px-4 py-4">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+              <div className="grid gap-3">
                 <div>
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Resource
@@ -657,7 +657,7 @@ export default function PermissionRequestDetailPage() {
         {/* Right panel: Impact & lineage */}
         <section className="flex-1 min-w-0 overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="px-6 py-4 shrink-0">
+          <div className="px-6 py-3 shrink-0">
             <h2 className="text-sm font-semibold">Impact & lineage</h2>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
               Downstream blast radius and data lineage for the requested

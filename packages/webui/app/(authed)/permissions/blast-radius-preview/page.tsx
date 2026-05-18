@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -14,23 +15,7 @@ import {
   type BlastRadiusPreview,
   type LlmRiskStatus,
   listBlastRadius,
-  type RiskLevel,
 } from "@/services/permissions";
-
-function getRiskVariant(risk: RiskLevel) {
-  switch (risk) {
-    case "high":
-      return "destructive";
-    case "medium":
-      return "secondary";
-    default:
-      return "outline";
-  }
-}
-
-function formatRiskLabel(risk: RiskLevel) {
-  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`;
-}
 
 function formatScopeLabel(scope: string) {
   return scope[0]?.toUpperCase() + scope.slice(1);
@@ -46,10 +31,7 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   }
   if (status === "failed") {
     return (
-      <Badge
-        variant="outline"
-        className="text-destructive border-destructive/40"
-      >
+      <Badge variant="outline" className="text-destructive border-destructive/40">
         LLM failed
       </Badge>
     );
@@ -58,11 +40,7 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
     return null;
   }
   const variant =
-    status === "high"
-      ? "destructive"
-      : status === "medium"
-        ? "secondary"
-        : "outline";
+    status === "high" ? "destructive" : status === "medium" ? "secondary" : "outline";
   return (
     <Badge variant={variant}>
       LLM {status[0]?.toUpperCase() + status.slice(1)} risk
@@ -89,13 +67,11 @@ export default function BlastRadiusPreviewPage() {
           <div>
             <h1 className="text-sm font-semibold">Blast-radius preview</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Impact analysis for requests that touch shared or sensitive
-              resources.
+              Impact analysis for requests that touch shared or sensitive resources.
             </p>
           </div>
           <div className="text-xs text-muted-foreground">
-            {resolvedCount} request{resolvedCount === 1 ? "" : "s"} resolved to
-            lineage
+            {resolvedCount} request{resolvedCount === 1 ? "" : "s"} resolved to lineage
           </div>
         </div>
       </div>
@@ -107,18 +83,13 @@ export default function BlastRadiusPreviewPage() {
               <TableHead>Request</TableHead>
               <TableHead>Resource</TableHead>
               <TableHead>Impact</TableHead>
-              <TableHead>Sensitive domains</TableHead>
               <TableHead>Guardrail</TableHead>
-              <TableHead>LLM assessment</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-24 text-center text-muted-foreground"
-                >
+                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                   Loading…
                 </TableCell>
               </TableRow>
@@ -128,73 +99,55 @@ export default function BlastRadiusPreviewPage() {
                   <TableCell className="align-top">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.requester}</span>
-                        <span className="font-mono text-muted-foreground">
-                          {item.request_id}
+                        <Link
+                          href={`/permissions/${item.request_id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {item.requester}
+                        </Link>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {item.code}
                         </span>
                       </div>
-                      <div className="text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {item.consumers} consuming teams
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="align-top">
                     <div className="space-y-1">
-                      <div className="font-mono text-muted-foreground">
+                      <div className="font-mono text-xs text-muted-foreground">
                         {item.resource}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline">
-                          {formatScopeLabel(item.scope)}
-                        </Badge>
-                        <Badge variant={getRiskVariant(item.risk)}>
-                          Request {formatRiskLabel(item.risk)}
-                        </Badge>
-                      </div>
+                      <Badge variant="outline">{formatScopeLabel(item.scope)}</Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="align-top text-muted-foreground">
+                  <TableCell className="align-top text-xs text-muted-foreground">
                     {item.lineage_resolved ? (
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant={getRiskVariant(item.derived_risk)}>
-                            Derived {formatRiskLabel(item.derived_risk)}
-                          </Badge>
-                        </div>
-                        <div>
-                          {item.total_downstream_nodes} downstream nodes
-                        </div>
-                        <div>{item.downstream_tables} datasets</div>
-                        <div>{item.downstream_assets} assets</div>
-                        <div>{item.downstream_jobs} jobs</div>
-                        <div>{item.downstream_schedules} schedules</div>
-                      </div>
+                      <span>
+                        {[
+                          { v: item.total_downstream_nodes, l: "nodes" },
+                          { v: item.downstream_tables, l: "datasets" },
+                          { v: item.downstream_assets, l: "assets" },
+                          { v: item.downstream_jobs, l: "jobs" },
+                          { v: item.downstream_schedules, l: "schedules" },
+                        ]
+                          .filter(({ v }) => v > 0)
+                          .map(({ v, l }) => `${v} ${l}`)
+                          .join(" · ") || "No downstream"}
+                      </span>
                     ) : (
-                      <div>No lineage root resolved</div>
+                      <span>No lineage root</span>
                     )}
                   </TableCell>
-                  <TableCell className="align-top">
-                    <div className="flex flex-wrap gap-1">
-                      {item.sensitive_domains.map((domain) => (
-                        <Badge key={domain} variant="outline">
-                          {domain}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="align-top text-muted-foreground text-xs max-w-56">
-                    {item.recommended_guardrail || (
-                      <span className="italic">None</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="align-top">
+                  <TableCell className="align-top max-w-56">
                     <div className="space-y-1.5">
                       <LlmRiskBadge status={item.llm_risk} />
-                      {item.llm_recommended_guardrail && (
-                        <p className="text-xs text-muted-foreground max-w-56">
-                          {item.llm_recommended_guardrail}
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground whitespace-normal">
+                        {item.llm_recommended_guardrail || item.recommended_guardrail || (
+                          <span className="italic">None</span>
+                        )}
+                      </p>
                     </div>
                   </TableCell>
                 </TableRow>

@@ -132,6 +132,7 @@ pub struct PolicyTemplate {
 #[derive(Debug, Clone, Serialize)]
 pub struct BlastRadiusPreview {
     pub request_id: Uuid,
+    pub code: String,
     pub requester: String,
     pub resource: String,
     pub scope: String,

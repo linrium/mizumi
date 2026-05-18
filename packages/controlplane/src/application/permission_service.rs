@@ -289,6 +289,7 @@ impl PermissionService {
         let Some(root) = root else {
             let mut preview = BlastRadiusPreview {
                 request_id: request.id,
+                code: Self::request_code(request.id),
                 requester: request.requester.clone(),
                 resource: request.resource.clone(),
                 scope: request.scope.clone(),
@@ -376,6 +377,7 @@ impl PermissionService {
 
         let mut preview = BlastRadiusPreview {
             request_id: request.id,
+            code: Self::request_code(request.id),
             requester: request.requester.clone(),
             resource: request.resource.clone(),
             scope: request.scope.clone(),

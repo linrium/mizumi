@@ -94,6 +94,7 @@ export type PolicyTemplate = {
 
 export type BlastRadiusPreview = {
   request_id: string
+  code: string
   requester: string
   resource: string
   scope: RequestScope
