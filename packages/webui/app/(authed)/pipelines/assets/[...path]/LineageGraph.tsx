@@ -1,347 +1,361 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import dagre from "@dagrejs/dagre"
 import {
-  ReactFlow,
   Background,
-  Controls,
-  Handle,
-  Position,
-  useNodesState,
-  useEdgesState,
   BackgroundVariant,
+  Controls,
+  type Edge,
+  Handle,
   MarkerType,
   type Node,
-  type Edge,
   type NodeTypes,
+  Position,
+  ReactFlow,
+  useEdgesState,
+  useNodesState,
 } from "@xyflow/react"
-import dagre from "@dagrejs/dagre"
-import "@xyflow/react/dist/style.css"
-import { cn } from "@/lib/utils"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
-import Link from "next/link"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import "@xyflow/react/dist/style.css"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+
 dayjs.extend(relativeTime)
 
-// ── API types ─────────────────────────────────────────────────────────────────
-
-type ApiAssetNode = {
-  path: string[]
-  compute_kind: string | null
-  group_name: string | null
-  stale_status: string | null
-  dependency_keys: string[][]
-  depended_by_keys: string[][]
-  last_materialization: { timestamp: string; run_id: string } | null
+type RuntimeInfo = {
+  source_system: string
+  latest_run_id: string | null
+  latest_run_status: string | null
+  latest_run_started_at: string | null
+  latest_run_ended_at: string | null
+  latest_materialization_at: string | null
+  latest_materialization_run_id: string | null
+  unstarted_run_ids: string[]
+  in_progress_run_ids: string[]
+  metadata: Record<string, unknown>
+  observed_at: string
 }
 
-// ── Node data types ───────────────────────────────────────────────────────────
-
-type AssetNodeData = {
+type ApiLineageNode = {
+  id: string
+  node_type: string
+  platform: string
+  namespace: string
   name: string
-  path: string[]
-  group_name: string | null
-  compute_kind: string | null
-  last_materialization: { timestamp: string; run_id: string } | null
-  is_current: boolean
+  display_name: string
+  properties: Record<string, unknown>
+  runtime: RuntimeInfo | null
+}
+
+type ApiLineageEdge = {
+  id: string
+  source: string
+  target: string
+  edge_type: string
+  confidence: number
+  properties: Record<string, unknown>
+}
+
+type ApiLineageGraph = {
+  root: ApiLineageNode | null
+  direction: string
+  depth: number
+  nodes: ApiLineageNode[]
+  edges: ApiLineageEdge[]
+}
+
+type LineageNodeData = {
+  id: string
+  displayName: string
+  nodeType: string
+  platform: string
+  properties: Record<string, unknown>
+  runtime: RuntimeInfo | null
+  isCurrent: boolean
+  href: string | null
   [key: string]: unknown
 }
 
-type GroupNodeData = {
-  label: string
-  [key: string]: unknown
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Dagster timestamps can be seconds or milliseconds; values > 1e12 are already ms.
 function toDayjs(ts: string | null | undefined) {
   if (!ts) return null
-  const v = Number(ts)
-  if (!isFinite(v)) return null
-  return v > 1e12 ? dayjs(v) : dayjs.unix(v)
+  const d = dayjs(ts)
+  return d.isValid() ? d : null
 }
 
-function fmtRelTime(ts: string | null | undefined): string {
+function fmtRelTime(ts: string | null | undefined) {
   const d = toDayjs(ts)
   return d ? d.fromNow() : "—"
 }
 
-function fmtDate(ts: string | null | undefined): string {
+function fmtAbsTime(ts: string | null | undefined) {
   const d = toDayjs(ts)
   return d ? d.format("MMM D, h:mm A") : "—"
 }
 
-// ── Custom node: asset card ───────────────────────────────────────────────────
+function nodeAccent(nodeType: string) {
+  switch (nodeType) {
+    case "table":
+      return "border-emerald-300 bg-emerald-50/60"
+    case "topic":
+      return "border-amber-300 bg-amber-50/60"
+    case "dagster_asset":
+      return "border-sky-300 bg-sky-50/60"
+    case "spark_job":
+    case "streaming_job":
+    case "daft_job":
+    case "dagster_job":
+      return "border-rose-300 bg-rose-50/60"
+    case "schedule":
+      return "border-violet-300 bg-violet-50/60"
+    case "catalog":
+    case "schema":
+      return "border-zinc-300 bg-zinc-50/60"
+    default:
+      return "border-zinc-200 bg-white"
+  }
+}
 
-function AssetNodeCard({ data }: { data: AssetNodeData }) {
-  const mat = data.last_materialization
+function nodeIcon(nodeType: string) {
+  switch (nodeType) {
+    case "table":
+      return "▦"
+    case "topic":
+      return "◉"
+    case "dagster_asset":
+      return "◫"
+    case "spark_job":
+    case "streaming_job":
+      return "⚙"
+    case "daft_job":
+      return "◇"
+    case "dagster_job":
+      return "▸"
+    case "schedule":
+      return "◷"
+    case "catalog":
+      return "▤"
+    case "schema":
+      return "⋮"
+    default:
+      return "•"
+  }
+}
+
+function latestTimestamp(runtime: RuntimeInfo | null) {
   return (
+    runtime?.latest_materialization_at ?? runtime?.latest_run_started_at ?? null
+  )
+}
+
+function nodeHref(node: ApiLineageNode) {
+  if (node.node_type === "dagster_asset") {
+    return `/pipelines/assets/${node.name}`
+  }
+  return null
+}
+
+function typeLabel(node: ApiLineageNode) {
+  if (node.node_type === "table") {
+    const catalog = String(node.properties.catalog_name ?? "")
+    const schema = String(node.properties.schema_name ?? "")
+    if (catalog && schema) return `${catalog}.${schema}`
+  }
+  return node.platform
+}
+
+function LineageNodeCard({ data }: { data: LineageNodeData }) {
+  const runtime = data.runtime
+  const isActive =
+    (runtime?.in_progress_run_ids.length ?? 0) > 0 ||
+    (runtime?.unstarted_run_ids.length ?? 0) > 0
+  const latest = latestTimestamp(runtime)
+
+  const body = (
     <div
       className={cn(
-        "bg-white dark:bg-zinc-900 rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none",
-        data.is_current
-          ? "border-blue-500"
-          : "border-zinc-200 dark:border-zinc-700",
+        "rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none bg-white",
+        nodeAccent(data.nodeType),
+        data.isCurrent ? "ring-2 ring-blue-500 border-blue-500" : "",
       )}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-2 !bg-zinc-300 dark:!bg-zinc-600 !border-0"
+        className="!w-2 !h-2 !bg-zinc-300 !border-0"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2 !h-2 !bg-zinc-300 dark:!bg-zinc-600 !border-0"
+        className="!w-2 !h-2 !bg-zinc-300 !border-0"
       />
 
-      {/* Name row */}
-      <Link
-        href={`/pipelines/assets/${data.path.join("/")}`}
-        className="flex items-center gap-1.5 px-3 py-2 border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-      >
-        <span className="text-zinc-400">▤</span>
-        <span className="font-mono font-semibold text-xs">{data.name}</span>
-      </Link>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-200/80">
+        <span className="text-zinc-500">{nodeIcon(data.nodeType)}</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-mono font-semibold truncate">
+            {data.displayName}
+          </div>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wide truncate">
+            {data.nodeType.replaceAll("_", " ")}
+          </div>
+        </div>
+      </div>
 
-      {/* Info rows */}
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+      <div className="divide-y divide-zinc-200/70">
         <div className="flex justify-between items-center px-3 py-1.5">
-          <span className="text-zinc-500">Latest event</span>
-          <span className={mat ? "text-blue-500 font-medium" : "text-zinc-400"}>
-            {fmtRelTime(mat?.timestamp)}
+          <span className="text-zinc-500">Platform</span>
+          <span className="text-zinc-700 capitalize">{data.platform}</span>
+        </div>
+        <div className="flex justify-between items-center px-3 py-1.5 gap-2">
+          <span className="text-zinc-500">Scope</span>
+          <span className="text-zinc-700 truncate">
+            {typeLabel({
+              id: data.id,
+              node_type: data.nodeType,
+              platform: data.platform,
+              namespace: "",
+              name: "",
+              display_name: data.displayName,
+              properties: data.properties,
+              runtime: data.runtime,
+            } as ApiLineageNode)}
           </span>
         </div>
         <div className="flex justify-between items-center px-3 py-1.5">
-          <span className="text-zinc-500">Asset checks</span>
-          <span className="text-zinc-400">—</span>
+          <span className="text-zinc-500">Latest event</span>
+          <span
+            className={latest ? "text-blue-600 font-medium" : "text-zinc-400"}
+          >
+            {fmtRelTime(latest)}
+          </span>
         </div>
         <div className="flex justify-between items-center px-3 py-1.5">
-          <span className="text-zinc-500">Partitions</span>
-          <span className="text-zinc-400">—</span>
-        </div>
-        <div className="flex justify-between items-center px-3 py-1.5">
-          <span className="text-zinc-500">Automation</span>
-          <span className="text-zinc-400">—</span>
+          <span className="text-zinc-500">Run state</span>
+          <span
+            className={cn(
+              "font-medium",
+              isActive
+                ? "text-orange-600"
+                : runtime?.latest_run_status === "SUCCESS"
+                  ? "text-green-600"
+                  : runtime?.latest_run_status
+                    ? "text-zinc-700"
+                    : "text-zinc-400",
+            )}
+          >
+            {isActive ? "Active" : (runtime?.latest_run_status ?? "—")}
+          </span>
         </div>
         <div
           className={cn(
             "flex justify-between items-center px-3 py-1.5",
-            mat ? "bg-green-50 dark:bg-green-950/20" : "",
+            latest ? "bg-green-50/70" : "",
           )}
         >
           <span
-            className={mat ? "text-green-600 font-medium" : "text-zinc-500"}
+            className={latest ? "text-green-700 font-medium" : "text-zinc-500"}
           >
-            {mat ? "Materialized" : "Never materialized"}
+            {latest ? "Observed" : "No runtime"}
           </span>
-          <span className={mat ? "text-green-600" : "text-zinc-400"}>
-            {fmtDate(mat?.timestamp)}
+          <span className={latest ? "text-green-700" : "text-zinc-400"}>
+            {fmtAbsTime(latest)}
           </span>
         </div>
       </div>
-
-      {/* Compute kind badge */}
-      {data.compute_kind && (
-        <div className="flex justify-end px-3 py-1.5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60">
-          <span className="text-[10px] text-zinc-500 flex items-center gap-0.5">
-            <span className="text-orange-400">✦</span>
-            <span className="capitalize">{data.compute_kind}</span>
-          </span>
-        </div>
-      )}
     </div>
   )
-}
 
-// ── Custom node: group container ──────────────────────────────────────────────
+  if (!data.href) return body
 
-function GroupContainerNode({ data }: { data: GroupNodeData }) {
   return (
-    <div className="w-full h-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 pointer-events-none">
-      <p className="px-4 pt-3 text-base font-semibold text-zinc-500 dark:text-zinc-400">
-        {data.label}
-      </p>
-    </div>
+    <Link
+      href={data.href}
+      className="block hover:opacity-90 transition-opacity"
+    >
+      {body}
+    </Link>
   )
 }
 
 const nodeTypes: NodeTypes = {
-  assetCard: AssetNodeCard as NodeTypes[string],
-  groupContainer: GroupContainerNode as NodeTypes[string],
+  lineageCard: LineageNodeCard as NodeTypes[string],
 }
 
-// ── Layout constants ──────────────────────────────────────────────────────────
-
-const CARD_W = 280
-const CARD_H = 200 // approximate rendered height
-const CARD_GAP = 16
-const GROUP_PAD = 20
-const GROUP_HEADER = 48
-
-// Height of a group container for N assets
-function groupHeight(n: number): number {
-  return GROUP_HEADER + GROUP_PAD + n * CARD_H + (n - 1) * CARD_GAP + GROUP_PAD
-}
-function groupWidth(): number {
-  return CARD_W + GROUP_PAD * 2
-}
-
-// ── Layout builder ────────────────────────────────────────────────────────────
+const CARD_W = 290
+const CARD_H = 190
 
 function buildLayout(
-  apiNodes: ApiAssetNode[],
-  currentPathStr: string,
+  graph: ApiLineageGraph,
+  currentId: string | null,
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
-  if (apiNodes.length === 0) return { rfNodes: [], rfEdges: [] }
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 })
 
-  const pathIndex = new Set(apiNodes.map((n) => n.path.join("/")))
-  // Fast O(1) group lookup instead of repeated find()
-  const nodeByKey = new Map(apiNodes.map((n) => [n.path.join("/"), n]))
-
-  // Collect groups
-  const groups = new Map<string, ApiAssetNode[]>()
-  for (const n of apiNodes) {
-    const g = n.group_name ?? "default"
-    if (!groups.has(g)) groups.set(g, [])
-    groups.get(g)!.push(n)
+  for (const node of graph.nodes) {
+    g.setNode(node.id, { width: CARD_W, height: CARD_H })
+  }
+  for (const edge of graph.edges) {
+    g.setEdge(edge.source, edge.target)
   }
 
-  // Build group-level dependency edges from BOTH directions so dagre can rank
-  // groups correctly even when only one direction is populated by the backend.
-  const groupEdgePairs = new Set<string>()
-  const addGroupEdge = (upKey: string, downKey: string) => {
-    const upGroup = nodeByKey.get(upKey)?.group_name ?? "default"
-    const downGroup = nodeByKey.get(downKey)?.group_name ?? "default"
-    if (upGroup !== downGroup) groupEdgePairs.add(`${upGroup}||${downGroup}`)
-  }
-  for (const n of apiNodes) {
-    const key = n.path.join("/")
-    for (const dep of n.depended_by_keys) {
-      const tgt = dep.join("/")
-      if (pathIndex.has(tgt)) addGroupEdge(key, tgt)
-    }
-    for (const dep of n.dependency_keys) {
-      const up = dep.join("/")
-      if (pathIndex.has(up)) addGroupEdge(up, key)
-    }
-  }
+  dagre.layout(g)
 
-  // Dagre layout on groups
-  const gg = new dagre.graphlib.Graph()
-  gg.setDefaultEdgeLabel(() => ({}))
-  gg.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 100 })
-
-  for (const [gName, gnodes] of groups) {
-    gg.setNode(gName, {
-      width: groupWidth(),
-      height: groupHeight(gnodes.length),
-    })
-  }
-  for (const pair of groupEdgePairs) {
-    const [src, tgt] = pair.split("||")
-    gg.setEdge(src, tgt)
-  }
-  dagre.layout(gg)
-
-  // Compute group top-left positions from dagre (dagre gives center)
-  const groupPos = new Map<string, { x: number; y: number }>()
-  for (const [gName, gnodes] of groups) {
-    const { x, y } = gg.node(gName)
-    const w = groupWidth()
-    const h = groupHeight(gnodes.length)
-    groupPos.set(gName, { x: x - w / 2, y: y - h / 2 })
-  }
-
-  // Build RF nodes
-  const rfNodes: Node[] = []
-
-  for (const [gName, gnodes] of groups) {
-    const gp = groupPos.get(gName)!
-
-    // Group container (z-index behind assets)
-    rfNodes.push({
-      id: `group:${gName}`,
-      type: "groupContainer",
-      position: gp,
-      style: {
-        width: groupWidth(),
-        height: groupHeight(gnodes.length),
-        zIndex: -1,
+  const rfNodes: Node[] = graph.nodes.map((node) => {
+    const pos = g.node(node.id)
+    return {
+      id: node.id,
+      type: "lineageCard",
+      position: {
+        x: pos.x - CARD_W / 2,
+        y: pos.y - CARD_H / 2,
       },
-      data: { label: gName } satisfies GroupNodeData,
-      selectable: false,
+      style: { width: CARD_W },
+      data: {
+        id: node.id,
+        displayName: node.display_name,
+        nodeType: node.node_type,
+        platform: node.platform,
+        properties: node.properties,
+        runtime: node.runtime,
+        isCurrent: node.id === currentId,
+        href: nodeHref(node),
+      } satisfies LineageNodeData,
       draggable: false,
-    })
-
-    // Asset nodes stacked inside the group
-    for (let i = 0; i < gnodes.length; i++) {
-      const n = gnodes[i]
-      const key = n.path.join("/")
-      rfNodes.push({
-        id: key,
-        type: "assetCard",
-        position: {
-          x: gp.x + GROUP_PAD,
-          y: gp.y + GROUP_HEADER + GROUP_PAD + i * (CARD_H + CARD_GAP),
-        },
-        style: { width: CARD_W },
-        data: {
-          name: n.path[n.path.length - 1],
-          path: n.path,
-          group_name: n.group_name,
-          compute_kind: n.compute_kind,
-          last_materialization: n.last_materialization,
-          is_current: key === currentPathStr,
-        } satisfies AssetNodeData,
-        draggable: false,
-      })
     }
-  }
+  })
 
-  // Build edges from BOTH depended_by_keys and dependency_keys, deduplicating
-  // by edge ID. This ensures arrows appear even when the backend only populates
-  // one of the two direction fields (common for cross-job asset dependencies).
-  const rfEdges: Edge[] = []
-  const edgeSet = new Set<string>()
-
-  const addEdge = (upKey: string, downKey: string) => {
-    const id = `${upKey}->${downKey}`
-    if (edgeSet.has(id)) return
-    edgeSet.add(id)
-    rfEdges.push({
-      id,
-      source: upKey,
-      target: downKey,
-      type: "default",
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 14,
-        height: 14,
-        color: "#94a3b8",
-      },
-      style: { stroke: "#94a3b8", strokeWidth: 1.5 },
-    })
-  }
-
-  for (const n of apiNodes) {
-    const key = n.path.join("/")
-    for (const dep of n.depended_by_keys) {
-      const tgt = dep.join("/")
-      if (pathIndex.has(tgt)) addEdge(key, tgt)
-    }
-    for (const dep of n.dependency_keys) {
-      const up = dep.join("/")
-      if (pathIndex.has(up)) addEdge(up, key)
-    }
-  }
+  const rfEdges: Edge[] = graph.edges.map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      width: 14,
+      height: 14,
+      color: "#94a3b8",
+    },
+    style: {
+      stroke: "#94a3b8",
+      strokeWidth: edge.edge_type === "contains" ? 1 : 1.6,
+      strokeDasharray: edge.edge_type === "contains" ? "4 4" : undefined,
+    },
+    label: edge.edge_type.replaceAll("_", " "),
+    labelStyle: {
+      fontSize: 10,
+      fill: "#64748b",
+      textTransform: "capitalize",
+    },
+    labelBgStyle: { fill: "rgba(255,255,255,0.9)" },
+    labelBgPadding: [4, 2],
+    labelBgBorderRadius: 4,
+  }))
 
   return { rfNodes, rfEdges }
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export function LineageGraph({
   currentPath,
@@ -350,45 +364,56 @@ export function LineageGraph({
   currentPath?: string[]
   neighborhoodOnly?: boolean
 }) {
-  const currentPathStr = currentPath?.join("/") ?? ""
+  const rootToken = currentPath?.join("/") ?? null
 
-  const [apiNodes, setApiNodes] = useState<ApiAssetNode[]>([])
+  const [graph, setGraph] = useState<ApiLineageGraph | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchWithAuth("/api/dagster/asset-nodes", { cache: "no-store" })
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    const params = new URLSearchParams()
+    if (rootToken) {
+      params.set("root", rootToken)
+    }
+    params.set("direction", "both")
+    params.set("depth", neighborhoodOnly ? "2" : "6")
+
+    fetchWithAuth(`/api/lineage/graph?${params.toString()}`, {
+      cache: "no-store",
+    })
       .then(async (res) => {
         const json = await res.json()
         if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
-        return (json.nodes ?? []) as ApiAssetNode[]
+        return json as ApiLineageGraph
       })
-      .then(setApiNodes)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+      .then((data) => {
+        if (!cancelled) setGraph(data)
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
-  const visibleNodes = useMemo(() => {
-    if (!neighborhoodOnly || !currentPathStr) return apiNodes
-    const current = apiNodes.find((n) => n.path.join("/") === currentPathStr)
-    if (!current) return apiNodes
-    const neighborKeys = new Set<string>([
-      currentPathStr,
-      ...current.dependency_keys.map((k) => k.join("/")),
-      ...current.depended_by_keys.map((k) => k.join("/")),
-    ])
-    return apiNodes.filter((n) => neighborKeys.has(n.path.join("/")))
-  }, [apiNodes, currentPathStr, neighborhoodOnly])
+    return () => {
+      cancelled = true
+    }
+  }, [rootToken, neighborhoodOnly])
 
-  const { rfNodes, rfEdges } = useMemo(
-    () => buildLayout(visibleNodes, currentPathStr),
-    [visibleNodes, currentPathStr],
-  )
+  const currentId = graph?.root?.id ?? null
+  const { rfNodes, rfEdges } = useMemo(() => {
+    if (!graph) return { rfNodes: [], rfEdges: [] }
+    return buildLayout(graph, currentId)
+  }, [graph, currentId])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges)
 
-  // Sync when layout changes after data loads
   useEffect(() => {
     setNodes(rfNodes)
   }, [rfNodes, setNodes])
@@ -403,10 +428,19 @@ export function LineageGraph({
       </div>
     )
   }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-destructive font-mono px-6 text-center">
         {error}
+      </div>
+    )
+  }
+
+  if (!graph || graph.nodes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        No lineage found
       </div>
     )
   }
@@ -424,7 +458,7 @@ export function LineageGraph({
       maxZoom={2}
       nodesDraggable={false}
       nodesConnectable={false}
-      elementsSelectable={true}
+      elementsSelectable
     >
       <Background
         variant={BackgroundVariant.Dots}

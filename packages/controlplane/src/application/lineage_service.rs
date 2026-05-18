@@ -153,12 +153,16 @@ impl LineageService {
     }
 
     pub async fn graph(&self, query: GraphQuery) -> Result<LineageGraphResponse, AppError> {
-        let root = lineage::resolve_node_by_token(&self.db, &query.root)
-            .await?
-            .ok_or(AppError::NotFound)?;
         let direction = query.direction.unwrap_or_else(|| "both".to_string());
         let depth = query.depth.unwrap_or(2);
-        self.build_graph(root, &direction, depth).await
+        if let Some(root_token) = query.root {
+            let root = lineage::resolve_node_by_token(&self.db, &root_token)
+                .await?
+                .ok_or(AppError::NotFound)?;
+            self.build_graph(root, &direction, depth).await
+        } else {
+            self.build_full_graph(&direction, depth).await
+        }
     }
 
     pub async fn blast_radius(&self, root: &str) -> Result<BlastRadiusSummary, AppError> {
@@ -289,7 +293,10 @@ impl LineageService {
             .collect::<HashMap<_, _>>();
 
         Ok(LineageGraphResponse {
-            root: node_to_response(root.clone(), runtime_by_id.get(&root.id).cloned()),
+            root: Some(node_to_response(
+                root.clone(),
+                runtime_by_id.get(&root.id).cloned(),
+            )),
             direction: direction.to_string(),
             depth,
             nodes: graph_nodes
@@ -300,6 +307,34 @@ impl LineageService {
                 })
                 .collect(),
             edges: graph_edges.into_iter().map(edge_to_response).collect(),
+        })
+    }
+
+    async fn build_full_graph(
+        &self,
+        direction: &str,
+        depth: usize,
+    ) -> Result<LineageGraphResponse, AppError> {
+        let nodes = lineage::list_nodes(&self.db).await?;
+        let edges = lineage::list_edges(&self.db).await?;
+        let runtime_rows = lineage::list_runtime(&self.db).await?;
+        let runtime_by_id = runtime_rows
+            .into_iter()
+            .map(|row| (row.node_id, row))
+            .collect::<HashMap<_, _>>();
+
+        Ok(LineageGraphResponse {
+            root: None,
+            direction: direction.to_string(),
+            depth,
+            nodes: nodes
+                .into_iter()
+                .map(|node| {
+                    let runtime = runtime_by_id.get(&node.id).cloned();
+                    node_to_response(node, runtime)
+                })
+                .collect(),
+            edges: edges.into_iter().map(edge_to_response).collect(),
         })
     }
 

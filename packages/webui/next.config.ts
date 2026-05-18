@@ -1,6 +1,6 @@
-import type { NextConfig } from "next"
+import type { NextConfig } from "next";
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
+const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async rewrites() {
     return [
+      {
+        source: "/api/lineage/:path*",
+        destination: `${API_BASE_URL}/api/lineage/:path*`,
+      },
       {
         source: "/api/dagster/:path*",
         destination: `${API_BASE_URL}/dagster/:path*`,
@@ -48,8 +52,8 @@ const nextConfig: NextConfig = {
         source: "/api/users",
         destination: `${API_BASE_URL}/api/users`,
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

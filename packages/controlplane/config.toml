@@ -16,6 +16,6 @@ admin_token = ""
 admin_token_file = "../uc/config/token.txt"
 
 [keycloak]
-url = "http://keycloak-svc.keycloak.svc.cluster.local:8080"
+url = "http://localhost:8083"
 realm = "sovico"
 audiences = []

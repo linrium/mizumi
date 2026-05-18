@@ -85,7 +85,7 @@ pub struct LineageRuntimeResponse {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LineageGraphResponse {
-    pub root: LineageNodeResponse,
+    pub root: Option<LineageNodeResponse>,
     pub direction: String,
     pub depth: usize,
     pub nodes: Vec<LineageNodeResponse>,
@@ -142,7 +142,7 @@ pub struct LineageSearchResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct GraphQuery {
-    pub root: String,
+    pub root: Option<String>,
     #[serde(default)]
     pub direction: Option<String>,
     #[serde(default)]

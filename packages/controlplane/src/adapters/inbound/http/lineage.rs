@@ -46,7 +46,11 @@ pub async fn get_blast_radius(
     State(state): State<Arc<AppState>>,
     Query(query): Query<GraphQuery>,
 ) -> impl IntoResponse {
-    match state.lineage_service.blast_radius(&query.root).await {
+    let Some(root) = query.root else {
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
+    };
+
+    match state.lineage_service.blast_radius(&root).await {
         Ok(response) => Json(response).into_response(),
         Err(err) => err.into_response(),
     }
