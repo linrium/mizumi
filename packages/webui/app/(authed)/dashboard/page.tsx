@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useSessionContext } from "@/hooks/use-session-context"
-import { readStoredIdToken } from "@/lib/auth/storage"
+import { apiFetch, getToken } from "@/lib/api-client"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import type { PanelSummary } from "@/services/dashboard"
 
@@ -230,19 +230,49 @@ function buildOption(
   }
 }
 
-// ── Default panel ─────────────────────────────────────────────────────────────
+// ── Default panels ────────────────────────────────────────────────────────────
 
 const DEFAULT_PANELS: Panel[] = [
   {
     id: "p1",
-    title: "Daily Transactions by Country",
+    title: "HDBank Customers by Segment",
+    chartType: "pie",
+    sql: "SELECT segment_name, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY segment_name ORDER BY customer_count DESC",
+    xCol: "segment_name",
+    yCol: "customer_count",
+  },
+  {
+    id: "p2",
+    title: "Co-brand Campaign Reach by Offer",
     chartType: "bar",
-    sql: "select country_code, sum(transaction_count) as transaction_count from banking.transactions.gold_daily_transaction_summary group by country_code order by transaction_count desc",
-    xCol: "country_code",
-    yCol: "transaction_count",
+    sql: "SELECT offer_name, customer_count, avg_propensity_score FROM partnership.co_brand_gold.campaign_summary_v1 ORDER BY customer_count DESC",
+    xCol: "offer_name",
+    yCol: "customer_count",
+  },
+  {
+    id: "p3",
+    title: "VietJet Activation Candidates by Use Case",
+    chartType: "bar",
+    sql: "SELECT use_case, COUNT(*) AS candidate_count, ROUND(AVG(propensity_score), 3) AS avg_propensity FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 GROUP BY use_case ORDER BY candidate_count DESC",
+    xCol: "use_case",
+    yCol: "candidate_count",
+  },
+  {
+    id: "p4",
+    title: "Co-brand Audience by Priority Band",
+    chartType: "bar",
+    sql: "SELECT priority_band, COUNT(*) AS customer_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY customer_count DESC",
+    xCol: "priority_band",
+    yCol: "customer_count",
   },
 ]
-const DEFAULT_LAYOUT: Layout = [{ i: "p1", x: 0, y: 0, w: 6, h: 4 }]
+
+const DEFAULT_LAYOUT: Layout = [
+  { i: "p1", x: 0, y: 0, w: 6, h: 4 },
+  { i: "p2", x: 6, y: 0, w: 6, h: 4 },
+  { i: "p3", x: 0, y: 4, w: 6, h: 4 },
+  { i: "p4", x: 6, y: 4, w: 6, h: 4 },
+]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
 
@@ -447,13 +477,11 @@ const CHART_TYPE_CONFIG: Record<
 function PanelSidebar({
   panel,
   data,
-  sessionId,
   onChange,
   onRun,
 }: {
   panel: Panel
   data: PanelData
-  sessionId: string | null
   onChange: (p: Panel) => void
   onRun: (p: Panel) => void
 }) {
@@ -482,7 +510,7 @@ function PanelSidebar({
           <Button
             size="sm"
             className="h-6 gap-1 text-[11px] px-2"
-            disabled={isRunning || !sessionId || !panel.sql.trim()}
+            disabled={isRunning || !panel.sql.trim()}
             onClick={() => onRun(panel)}
           >
             {isRunning ? (
@@ -506,15 +534,10 @@ function PanelSidebar({
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault()
-              if (!isRunning && sessionId && panel.sql.trim()) onRun(panel)
+              if (!isRunning && panel.sql.trim()) onRun(panel)
             }
           }}
         />
-        {!sessionId && (
-          <p className="text-[10px] text-destructive">
-            No session — create one to run queries
-          </p>
-        )}
         {data.status === "error" && (
           <p className="text-[10px] text-destructive whitespace-pre-wrap">
             {data.error}
@@ -653,12 +676,12 @@ function PanelSidebar({
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "Daily transaction volume by country",
-  "Monthly revenue by merchant category",
-  "Customer risk tier distribution",
-  "Channel usage breakdown",
-  "AML structuring alerts over time",
-  "Account balance trends",
+  "HDBank customers by preferred channel",
+  "VietJet membership tiers by average booking value",
+  "Travel affinity score distribution across HDBank customers",
+  "HDBank finance candidates from VietJet by propensity",
+  "Shared customers between HDBank and VietJet",
+  "Co-brand signal value by source company",
 ]
 
 function AiComposer({
@@ -1109,7 +1132,7 @@ export default function DashboardPage() {
   const { activeId } = useSessionContext()
 
   const runQuery = useCallback(
-    async (panel: Panel, sessionId: string | null) => {
+    async (panel: Panel) => {
       if (!panel.sql.trim()) return
       abortRefs.current[panel.id]?.abort()
       const ctrl = new AbortController()
@@ -1119,16 +1142,11 @@ export default function DashboardPage() {
         [panel.id]: { status: "running", result: null, error: null },
       }))
       try {
-        const url = sessionId
-          ? `/api/sessions/${sessionId}/query`
-          : `/api/query`
-        const res = await fetch(url, {
+        const idToken = await getToken()
+        const res = await apiFetch("/api/sessions/default/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sql: panel.sql,
-            idToken: readStoredIdToken() ?? undefined,
-          }),
+          body: JSON.stringify({ sql: panel.sql, idToken }),
           signal: ctrl.signal,
         })
         const json = await res.json()
@@ -1155,14 +1173,14 @@ export default function DashboardPage() {
 
   const hasAutoRun = useRef(false)
   useEffect(() => {
-    if (!activeId || hasAutoRun.current) return
+    if (hasAutoRun.current) return
     hasAutoRun.current = true
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel, activeId)
+      if (panel.sql.trim()) runQuery(panel)
     }
-    // panels intentionally excluded — only run once when activeId first arrives
+    // panels intentionally excluded — only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, runQuery])
+  }, [runQuery])
 
   const handlePanelChange = useCallback((updated: Panel) => {
     setPanels((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
@@ -1262,7 +1280,7 @@ export default function DashboardPage() {
 
   const refreshAll = () => {
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel, activeId)
+      if (panel.sql.trim()) runQuery(panel)
     }
   }
 
@@ -1461,9 +1479,8 @@ export default function DashboardPage() {
               <PanelSidebar
                 panel={selectedPanel}
                 data={selectedData}
-                sessionId={activeId}
                 onChange={handlePanelChange}
-                onRun={(p) => runQuery(p, activeId)}
+                onRun={runQuery}
               />
             </div>
           </div>

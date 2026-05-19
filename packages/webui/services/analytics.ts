@@ -19,13 +19,14 @@ const openai = createOpenAI({
 })
 
 async function runSql(sessionId: string | null, sql: string, token?: string) {
-  const url = `${API_BASE}/api/query`
+  const sid = sessionId ?? "default"
+  const url = `${API_BASE}/api/sessions/${sid}/query`
   const headers: Record<string, string> = { "Content-Type": "application/json" }
   if (token) headers.Authorization = `Bearer ${token}`
   const res = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken: token }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -143,8 +144,11 @@ export async function handleAnalyticsChat(req: NextRequest) {
 - questions about the schema you can answer from the list below
 
 ## SQL rules:
-- Always use fully qualified names: <catalog>.<schema>.<table>
-- If the user provides a fully qualified name, use it verbatim
+- ONLY use catalogs, schemas, and tables from the "Available tables" list below.
+- NEVER invent or guess catalog, schema, or table names — if it is not in the list, do not use it.
+- Always use fully qualified 3-part names: <catalog>.<schema>.<table>
+- Valid catalogs are: hdbank, vietjetair, partnership
+- If the user provides a fully qualified name, verify it exists in the list before using it
 
 ## Error handling:
 - If a tool returns an error field, quote it exactly and STOP.

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import { type QueryResponse, runSqlQuery } from "@/services/sql"
+import { type QueryResponse, runSessionSqlQuery } from "@/services/sql"
 
 type Row = Record<string, unknown>
 
@@ -79,7 +79,8 @@ export default function TablePreviewPage() {
       setError(null)
       setQueryResult(null)
       try {
-        const result = await runSqlQuery(
+        const result = await runSessionSqlQuery(
+          "default",
           `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
         )
         if (!cancelled) setQueryResult(result)

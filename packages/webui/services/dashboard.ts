@@ -46,7 +46,7 @@ async function runSql(sessionId: string, sql: string, token?: string) {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken: token }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -277,7 +277,10 @@ ${contextHints ? `## Context:\n${contextHints}` : ""}
 - After tool calls, write 1–2 sentences summarizing what changed.
 
 ## SQL rules:
-- Always use fully qualified names: <catalog>.<schema>.<table>
+- ONLY use catalogs, schemas, and tables from the "Available tables" list below.
+- NEVER invent or guess catalog, schema, or table names — if it is not in the list, do not use it.
+- Always use fully qualified 3-part names: <catalog>.<schema>.<table>
+- Valid catalogs are: hdbank, vietjetair, partnership
 - For time-series: ORDER BY the date/time column ascending
 
 ## Chart types:

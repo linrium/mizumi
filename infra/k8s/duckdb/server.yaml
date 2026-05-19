@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: duckdb-server
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: duckdb-server
+  template:
+    metadata:
+      labels:
+        app: duckdb-server
+    spec:
+      containers:
+        - name: duckdb-server
+          image: mizumi-duckdb-server:0.1.0
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -lc
+            - |
+              cp /etc/rustfs-s3-proxy/tls.crt /usr/local/share/ca-certificates/rustfs-s3-proxy.crt
+              update-ca-certificates
+              python /opt/duckdb-server/server.py
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+            - name: AWS_ACCESS_KEY_ID
+              value: rustfsadmin
+            - name: AWS_SECRET_ACCESS_KEY
+              value: rustfsadmin
+            - name: DUCKDB_UC_ENDPOINT
+              value: http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080
+            - name: DUCKDB_CA_CERT_PATH
+              value: /etc/rustfs-s3-proxy/tls.crt
+            - name: IDLE_TIMEOUT_SECS
+              value: "86400"
+          volumeMounts:
+            - name: rustfs-s3-proxy-tls
+              mountPath: /etc/rustfs-s3-proxy
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+      volumes:
+        - name: rustfs-s3-proxy-tls
+          secret:
+            secretName: rustfs-s3-proxy-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: duckdb-server-svc
+  namespace: spark
+spec:
+  selector:
+    app: duckdb-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

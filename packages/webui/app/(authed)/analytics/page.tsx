@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import { useSessionContext } from "@/hooks/use-session-context"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import { cn } from "@/lib/utils"
 
@@ -456,12 +455,12 @@ function MessageBubble({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "Daily transaction volume by country",
-  "Monthly revenue by merchant category",
-  "Customer risk tier distribution",
-  "Channel usage breakdown",
-  "AML structuring alerts over time",
-  "Account balance trends",
+  "HDBank customer count by segment",
+  "Top VietJet activation candidates by propensity score",
+  "Travel spend vs credit score across HDBank customers",
+  "Co-brand campaign audience by priority band",
+  "Campaign summary: customer count and avg propensity by offer",
+  "VietJet customers by membership tier and booking value",
 ]
 
 export default function AnalyticsPage() {
@@ -469,16 +468,8 @@ export default function AnalyticsPage() {
   const [modelId, setModelId] = useState<ModelId>("gpt-5.4-mini")
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const sessionIdRef = useRef<string | null>(null)
+  const sessionIdRef = useRef<string>("default")
   const modelIdRef = useRef<ModelId>(modelId)
-
-  const { sessions, activeId, setActiveId, createSession } = useSessionContext()
-
-  useEffect(() => {
-    const id = activeId ?? sessions[0]?.session_id ?? null
-    sessionIdRef.current = id
-    if (!activeId && sessions[0]) setActiveId(sessions[0].session_id)
-  }, [activeId, sessions, setActiveId])
 
   useEffect(() => {
     modelIdRef.current = modelId
@@ -508,12 +499,6 @@ export default function AnalyticsPage() {
     const text = input.trim()
     if (!text || isLoading) return
     setInput("")
-
-    if (!sessionIdRef.current) {
-      const s = await createSession()
-      sessionIdRef.current = s?.session_id ?? null
-    }
-
     await sendMessage({ text })
   }
 
