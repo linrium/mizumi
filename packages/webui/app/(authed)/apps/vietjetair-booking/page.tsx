@@ -35,6 +35,14 @@ type VietjetairCustomer = {
   vietjetair_customer_id: string
 }
 
+const FALLBACK_CUSTOMERS: VietjetairCustomer[] = [
+  { vietjetair_customer_id: "VJ-FALLBACK-0001" },
+  { vietjetair_customer_id: "VJ-FALLBACK-0002" },
+  { vietjetair_customer_id: "VJ-FALLBACK-0003" },
+  { vietjetair_customer_id: "VJ-FALLBACK-0004" },
+  { vietjetair_customer_id: "VJ-FALLBACK-0005" },
+]
+
 const ROUTES = [
   { route_code: "SGN-HAN", base_price_vnd: 1_200_000 },
   { route_code: "HAN-SGN", base_price_vnd: 1_200_000 },
@@ -100,28 +108,33 @@ export default function VietjetairBookingPage() {
     )
   }
 
-  if (customers.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        No VietJet customers found in the shared customer master.
-      </div>
-    )
-  }
+  const activeCustomers =
+    customers.length > 0 ? customers : FALLBACK_CUSTOMERS
 
   const vietjetairOptions: EventOption[] = [
     {
       id: "booking",
       label: "Booking Event",
       endpoint: "/api/tests/vietjetair/booking-events",
-      createSample: () => generateBookingEvent(customers),
+      createSample: () => generateBookingEvent(activeCustomers),
     },
   ]
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {customers.length === 0 && (
+        <div className="border-b bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Shared customer master returned no VietJet rows. Using fallback demo
+          customer IDs so you can still send booking events.
+        </div>
+      )}
       <EventPublisher
         title="VietJet Air Booking"
-        subtitle="Customer profiles come from the shared CSV master. Send 100 VietJet booking events for HDBank travel financing."
+        subtitle={
+          customers.length > 0
+            ? "Customer profiles come from the shared CSV master. Send 100 VietJet booking events for HDBank travel financing."
+            : "Shared CSV customers were unavailable, so this page is using fallback VietJet demo customer IDs. Send 100 booking events."
+        }
         options={vietjetairOptions}
       />
     </div>

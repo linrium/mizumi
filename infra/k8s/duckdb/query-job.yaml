@@ -10,7 +10,7 @@ spec:
       containers:
         - name: duckdb-query
           image: mizumi-duckdb:1.1.5
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           resources:
             requests:
               cpu: 50m

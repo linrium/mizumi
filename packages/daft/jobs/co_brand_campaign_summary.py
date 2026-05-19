@@ -31,6 +31,18 @@ IO_CONFIG = IOConfig(
     )
 )
 
+SUMMARY_SCHEMA = pa.schema(
+    [
+        pa.field("campaign_name", pa.string(), nullable=False),
+        pa.field("source_company", pa.string(), nullable=False),
+        pa.field("target_company", pa.string(), nullable=False),
+        pa.field("offer_name", pa.string(), nullable=False),
+        pa.field("customer_count", pa.int64(), nullable=False),
+        pa.field("avg_propensity_score", pa.float64(), nullable=False),
+        pa.field("total_signal_value", pa.float64(), nullable=False),
+    ]
+)
+
 
 def main() -> None:
     with open_dagster_pipes() as pipes:
@@ -63,7 +75,7 @@ def main() -> None:
                 }
             )
 
-        arrow_table = pa.Table.from_pylist(summary_rows)
+        arrow_table = pa.Table.from_pylist(summary_rows, schema=SUMMARY_SCHEMA)
         deltalake.write_deltalake(
             SUMMARY_TARGET_PATH,
             arrow_table,

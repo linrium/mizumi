@@ -132,7 +132,7 @@ data:
                     "table_type": "EXTERNAL",
                     "data_source_format": "DELTA",
                     "columns": table["columns"],
-                    "storage_location": table["url"],
+                    "url": table["url"],
                     "comment": table["comment"],
                 },
             )

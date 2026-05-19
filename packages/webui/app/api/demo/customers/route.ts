@@ -22,12 +22,12 @@ type CustomerRow = {
 }
 
 function parseCsv(content: string): CustomerRow[] {
-  const lines = content.trim().split("\n")
+  const lines = content.trim().split(/\r?\n/)
   const [header, ...rows] = lines
-  const columns = header.split(",")
+  const columns = header.split(",").map((column) => column.trim())
 
   return rows.map((line) => {
-    const values = line.split(",")
+    const values = line.split(",").map((value) => value.trim())
     return Object.fromEntries(
       columns.map((column, index) => [column, values[index] ?? ""]),
     ) as CustomerRow

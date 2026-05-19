@@ -16,7 +16,7 @@ def _run_spark_job(
             "containers": [
                 {
                     "name": "dagster-pipes-execution",
-                    "imagePullPolicy": "Never",
+                    "imagePullPolicy": "IfNotPresent",
                 }
             ]
         },
@@ -26,8 +26,16 @@ def _run_spark_job(
 
 @dg.multi_asset(
     specs=[
-        dg.AssetSpec("hdbank_bronze_partner_events", group_name="hdbank_bronze", kinds={"spark", "k8s"}),
-        dg.AssetSpec("vietjetair_bronze_partner_events", group_name="vietjetair_bronze", kinds={"spark", "k8s"}),
+        dg.AssetSpec(
+            "hdbank_bronze_partner_events",
+            group_name="hdbank_bronze",
+            kinds={"spark", "k8s"},
+        ),
+        dg.AssetSpec(
+            "vietjetair_bronze_partner_events",
+            group_name="vietjetair_bronze",
+            kinds={"spark", "k8s"},
+        ),
     ],
     can_subset=False,
 )
@@ -101,13 +109,21 @@ def build_vietjetair_silver(
         dg.AssetSpec(
             "hdbank_gold_vietjet_activation_candidates",
             group_name="hdbank_gold",
-            deps=["hdbank_silver_customers", "hdbank_silver_travel_spend_features", "vietjetair_silver_customers"],
+            deps=[
+                "hdbank_silver_customers",
+                "hdbank_silver_travel_spend_features",
+                "vietjetair_silver_customers",
+            ],
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
             "vietjetair_gold_hdbank_finance_candidates",
             group_name="vietjetair_gold",
-            deps=["vietjetair_silver_customers", "vietjetair_silver_booking_features", "hdbank_silver_customers"],
+            deps=[
+                "vietjetair_silver_customers",
+                "vietjetair_silver_booking_features",
+                "hdbank_silver_customers",
+            ],
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
@@ -146,7 +162,11 @@ def partnership_gold_campaign_summary(
     return pipes_k8s_client.run(
         context=context,
         image=DAFT_IMAGE,
-        base_pod_spec={"containers": [{"name": "dagster-pipes-execution", "imagePullPolicy": "IfNotPresent"}]},
+        base_pod_spec={
+            "containers": [
+                {"name": "dagster-pipes-execution", "imagePullPolicy": "Always"}
+            ]
+        },
         command=["python", "/opt/daft/jobs/co_brand_campaign_summary.py"],
     ).get_materialize_result()
 

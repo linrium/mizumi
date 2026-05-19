@@ -113,7 +113,7 @@ fn build_job(name: &str, sql: &str, uc_token: Option<&str>) -> Job {
                     containers: vec![Container {
                         name: "duckdb-query".to_string(),
                         image: Some(DUCKDB_IMAGE.to_string()),
-                        image_pull_policy: Some("IfNotPresent".to_string()),
+                        image_pull_policy: Some("Always".to_string()),
                         command: Some(vec![
                             "/bin/sh".to_string(),
                             "-lc".to_string(),
@@ -266,7 +266,7 @@ async fn spawn_session_pod(
             containers: vec![Container {
                 name: "duckdb-server".to_string(),
                 image: Some(DUCKDB_SERVER_IMAGE.to_string()),
-                image_pull_policy: Some("IfNotPresent".to_string()),
+                image_pull_policy: Some("Always".to_string()),
                 ports: Some(vec![k8s_openapi::api::core::v1::ContainerPort {
                     container_port: SERVER_PORT,
                     ..Default::default()
