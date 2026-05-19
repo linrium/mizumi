@@ -90,6 +90,8 @@ type LineageNodeData = {
   [key: string]: unknown;
 };
 
+type LineageFlowNode = Node<LineageNodeData, "lineageCard">;
+
 function toDayjs(ts: string | null | undefined) {
   if (!ts) return null;
   const d = dayjs(ts);
@@ -328,7 +330,7 @@ function cardHeight(node: ApiLineageNode) {
 function buildLayout(
   graph: ApiLineageGraph,
   currentId: string | null,
-): { rfNodes: Node[]; rfEdges: Edge[] } {
+): { rfNodes: LineageFlowNode[]; rfEdges: Edge[] } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 });
@@ -342,7 +344,7 @@ function buildLayout(
 
   dagre.layout(g);
 
-  const rfNodes: Node[] = graph.nodes.map((node) => {
+  const rfNodes: LineageFlowNode[] = graph.nodes.map((node) => {
     const pos = g.node(node.id);
     const height = cardHeight(node);
     return {
@@ -362,6 +364,9 @@ function buildLayout(
         runtime: node.runtime,
         isCurrent: node.id === currentId,
         href: nodeHref(node),
+        canExpand: false,
+        isExpanded: false,
+        onExpand: null,
       } satisfies LineageNodeData,
       draggable: false,
     };
@@ -586,10 +591,9 @@ export function LineageGraph({
     const layout = buildLayout(graphForLayout, currentId);
 
     return {
-      rfNodes: layout.rfNodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
+      rfNodes: layout.rfNodes.map((node) => {
+        const data: LineageNodeData = {
+          ...(node.data as LineageNodeData),
           canExpand:
             enableNeighborhoodSelection &&
             !!selectedNodeId &&
@@ -604,8 +608,13 @@ export function LineageGraph({
                 );
               }
             : null,
-        } satisfies LineageNodeData,
-      })),
+        };
+
+        return {
+          ...node,
+          data,
+        };
+      }),
       rfEdges: layout.rfEdges,
     };
   }, [
@@ -616,9 +625,13 @@ export function LineageGraph({
     selectedNodeId,
   ]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<LineageFlowNode>(
+    rfNodes,
+  );
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
-  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+  const [rfInstance, setRfInstance] = useState<
+    ReactFlowInstance<LineageFlowNode, Edge> | null
+  >(null);
 
   useEffect(() => {
     setNodes(rfNodes);
@@ -655,7 +668,7 @@ export function LineageGraph({
   }
 
   return (
-    <ReactFlow
+    <ReactFlow<LineageFlowNode, Edge>
       nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}
