@@ -24,7 +24,7 @@ data:
     enabled = true
 
     [database]
-    url = "postgres://ucuser:ucpassword@unitycatalog-postgres-svc:5432/ucdb"
+    url = "postgres://ucuser:ucpassword@dagster-postgresql.dagster.svc.cluster.local:5432/ucdb"
     max_connections = 20
 
     [[s3]]
@@ -80,6 +80,11 @@ spec:
           env:
             - name: RUST_LOG
               value: debug
+            - name: UC__DATABASE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DATABASE_URL
             - name: UC_INTERNAL_SERVER_KEY_PEM
               valueFrom:
                 secretKeyRef:

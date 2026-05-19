@@ -447,9 +447,9 @@ All components run in dedicated Kubernetes namespaces:
 | `spark` | Spark Operator, Spark jobs | SparkApplication CRDs |
 | `dagster` | Webserver, Daemon, PostgreSQL | Helm Chart |
 | `daft` | Daft jobs, Ray cluster | Simple + distributed modes |
-| `unitycatalog` | UC server, UC UI, PostgreSQL | Custom Rust image |
+| `unitycatalog` | UC server, UC UI, shared PostgreSQL | Custom Rust image |
 | `keycloak` | Keycloak, PostgreSQL | OIDC provider |
-| `controlplane` | Control Plane API, PostgreSQL | Rust/Axum |
+| `controlplane` | Control Plane API, shared PostgreSQL | Rust/Axum |
 | `redpanda` | Broker, Console | Kafka-compatible |
 | `ballista` | Distributed DataFusion | Optional, gRPC :50050 |
 

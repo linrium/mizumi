@@ -76,9 +76,9 @@ deploy: \
   rustfs-s3-proxy-dns-enable \
   redpanda-deploy \
   keycloak-deploy \
+  dagster-deploy \
   unitycatalog-deploy \
   spark-deploy \
-  dagster-deploy \
   daft-image-build \
   rustfs-unitycatalog-anon-read-enable \
   duckdb-image-build \
@@ -109,8 +109,7 @@ forward:
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8080:8080 &
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
-    kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-postgres-svc 5434:5432 &
-    kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
+    kubectl port-forward -n {{ dagster_namespace }} svc/dagster-postgresql 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n controlplane svc/controlplane-svc 4000:6000 &
@@ -125,7 +124,7 @@ forward:
     echo "UC API:           http://127.0.0.1:8082"
     echo "DuckDB Server:    http://127.0.0.1:8090"
     echo "Controlplane API: http://127.0.0.1:4000"
-    echo "Controlplane Postgres: localhost:5433"
+    echo "Shared Postgres:  localhost:5433"
     echo "WebUI:            http://127.0.0.1:3000"
     wait
 
@@ -326,6 +325,9 @@ dagster-deploy: dagster-helm-repo dagster-image-build
     kubectl rollout status deployment/{{ dagster_release }}-dagster-webserver -n {{ dagster_namespace }} --timeout=600s
     kubectl get pods -n {{ dagster_namespace }}
 
+shared-postgres-bootstrap:
+    ./scripts/bootstrap-shared-postgres.sh
+
 dagster-destroy:
     helm uninstall {{ dagster_release }} --namespace {{ dagster_namespace }} || true
     kubectl delete namespace {{ dagster_namespace }} --ignore-not-found --wait=false
@@ -358,8 +360,8 @@ unitycatalog-ui-image-build:
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl create namespace {{ unitycatalog_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
+    just shared-postgres-bootstrap
     kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
-    kubectl rollout status statefulset/unitycatalog-postgres -n {{ unitycatalog_namespace }} --timeout=120s
     kubectl apply -f infra/k8s/unitycatalog/server.yaml
     # kubectl apply -f infra/k8s/unitycatalog/ui.yaml
     kubectl wait --for=condition=Available deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=180s
@@ -445,9 +447,10 @@ controlplane-image-build:
     fi
 
 controlplane-deploy: controlplane-image-build
+    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
+    just shared-postgres-bootstrap
     kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
-    kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n {{ controlplane_namespace }} --timeout=120s
     kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
     kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s
     just controlplane-bootstrap

@@ -213,7 +213,7 @@ just unitycatalog-bootstrap
 just unitycatalog-destroy
 ```
 
-`unitycatalog-deploy` provisions the backing Postgres instance, the catalog server, the UI, and runs bootstrap initialization.
+`unitycatalog-deploy` reuses Dagster's shared Postgres instance, deploys the catalog server and UI, and runs bootstrap initialization.
 
 ### Keycloak
 

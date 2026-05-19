@@ -56,7 +56,7 @@ enabled = false
 # Database
 # ---------------------------------------------------------------------------
 [database]
-url = "postgres://ucuser:ucpassword@localhost:5434/ucdb"
+url = "postgres://ucuser:ucpassword@localhost:5433/ucdb"
 max_connections = 20
 
 # ---------------------------------------------------------------------------

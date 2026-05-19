@@ -130,4 +130,4 @@ Every job that runs as a K8s pod must use `dagster_pipes.open_dagster_pipes()` a
 
 ### Unity Catalog
 
-Deployed from a custom image (`packages/unitycatalog/Dockerfile`) with a Postgres StatefulSet for persistence. A bootstrap job (`infra/k8s/unitycatalog/bootstrap-job.yaml`) seeds the catalog with the initial namespace/schema definitions after deployment.
+Deployed from a custom image (`packages/unitycatalog/Dockerfile`) and backed by the shared `dagster-postgresql` instance. A bootstrap job (`infra/k8s/unitycatalog/bootstrap-job.yaml`) seeds the catalog with the initial namespace/schema definitions after deployment.

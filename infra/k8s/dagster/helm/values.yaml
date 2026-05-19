@@ -51,6 +51,11 @@ runLauncher:
 
 postgresql:
   enabled: true
+  auth:
+    postgresPassword: dagster_postgres_password
+    username: dagster
+    password: dagster_password
+    database: dagster
   primary:
     persistence:
       size: 1Gi
