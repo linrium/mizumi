@@ -56,6 +56,9 @@ redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
 doctor:
+  docker pull curlimages/curl:8.13.0
+  docker pull docker.io/busybox:1.28
+  docker pull docker.io/library/postgres:14.6
   docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
   docker pull python:3.11-alpine
   docker pull postgres:16
@@ -318,7 +321,9 @@ dagster-deploy: dagster-helm-repo dagster-image-build
       --create-namespace \
       --version {{ dagster_chart_version }} \
       --values {{ dagster_values }}
-    kubectl wait --namespace {{ dagster_namespace }} --for=condition=Available deployment --all --timeout=300s
+    kubectl rollout status deployment/{{ dagster_release }}-daemon -n {{ dagster_namespace }} --timeout=300s
+    kubectl rollout status deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }} --timeout=300s
+    kubectl rollout status deployment/{{ dagster_release }}-dagster-webserver -n {{ dagster_namespace }} --timeout=600s
     kubectl get pods -n {{ dagster_namespace }}
 
 dagster-destroy:
@@ -352,6 +357,7 @@ unitycatalog-ui-image-build:
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     kubectl create namespace {{ unitycatalog_namespace }} 2>/dev/null || true
+    just unitycatalog-auth-secret-apply
     kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
     kubectl rollout status statefulset/unitycatalog-postgres -n {{ unitycatalog_namespace }} --timeout=120s
     kubectl apply -f infra/k8s/unitycatalog/server.yaml
@@ -364,6 +370,26 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
 unitycatalog-destroy:
     kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
     kubectl delete namespace {{ unitycatalog_namespace }} --ignore-not-found --wait=false
+
+unitycatalog-auth-secret-apply:
+    kubectl create secret generic unitycatalog-auth \
+      -n {{ unitycatalog_namespace }} \
+      --from-file=UC_INTERNAL_SERVER_KEY_PEM=packages/uc/config/server.key \
+      --from-file=UC_INTERNAL_SERVICE_TOKEN=packages/uc/config/token.txt \
+      --dry-run=client -o yaml | kubectl apply -f -
+    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
+    kubectl create secret generic unitycatalog-auth \
+      -n {{ controlplane_namespace }} \
+      --from-file=UC_INTERNAL_SERVICE_TOKEN=packages/uc/config/token.txt \
+      --dry-run=client -o yaml | kubectl apply -f -
+    if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
+      kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
+    fi
+    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    fi
 
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
@@ -419,12 +445,19 @@ controlplane-image-build:
     fi
 
 controlplane-deploy: controlplane-image-build
+    just unitycatalog-auth-secret-apply
     kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
     kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n {{ controlplane_namespace }} --timeout=120s
     kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
     kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s
-    just jobs-submit-all
+    just controlplane-bootstrap
     kubectl get pods,svc -n {{ controlplane_namespace }}
+
+controlplane-bootstrap:
+    kubectl delete job controlplane-bootstrap -n {{ controlplane_namespace }} --ignore-not-found
+    kubectl apply -f {{ controlplane_manifests }}/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/controlplane-bootstrap -n {{ controlplane_namespace }} --timeout=180s
+    kubectl logs job/controlplane-bootstrap -n {{ controlplane_namespace }}
 
 controlplane-destroy:
     kubectl delete -f {{ controlplane_manifests }}/ --ignore-not-found || true

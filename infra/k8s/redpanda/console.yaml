@@ -4,7 +4,7 @@ metadata:
   name: redpanda-console
   namespace: redpanda
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: redpanda-console

@@ -556,6 +556,7 @@ data:
         changes.extend({"principal": reader, "add": ["SELECT"], "remove": []} for reader in readers)
         request("PATCH", f"/api/2.1/unity-catalog/permissions/table/{table_name}", {"changes": changes})
     PY
+---
 apiVersion: batch/v1
 kind: Job
 metadata:

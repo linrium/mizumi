@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: controlplane-bootstrap
+  namespace: controlplane
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: curlimages/curl:8.13.0
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          command:
+            - sh
+            - -ec
+            - |
+              readyz="http://controlplane-svc.controlplane.svc.cluster.local:6000/readyz"
+              endpoint="http://controlplane-svc.controlplane.svc.cluster.local:6000/api/streaming/jobs"
+
+              for attempt in $(seq 1 60); do
+                if curl -fsS "$readyz" >/dev/null; then
+                  echo "controlplane ready"
+                  break
+                fi
+                echo "waiting for controlplane ($attempt/60)"
+                sleep 2
+              done
+
+              if ! curl -fsS "$readyz" >/dev/null; then
+                echo "controlplane never became ready" >&2
+                exit 1
+              fi
+
+              submit_job() {
+                name="$1"
+                main_application_file="$2"
+                payload=$(printf '{"name":"%s","image":"mizumi-spark-rustfs:4.1.3","main_application_file":"%s"}' "$name" "$main_application_file")
+                for attempt in $(seq 1 20); do
+                  body_file="$(mktemp)"
+                  code="$(
+                    curl -sS -o "$body_file" -w '%{http_code}' \
+                      -X POST "$endpoint" \
+                      -H 'Content-Type: application/json' \
+                      -H 'Authorization: Bearer test' \
+                      -d "$payload" || true
+                  )"
+                  cat "$body_file"
+                  echo
+                  rm -f "$body_file"
+
+                  case "$code" in
+                    201|409)
+                      echo "accepted status $code for $name"
+                      return 0
+                      ;;
+                    000|5??)
+                      echo "retrying $name after status $code ($attempt/20)"
+                      sleep 3
+                      ;;
+                    *)
+                      echo "unexpected status $code for $name" >&2
+                      return 1
+                      ;;
+                  esac
+                done
+
+                echo "exhausted retries for $name" >&2
+                return 1
+              }
+
+              submit_job "hdbank-stream-partner-events-to-bronze" "local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"
+              submit_job "vietjetair-stream-partner-events-to-bronze" "local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py"

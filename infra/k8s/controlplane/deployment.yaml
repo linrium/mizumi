@@ -61,6 +61,8 @@ spec:
           env:
             - name: BIND_ADDR
               value: "0.0.0.0:6000"
+            - name: BYPASS_TOKEN
+              value: "test"
             - name: DATABASE__URL
               valueFrom:
                 secretKeyRef:
