@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Airplane01Icon,
@@ -14,12 +14,12 @@ import {
   Logout03Icon,
   UserMultiple02Icon,
   WorkflowCircle01Icon,
-} from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { startTransition } from "react"
-import { toast } from "sonner"
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { startTransition } from "react";
+import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -31,9 +31,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { signOut } from "@/lib/auth/actions"
-import type { AppSession } from "@/lib/auth/types"
+} from "@/components/ui/sidebar";
+import { signOut } from "@/lib/auth/actions";
+import type { AppSession } from "@/lib/auth/types";
 
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: Book03Icon },
@@ -43,7 +43,7 @@ const navItems = [
   { title: "Pipelines", href: "/pipelines", icon: WorkflowCircle01Icon },
   { title: "Analytics", href: "/analytics", icon: Chart01Icon },
   { title: "Dashboard", href: "/dashboard", icon: DashboardSquare01Icon },
-]
+];
 
 const appItems = [
   {
@@ -52,31 +52,31 @@ const appItems = [
     icon: Airplane01Icon,
   },
   {
-    title: "HDBank Events",
+    title: "HDBank Transfer",
     href: "/apps/hdbank",
     icon: BankIcon,
   },
-]
+];
 
 type AppSidebarProps = {
-  session: AppSession
-}
+  session: AppSession;
+};
 
 export function AppSidebar({ session }: AppSidebarProps) {
-  const pathname = usePathname()
-  const groupsLabel = session.groups?.join(", ")
+  const pathname = usePathname();
+  const groupsLabel = session.groups?.join(", ");
 
   async function copyDebugToken() {
     if (!session.idToken) {
-      toast.error("No ID token available")
-      return
+      toast.error("No ID token available");
+      return;
     }
 
     try {
-      await navigator.clipboard.writeText(session.idToken)
-      toast.success("Copied ID token")
+      await navigator.clipboard.writeText(session.idToken);
+      toast.success("Copied ID token");
     } catch {
-      toast.error("Failed to copy ID token")
+      toast.error("Failed to copy ID token");
     }
   }
 
@@ -168,8 +168,8 @@ export function AppSidebar({ session }: AppSidebarProps) {
               tooltip="Log out"
               onClick={() => {
                 startTransition(() => {
-                  void signOut()
-                })
+                  void signOut();
+                });
               }}
             >
               <HugeiconsIcon icon={Logout03Icon} size={16} />
@@ -179,5 +179,5 @@ export function AppSidebar({ session }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

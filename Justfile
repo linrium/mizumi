@@ -47,9 +47,9 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build spark-image-build
+deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build
 
-destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
+destroy: duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -63,6 +63,7 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
+    kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -72,6 +73,7 @@ forward:
     echo "Dagster UI:       http://127.0.0.1:8088"
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
+    echo "DuckDB Server:    http://127.0.0.1:8090"
     echo "Controlplane Postgres: localhost:5433"
     wait
 
@@ -224,6 +226,17 @@ duckdb-server-image-build:
     docker build -t {{ duckdb_server_image }} packages/duckdb-server
 
 duckdb-server-build: duckdb-server-image-build
+
+duckdb-server-deploy: duckdb-server-image-build
+    kubectl apply -f infra/k8s/duckdb/server.yaml
+    kubectl rollout status deployment/duckdb-server -n {{ spark_namespace }} --timeout=120s
+    kubectl get pods,svc -n {{ spark_namespace }} | rg duckdb-server
+
+duckdb-server-forward:
+    kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080
+
+duckdb-server-destroy:
+    kubectl delete -f infra/k8s/duckdb/server.yaml --ignore-not-found
 
 duckdb-test-job:
     kubectl delete job duckdb-rustfs-query -n {{ spark_namespace }} --ignore-not-found

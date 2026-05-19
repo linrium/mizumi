@@ -41,10 +41,11 @@ export async function runSessionSqlQuery(
   sessionId: string,
   sql: string,
 ): Promise<QueryResponse> {
+  const idToken = await getToken()
   const res = await apiFetch(`/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken }),
   })
   const body = await res.json()
   if (!res.ok) {

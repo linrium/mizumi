@@ -44,6 +44,12 @@ pub struct OpenAiConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct DuckdbServerConfig {
+    #[serde(default = "default_duckdb_server_base_url")]
+    pub base_url: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
     #[serde(default)]
@@ -54,6 +60,8 @@ pub struct Config {
     pub kafka: KafkaConfig,
     pub unity_catalog: UnityCatalogConfig,
     pub keycloak: KeycloakConfig,
+    #[serde(default)]
+    pub duckdb_server: DuckdbServerConfig,
     #[serde(default)]
     pub openai: OpenAiConfig,
 }
@@ -84,8 +92,20 @@ fn default_openai_model() -> String {
     "gpt-4o-mini".to_string()
 }
 
+fn default_duckdb_server_base_url() -> String {
+    "http://localhost:8090".to_string()
+}
+
 fn default_openai_base_url() -> String {
     "https://api.openai.com/v1".to_string()
+}
+
+impl Default for DuckdbServerConfig {
+    fn default() -> Self {
+        Self {
+            base_url: default_duckdb_server_base_url(),
+        }
+    }
 }
 
 impl Default for OpenAiConfig {

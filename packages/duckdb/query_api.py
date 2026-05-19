@@ -95,8 +95,7 @@ def main() -> None:
         hdbank_attach_sql = """
         ATTACH 'hdbank' AS hdbank (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'hdbank_partnership_prod_bronze'
+            READ_ONLY
         )
         """
         debug_log("Attaching Unity Catalog catalog", catalog="hdbank", sql=hdbank_attach_sql)
@@ -105,8 +104,7 @@ def main() -> None:
         vietjetair_attach_sql = """
         ATTACH 'vietjetair' AS vietjetair (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'vietjetair_partnership_prod_bronze'
+            READ_ONLY
         )
         """
         debug_log(
@@ -119,8 +117,7 @@ def main() -> None:
         partnership_attach_sql = """
         ATTACH 'partnership' AS partnership (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'co_brand_gold'
+            READ_ONLY
         )
         """
         debug_log("Attaching Unity Catalog catalog", catalog="partnership", sql=partnership_attach_sql)

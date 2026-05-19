@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde_json::{Value, json};
 
 use crate::{
@@ -12,16 +10,16 @@ use crate::{
 
 #[derive(Clone)]
 pub struct K8sQueryService {
-    sessions: Arc<duckdb::SessionStore>,
+    duckdb_server_base_url: String,
+    http_client: reqwest::Client,
 }
 
 impl K8sQueryService {
-    pub fn new(sessions: Arc<duckdb::SessionStore>) -> Self {
-        Self { sessions }
-    }
-
-    pub fn sessions(&self) -> Arc<duckdb::SessionStore> {
-        self.sessions.clone()
+    pub fn new(duckdb_server_base_url: String) -> Self {
+        Self {
+            duckdb_server_base_url: duckdb_server_base_url.trim_end_matches('/').to_string(),
+            http_client: reqwest::Client::new(),
+        }
     }
 
     pub async fn run_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
@@ -33,25 +31,23 @@ impl K8sQueryService {
     }
 
     pub async fn create_session(&self) -> Result<Value, AppError> {
-        let client = duckdb::client().await?;
-        let (session_id, pod_name) = duckdb::create_session(&client, self.sessions()).await?;
-        Ok(json!({ "session_id": session_id, "pod": pod_name }))
+        self.ensure_server_ready().await?;
+        Ok(json!({ "session_id": default_session_id(), "pod": "duckdb-server" }))
     }
 
     pub fn list_sessions(&self) -> Value {
-        let sessions: Vec<Value> = self
-            .sessions
-            .list()
-            .into_iter()
-            .map(|(id, pod)| json!({ "session_id": id, "pod": pod }))
-            .collect();
-        json!({ "sessions": sessions })
+        json!({
+            "sessions": [{
+                "session_id": default_session_id(),
+                "pod": "duckdb-server"
+            }]
+        })
     }
 
     pub async fn delete_session(&self, id: &str) -> Result<(), AppError> {
-        let pod_name = self.sessions.remove(id).ok_or(AppError::NotFound)?;
-        let client = duckdb::client().await?;
-        duckdb::delete_session(&client, &pod_name).await?;
+        if id != default_session_id() {
+            return Err(AppError::NotFound);
+        }
         Ok(())
     }
 
@@ -60,14 +56,60 @@ impl K8sQueryService {
         id: &str,
         req: QueryRequest,
     ) -> Result<QueryResponse, AppError> {
-        let pod_name = self.sessions.get(id).ok_or(AppError::NotFound)?;
-        match duckdb::session_query(&pod_name, &req.sql, req.id_token.as_deref()).await {
-            Ok(resp) => Ok(resp),
-            Err(AppError::SessionDied(_)) => {
-                self.sessions.remove(id);
-                Err(AppError::NotFound)
-            }
-            Err(e) => Err(e),
+        if id != default_session_id() {
+            return Err(AppError::NotFound);
+        }
+
+        let mut body = json!({ "sql": req.sql });
+        if let Some(token) = req.id_token {
+            body["uc_token"] = Value::String(token);
+        }
+
+        let response = self
+            .http_client
+            .post(format!("{}/query", self.duckdb_server_base_url))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|err| AppError::QueryFailed(err.to_string()))?;
+
+        let status = response.status();
+        let value = response
+            .json::<Value>()
+            .await
+            .map_err(|err| AppError::Parse(err.to_string()))?;
+
+        if !status.is_success() {
+            let message = value
+                .get("error")
+                .and_then(|inner| inner.as_str())
+                .unwrap_or("query failed")
+                .to_string();
+            return Err(AppError::QueryFailed(message));
+        }
+
+        serde_json::from_value(value).map_err(|err| AppError::Parse(err.to_string()))
+    }
+
+    async fn ensure_server_ready(&self) -> Result<(), AppError> {
+        let response = self
+            .http_client
+            .get(format!("{}/health", self.duckdb_server_base_url))
+            .send()
+            .await
+            .map_err(|err| AppError::QueryFailed(err.to_string()))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(AppError::QueryFailed(format!(
+                "duckdb server health check failed: HTTP {}",
+                response.status()
+            )))
         }
     }
+}
+
+fn default_session_id() -> &'static str {
+    "default"
 }

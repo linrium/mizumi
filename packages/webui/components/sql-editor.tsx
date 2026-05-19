@@ -1,18 +1,19 @@
 "use client"
 
-import { Copy01Icon, PlayIcon, SqlIcon } from "@hugeicons/core-free-icons"
+import { Copy01Icon, PlayIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import Editor from "@monaco-editor/react"
 import type { Monaco } from "@monaco-editor/react"
+import Editor from "@monaco-editor/react"
 import { useForm } from "@tanstack/react-form"
 import type { ColumnDef } from "@tanstack/react-table"
 import { useEffect, useMemo, useRef, useState } from "react"
+import type { CatalogCompletionSchema } from "@/app/api/catalog/completions/route"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { Button } from "@/components/ui/button"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import type { CatalogCompletionSchema } from "@/app/api/catalog/completions/route"
+import { apiFetch } from "@/lib/api-client"
 import {
-  executeSqlQuery,
+  executeSessionSqlQuery,
   formatQueryResultsAsTsv,
   type QueryResponse,
   type SqlQueryResult,
@@ -85,7 +86,11 @@ function tablesInScope(
   const refs = new Set<string>()
   const re = /(?:FROM|JOIN)\s+([\w.]+)/gi
   let m: RegExpExecArray | null
-  while ((m = re.exec(sql)) !== null) refs.add(m[1].toLowerCase())
+  m = re.exec(sql)
+  while (m !== null) {
+    refs.add(m[1].toLowerCase())
+    m = re.exec(sql)
+  }
   if (refs.size === 0) return all
   return all.filter((t) => {
     const lc = (s: string) => s.toLowerCase()
@@ -321,6 +326,7 @@ const RESULTS_DEFAULT = 300
 export function SqlEditor() {
   const [result, setResult] = useState<SqlQueryResult | null>(null)
   const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
   const completionDataRef = useRef<CatalogCompletionSchema | null>(null)
@@ -375,12 +381,27 @@ export function SqlEditor() {
 
   const form = useForm({
     defaultValues: {
-      sql: "select * from hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
+      sql: "select * from hdbank.hdbank_partnership_prod_bronze.partner_events_v1 limit 100",
     },
     validators: { onSubmit: sqlSchema },
     onSubmit: async ({ value }) => {
       setResult(null)
-      setResult(await executeSqlQuery(value.sql))
+      setResult(
+        await executeSessionSqlQuery({
+          sql: value.sql,
+          activeSessionId,
+          createSession: async () => {
+            const res = await apiFetch("/api/sessions", { method: "POST" })
+            if (!res.ok) return null
+            const session = (await res.json()) as {
+              session_id: string
+              pod: string
+            }
+            setActiveSessionId(session.session_id)
+            return session
+          },
+        }),
+      )
     },
   })
 

@@ -74,6 +74,8 @@ spec:
               value: "http://keycloak.keycloak.svc.cluster.local:8080"
             - name: KEYCLOAK__REALM
               value: "mizumi"
+            - name: DUCKDB_SERVER__BASE_URL
+              value: "http://duckdb-server-svc.spark.svc.cluster.local:8080"
             - name: RUST_LOG
               value: "info"
           readinessProbe:

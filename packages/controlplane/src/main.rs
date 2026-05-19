@@ -10,7 +10,7 @@ use rdkafka::{ClientConfig, producer::FutureProducer};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use adapters::inbound::http::create_router;
-use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
+use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
     dagster_service::DagsterService, k8s_service::K8sQueryService, lineage_service::LineageService,
     llm_service::LlmService, permission_service::PermissionService,
@@ -62,14 +62,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("failed to run migrations");
 
-    let session_store = SessionStore::new();
     let llm_service = LlmService::new(&config.openai);
     if llm_service.is_none() {
         tracing::warn!("OpenAI API key not configured; LLM blast-radius analysis is disabled");
     }
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
-        k8s_service: Arc::new(K8sQueryService::new(session_store)),
+        k8s_service: Arc::new(K8sQueryService::new(
+            config.duckdb_server.base_url.clone(),
+        )),
         lineage_service: Arc::new(LineageService::new(
             db.clone(),
             config.unity_catalog.base_url.clone(),

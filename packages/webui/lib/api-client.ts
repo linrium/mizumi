@@ -1,5 +1,6 @@
 "use client"
 
+import { readStoredIdToken } from "@/lib/auth/storage"
 import type { AppSession } from "@/lib/auth/types"
 import { authClient } from "@/lib/auth-client"
 
@@ -8,7 +9,7 @@ let isHandlingUnauthorized = false
 export async function getToken(): Promise<string | undefined> {
   const { data } = await authClient.getSession()
   const session = data as AppSession | null
-  return session?.idToken
+  return session?.idToken ?? readStoredIdToken() ?? undefined
 }
 
 async function handleUnauthorized() {

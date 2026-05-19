@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
+import { apiFetch } from "@/lib/api-client"
 
 export type Session = {
   session_id: string
@@ -15,7 +16,7 @@ export function useSessions() {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch("/api/sessions")
+      const res = await apiFetch("/api/sessions")
       if (!res.ok) return
       const data: { sessions: Session[] } = await res.json()
       const list = data.sessions ?? []
@@ -27,7 +28,7 @@ export function useSessions() {
   const createSession = useCallback(async (): Promise<Session | null> => {
     setCreating(true)
     try {
-      const res = await fetch("/api/sessions", { method: "POST" })
+      const res = await apiFetch("/api/sessions", { method: "POST" })
       if (!res.ok) return null
       const session: Session = await res.json()
       setSessions((prev) => [...prev, session])
@@ -43,7 +44,7 @@ export function useSessions() {
   const deleteSession = useCallback(async (id: string) => {
     setDeleting(id)
     try {
-      await fetch(`/api/sessions/${id}`, { method: "DELETE" })
+      await apiFetch(`/api/sessions/${id}`, { method: "DELETE" })
       setSessions((prev) => {
         const next = prev.filter((s) => s.session_id !== id)
         setActiveId((curr) =>
