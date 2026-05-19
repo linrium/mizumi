@@ -2,29 +2,29 @@ import os
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 CHECKPOINT_PATH = os.getenv(
     "BRONZE_CHECKPOINT_PATH",
-    "s3a://unitycatalog/vietjetair/checkpoints/vietjetair_bookings_prod_bronze/raw_flight_events_v1",
+    "s3a://unitycatalog/hdbank/checkpoints/hdbank_partnership_prod_bronze/partner_events_v1",
 )
 TARGET_PATH = os.getenv(
     "BRONZE_TARGET_PATH",
-    "s3a://unitycatalog/vietjetair/vietjetair_bookings_prod_bronze/raw_flight_events_v1",
+    "s3a://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1",
 )
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "KAFKA_BOOTSTRAP_SERVERS",
     "redpanda-svc.redpanda.svc.cluster.local:9092",
 )
-KAFKA_TOPIC = os.getenv(
-    "KAFKA_TOPIC",
-    "vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1",
-)
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "hdbank.partner_events_v1")
 STARTING_OFFSETS = os.getenv("KAFKA_STARTING_OFFSETS", "latest")
+
+EVENT_ENVELOPE_SCHEMA = T.StructType([T.StructField("event_type", T.StringType(), True)])
 
 
 def build_session() -> SparkSession:
     return (
-        SparkSession.builder.appName("vietjetair-stream-raw-flight-events-to-bronze")
+        SparkSession.builder.appName("hdbank-stream-partner-events-to-bronze")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -51,6 +51,10 @@ def main() -> None:
             F.col("value").cast("string").alias("value"),
         )
         .where(F.col("value").isNotNull())
+        .withColumn(
+            "event_type",
+            F.from_json(F.col("value"), EVENT_ENVELOPE_SCHEMA).getField("event_type"),
+        )
     )
 
     query = (

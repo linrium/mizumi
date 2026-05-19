@@ -10,7 +10,16 @@ import { apiFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 
 type SendResult =
-  | { ok: true; status: number; data: unknown }
+  | {
+      ok: true
+      status: number
+      data: {
+        sent: number
+        accepted: number
+        failed: number
+        sample: unknown[]
+      }
+    }
   | { ok: false; status?: number; error: string }
 
 export type EventOption = {
@@ -26,6 +35,7 @@ type EventPublisherProps = {
   options: EventOption[]
   logoSrc?: StaticImageData
   logoAlt?: string
+  batchSize?: number
 }
 
 function prettyJson(value: Record<string, unknown>) {
@@ -38,6 +48,7 @@ export function EventPublisher({
   options,
   logoSrc,
   logoAlt,
+  batchSize = 100,
 }: EventPublisherProps) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -52,30 +63,60 @@ export function EventPublisher({
     const value = prettyJson(sample)
     setValues((current) => ({ ...current, [option.id]: value }))
 
-    const parsed = sample
-
     setSending((current) => ({ ...current, [option.id]: true }))
     setResults((current) => ({ ...current, [option.id]: null }))
 
     try {
-      const res = await apiFetch(option.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      })
-      const body = await res.json().catch(() => null)
-      if (res.ok) {
+      const responses = await Promise.all(
+        Array.from({ length: batchSize }, () =>
+          apiFetch(option.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(option.createSample()),
+          }).then(async (res) => ({
+            ok: res.ok,
+            status: res.status,
+            body: await res.json().catch(() => null),
+          })),
+        ),
+      )
+
+      const accepted = responses.filter((response) => response.ok).length
+      const failed = responses.length - accepted
+
+      if (accepted > 0) {
         setResults((current) => ({
           ...current,
-          [option.id]: { ok: true, status: res.status, data: body },
+          [option.id]: {
+            ok: true,
+            status: failed === 0 ? 202 : 207,
+            data: {
+              sent: responses.length,
+              accepted,
+              failed,
+              sample: responses.slice(0, 5).map((response) =>
+                response.ok
+                  ? response.body
+                  : {
+                      status: response.status,
+                      error:
+                        (response.body as { error?: string } | null)?.error ??
+                        "Request failed",
+                    },
+              ),
+            },
+          },
         }))
       } else {
+        const firstFailure = responses[0]
         setResults((current) => ({
           ...current,
           [option.id]: {
             ok: false,
-            status: res.status,
-            error: (body as { error?: string })?.error ?? `HTTP ${res.status}`,
+            status: firstFailure?.status,
+            error:
+              (firstFailure?.body as { error?: string } | null)?.error ??
+              `All ${responses.length} requests failed`,
           },
         }))
       }
@@ -150,7 +191,7 @@ export function EventPublisher({
                       className="h-7 gap-1.5 px-2.5 text-[11px]"
                     >
                       <HugeiconsIcon icon={MailSend02Icon} size={11} />
-                      {isSending ? "Sending…" : "Send"}
+                      {isSending ? `Sending ${batchSize}…` : `Send ${batchSize}`}
                     </Button>
                   </div>
                 </div>
@@ -212,7 +253,7 @@ export function EventPublisher({
                   <div className="h-[calc(100%-32px)] overflow-auto px-4 py-2">
                     {!result && (
                       <span className="text-xs text-muted-foreground">
-                        Send this event to see the response.
+                        Send {batchSize} generated events to see the batch response.
                       </span>
                     )}
                     {result && (

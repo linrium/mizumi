@@ -45,8 +45,5 @@ spec:
                   || rpk topic describe "$topic" --brokers "$brokers"
               }
 
-              create_topic "hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1"
-              create_topic "hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1"
-              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1"
-              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1"
-              create_topic "vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1"
+              create_topic "hdbank.partner_events_v1"
+              create_topic "vietjetair.partner_events_v1"

@@ -977,6 +977,7 @@ impl LineageService {
     }
 
     async fn uc_get<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, AppError> {
+        tracing::debug!("admin token: {}", self.uc_admin_token);
         let response = self
             .client
             .get(format!("{}{}", self.uc_base_url, path))

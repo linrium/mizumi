@@ -47,7 +47,7 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build
+deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build spark-image-build
 
 destroy: spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
@@ -69,8 +69,8 @@ forward:
     echo "Redpanda Admin:   http://127.0.0.1:9644"
     echo "Redpanda UI:      http://127.0.0.1:8081"
     echo "Keycloak:         http://127.0.0.1:8083"
-    echo "Dagster UI:       http://127.0.0.1:8080"
-    echo "Dagster GraphQL:  http://127.0.0.1:8080/graphql"
+    echo "Dagster UI:       http://127.0.0.1:8088"
+    echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "Controlplane Postgres: localhost:5433"
     wait
@@ -307,43 +307,28 @@ unitycatalog-bootstrap:
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }}
 
-jobs-submit-all token:
+jobs-submit-all token='test':
     just jobs-submit-hdbank {{ token }}
     just jobs-submit-vietjetair {{ token }}
 
-jobs-submit-hdbank token:
+jobs-submit-hdbank token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"hdbank-stream-raw-card-payment-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_card_payment_events_to_bronze.py"}' \
-      | jq
-    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
-      -H 'Content-Type: application/json' \
-      -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"hdbank-stream-raw-customer-profile-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_raw_customer_profile_events_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"}' \
       | jq
 
-jobs-submit-vietjetair token:
+jobs-submit-vietjetair token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"vietjetair-stream-raw-customer-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_customer_events_to_bronze.py"}' \
-      | jq
-    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
-      -H 'Content-Type: application/json' \
-      -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"vietjetair-stream-raw-flight-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_flight_events_to_bronze.py"}' \
-      | jq
-    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
-      -H 'Content-Type: application/json' \
-      -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"vietjetair-stream-raw-booking-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_raw_booking_events_to_bronze.py"}' \
+      -d '{"name":"vietjetair-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py"}' \
       | jq
 
-jobs-delete-hdbank token:
+jobs-delete-hdbank token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in hdbank-stream-raw-card-payment-events-to-bronze hdbank-stream-raw-customer-profile-events-to-bronze; do
+    for name in hdbank-stream-partner-events-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
@@ -351,10 +336,10 @@ jobs-delete-hdbank token:
       curl -fsSL -X DELETE -H "Authorization: Bearer {{ token }}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted: $name"
     done
 
-jobs-delete-vietjetair token:
+jobs-delete-vietjetair token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in vietjetair-stream-raw-customer-events-to-bronze vietjetair-stream-raw-flight-events-to-bronze vietjetair-stream-raw-booking-events-to-bronze; do
+    for name in vietjetair-stream-partner-events-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')

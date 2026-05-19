@@ -16,15 +16,8 @@ use crate::domain::{
     error::AppError,
 };
 
-const HDBANK_RAW_CARD_PAYMENT_TOPIC: &str =
-    "hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1";
-const HDBANK_RAW_CUSTOMER_TOPIC: &str = "hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1";
-const VIETJETAIR_RAW_CUSTOMER_TOPIC: &str =
-    "vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1";
-const VIETJETAIR_RAW_FLIGHT_TOPIC: &str =
-    "vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1";
-const VIETJETAIR_RAW_BOOKING_TOPIC: &str =
-    "vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1";
+const HDBANK_PARTNER_EVENTS_TOPIC: &str = "hdbank.partner_events_v1";
+const VIETJETAIR_PARTNER_EVENTS_TOPIC: &str = "vietjetair.partner_events_v1";
 
 #[derive(Clone)]
 pub struct TestEventService {
@@ -67,6 +60,7 @@ impl TestEventService {
         let timestamp = req.payment_timestamp.unwrap_or_else(Utc::now);
         let key = req.payment_event_id.clone();
         let value = serde_json::json!({
+            "event_type": "card_transaction_posted",
             "payment_event_id": req.payment_event_id,
             "customer_id": req.customer_id,
             "account_id": req.account_id,
@@ -80,7 +74,7 @@ impl TestEventService {
         })
         .to_string();
 
-        self.publish_raw_event(HDBANK_RAW_CARD_PAYMENT_TOPIC, key, timestamp, value)
+        self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
             .await
     }
 
@@ -91,6 +85,7 @@ impl TestEventService {
         let timestamp = req.updated_at.unwrap_or_else(Utc::now);
         let key = req.customer_id.clone();
         let value = serde_json::json!({
+            "event_type": "customer_profile_updated",
             "customer_id": req.customer_id,
             "customer_name": req.customer_name,
             "segment_name": req.segment_name,
@@ -100,7 +95,7 @@ impl TestEventService {
         })
         .to_string();
 
-        self.publish_raw_event(HDBANK_RAW_CUSTOMER_TOPIC, key, timestamp, value)
+        self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
             .await
     }
 
@@ -111,6 +106,7 @@ impl TestEventService {
         let timestamp = req.updated_at.unwrap_or_else(Utc::now);
         let key = req.customer_id.clone();
         let value = serde_json::json!({
+            "event_type": "customer_profile_updated",
             "customer_id": req.customer_id,
             "customer_name": req.customer_name,
             "membership_tier": req.membership_tier,
@@ -120,7 +116,7 @@ impl TestEventService {
         })
         .to_string();
 
-        self.publish_raw_event(VIETJETAIR_RAW_CUSTOMER_TOPIC, key, timestamp, value)
+        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
             .await
     }
 
@@ -131,6 +127,7 @@ impl TestEventService {
         let timestamp = req.scheduled_departure_time;
         let key = req.flight_id.clone();
         let value = serde_json::json!({
+            "event_type": "flight_schedule_updated",
             "flight_id": req.flight_id,
             "flight_number": req.flight_number,
             "route_code": req.route_code,
@@ -141,7 +138,7 @@ impl TestEventService {
         })
         .to_string();
 
-        self.publish_raw_event(VIETJETAIR_RAW_FLIGHT_TOPIC, key, timestamp, value)
+        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
             .await
     }
 
@@ -152,6 +149,7 @@ impl TestEventService {
         let timestamp = req.booking_timestamp.unwrap_or_else(Utc::now);
         let key = req.booking_id.clone();
         let value = serde_json::json!({
+            "event_type": "booking_confirmed",
             "booking_id": req.booking_id,
             "customer_id": req.customer_id,
             "pnr_code": req.pnr_code,
@@ -163,7 +161,7 @@ impl TestEventService {
         })
         .to_string();
 
-        self.publish_raw_event(VIETJETAIR_RAW_BOOKING_TOPIC, key, timestamp, value)
+        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
             .await
     }
 }
