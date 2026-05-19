@@ -22,12 +22,11 @@ S3_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 PORT = int(os.getenv("PORT", "8080"))
 IDLE_TIMEOUT_SECS = int(os.getenv("IDLE_TIMEOUT_SECS", "300"))
 
+# Keep this aligned with infra/k8s/unitycatalog/bootstrap-job.yaml.
 CATALOGS = [
     ("hdbank", "hdbank_partnership_prod_bronze"),
     ("vietjetair", "vietjetair_partnership_prod_bronze"),
-    ("hdbank_sandbox", "hdbank_payments_sandbox_bronze"),
-    ("vietjetair_sandbox", "vietjetair_bookings_sandbox_bronze"),
-    ("partnership_sandbox", "credit_risk"),
+    ("partnership", "co_brand_gold"),
 ]
 
 con: duckdb.DuckDBPyConnection | None = None

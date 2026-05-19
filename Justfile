@@ -223,6 +223,8 @@ duckdb-image-build:
 duckdb-server-image-build:
     docker build -t {{ duckdb_server_image }} packages/duckdb-server
 
+duckdb-server-build: duckdb-server-image-build
+
 duckdb-test-job:
     kubectl delete job duckdb-rustfs-query -n {{ spark_namespace }} --ignore-not-found
     kubectl apply -f infra/k8s/duckdb/query-job.yaml
