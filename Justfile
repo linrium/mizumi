@@ -56,6 +56,9 @@ redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
 doctor:
+  docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
+  docker pull python:3.11-alpine
+  docker pull postgres:16
   docker pull postgres:17
   docker pull postgres:18
   docker pull busybox:stable
@@ -364,8 +367,6 @@ unitycatalog-destroy:
 
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
-    kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}
-    kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=180s
     kubectl apply -f infra/k8s/unitycatalog/bootstrap-job.yaml
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }}

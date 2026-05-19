@@ -556,34 +556,6 @@ data:
         changes.extend({"principal": reader, "add": ["SELECT"], "remove": []} for reader in readers)
         request("PATCH", f"/api/2.1/unity-catalog/permissions/table/{table_name}", {"changes": changes})
     PY
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: unitycatalog-bootstrap-role
-  namespace: unitycatalog
-rules:
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: unitycatalog-bootstrap-rb
-  namespace: unitycatalog
-subjects:
-  - kind: ServiceAccount
-    name: unitycatalog-bootstrap-sa
-    namespace: unitycatalog
-roleRef:
-  kind: Role
-  name: unitycatalog-bootstrap-role
-  apiGroup: rbac.authorization.k8s.io
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -613,25 +585,6 @@ spec:
                 echo "waiting for unitycatalog..."; sleep 3
               done
               echo "unitycatalog ready"
-        - name: fetch-token
-          image: bitnami/kubectl:latest
-          resources:
-            requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 50m
-              memory: 128Mi
-          command:
-            - sh
-            - -c
-            - |
-              POD=$(kubectl get pod -n unitycatalog -l app=unitycatalog -o jsonpath='{.items[0].metadata.name}')
-              kubectl exec -n unitycatalog "$POD" -- cat /app/config/token.txt > /token/uc-token
-              printf 'Fetched Unity Catalog token:\n%s\n' "$(cat /token/uc-token)"
-          volumeMounts:
-            - name: token
-              mountPath: /token
         - name: create-buckets
           image: minio/mc:latest
           resources:
@@ -694,4 +647,8 @@ spec:
             name: unitycatalog-bootstrap-script
             defaultMode: 0755
         - name: token
-          emptyDir: {}
+          secret:
+            secretName: unitycatalog-auth
+            items:
+              - key: UC_INTERNAL_SERVICE_TOKEN
+                path: uc-token
