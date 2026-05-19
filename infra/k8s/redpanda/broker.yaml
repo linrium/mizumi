@@ -60,7 +60,7 @@ spec:
       containers:
         - name: redpanda
           image: docker.redpanda.com/redpandadata/redpanda:v24.3.11
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command:
             - /bin/bash
             - -ec

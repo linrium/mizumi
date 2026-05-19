@@ -8,7 +8,7 @@ spec:
   pythonVersion: "3"
   mode: cluster
   image: mizumi-spark-rustfs:4.1.1
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   mainApplicationFile: local:///opt/spark/jobs/hdbank/build_card_payment_events_silver.py
   sparkVersion: 4.1.1
   restartPolicy:

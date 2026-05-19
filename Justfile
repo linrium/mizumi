@@ -55,9 +55,43 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
+doctor:
+  docker pull postgres:17
+  docker pull postgres:18
+  docker pull busybox:stable
+  docker pull caddy:2.8-alpine
+  docker pull docker.redpanda.com/redpandadata/console:v2.8.3
+  docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
+deploy: \
+  doctor \
+  rustfs-deploy \
+  rustfs-s3-proxy-deploy \
+  rustfs-s3-proxy-dns-enable \
+  redpanda-deploy \
+  keycloak-deploy \
+  unitycatalog-deploy \
+  spark-deploy \
+  dagster-deploy \
+  daft-image-build \
+  rustfs-unitycatalog-anon-read-enable \
+  duckdb-image-build \
+  duckdb-server-image-build \
+  duckdb-server-deploy \
+  spark-image-build \
+  controlplane-deploy \
+  webui-deploy
+
+destroy: \
+  webui-destroy \
+  controlplane-destroy \
+  duckdb-server-destroy \
+  spark-destroy \
+  dagster-destroy \
+  unitycatalog-destroy \
+  keycloak-destroy \
+  redpanda-destroy \
+  rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -330,6 +364,8 @@ unitycatalog-destroy:
 
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
+    kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}
+    kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=180s
     kubectl apply -f infra/k8s/unitycatalog/bootstrap-job.yaml
     kubectl wait --for=condition=complete job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --timeout=120s
     kubectl logs job/unitycatalog-bootstrap -n {{ unitycatalog_namespace }}

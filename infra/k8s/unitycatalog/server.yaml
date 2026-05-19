@@ -80,6 +80,18 @@ spec:
           env:
             - name: RUST_LOG
               value: debug
+            - name: UC_INTERNAL_SERVER_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: unitycatalog-auth
+                  key: UC_INTERNAL_SERVER_KEY_PEM
+                  optional: true
+            - name: UC_INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: unitycatalog-auth
+                  key: UC_INTERNAL_SERVICE_TOKEN
+                  optional: true
           volumeMounts:
             - name: config
               mountPath: /app/config/server.toml

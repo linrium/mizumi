@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fs, time::Duration};
 
 use k8s_openapi::api::batch::v1::{Job, JobSpec};
 use k8s_openapi::api::core::v1::{
@@ -152,6 +152,13 @@ fn duckdb_env(sql: Option<&str>, uc_token: Option<&str>) -> Vec<EnvVar> {
         vars.push(env("DUCKDB_UC_TOKEN", token));
     } else if let Ok(token) = std::env::var("DUCKDB_UC_TOKEN") {
         vars.push(env("DUCKDB_UC_TOKEN", &token));
+    } else if let Ok(path) = std::env::var("UNITY_CATALOG__ADMIN_TOKEN_FILE") {
+        if let Ok(token) = fs::read_to_string(&path) {
+            let token = token.trim().to_string();
+            if !token.is_empty() {
+                vars.push(env("DUCKDB_UC_TOKEN", &token));
+            }
+        }
     }
     if let Ok(endpoint) = std::env::var("DUCKDB_UC_ENDPOINT") {
         vars.push(env("DUCKDB_UC_ENDPOINT", &endpoint));
