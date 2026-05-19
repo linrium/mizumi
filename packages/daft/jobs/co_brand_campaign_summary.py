@@ -37,7 +37,7 @@ SUMMARY_SCHEMA = pa.schema(
         pa.field("source_company", pa.string(), nullable=False),
         pa.field("target_company", pa.string(), nullable=False),
         pa.field("offer_name", pa.string(), nullable=False),
-        pa.field("customer_count", pa.int64(), nullable=False),
+        pa.field("customer_count", pa.int32(), nullable=False),
         pa.field("avg_propensity_score", pa.float64(), nullable=False),
         pa.field("total_signal_value", pa.float64(), nullable=False),
     ]
