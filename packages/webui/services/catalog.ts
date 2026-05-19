@@ -9,7 +9,7 @@ import {
   type TableSummary,
 } from "@/services/catalog-types"
 
-const API_BASE = "http://localhost:4000"
+const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
 
 function getPermissionsPath(
   resourceType: ResourceType,

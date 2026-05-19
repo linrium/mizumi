@@ -8,7 +8,7 @@ import { MODELS, type ModelId } from "@/services/ai-models"
 import { getServerSession } from "@/lib/auth"
 import { fetchSchema } from "@/services/unity-catalog"
 
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"
+const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
 
 const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",

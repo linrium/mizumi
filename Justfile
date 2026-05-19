@@ -1,5 +1,13 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
+controlplane_namespace := "controlplane"
+controlplane_manifests := "infra/k8s/controlplane"
+controlplane_image := "mizumi-controlplane:0.1.0"
+
+webui_namespace := "webui"
+webui_manifests := "infra/k8s/webui"
+webui_image := "mizumi-webui:0.1.0"
+
 unitycatalog_namespace := "unitycatalog"
 unitycatalog_image := "mizumi-uc:0.1.0"
 unitycatalog_ui_image := "mizumi-unitycatalog-ui:v0.4.0"
@@ -47,9 +55,9 @@ redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
-deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build
+deploy: rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy unitycatalog-deploy spark-deploy dagster-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
 
-destroy: duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
+destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -64,6 +72,8 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-postgres-svc 5434:5432 &
     kubectl port-forward -n controlplane svc/controlplane-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
+    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    kubectl port-forward -n controlplane svc/controlplane-svc 4000:6000 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -74,7 +84,9 @@ forward:
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "DuckDB Server:    http://127.0.0.1:8090"
+    echo "Controlplane API: http://127.0.0.1:4000"
     echo "Controlplane Postgres: localhost:5433"
+    echo "WebUI:            http://127.0.0.1:3000"
     wait
 
 caddy-s3-proxy:
@@ -362,23 +374,40 @@ jobs-delete-vietjetair token='test':
       curl -fsSL -X DELETE -H "Authorization: Bearer {{ token }}" "http://127.0.0.1:4000/api/streaming/jobs/$id" && echo "deleted: $name"
     done
 
-controlplane-deploy:
-    kubectl apply -f infra/k8s/controlplane/postgres.yaml
-    kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n controlplane --timeout=120s
-    # kubectl apply -f infra/k8s/controlplane/deployment.yaml
-    kubectl rollout status deployment/controlplane -n controlplane --timeout=120s
-    # just controlplane-bootstrap
-    kubectl get pods,svc -n controlplane
+controlplane-image-build:
+    docker build -t {{ controlplane_image }} packages/controlplane
+    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    fi
 
-controlplane-bootstrap:
-    kubectl delete job controlplane-bootstrap -n controlplane --ignore-not-found
-    kubectl apply -f infra/k8s/controlplane/bootstrap-job.yaml
-    kubectl wait --for=condition=complete job/controlplane-bootstrap -n controlplane --timeout=120s
-    kubectl logs job/controlplane-bootstrap -n controlplane
+controlplane-deploy: controlplane-image-build
+    kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
+    kubectl wait --for=condition=Ready pod -l app=controlplane-postgres -n {{ controlplane_namespace }} --timeout=120s
+    kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
+    kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s
+    just jobs-submit-all
+    kubectl get pods,svc -n {{ controlplane_namespace }}
 
 controlplane-destroy:
-    kubectl delete -f infra/k8s/controlplane/ --ignore-not-found || true
-    kubectl delete namespace controlplane --ignore-not-found --wait=false
+    kubectl delete -f {{ controlplane_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ controlplane_namespace }} --ignore-not-found --wait=false
+
+webui-image-build:
+    docker build -t {{ webui_image }} packages/webui
+    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
+      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
+    fi
+
+webui-deploy: webui-image-build
+    kubectl apply -f {{ webui_manifests }}/deployment.yaml
+    kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
+    kubectl get pods,svc -n {{ webui_namespace }}
+
+webui-destroy:
+    kubectl delete -f {{ webui_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ webui_namespace }} --ignore-not-found --wait=false
 
 daft-distributed-deploy:
     kubectl create namespace {{ daft_namespace }} 2>/dev/null || true
