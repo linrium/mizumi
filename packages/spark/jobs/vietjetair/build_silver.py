@@ -4,23 +4,11 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-SOURCE_PATH = "s3a://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1"
+BRONZE_CUSTOMERS_SOURCE_PATH = "s3a://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/customers_v1"
+BRONZE_PARTNER_EVENTS_SOURCE_PATH = "s3a://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1"
 CUSTOMERS_TARGET_PATH = "s3a://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/customers_v1"
 BOOKING_FEATURES_TARGET_PATH = (
     "s3a://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1"
-)
-
-CUSTOMER_SCHEMA = T.StructType(
-    [
-        T.StructField("event_type", T.StringType(), True),
-        T.StructField("customer_id", T.StringType(), True),
-        T.StructField("customer_name", T.StringType(), True),
-        T.StructField("membership_tier", T.StringType(), True),
-        T.StructField("home_airport", T.StringType(), True),
-        T.StructField("email_opt_in", T.BooleanType(), True),
-        T.StructField("shared_customer", T.BooleanType(), True),
-        T.StructField("updated_at", T.StringType(), True),
-    ]
 )
 
 BOOKING_SCHEMA = T.StructType(
@@ -54,19 +42,19 @@ def build_session() -> SparkSession:
 
 def main() -> None:
     spark = build_session()
-    bronze_df = spark.read.format("delta").load(SOURCE_PATH)
+    bronze_customers_df = spark.read.format("delta").load(BRONZE_CUSTOMERS_SOURCE_PATH)
+    bronze_events_df = spark.read.format("delta").load(BRONZE_PARTNER_EVENTS_SOURCE_PATH)
 
     customer_events = (
-        bronze_df.where(F.col("event_type") == "customer_profile_updated")
-        .withColumn("payload", F.from_json(F.col("value"), CUSTOMER_SCHEMA))
+        bronze_customers_df.where(F.col("customer_id").isNotNull())
         .select(
-            F.col("payload.customer_id").alias("customer_id"),
-            F.col("payload.customer_name").alias("customer_name"),
-            F.upper(F.col("payload.membership_tier")).alias("membership_tier"),
-            F.upper(F.col("payload.home_airport")).alias("home_airport"),
-            F.col("payload.email_opt_in").alias("email_opt_in"),
-            F.col("payload.shared_customer").alias("shared_customer"),
-            F.to_timestamp(F.col("payload.updated_at")).alias("updated_at"),
+            F.col("customer_id"),
+            F.col("customer_name"),
+            F.upper(F.col("membership_tier")).alias("membership_tier"),
+            F.upper(F.col("home_airport")).alias("home_airport"),
+            F.col("email_opt_in"),
+            F.col("shared_customer"),
+            F.col("seed_timestamp").alias("updated_at"),
         )
     )
 
@@ -78,7 +66,7 @@ def main() -> None:
     )
 
     booking_events = (
-        bronze_df.where(F.col("event_type") == "booking_confirmed")
+        bronze_events_df.where(F.col("event_type") == "booking_confirmed")
         .withColumn("payload", F.from_json(F.col("value"), BOOKING_SCHEMA))
         .select(
             F.col("payload.booking_id").alias("booking_id"),

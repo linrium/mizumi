@@ -30,6 +30,7 @@ data:
     import os
     import sys
     import urllib.error
+    import urllib.parse
     import urllib.request
 
     base_url = os.environ["UC_URL"].rstrip("/")
@@ -80,6 +81,48 @@ data:
         return {table["name"] for table in (response or {}).get("tables", [])}
 
 
+    def get_table(catalog_name: str, schema_name: str, table_name: str) -> dict | None:
+        full_name = f"{catalog_name}.{schema_name}.{table_name}"
+        encoded = urllib.parse.quote(full_name, safe="")
+        try:
+            return request("GET", f"/api/2.1/unity-catalog/tables/{encoded}")
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                return None
+            raise
+
+
+    def delete_table(catalog_name: str, schema_name: str, table_name: str) -> None:
+        full_name = f"{catalog_name}.{schema_name}.{table_name}"
+        encoded = urllib.parse.quote(full_name, safe="")
+        request("DELETE", f"/api/2.1/unity-catalog/tables/{encoded}")
+
+
+    def table_matches(existing: dict, desired: dict) -> bool:
+        if existing.get("storage_location") != desired["storage_location"]:
+            return False
+
+        existing_columns = existing.get("columns") or []
+        desired_columns = desired["columns"]
+        if len(existing_columns) != len(desired_columns):
+            return False
+
+        comparable_fields = (
+            "name",
+            "type_name",
+            "type_text",
+            "type_json",
+            "position",
+            "nullable",
+            "partition_index",
+        )
+        for existing_col, desired_col in zip(existing_columns, desired_columns):
+            for field in comparable_fields:
+                if existing_col.get(field) != desired_col.get(field):
+                    return False
+        return True
+
+
     def ensure_catalog(catalog_name: str, comment: str, existing_catalogs: set[str]) -> None:
         if catalog_name in existing_catalogs:
             print(f"already exists: /api/2.1/unity-catalog/catalogs/{catalog_name}")
@@ -119,8 +162,13 @@ data:
     def ensure_table(catalog_name: str, schema_name: str, table: dict, existing_tables: set[str]) -> None:
         table_name = table["name"]
         if table_name in existing_tables:
-            print(f"already exists: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
-            return
+            existing_table = get_table(catalog_name, schema_name, table_name)
+            if existing_table and table_matches(existing_table, table):
+                print(f"already exists: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
+                return
+            print(f"recreating stale table metadata: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
+            delete_table(catalog_name, schema_name, table_name)
+            existing_tables.discard(table_name)
         try:
             request(
                 "POST",
@@ -132,7 +180,7 @@ data:
                     "table_type": "EXTERNAL",
                     "data_source_format": "DELTA",
                     "columns": table["columns"],
-                    "url": table["url"],
+                    "url": table["storage_location"],
                     "comment": table["comment"],
                 },
             )
@@ -178,6 +226,23 @@ data:
         ]
     )
 
+    HDBANK_BRONZE_CUSTOMERS_V1 = build_cols(
+        [
+            ("unified_customer_id", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("segment_name", "STRING", "string", "string"),
+            ("preferred_channel", "STRING", "string", "string"),
+            ("monthly_income", "DOUBLE", "double", "double"),
+            ("credit_score", "INT", "int", "integer"),
+            ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
     HDBANK_CUSTOMERS_V1 = build_cols(
         [
             ("customer_id", "STRING", "string", "string"),
@@ -186,7 +251,7 @@ data:
             ("kyc_status", "STRING", "string", "string"),
             ("preferred_channel", "STRING", "string", "string"),
             ("monthly_income", "DOUBLE", "double", "double"),
-            ("credit_score", "LONG", "bigint", "long"),
+            ("credit_score", "INT", "int", "integer"),
             ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
             ("shared_customer", "BOOLEAN", "boolean", "boolean"),
             ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
@@ -214,6 +279,21 @@ data:
             ("propensity_score", "DOUBLE", "double", "double"),
             ("recommended_channel", "STRING", "string", "string"),
             ("signal_value", "DOUBLE", "double", "double"),
+        ]
+    )
+
+    VIETJETAIR_BRONZE_CUSTOMERS_V1 = build_cols(
+        [
+            ("unified_customer_id", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("membership_tier", "STRING", "string", "string"),
+            ("home_airport", "STRING", "string", "string"),
+            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
@@ -273,7 +353,7 @@ data:
             ("source_company", "STRING", "string", "string"),
             ("target_company", "STRING", "string", "string"),
             ("offer_name", "STRING", "string", "string"),
-            ("customer_count", "LONG", "bigint", "long"),
+            ("customer_count", "INT", "int", "integer"),
             ("avg_propensity_score", "DOUBLE", "double", "double"),
             ("total_signal_value", "DOUBLE", "double", "double"),
         ]
@@ -305,8 +385,14 @@ data:
                         {
                             "name": "partner_events_v1",
                             "comment": "Mixed HDBank customer and card transaction events.",
-                            "url": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1",
                             "columns": PARTNER_EVENTS_V1,
+                        },
+                        {
+                            "name": "customers_v1",
+                            "comment": "Seeded HDBank customer master rows for the partnership demo.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/customers_v1",
+                            "columns": HDBANK_BRONZE_CUSTOMERS_V1,
                         }
                     ],
                 },
@@ -316,13 +402,13 @@ data:
                         {
                             "name": "customers_v1",
                             "comment": "Latest HDBank customer profiles for cross-sell analysis.",
-                            "url": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/customers_v1",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/customers_v1",
                             "columns": HDBANK_CUSTOMERS_V1,
                         },
                         {
                             "name": "travel_spend_features_v1",
                             "comment": "Travel affinity features from HDBank card transactions.",
-                            "url": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/travel_spend_features_v1",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/travel_spend_features_v1",
                             "columns": HDBANK_TRAVEL_SPEND_FEATURES_V1,
                         },
                     ],
@@ -333,7 +419,7 @@ data:
                         {
                             "name": "vietjet_activation_candidates_v1",
                             "comment": "HDBank customers most likely to convert into VietJet flyers.",
-                            "url": "s3://unitycatalog/hdbank/hdbank_partnership_prod_gold/vietjet_activation_candidates_v1",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_gold/vietjet_activation_candidates_v1",
                             "columns": HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1,
                         }
                     ],
@@ -349,8 +435,14 @@ data:
                         {
                             "name": "partner_events_v1",
                             "comment": "Mixed VietJet customer and booking events.",
-                            "url": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1",
                             "columns": PARTNER_EVENTS_V1,
+                        },
+                        {
+                            "name": "customers_v1",
+                            "comment": "Seeded VietJet customer master rows for the partnership demo.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/customers_v1",
+                            "columns": VIETJETAIR_BRONZE_CUSTOMERS_V1,
                         }
                     ],
                 },
@@ -360,13 +452,13 @@ data:
                         {
                             "name": "customers_v1",
                             "comment": "Latest VietJet customer profiles for cross-sell analysis.",
-                            "url": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/customers_v1",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/customers_v1",
                             "columns": VIETJETAIR_CUSTOMERS_V1,
                         },
                         {
                             "name": "booking_features_v1",
                             "comment": "Booking intensity features for HDBank finance targeting.",
-                            "url": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1",
                             "columns": VIETJETAIR_BOOKING_FEATURES_V1,
                         },
                     ],
@@ -377,7 +469,7 @@ data:
                         {
                             "name": "hdbank_finance_candidates_v1",
                             "comment": "VietJet flyers most likely to take HDBank financing or a co-brand card.",
-                            "url": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/hdbank_finance_candidates_v1",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/hdbank_finance_candidates_v1",
                             "columns": VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1,
                         }
                     ],
@@ -393,13 +485,13 @@ data:
                         {
                             "name": "co_brand_offer_audience_v1",
                             "comment": "Unified outbound audience for the co-brand travel use case.",
-                            "url": "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1",
+                            "storage_location": "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1",
                             "columns": PARTNERSHIP_CO_BRAND_AUDIENCE_V1,
                         },
                         {
                             "name": "campaign_summary_v1",
                             "comment": "Compact campaign summary for activation planning.",
-                            "url": "s3://unitycatalog/partnership/co_brand_gold/campaign_summary_v1",
+                            "storage_location": "s3://unitycatalog/partnership/co_brand_gold/campaign_summary_v1",
                             "columns": PARTNERSHIP_CAMPAIGN_SUMMARY_V1,
                         },
                     ],
@@ -447,10 +539,12 @@ data:
 
     table_access = {
         "hdbank.hdbank_partnership_prod_bronze.partner_events_v1": ["khaosoi@gmail.com"],
+        "hdbank.hdbank_partnership_prod_bronze.customers_v1": ["khaosoi@gmail.com"],
         "hdbank.hdbank_partnership_prod_silver.customers_v1": ["khaosoi@gmail.com"],
         "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1": ["khaosoi@gmail.com"],
         "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1": ["khaosoi@gmail.com"],
         "vietjetair.vietjetair_partnership_prod_bronze.partner_events_v1": ["khaopad@gmail.com"],
+        "vietjetair.vietjetair_partnership_prod_bronze.customers_v1": ["khaopad@gmail.com"],
         "vietjetair.vietjetair_partnership_prod_silver.customers_v1": ["khaopad@gmail.com"],
         "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1": ["khaopad@gmail.com"],
         "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": ["khaopad@gmail.com"],

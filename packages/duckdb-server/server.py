@@ -23,8 +23,8 @@ PORT = int(os.getenv("PORT", "8080"))
 IDLE_TIMEOUT_SECS = int(os.getenv("IDLE_TIMEOUT_SECS", "300"))
 
 CATALOGS = [
-    ("hdbank", "hdbank_payments_prod_bronze"),
-    ("vietjetair", "vietjetair_bookings_prod_bronze"),
+    ("hdbank", "hdbank_partnership_prod_bronze"),
+    ("vietjetair", "vietjetair_partnership_prod_bronze"),
     ("hdbank_sandbox", "hdbank_payments_sandbox_bronze"),
     ("vietjetair_sandbox", "vietjetair_bookings_sandbox_bronze"),
     ("partnership_sandbox", "credit_risk"),

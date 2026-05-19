@@ -16,7 +16,7 @@ def _run_spark_job(
             "containers": [
                 {
                     "name": "dagster-pipes-execution",
-                    "imagePullPolicy": "IfNotPresent",
+                    "imagePullPolicy": "Always",
                 }
             ]
         },
@@ -27,12 +27,12 @@ def _run_spark_job(
 @dg.multi_asset(
     specs=[
         dg.AssetSpec(
-            "hdbank_bronze_partner_events",
+            "hdbank_bronze_customers",
             group_name="hdbank_bronze",
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
-            "vietjetair_bronze_partner_events",
+            "vietjetair_bronze_customers",
             group_name="vietjetair_bronze",
             kinds={"spark", "k8s"},
         ),
@@ -55,13 +55,13 @@ def seed_partner_bronze_events(
         dg.AssetSpec(
             "hdbank_silver_customers",
             group_name="hdbank_silver",
-            deps=["hdbank_bronze_partner_events"],
+            deps=["hdbank_bronze_customers"],
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
             "hdbank_silver_travel_spend_features",
             group_name="hdbank_silver",
-            deps=["hdbank_bronze_partner_events"],
+            deps=["hdbank_bronze_customers"],
             kinds={"spark", "k8s"},
         ),
     ],
@@ -82,13 +82,13 @@ def build_hdbank_silver(
         dg.AssetSpec(
             "vietjetair_silver_customers",
             group_name="vietjetair_silver",
-            deps=["vietjetair_bronze_partner_events"],
+            deps=["vietjetair_bronze_customers"],
             kinds={"spark", "k8s"},
         ),
         dg.AssetSpec(
             "vietjetair_silver_booking_features",
             group_name="vietjetair_silver",
-            deps=["vietjetair_bronze_partner_events"],
+            deps=["vietjetair_bronze_customers"],
             kinds={"spark", "k8s"},
         ),
     ],
@@ -174,8 +174,8 @@ def partnership_gold_campaign_summary(
 cross_sell_daily_job = dg.define_asset_job(
     name="cross_sell_daily_job",
     selection=dg.AssetSelection.assets(
-        "hdbank_bronze_partner_events",
-        "vietjetair_bronze_partner_events",
+        "hdbank_bronze_customers",
+        "vietjetair_bronze_customers",
         "hdbank_silver_customers",
         "hdbank_silver_travel_spend_features",
         "vietjetair_silver_customers",

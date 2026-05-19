@@ -4,26 +4,11 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-SOURCE_PATH = "s3a://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1"
+BRONZE_CUSTOMERS_SOURCE_PATH = "s3a://unitycatalog/hdbank/hdbank_partnership_prod_bronze/customers_v1"
+BRONZE_PARTNER_EVENTS_SOURCE_PATH = "s3a://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1"
 CUSTOMERS_TARGET_PATH = "s3a://unitycatalog/hdbank/hdbank_partnership_prod_silver/customers_v1"
 TRAVEL_FEATURES_TARGET_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_partnership_prod_silver/travel_spend_features_v1"
-)
-
-CUSTOMER_SCHEMA = T.StructType(
-    [
-        T.StructField("event_type", T.StringType(), True),
-        T.StructField("customer_id", T.StringType(), True),
-        T.StructField("customer_name", T.StringType(), True),
-        T.StructField("segment_name", T.StringType(), True),
-        T.StructField("kyc_status", T.StringType(), True),
-        T.StructField("preferred_channel", T.StringType(), True),
-        T.StructField("monthly_income", T.DoubleType(), True),
-        T.StructField("credit_score", T.LongType(), True),
-        T.StructField("has_credit_card", T.BooleanType(), True),
-        T.StructField("shared_customer", T.BooleanType(), True),
-        T.StructField("updated_at", T.StringType(), True),
-    ]
 )
 
 PAYMENT_SCHEMA = T.StructType(
@@ -60,22 +45,22 @@ def build_session() -> SparkSession:
 def main() -> None:
     spark = build_session()
 
-    bronze_df = spark.read.format("delta").load(SOURCE_PATH)
+    bronze_customers_df = spark.read.format("delta").load(BRONZE_CUSTOMERS_SOURCE_PATH)
+    bronze_events_df = spark.read.format("delta").load(BRONZE_PARTNER_EVENTS_SOURCE_PATH)
 
     customer_events = (
-        bronze_df.where(F.col("event_type") == "customer_profile_updated")
-        .withColumn("payload", F.from_json(F.col("value"), CUSTOMER_SCHEMA))
+        bronze_customers_df.where(F.col("customer_id").isNotNull())
         .select(
-            F.col("payload.customer_id").alias("customer_id"),
-            F.col("payload.customer_name").alias("customer_name"),
-            F.upper(F.col("payload.segment_name")).alias("segment_name"),
-            F.upper(F.col("payload.kyc_status")).alias("kyc_status"),
-            F.upper(F.col("payload.preferred_channel")).alias("preferred_channel"),
-            F.col("payload.monthly_income").alias("monthly_income"),
-            F.col("payload.credit_score").alias("credit_score"),
-            F.col("payload.has_credit_card").alias("has_credit_card"),
-            F.col("payload.shared_customer").alias("shared_customer"),
-            F.to_timestamp(F.col("payload.updated_at")).alias("updated_at"),
+            F.col("customer_id"),
+            F.col("customer_name"),
+            F.upper(F.col("segment_name")).alias("segment_name"),
+            F.lit("VERIFIED").alias("kyc_status"),
+            F.upper(F.col("preferred_channel")).alias("preferred_channel"),
+            F.col("monthly_income"),
+            F.col("credit_score"),
+            F.col("has_credit_card"),
+            F.col("shared_customer"),
+            F.col("seed_timestamp").alias("updated_at"),
         )
     )
 
@@ -87,7 +72,7 @@ def main() -> None:
     )
 
     payment_events = (
-        bronze_df.where(F.col("event_type") == "card_transaction_posted")
+        bronze_events_df.where(F.col("event_type") == "card_transaction_posted")
         .withColumn("payload", F.from_json(F.col("value"), PAYMENT_SCHEMA))
         .select(
             F.col("payload.payment_event_id").alias("payment_event_id"),

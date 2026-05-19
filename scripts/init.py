@@ -363,6 +363,7 @@ for catalog_name, catalog in CATALOGS.items():
               "catalog_name": catalog_name,
               "schema_name": schema_name,
               "table_type": "EXTERNAL",
+              "url": t.get("url", t.get("storage_location")),
               **t,
           })
 
