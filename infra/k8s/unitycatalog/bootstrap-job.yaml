@@ -512,48 +512,65 @@ data:
             for table in schema_spec["tables"]:
                 ensure_table(catalog_name, schema_name, table, existing_tables)
 
-    owners = ["linh@gmail.com", "rikki@gmail.com"]
-    catalog_access = {
-        "hdbank": ["khaosoi@gmail.com"],
-        "vietjetair": ["khaopad@gmail.com"],
-        "partnership": ["khaosoi@gmail.com", "khaopad@gmail.com"],
+    linh = "linh@gmail.com"
+
+    # Catalog-level grants
+    # linh: full owner; rikki: browse partnership only;
+    # khaosoi: use+browse hdbank, browse partnership;
+    # khaopad: use+browse vietjetair, browse partnership
+    catalog_grants = {
+        "hdbank": {
+            linh: ["OWNER"],
+            "khaosoi@gmail.com": ["USE_CATALOG", "BROWSE"],
+        },
+        "vietjetair": {
+            linh: ["OWNER"],
+            "khaopad@gmail.com": ["USE_CATALOG", "BROWSE"],
+        },
+        "partnership": {
+            linh: ["OWNER"],
+            "rikki@gmail.com": ["BROWSE"],
+            "khaosoi@gmail.com": ["BROWSE"],
+            "khaopad@gmail.com": ["BROWSE"],
+        },
     }
-    for catalog_name, readers in catalog_access.items():
-        changes = [{"principal": owner, "add": ["USE_CATALOG", "OWNER"], "remove": []} for owner in owners]
-        changes.extend({"principal": reader, "add": ["USE_CATALOG"], "remove": []} for reader in readers)
+    for catalog_name, grants in catalog_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
         request("PATCH", f"/api/2.1/unity-catalog/permissions/catalog/{catalog_name}", {"changes": changes})
 
-    schema_access = {
-        "hdbank.hdbank_partnership_prod_bronze": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_silver": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_gold": ["khaosoi@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_bronze": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_silver": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_gold": ["khaopad@gmail.com"],
-        "partnership.co_brand_gold": ["khaosoi@gmail.com", "khaopad@gmail.com"],
+    # Schema-level grants
+    # linh: owner on all; khaosoi: use_schema on hdbank; khaopad: use_schema on vietjetair
+    schema_grants = {
+        "hdbank.hdbank_partnership_prod_bronze": {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "hdbank.hdbank_partnership_prod_silver": {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "hdbank.hdbank_partnership_prod_gold":   {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_bronze": {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_silver": {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_gold":   {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "partnership.co_brand_gold": {linh: ["OWNER", "USE_SCHEMA"]},
     }
-    for schema_name, readers in schema_access.items():
-        changes = [{"principal": owner, "add": ["USE_SCHEMA", "OWNER"], "remove": []} for owner in owners]
-        changes.extend({"principal": reader, "add": ["USE_SCHEMA"], "remove": []} for reader in readers)
+    for schema_name, grants in schema_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
         request("PATCH", f"/api/2.1/unity-catalog/permissions/schema/{schema_name}", {"changes": changes})
 
-    table_access = {
-        "hdbank.hdbank_partnership_prod_bronze.partner_events_v1": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_bronze.customers_v1": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_silver.customers_v1": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1": ["khaosoi@gmail.com"],
-        "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1": ["khaosoi@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_bronze.partner_events_v1": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_bronze.customers_v1": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_silver.customers_v1": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1": ["khaopad@gmail.com"],
-        "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": ["khaopad@gmail.com"],
-        "partnership.co_brand_gold.co_brand_offer_audience_v1": ["khaosoi@gmail.com", "khaopad@gmail.com"],
-        "partnership.co_brand_gold.campaign_summary_v1": ["khaosoi@gmail.com", "khaopad@gmail.com"],
+    # Table-level grants
+    # linh: owner+select on all; khaosoi: select on hdbank; khaopad: select on vietjetair
+    table_grants = {
+        "hdbank.hdbank_partnership_prod_bronze.partner_events_v1":             {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_bronze.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_silver.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1":      {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1":{linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.partner_events_v1":     {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_silver.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "partnership.co_brand_gold.co_brand_offer_audience_v1": {linh: ["OWNER", "SELECT"]},
+        "partnership.co_brand_gold.campaign_summary_v1":        {linh: ["OWNER", "SELECT"]},
     }
-    for table_name, readers in table_access.items():
-        changes = [{"principal": owner, "add": ["SELECT", "OWNER"], "remove": []} for owner in owners]
-        changes.extend({"principal": reader, "add": ["SELECT"], "remove": []} for reader in readers)
+    for table_name, grants in table_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
         request("PATCH", f"/api/2.1/unity-catalog/permissions/table/{table_name}", {"changes": changes})
     PY
 ---
