@@ -8,6 +8,8 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 COPY --from=builder /build/target/release/controlplane /usr/local/bin/controlplane
+COPY config.toml /app/config.toml
 EXPOSE 6000
 CMD ["controlplane"]

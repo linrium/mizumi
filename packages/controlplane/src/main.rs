@@ -96,6 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         keycloak_auth: Arc::new(KeycloakAuth::new(
             &config.keycloak.url,
             &config.keycloak.realm,
+            config.keycloak.issuer.as_deref(),
             config.keycloak.audiences.clone(),
         )),
         bypass_token: config.bypass_token.clone(),

@@ -57,10 +57,10 @@ spec:
           image: mizumi-controlplane:0.1.0
           imagePullPolicy: Always
           ports:
-            - containerPort: 6000
+            - containerPort: 4000
           env:
             - name: BIND_ADDR
-              value: "0.0.0.0:6000"
+              value: "0.0.0.0:4000"
             - name: BYPASS_TOKEN
               value: "test"
             - name: DATABASE__URL
@@ -68,7 +68,7 @@ spec:
                 secretKeyRef:
                   name: controlplane-postgres-secret
                   key: DATABASE_URL
-            - name: DAGSTER_BASE_URL
+            - name: DAGSTER__BASE_URL
               value: "http://dagster-dagster-webserver.dagster.svc.cluster.local:80"
             - name: KAFKA__BOOTSTRAP_SERVERS
               value: "redpanda-svc.redpanda.svc.cluster.local:9092"
@@ -79,10 +79,6 @@ spec:
                 secretKeyRef:
                   name: unitycatalog-auth
                   key: UC_INTERNAL_SERVICE_TOKEN
-            - name: KEYCLOAK__URL
-              value: "http://keycloak.keycloak.svc.cluster.local:8080"
-            - name: KEYCLOAK__REALM
-              value: "mizumi"
             - name: DUCKDB_SERVER__BASE_URL
               value: "http://duckdb-server-svc.spark.svc.cluster.local:8080"
             - name: DUCKDB_UC_TOKEN
@@ -103,17 +99,17 @@ spec:
                   key: OPENAI_API_KEY
                   optional: true
             - name: RUST_LOG
-              value: "info"
+              value: "debug"
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 6000
+              port: 4000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /livez
-              port: 6000
+              port: 4000
             initialDelaySeconds: 15
             periodSeconds: 20
           resources:
@@ -133,5 +129,5 @@ spec:
   selector:
     app: controlplane
   ports:
-    - port: 6000
-      targetPort: 6000
+    - port: 4000
+      targetPort: 4000

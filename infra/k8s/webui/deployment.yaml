@@ -34,7 +34,7 @@ spec:
           env:
             - name: NODE_ENV
               value: production
-            - name: KEYCLOAK_REALMS
+            - name: KEYCLOAK_REALM
               value: sovico
             - name: KEYCLOAK_CLIENT_ID
               value: webui
@@ -44,10 +44,10 @@ spec:
               value: http://127.0.0.1:8083
             - name: KEYCLOAK_INTERNAL_BASE_URL
               value: http://keycloak-svc.keycloak.svc.cluster.local:8080
-            - name: AUTH_SECRET
+            - name: BETTER_AUTH_SECRET
               value: xohzlCDjF8FoDU+SFb1Dcw9BCkYFGs7NaipxrZE6rwk=
             - name: API_BASE_URL
-              value: http://controlplane-svc.controlplane.svc.cluster.local:6000
+              value: http://controlplane-svc.controlplane.svc.cluster.local:4000
             - name: OPENAI_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -62,13 +62,13 @@ spec:
                   optional: true
           readinessProbe:
             httpGet:
-              path: /
+              path: /readyz
               port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /
+              path: /livez
               port: 3000
             initialDelaySeconds: 15
             periodSeconds: 20

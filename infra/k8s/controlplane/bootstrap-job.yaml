@@ -22,8 +22,8 @@ spec:
             - sh
             - -ec
             - |
-              readyz="http://controlplane-svc.controlplane.svc.cluster.local:6000/readyz"
-              endpoint="http://controlplane-svc.controlplane.svc.cluster.local:6000/api/streaming/jobs"
+              readyz="http://controlplane-svc.controlplane.svc.cluster.local:4000/readyz"
+              endpoint="http://controlplane-svc.controlplane.svc.cluster.local:4000/api/streaming/jobs"
 
               for attempt in $(seq 1 60); do
                 if curl -fsS "$readyz" >/dev/null; then

@@ -1,6 +1,11 @@
 import type { NextConfig } from "next"
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "http://controlplane-svc.controlplane.svc.cluster.local:4000"
+    : "http://localhost:4000"
+
+const API_BASE_URL = process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL
 
 const nextConfig: NextConfig = {
   reactCompiler: true,

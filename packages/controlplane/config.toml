@@ -18,6 +18,7 @@ admin_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6IjNlMzZhYTAzMGE0MmU5Y
 [keycloak]
 url = "http://keycloak-svc.keycloak.svc.cluster.local:8080"
 realm = "sovico"
+issuer = "http://127.0.0.1:8083/realms/sovico"
 audiences = []
 
 [duckdb_server]

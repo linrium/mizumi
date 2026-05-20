@@ -29,6 +29,7 @@ pub struct DagsterConfig {
 pub struct KeycloakConfig {
     pub url: String,
     pub realm: String,
+    pub issuer: Option<String>,
     #[serde(default)]
     pub audiences: Vec<String>,
 }

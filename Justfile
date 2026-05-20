@@ -56,48 +56,22 @@ redpanda_manifests := "infra/k8s/redpanda"
 redpanda_default_topic_job := "redpanda-default-topic"
 
 doctor:
-  docker pull curlimages/curl:8.13.0
-  docker pull docker.io/busybox:1.28
-  docker pull docker.io/library/postgres:14.6
-  docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
-  docker pull python:3.11-alpine
-  docker pull postgres:16
-  docker pull postgres:17
-  docker pull postgres:18
-  docker pull busybox:stable
-  docker pull caddy:2.8-alpine
-  docker pull docker.redpanda.com/redpandadata/console:v2.8.3
-  docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
+    docker pull curlimages/curl:8.13.0
+    docker pull docker.io/busybox:1.28
+    docker pull docker.io/library/postgres:14.6
+    docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
+    docker pull python:3.11-alpine
+    docker pull postgres:16
+    docker pull postgres:17
+    docker pull postgres:18
+    docker pull busybox:stable
+    docker pull caddy:2.8-alpine
+    docker pull docker.redpanda.com/redpandadata/console:v2.8.3
+    docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: \
-  doctor \
-  rustfs-deploy \
-  rustfs-s3-proxy-deploy \
-  rustfs-s3-proxy-dns-enable \
-  redpanda-deploy \
-  keycloak-deploy \
-  dagster-deploy \
-  unitycatalog-deploy \
-  spark-deploy \
-  daft-image-build \
-  rustfs-unitycatalog-anon-read-enable \
-  duckdb-image-build \
-  duckdb-server-image-build \
-  duckdb-server-deploy \
-  spark-image-build \
-  controlplane-deploy \
-  webui-deploy
+deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
 
-destroy: \
-  webui-destroy \
-  controlplane-destroy \
-  duckdb-server-destroy \
-  spark-destroy \
-  dagster-destroy \
-  unitycatalog-destroy \
-  keycloak-destroy \
-  redpanda-destroy \
-  rustfs-destroy
+destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -107,7 +81,7 @@ forward:
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:80 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
-    kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8080:8080 &
+    kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8083:8080 &
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-postgresql 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
