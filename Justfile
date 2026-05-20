@@ -278,7 +278,7 @@ duckdb-server-image-build:
 
 duckdb-server-build: duckdb-server-image-build
 
-duckdb-server-deploy: duckdb-server-image-build
+duckdb-server-deploy: rustfs-s3-proxy-deploy duckdb-server-image-build
     kubectl apply -f infra/k8s/duckdb/server.yaml
     kubectl rollout status deployment/duckdb-server -n {{ spark_namespace }} --timeout=120s
     kubectl get pods,svc -n {{ spark_namespace }} | rg duckdb-server
