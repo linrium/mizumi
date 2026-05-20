@@ -367,6 +367,28 @@ unitycatalog-auth-secret-apply:
       kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
     fi
 
+openai-secrets-apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
+    for namespace in {{ controlplane_namespace }} {{ webui_namespace }}; do
+      secret_name="${namespace}-secret"
+      kubectl create secret generic "$secret_name" \
+        -n "$namespace" \
+        --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
+        --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    done
+    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    fi
+    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
+      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
+    fi
+
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
     kubectl apply -f infra/k8s/unitycatalog/bootstrap-job.yaml
@@ -423,6 +445,7 @@ controlplane-image-build:
 controlplane-deploy: controlplane-image-build
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
+    just openai-secrets-apply
     just shared-postgres-bootstrap
     kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
     kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
@@ -448,6 +471,7 @@ webui-image-build:
     fi
 
 webui-deploy: webui-image-build
+    just openai-secrets-apply
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
     kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
     kubectl get pods,svc -n {{ webui_namespace }}
