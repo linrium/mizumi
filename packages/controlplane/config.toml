@@ -29,6 +29,6 @@ audiences = []
 base_url = "http://localhost:8090"
 
 [openai]
-api_key = "wovey_VbQaGZ7V-uIhLOba6NaBtuhz2CgJaNAjQYZSZwzUGSw"
+api_key = ""
 model = "gpt-5.4-mini"
-base_url = "https://wovey-api.woven.tech/openai/project/linh_project/v1"
+base_url = ""
