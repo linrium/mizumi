@@ -1124,7 +1124,7 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
   const [composerWidth, setComposerWidth] = useState(COMPOSER_DEFAULT)
-  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-mini")
+  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-nano")
   const sidebarDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const composerDragRef = useRef<{ startX: number; startW: number } | null>(
     null,

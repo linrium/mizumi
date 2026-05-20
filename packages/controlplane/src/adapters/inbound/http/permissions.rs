@@ -17,6 +17,20 @@ use crate::{
     infrastructure::{auth::KeycloakClaims, server::AppState},
 };
 
+/// Incoming JSON body — `requester_id` is omitted; it is always derived from
+/// the authenticated JWT claims so clients cannot impersonate another user.
+#[derive(Deserialize)]
+pub(crate) struct CreateRequestInput {
+    pub submit_as: String,
+    pub team: Option<Uuid>,
+    pub resource: String,
+    pub scope: String,
+    pub privileges: Vec<String>,
+    pub rationale: String,
+    pub requested_duration_days: Option<i32>,
+    pub renewal_of: Option<Uuid>,
+}
+
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub resource: Option<String>,
@@ -63,8 +77,24 @@ pub async fn list_requests(
 
 pub async fn create_request(
     State(state): State<Arc<AppState>>,
-    Json(body): Json<CreatePermissionRequestBody>,
+    Extension(claims): Extension<KeycloakClaims>,
+    Json(input): Json<CreateRequestInput>,
 ) -> impl IntoResponse {
+    let requester_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let body = CreatePermissionRequestBody {
+        requester_id,
+        submit_as: input.submit_as,
+        team: input.team,
+        resource: input.resource,
+        scope: input.scope,
+        privileges: input.privileges,
+        rationale: input.rationale,
+        requested_duration_days: input.requested_duration_days,
+        renewal_of: input.renewal_of,
+    };
     match state.permission_service.create_request(body).await {
         Ok(request) => (StatusCode::CREATED, Json(request)).into_response(),
         Err(err) => err.into_response(),

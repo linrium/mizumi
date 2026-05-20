@@ -797,7 +797,53 @@ function buildLayout(
     ...schemaGroupNodes,
     ...absoluteLeafNodes.values(),
   ]
+  // Track y positions before overlap resolution so we can propagate
+  // group deltas to standalone leaf nodes that connect into the moved groups.
+  const preOverlapY = new Map(rfNodes.map((n) => [n.id, n.position.y]))
   resolveTopLevelGroupOverlaps(rfNodes)
+
+  // Compute how much each top-level group moved
+  const topGroupDelta = new Map<string, number>()
+  for (const n of rfNodes) {
+    if (n.type !== "lineageGroup" || (n as { parentId?: string }).parentId)
+      continue
+    const delta = n.position.y - (preOverlapY.get(n.id) ?? n.position.y)
+    if (Math.abs(delta) > 0.5) topGroupDelta.set(n.id, delta)
+  }
+
+  if (topGroupDelta.size > 0) {
+    const rfNodeById = new Map(rfNodes.map((n) => [n.id, n]))
+    const topGroupOf = (id: string): string | null => {
+      let cur = rfNodeById.get(id)
+      let top: string | null = null
+      while ((cur as { parentId?: string } | undefined)?.parentId) {
+        top = (cur as { parentId?: string }).parentId!
+        cur = rfNodeById.get(top)
+      }
+      return top
+    }
+    for (const n of rfNodes) {
+      if (n.type !== "lineageCard" || (n as { parentId?: string }).parentId)
+        continue
+      const deltas: number[] = []
+      for (const edge of graph.edges) {
+        if (edge.edge_type === "contains") continue
+        const otherId =
+          edge.source === n.id
+            ? edge.target
+            : edge.target === n.id
+              ? edge.source
+              : null
+        if (!otherId) continue
+        const gid = topGroupOf(otherId)
+        if (gid) deltas.push(topGroupDelta.get(gid) ?? 0)
+      }
+      if (deltas.length === 0) continue
+      const avg = deltas.reduce((s, d) => s + d, 0) / deltas.length
+      if (Math.abs(avg) > 0.5)
+        n.position = { ...n.position, y: n.position.y + avg }
+    }
+  }
 
   const rfEdges: Edge[] = graph.edges.map((edge) => ({
     id: edge.id,
@@ -832,11 +878,17 @@ export function LineageGraph({
   currentPath,
   neighborhoodOnly = false,
   enableNeighborhoodSelection = false,
+  selectRoot = false,
+  selectRootHint,
+  initialDepth,
   filters,
 }: {
   currentPath?: string[]
   neighborhoodOnly?: boolean
   enableNeighborhoodSelection?: boolean
+  selectRoot?: boolean
+  selectRootHint?: { displayName: string; nodeType: string }
+  initialDepth?: number
   filters?: LineageFilters
 }) {
   const rootToken = currentPath?.join("/") ?? null
@@ -851,13 +903,14 @@ export function LineageGraph({
     let cancelled = false
     setLoading(true)
     setError(null)
+    setSelectedNodeId(null)
 
     const params = new URLSearchParams()
     if (rootToken) {
       params.set("root", rootToken)
     }
     params.set("direction", "both")
-    params.set("depth", neighborhoodOnly ? "2" : "6")
+    params.set("depth", neighborhoodOnly ? String(initialDepth ?? 2) : "6")
 
     fetchWithAuth(`/api/lineage/graph?${params.toString()}`, {
       cache: "no-store",
@@ -868,7 +921,22 @@ export function LineageGraph({
         return json as ApiLineageGraph
       })
       .then((data) => {
-        if (!cancelled) setGraph(data)
+        if (!cancelled) {
+          setGraph(data)
+          if (selectRoot) {
+            if (data.root) {
+              setSelectedNodeId(data.root.id)
+            } else if (selectRootHint) {
+              const match = data.nodes.find(
+                (n) =>
+                  n.node_type === selectRootHint.nodeType &&
+                  (n.display_name === selectRootHint.displayName ||
+                    n.name === selectRootHint.displayName),
+              )
+              if (match) setSelectedNodeId(match.id)
+            }
+          }
+        }
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message)
@@ -880,7 +948,7 @@ export function LineageGraph({
     return () => {
       cancelled = true
     }
-  }, [rootToken, neighborhoodOnly])
+  }, [rootToken, neighborhoodOnly, selectRoot, selectRootHint, initialDepth])
 
   const filteredGraph = useMemo<LineageGraphView | null>(() => {
     if (!graph) return null

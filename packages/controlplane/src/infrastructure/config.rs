@@ -102,7 +102,7 @@ impl Default for DagsterConfig {
 }
 
 fn default_openai_model() -> String {
-    "gpt-4o-mini".to_string()
+    "gpt-5.4-nano".to_string()
 }
 
 fn default_duckdb_server_base_url() -> String {

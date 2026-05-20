@@ -121,6 +121,7 @@ function deriveSteps(
       const upStep = assetToStep.get(dep.join("/"));
       if (upStep && steps.has(upStep)) s.upstream.push(upStep);
     }
+    s.upstream = [...new Set(s.upstream)];
   }
 
   return Array.from(steps.values());

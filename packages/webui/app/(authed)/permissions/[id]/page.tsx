@@ -334,11 +334,7 @@ export default function PermissionRequestDetailPage() {
 
   function handleApprove(stepId: string) {
     if (!request) return
-    if (request.queue_decision === "time-bounded") {
-      openApprovalDialog(stepId)
-    } else {
-      handleStatusUpdate("approved", stepId)
-    }
+    openApprovalDialog(stepId)
   }
 
   if (loading) {
@@ -752,8 +748,25 @@ export default function PermissionRequestDetailPage() {
             {/* Lineage graph */}
             <div className="flex-1 min-w-0 relative">
               <LineageGraph
-                currentPath={request.resource.split(".")}
+                currentPath={
+                  request.scope === "table"
+                    ? request.resource.split(".")
+                    : undefined
+                }
+                selectRootHint={
+                  request.scope !== "table"
+                    ? {
+                        displayName:
+                          request.resource.split(".").at(-1) ??
+                          request.resource,
+                        nodeType: request.scope,
+                      }
+                    : undefined
+                }
                 neighborhoodOnly
+                enableNeighborhoodSelection
+                selectRoot
+                initialDepth={1}
               />
             </div>
 
@@ -974,7 +987,11 @@ export default function PermissionRequestDetailPage() {
           </Button>
           <Button
             onClick={handleApprovalDialogConfirm}
-            disabled={actioningKey != null}
+            disabled={
+              actioningKey != null ||
+              !approvalDialog ||
+              !(Number(approvalDialog.durationDays) >= 1)
+            }
           >
             {actioningKey != null ? "Approving…" : "Confirm & grant access"}
           </Button>

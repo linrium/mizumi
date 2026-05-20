@@ -65,9 +65,9 @@ doctor:
     docker pull docker.io/library/postgres:14.6
     docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
     docker pull python:3.11-alpine
-    docker pull postgres:16
-    docker pull postgres:17
-    docker pull postgres:18
+    # docker pull postgres:16
+    # docker pull postgres:17
+    # docker pull postgres:18
     docker pull busybox:stable
     docker pull caddy:2.8-alpine
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
@@ -86,11 +86,12 @@ forward:
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8083:8080 &
+    kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8080:8080 &
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
-    kubectl port-forward -n controlplane svc/controlplane-svc 4000:4000 &
+    # kubectl port-forward -n controlplane svc/controlplane-svc 4000:4000 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -378,6 +379,12 @@ unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
 unitycatalog-destroy:
     kubectl delete -f infra/k8s/unitycatalog/ --ignore-not-found || true
     kubectl delete namespace {{ unitycatalog_namespace }} --ignore-not-found --wait=false
+
+unitycatalog-token:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pod=$(kubectl get pod -n {{ unitycatalog_namespace }} -l app=unitycatalog -o jsonpath='{.items[0].metadata.name}')
+    kubectl exec -n {{ unitycatalog_namespace }} "$pod" -- printenv UC_INTERNAL_SERVICE_TOKEN
 
 unitycatalog-auth-secret-apply:
     kubectl create secret generic unitycatalog-auth \

@@ -56,8 +56,8 @@ async function runSql(sessionId: string, sql: string, token?: string) {
 }
 
 function resolveModel(modelId: ModelId): LanguageModel {
-  if (modelId === "gpt-5.4-mini") {
-    return openai("gpt-5.4-mini")
+  if (modelId === "gpt-5.4-nano") {
+    return openai("gpt-5.4-nano")
   }
   if (modelId === "mlx-community/Qwen3.5-9B-MLX-4bit") {
     return omlx("mlx-community/Qwen3.5-9B-MLX-4bit")
@@ -98,7 +98,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     lastCreatedIds: string[]
   }
 
-  const model = resolveModel(modelId ?? "gpt-5.4-mini")
+  const model = resolveModel(modelId ?? "gpt-5.4-nano")
   const resolvedSessionId = await ensureSession(sessionId, idToken)
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 

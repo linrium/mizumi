@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
@@ -170,6 +171,7 @@ export default function PermissionsPage() {
   const [approveTarget, setApproveTarget] = useState<{
     request: PermissionRequest
     stepId?: string
+    durationDays: string
   } | null>(null)
 
   useEffect(() => {
@@ -258,6 +260,11 @@ export default function PermissionsPage() {
 
   async function handleApprove() {
     if (!approveTarget || approving) return
+    const days = parseInt(approveTarget.durationDays, 10)
+    if (!days || days < 1) {
+      setError("Grant duration must be at least 1 day")
+      return
+    }
     setApproving(true)
     setError(null)
     try {
@@ -265,6 +272,7 @@ export default function PermissionsPage() {
         approveTarget.request.id,
         "approved",
         approveTarget.stepId,
+        days,
       )
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
@@ -590,6 +598,7 @@ export default function PermissionsPage() {
                                 setApproveTarget({
                                   request,
                                   stepId: currentSteps[0]?.id,
+                                  durationDays: String(Math.max(request.expires_in_days, 1)),
                                 })
                               }
                             >
@@ -608,6 +617,7 @@ export default function PermissionsPage() {
                                   setApproveTarget({
                                     request,
                                     stepId: step.id,
+                                    durationDays: String(Math.max(request.expires_in_days, 1)),
                                   })
                                 }
                               >
@@ -773,6 +783,39 @@ export default function PermissionsPage() {
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <Label htmlFor="grant-duration-days" className="text-xs">
+              Grant duration (days)
+            </Label>
+            <Input
+              id="grant-duration-days"
+              type="number"
+              min={1}
+              max={approveTarget?.request.expires_in_days ?? 365}
+              value={approveTarget?.durationDays ?? ""}
+              onChange={(e) =>
+                setApproveTarget((prev) =>
+                  prev ? { ...prev, durationDays: e.target.value } : prev,
+                )
+              }
+              className="h-8 text-sm"
+              placeholder="e.g. 30"
+            />
+            {approveTarget && Number(approveTarget.durationDays) >= 1 && (
+              <p className="text-xs text-muted-foreground">
+                Access expires on{" "}
+                {new Date(
+                  Date.now() +
+                    Number(approveTarget.durationDays) * 86_400_000,
+                ).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -782,7 +825,15 @@ export default function PermissionsPage() {
             >
               Cancel
             </Button>
-            <Button type="button" disabled={approving} onClick={handleApprove}>
+            <Button
+              type="button"
+              disabled={
+                approving ||
+                !approveTarget ||
+                !(Number(approveTarget.durationDays) >= 1)
+              }
+              onClick={handleApprove}
+            >
               {approving ? "Approving…" : "Approve"}
             </Button>
           </DialogFooter>

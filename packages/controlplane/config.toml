@@ -12,7 +12,7 @@ bootstrap_servers = "127.0.0.1:19092"
 
 [unity_catalog]
 base_url = "http://localhost:8082/api/2.1/unity-catalog"
-admin_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6IjNlMzZhYTAzMGE0MmU5YThhNTNmMzU1YzFjZjBlOWJlYzUyZDE0MzMifQ.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImludGVybmFsIiwiaWF0IjoxNzc5MTc1MDE4LCJqdGkiOiJhMTZiYjUxOS01YTIxLTQ2NjAtOTA3MC0zMWRiODgyMzBlN2QiLCJ0eXBlIjoiU0VSVklDRSJ9.bH6QBidinnJ9Ga60AupVBHTkykwPnmcR6SJAtZH8v9qKfZTm9QgYrh3CUfJua0292tg2aVAXbusotM9iLl-HDdYl3Triisks8JKrRtJdu5YOrnZKGFHDwKpXA3J5u9Uz_eo0DCGd-Ev6WakJH3K6GeBG3-5Ny8pzNP4kLIXMl59quOYjN5Ot2PQICYn9BV69jBoiVJnKSzk_vdHHPQ5LOFx_siv8is152Ku7dmAsps6vdNfnv4iixlKlbK_cSot9ELahaJTtpVTb6-W2-vuwCcaKs_vkcMDVX-DzeHAABeZxCbEIi36Fjdb6yKpfQ1sKeyd_982IXIeZjEO9f7P0KA"
+admin_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6IjA5MWJlZjFhMjc0ODY0MDc1MTkwYjZkMjFkNjI0YTEzOWQ0NmFjMTAifQ.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImludGVybmFsIiwiaWF0IjoxNzc5MDkzOTM4LCJqdGkiOiI2NWFhMTRkZC00ZDNlLTQxOTEtYjg4OC01YTE5Zjg0NGE4ZTAiLCJ0eXBlIjoiU0VSVklDRSJ9.C6IqFZMcL32JjhxgFWhzR9DhOewwTt7WOjol1BypZmRYlgp6jAjz9PWdrRmTidlTrp_90co9n9zP7UAwuu_fKlSiJ43_PjjnhuhLGrKR1jHOnC4VeqmDNjQR1pjcYP8gnahOW8Y5rP-sA3oBW33NnPnBhbYRg0eh_1Lv9gpC1XMPggu7rxswCySsC6V_4-wyOMn5iXImTDjlL0hghqHsdOqI69dtcWwgf6uu1t-bFTYjxhT15rp2CvqiSpO78sSuQUDUlbdEOvLjN4PaMC5sKs-WsfqF8HgbQGh6cFlrOLbWpHzgHa3K54PKG1qEmY14WWCZ7nrcfGVixnW-wMGiUQ"
 #admin_token_file = "../uc/config/token.txt"
 
 [keycloak]
@@ -30,5 +30,5 @@ base_url = "http://localhost:8090"
 
 [openai]
 api_key = ""
-model = "gpt-5.4-mini"
-base_url = ""
+model = "gpt-5.4-nano"
+base_url = "https://api.openai.com/v1"
