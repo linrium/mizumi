@@ -23,8 +23,8 @@ use crate::{
 };
 
 const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved", "cancelled"];
-const REVIEWER_VIETJETAIR: &str = "10000000-0000-0000-0000-000000000002"; // VietJetair Data Platform
-const REVIEWER_DEFAULT: &str = "10000000-0000-0000-0000-000000000004"; // HDBank Data Steward
+const REVIEWER_VIETJETAIR: &str = "10000000-0000-0000-0000-000000000002"; // VietJetair Analytics
+const REVIEWER_DEFAULT: &str = "10000000-0000-0000-0000-000000000004"; // Sovico Data Steward
 const SECURITY_TEAM_ID: &str = "10000000-0000-0000-0000-000000000005";
 
 fn default_reviewer_id(resource: &str) -> Uuid {
