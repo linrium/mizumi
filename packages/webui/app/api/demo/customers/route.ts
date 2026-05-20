@@ -34,20 +34,42 @@ function parseCsv(content: string): CustomerRow[] {
   })
 }
 
+async function loadCustomers(): Promise<CustomerRow[]> {
+  const candidatePaths = [
+    path.resolve(process.cwd(), "data", "co_brand_customers.csv"),
+    path.resolve(
+      process.cwd(),
+      "..",
+      "spark",
+      "jobs",
+      "data",
+      "co_brand_customers.csv",
+    ),
+  ]
+
+  for (const csvPath of candidatePaths) {
+    try {
+      const csvContent = await readFile(csvPath, "utf-8")
+      return parseCsv(csvContent)
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !("code" in error) ||
+        error.code !== "ENOENT"
+      ) {
+        throw error
+      }
+    }
+  }
+
+  throw new Error("co_brand_customers.csv was not found in the webui runtime")
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const company = searchParams.get("company")
 
-  const csvPath = path.resolve(
-    process.cwd(),
-    "..",
-    "spark",
-    "jobs",
-    "data",
-    "co_brand_customers.csv",
-  )
-  const csvContent = await readFile(csvPath, "utf-8")
-  const allCustomers = parseCsv(csvContent)
+  const allCustomers = await loadCustomers()
 
   const filteredCustomers = allCustomers.filter((customer) => {
     if (company === "hdbank") return customer.has_hdbank === "true"
