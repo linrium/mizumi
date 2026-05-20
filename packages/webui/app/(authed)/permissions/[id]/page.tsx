@@ -9,6 +9,16 @@ import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { cn } from "@/lib/utils"
@@ -82,8 +92,8 @@ function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   switch (decision) {
     case "auto-approved":
       return "Auto-approved by template"
-    case "reviewer-gate":
-      return "Matched template, routed to reviewer chain"
+    case "time-bounded":
+      return "Matched template, time-bound access pending approval"
     case "security-escalation":
       return "Matched template, escalated through security review"
     default:
@@ -213,6 +223,12 @@ export default function PermissionRequestDetailPage() {
     "guardrail",
   )
 
+  // Approval confirmation dialog for time-bounded requests
+  const [approvalDialog, setApprovalDialog] = useState<{
+    stepId: string
+    durationDays: string
+  } | null>(null)
+
   const groupedComponents = useMemo(() => {
     if (!blastRadius) return {} as Record<string, string[]>
     const map: Record<string, string[]> = {}
@@ -271,6 +287,7 @@ export default function PermissionRequestDetailPage() {
   async function handleStatusUpdate(
     status: RequestStatus,
     approvalStepId?: string,
+    grantDurationDays?: number,
   ) {
     if (!request) return
 
@@ -283,6 +300,7 @@ export default function PermissionRequestDetailPage() {
         request.id,
         status,
         approvalStepId,
+        grantDurationDays,
       )
       setRequest(updated)
     } catch (err) {
@@ -293,6 +311,33 @@ export default function PermissionRequestDetailPage() {
       )
     } finally {
       setActioningKey(null)
+    }
+  }
+
+  function openApprovalDialog(stepId: string) {
+    setApprovalDialog({
+      stepId,
+      durationDays: String(Math.max(request?.expires_in_days ?? 30, 1)),
+    })
+  }
+
+  async function handleApprovalDialogConfirm() {
+    if (!approvalDialog || !request) return
+    const days = parseInt(approvalDialog.durationDays, 10)
+    if (!days || days < 1) {
+      setError("Grant duration must be at least 1 day")
+      return
+    }
+    setApprovalDialog(null)
+    await handleStatusUpdate("approved", approvalDialog.stepId, days)
+  }
+
+  function handleApprove(stepId: string) {
+    if (!request) return
+    if (request.queue_decision === "time-bounded") {
+      openApprovalDialog(stepId)
+    } else {
+      handleStatusUpdate("approved", stepId)
     }
   }
 
@@ -321,6 +366,7 @@ export default function PermissionRequestDetailPage() {
   }
 
   return (
+    <>
     <div className="flex h-full flex-col overflow-hidden">
       {/* Page header */}
       <div className="border-b px-6 py-3 shrink-0">
@@ -352,9 +398,7 @@ export default function PermissionRequestDetailPage() {
               <Button
                 size="sm"
                 disabled={actioningKey != null}
-                onClick={() =>
-                  handleStatusUpdate("approved", currentSteps[0]?.id)
-                }
+                onClick={() => handleApprove(currentSteps[0]?.id ?? "")}
               >
                 {actioningKey === `approved:${currentSteps[0]?.id}`
                   ? "Approving…"
@@ -366,7 +410,7 @@ export default function PermissionRequestDetailPage() {
                   key={step.id}
                   size="sm"
                   disabled={actioningKey != null}
-                  onClick={() => handleStatusUpdate("approved", step.id)}
+                  onClick={() => handleApprove(step.id)}
                 >
                   {actioningKey === `approved:${step.id}`
                     ? "Approving…"
@@ -445,6 +489,19 @@ export default function PermissionRequestDetailPage() {
                     {formatQueueDecision(request.queue_decision)}
                   </p>
                 </div>
+                {request.renewal_of && (
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Renewal of grant
+                    </p>
+                    <Link
+                      href={`/permissions/grants/${request.renewal_of}`}
+                      className="mt-0.5 block font-mono text-xs text-muted-foreground hover:underline truncate"
+                    >
+                      {request.renewal_of}
+                    </Link>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2.5">
@@ -814,5 +871,116 @@ export default function PermissionRequestDetailPage() {
         </section>
       </div>
     </div>
+
+    {/* Time-bound approval dialog */}
+    <Dialog
+      open={approvalDialog !== null}
+      onOpenChange={(open) => {
+        if (!open && actioningKey == null) setApprovalDialog(null)
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Approve time-bound access</DialogTitle>
+          <DialogDescription>
+            Confirm the grant duration before issuing access. The requester
+            asked for{" "}
+            <strong>
+              {request?.expires_in_days ?? 0} day
+              {request?.expires_in_days === 1 ? "" : "s"}
+            </strong>
+            . You can reduce it but not exceed the requested duration.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Request summary */}
+        {request && (
+          <div className="rounded-md border bg-muted/40 px-3 py-2.5 text-xs space-y-1.5">
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Requester</span>
+              <span className="font-medium">{request.requester}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Resource</span>
+              <span className="font-mono text-right break-all">
+                {request.resource}
+              </span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Scope</span>
+              <Badge variant="outline" className="text-[10px]">
+                {request.scope}
+              </Badge>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Privileges</span>
+              <div className="flex flex-wrap justify-end gap-1">
+                {request.privileges.map((p) => (
+                  <Badge key={p} variant="outline" className="text-[10px]">
+                    {p}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            {request.policy_template_name && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Policy</span>
+                <span className="text-right">{request.policy_template_name}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="grant-duration-days" className="text-xs">
+            Grant duration (days)
+          </Label>
+          <Input
+            id="grant-duration-days"
+            type="number"
+            min={1}
+            max={request?.expires_in_days ?? 365}
+            value={approvalDialog?.durationDays ?? ""}
+            onChange={(e) =>
+              setApprovalDialog((prev) =>
+                prev ? { ...prev, durationDays: e.target.value } : prev,
+              )
+            }
+            className="h-8 text-sm"
+            placeholder="e.g. 30"
+          />
+          {approvalDialog && Number(approvalDialog.durationDays) >= 1 && (
+            <p className="text-xs text-muted-foreground">
+              Access expires on{" "}
+              {new Date(
+                Date.now() +
+                  Number(approvalDialog.durationDays) * 86_400_000,
+              ).toLocaleDateString(undefined, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setApprovalDialog(null)}
+            disabled={actioningKey != null}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleApprovalDialogConfirm}
+            disabled={actioningKey != null}
+          >
+            {actioningKey != null ? "Approving…" : "Confirm & grant access"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

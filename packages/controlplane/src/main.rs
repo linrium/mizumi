@@ -12,11 +12,11 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use adapters::inbound::http::create_router;
 use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
-    dagster_service::DagsterService, k8s_service::K8sQueryService, lineage_service::LineageService,
-    llm_service::LlmService, permission_service::PermissionService,
-    streaming_service::StreamingJobService, team_service::TeamService,
-    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
-    user_service::UserService,
+    dagster_service::DagsterService, expiry_worker::ExpiryWorker, k8s_service::K8sQueryService,
+    lineage_service::LineageService, llm_service::LlmService,
+    permission_service::PermissionService, streaming_service::StreamingJobService,
+    team_service::TeamService, test_event_service::TestEventService,
+    uc_service::UnityCatalogProxyService, user_service::UserService,
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.unity_catalog.base_url.clone(),
-            uc_admin_token,
+            uc_admin_token.clone(),
         ))),
         user_service: Arc::new(UserService::new(db.clone())),
         keycloak_auth: Arc::new(KeycloakAuth::new(
@@ -101,6 +101,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let app = create_router(state);
+
+    // Start the background expiry worker — runs for the lifetime of the process.
+    let expiry_uc = UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
+        config.unity_catalog.base_url.clone(),
+        uc_admin_token.clone(),
+    ));
+    ExpiryWorker::new(db.clone(), expiry_uc).start();
+
     tracing::info!("listening on {}", config.bind_addr);
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
     axum::serve(listener, app).await?;

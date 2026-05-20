@@ -153,6 +153,18 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/api/permissions/grants",
             get(permissions::list_time_bound_grants),
         )
+        .route(
+            "/api/permissions/grants/{id}",
+            get(permissions::get_time_bound_grant),
+        )
+        .route(
+            "/api/permissions/grants/{id}/revoke",
+            post(permissions::revoke_grant),
+        )
+        .route(
+            "/api/permissions/grants/{id}/renew",
+            post(permissions::admin_renew_grant),
+        )
         .route("/api/lineage/rebuild", post(lineage::rebuild_lineage))
         .route("/api/lineage/search", get(lineage::search_lineage))
         .route("/api/lineage/nodes/{token}", get(lineage::get_lineage_node))

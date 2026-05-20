@@ -58,11 +58,12 @@ export type PermissionRequest = {
   policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_owner_id: string | null
   policy_template_owner: string | null
+  renewal_of: string | null
   approval_steps: PermissionApprovalStep[]
   current_approval_step_id: string | null
   queue_decision:
     | "auto-approved"
-    | "reviewer-gate"
+    | "time-bounded"
     | "security-escalation"
     | "manual-review"
 }
@@ -85,6 +86,7 @@ export type PolicyTemplate = {
   privileges: string[]
   approval_mode: "auto" | "review" | "escalate"
   risk: RiskLevel
+  max_grant_duration_days: number
   usage_30d: number
   owner_id: string
   owner: string
@@ -130,12 +132,16 @@ export type TimeBoundGrant = {
   principal: string
   team: string
   resource: string
+  scope: string
   privilege: string
   started_at: string
   expires_at: string
-  reviewer: string
-  renewal_status: "healthy" | "expiring" | "expired"
+  reviewer_id: string
+  renewal_status: "healthy" | "expiring" | "expired" | "revoked"
   reason: string
+  source_request_id: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type CreatePermissionRequestBody = {
@@ -145,6 +151,8 @@ export type CreatePermissionRequestBody = {
   scope: RequestScope
   privileges: string[]
   rationale: string
+  requested_duration_days?: number
+  renewal_of?: string
 }
 
 export async function listPermissionRequests(params?: {
@@ -195,6 +203,7 @@ export async function updateRequestStatus(
   id: string,
   status: RequestStatus,
   approvalStepId?: string,
+  grantDurationDays?: number,
 ): Promise<PermissionRequest> {
   const res = await apiFetch(
     `/api/permissions/requests/${encodeURIComponent(id)}`,
@@ -204,6 +213,7 @@ export async function updateRequestStatus(
       body: JSON.stringify({
         status,
         approval_step_id: approvalStepId ?? null,
+        grant_duration_days: grantDurationDays ?? null,
       }),
     },
   )
@@ -261,9 +271,63 @@ export async function getBlastRadius(
   return res.json()
 }
 
-export async function listTimeBoundGrants(): Promise<TimeBoundGrant[]> {
-  const res = await apiFetch("/api/permissions/grants")
+export async function listTimeBoundGrants(params?: {
+  status?: string
+  resource?: string
+  principal?: string
+}): Promise<TimeBoundGrant[]> {
+  const url = new URL("/api/permissions/grants", window.location.origin)
+  if (params?.status) url.searchParams.set("status", params.status)
+  if (params?.resource) url.searchParams.set("resource", params.resource)
+  if (params?.principal) url.searchParams.set("principal", params.principal)
+  const res = await apiFetch(url.toString())
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = await res.json()
   return body.grants
+}
+
+export async function getTimeBoundGrant(id: string): Promise<TimeBoundGrant> {
+  const res = await apiFetch(
+    `/api/permissions/grants/${encodeURIComponent(id)}`,
+  )
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function revokeGrant(
+  id: string,
+  reason?: string,
+): Promise<TimeBoundGrant> {
+  const res = await apiFetch(
+    `/api/permissions/grants/${encodeURIComponent(id)}/revoke`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason ?? null }),
+    },
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function adminRenewGrant(
+  id: string,
+  expiresAt: string,
+): Promise<TimeBoundGrant> {
+  const res = await apiFetch(
+    `/api/permissions/grants/${encodeURIComponent(id)}/renew`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expires_at: expiresAt }),
+    },
+  )
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
 }

@@ -106,13 +106,35 @@ impl UnityCatalogHttpProxy {
         principal: &str,
         privileges: &[String],
     ) -> Result<(), String> {
+        self.patch_permissions(scope, resource, principal, privileges, &[])
+            .await
+    }
+
+    pub async fn revoke_permissions(
+        &self,
+        scope: &str,
+        resource: &str,
+        principal: &str,
+        privileges: &[String],
+    ) -> Result<(), String> {
+        self.patch_permissions(scope, resource, principal, &[], privileges)
+            .await
+    }
+
+    async fn patch_permissions(
+        &self,
+        scope: &str,
+        resource: &str,
+        principal: &str,
+        add: &[String],
+        remove: &[String],
+    ) -> Result<(), String> {
         let uc_url = format!("{}/permissions/{scope}/{resource}", self.base_url);
-        let remove: Vec<String> = Vec::new();
         let body = PatchPermissionsBody {
             changes: [PermissionChange {
                 principal,
-                add: privileges,
-                remove: &remove,
+                add,
+                remove,
             }],
         };
 

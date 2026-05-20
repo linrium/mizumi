@@ -103,7 +103,7 @@ function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   switch (decision) {
     case "auto-approved":
       return "Auto-approved by template"
-    case "reviewer-gate":
+    case "time-bounded":
       return "Matched template, routed to reviewer"
     case "security-escalation":
       return "Matched template, escalated"

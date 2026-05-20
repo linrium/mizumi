@@ -1,4 +1,5 @@
 pub mod dagster_service;
+pub mod expiry_worker;
 pub mod k8s_service;
 pub mod lineage_service;
 pub mod llm_service;

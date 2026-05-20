@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
@@ -40,6 +40,7 @@ struct RequestPolicyMatch {
     template_resource: Option<String>,
     approval_mode: String,
     risk: String,
+    max_grant_duration_days: i32,
     owner_id: Uuid,
     approval_steps: Vec<PolicyTemplateApprovalStep>,
 }
@@ -85,7 +86,7 @@ impl PermissionService {
         }
 
         if request.policy_template_id.is_some() {
-            return "reviewer-gate".to_string();
+            return "time-bounded".to_string();
         }
 
         "manual-review".to_string()
@@ -129,6 +130,7 @@ impl PermissionService {
             policy_template_approval_mode: request.policy_template_approval_mode,
             policy_template_owner_id: request.policy_template_owner_id,
             policy_template_owner: request.policy_template_owner,
+            renewal_of: request.renewal_of,
             queue_decision,
             approval_steps: request.approval_steps,
             current_approval_step_id,
@@ -421,7 +423,11 @@ impl PermissionService {
         preview
     }
 
-    async fn grant_request(&self, request: &PermissionRequestView) -> Result<(), AppError> {
+    async fn grant_request(
+        &self,
+        request: &PermissionRequestView,
+        expires_at_override: Option<DateTime<Utc>>,
+    ) -> Result<(), AppError> {
         let principals: Vec<String> = if request.submit_as == "team" {
             if let Some(team_id) = request.team_id {
                 teams::list_members(&self.db, team_id)
@@ -449,26 +455,128 @@ impl PermissionService {
                 .map_err(AppError::QueryFailed)?;
         }
 
+        let team_name = request
+            .team
+            .as_deref()
+            .unwrap_or(&request.requester);
+        let started_at = Utc::now();
+        // Reviewer override takes precedence; fall back to the duration baked
+        // into the request at creation time (already policy-capped).
+        let effective_expires_at = expires_at_override.unwrap_or(request.expires_at);
+
+        // Renewal: extend the existing grant's expiry instead of inserting duplicates.
+        if let Some(renewal_grant_id) = request.renewal_of {
+            match time_bound_grants::extend(&self.db, renewal_grant_id, effective_expires_at).await {
+                Ok(Some(_)) => tracing::info!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    expires_at = %effective_expires_at,
+                    "grant renewed — expires_at extended"
+                ),
+                Ok(None) => tracing::warn!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    "renewal target grant not found or already expired/revoked"
+                ),
+                Err(e) => tracing::error!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    error = %e,
+                    "failed to extend grant on renewal"
+                ),
+            }
+            self.apply_guardrail_if_ready(request.id).await;
+            return Ok(());
+        }
+
+        for principal in &principals {
+            for privilege in &request.privileges {
+                if let Err(e) = time_bound_grants::insert(
+                    &self.db,
+                    principal,
+                    team_name,
+                    &request.resource,
+                    &request.scope,
+                    privilege,
+                    started_at,
+                    effective_expires_at,
+                    &request.reviewer,
+                    &request.rationale,
+                    request.id,
+                )
+                .await
+                {
+                    tracing::error!(
+                        request_id = %request.id,
+                        principal = %principal,
+                        privilege = %privilege,
+                        error = %e,
+                        "failed to record time_bound_grant — UC access was granted but grant tracking is missing"
+                    );
+                }
+            }
+        }
+
+        self.apply_guardrail_if_ready(request.id).await;
+
         Ok(())
     }
 
-    fn best_template_match(
-        request: &PermissionRequestView,
+    /// Apply the blast-radius guardrail cap to the grants linked to `request_id`
+    /// if the LLM analysis is already available.  This is called right after
+    /// inserting grants so manual-approved requests get the cap applied
+    /// immediately when the LLM finished before the reviewer acted.
+    async fn apply_guardrail_if_ready(&self, request_id: Uuid) {
+        match blast_radius::get_llm_data(&self.db, request_id).await {
+            Ok(Some(llm_data)) => {
+                if let Some(cap_days) = Self::guardrail_cap_days(&llm_data.llm_risk) {
+                    match time_bound_grants::apply_guardrail_cap(&self.db, request_id, cap_days)
+                        .await
+                    {
+                        Ok(rows) => tracing::info!(
+                            request_id = %request_id,
+                            cap_days,
+                            rows_affected = rows,
+                            "guardrail cap applied at grant time"
+                        ),
+                        Err(e) => tracing::warn!(
+                            request_id = %request_id,
+                            cap_days,
+                            error = %e,
+                            "guardrail cap update failed at grant time"
+                        ),
+                    }
+                }
+            }
+            Ok(None) => {} // LLM not done yet; spawn_llm_analysis will apply it later
+            Err(e) => tracing::warn!(
+                request_id = %request_id,
+                error = %e,
+                "failed to query LLM data when checking guardrail at grant time"
+            ),
+        }
+    }
+
+    fn find_best_template(
+        scope: &str,
+        resource: &str,
+        team_id: Option<Uuid>,
+        privileges: &[String],
         templates: &[PolicyTemplate],
     ) -> Option<RequestPolicyMatch> {
         let mut matches = templates
             .iter()
             .filter(|template| {
-                template.scope == request.scope
+                template.scope == scope
                     && (template.resource.is_none()
-                        || template.resource.as_deref() == Some(request.resource.as_str()))
-                    && request.team_id.as_ref().is_some_and(|request_team_id| {
+                        || template.resource.as_deref() == Some(resource))
+                    && team_id.as_ref().is_some_and(|request_team_id| {
                         template
                             .team_ids
                             .iter()
                             .any(|team_id| team_id == request_team_id)
                     })
-                    && request.privileges.iter().all(|privilege| {
+                    && privileges.iter().all(|privilege| {
                         template
                             .privileges
                             .iter()
@@ -498,9 +606,55 @@ impl PermissionService {
                 template_resource: template.resource,
                 approval_mode: template.approval_mode,
                 risk: template.risk,
+                max_grant_duration_days: template.max_grant_duration_days,
                 owner_id: template.owner_id,
                 approval_steps: template.approval_steps,
             })
+    }
+
+    fn best_template_match(
+        request: &PermissionRequestView,
+        templates: &[PolicyTemplate],
+    ) -> Option<RequestPolicyMatch> {
+        Self::find_best_template(
+            &request.scope,
+            &request.resource,
+            request.team_id,
+            &request.privileges,
+            templates,
+        )
+    }
+
+    /// Returns the effective `expires_at` for a new permission request.
+    ///
+    /// The requested duration (from the caller) is capped by the matched
+    /// template's `max_grant_duration_days`. When neither is provided the
+    /// service falls back to `DEFAULT_DURATION_DAYS`.
+    fn effective_expires_at(requested_days: Option<i32>, template_max: Option<i32>) -> DateTime<Utc> {
+        const DEFAULT_DURATION_DAYS: i64 = 7;
+        const MAX_DURATION_DAYS: i64 = 365;
+
+        let requested = requested_days
+            .map(|d| d.max(1) as i64)
+            .unwrap_or(DEFAULT_DURATION_DAYS)
+            .min(MAX_DURATION_DAYS);
+
+        let effective = match template_max {
+            Some(max) => requested.min(max as i64),
+            None => requested,
+        };
+
+        Utc::now() + chrono::Duration::days(effective)
+    }
+
+    /// Returns the guardrail cap in days for a given LLM risk level, or `None`
+    /// when no cap should be applied (low risk or analysis not yet complete).
+    fn guardrail_cap_days(llm_risk: &str) -> Option<i32> {
+        match llm_risk {
+            "high" => Some(7),
+            "medium" => Some(30),
+            _ => None,
+        }
     }
 
     fn default_approval_steps_for_mode(
@@ -715,6 +869,28 @@ impl PermissionService {
                         &analysis.explanation,
                     )
                     .await;
+
+                    // Apply guardrail cap to any grants that already exist
+                    // (covers auto-approved requests where grants were created
+                    // before the LLM analysis finished).
+                    if let Some(cap_days) = Self::guardrail_cap_days(&analysis.risk_level) {
+                        match time_bound_grants::apply_guardrail_cap(&db, request_id, cap_days)
+                            .await
+                        {
+                            Ok(rows) => tracing::info!(
+                                request_id = %request_id,
+                                cap_days,
+                                rows_affected = rows,
+                                "guardrail cap applied after LLM analysis"
+                            ),
+                            Err(e) => tracing::warn!(
+                                request_id = %request_id,
+                                cap_days,
+                                error = %e,
+                                "guardrail cap update failed after LLM analysis"
+                            ),
+                        }
+                    }
                 }
                 Err(e) => {
                     tracing::warn!(request_id = %request_id, error = %e, "LLM blast-radius analysis failed");
@@ -786,6 +962,26 @@ impl PermissionService {
             ));
         }
 
+        if let Some(d) = body.requested_duration_days {
+            if d < 1 {
+                return Err(AppError::QueryFailed(
+                    "requested_duration_days must be at least 1".into(),
+                ));
+            }
+        }
+
+        // Validate renewal target if provided.
+        if let Some(renewal_grant_id) = body.renewal_of {
+            let grant = time_bound_grants::get(&self.db, renewal_grant_id)
+                .await?
+                .ok_or_else(|| AppError::QueryFailed("renewal_of grant not found".into()))?;
+            if matches!(grant.renewal_status.as_str(), "expired" | "revoked") {
+                return Err(AppError::QueryFailed(
+                    "cannot renew an expired or revoked grant".into(),
+                ));
+            }
+        }
+
         let team = match body.submit_as.as_str() {
             "personal" => None,
             "team" => {
@@ -812,6 +1008,21 @@ impl PermissionService {
             }
         };
 
+        // Fetch templates before inserting so we can compute the correct
+        // expires_at from the same template that will govern the request.
+        let templates = policy_templates::list(&self.db).await?;
+        let pre_match = Self::find_best_template(
+            &body.scope,
+            &body.resource,
+            team,
+            &body.privileges,
+            &templates,
+        );
+        let expires_at = Self::effective_expires_at(
+            body.requested_duration_days,
+            pre_match.as_ref().map(|m| m.max_grant_duration_days),
+        );
+
         let request = permission_requests::create(
             &self.db,
             body.requester_id,
@@ -820,10 +1031,13 @@ impl PermissionService {
             &body.scope,
             &body.privileges,
             &body.rationale,
+            expires_at,
+            body.renewal_of,
         )
         .await?;
 
-        let templates = policy_templates::list(&self.db).await?;
+        // Reuse the same templates slice — the result is deterministic for the
+        // same inputs, so matched_template == pre_match.
         let matched_template = Self::best_template_match(&request, &templates);
         let approval_chain =
             Self::approval_chain_from_policy_match(matched_template.as_ref(), &request.resource);
@@ -890,7 +1104,7 @@ impl PermissionService {
         }
 
         if request.status == "approved" {
-            self.grant_request(&request).await?;
+            self.grant_request(&request, None).await?;
         }
 
         // Insert the blast-radius preview row with llm_risk = 'processing' and
@@ -935,6 +1149,12 @@ impl PermissionService {
                 self.sync_request_state(id, &existing.resource).await?
             }
             "approved" => {
+                // If the reviewer supplied an explicit duration, compute a new
+                // expires_at from now. This overrides the value baked into the
+                // request at creation time (which is already policy-capped).
+                let expires_at_override = body.grant_duration_days.map(|days| {
+                    Utc::now() + chrono::Duration::days(days)
+                });
                 if existing.approval_steps.is_empty() {
                     let reviewer_id = existing.reviewer_id;
                     let request = permission_requests::update_status_and_reviewer(
@@ -945,7 +1165,7 @@ impl PermissionService {
                     )
                     .await?
                     .ok_or(AppError::NotFound)?;
-                    self.grant_request(&request).await?;
+                    self.grant_request(&request, expires_at_override).await?;
                     request
                 } else {
                     let step_id = Self::resolve_target_step_id(
@@ -962,7 +1182,7 @@ impl PermissionService {
                     permission_requests::activate_next_stage_if_ready(&self.db, id).await?;
                     let request = self.sync_request_state(id, &existing.resource).await?;
                     if request.status == "approved" {
-                        self.grant_request(&request).await?;
+                        self.grant_request(&request, expires_at_override).await?;
                     }
                     request
                 }
@@ -1004,7 +1224,7 @@ impl PermissionService {
         for request in &requests {
             permission_requests::approve_all_steps(&self.db, request.id).await?;
             if request.status != "approved" {
-                self.grant_request(request).await?;
+                self.grant_request(request, None).await?;
             }
         }
 
@@ -1083,7 +1303,75 @@ impl PermissionService {
         ))
     }
 
-    pub async fn list_time_bound_grants(&self) -> Result<Vec<TimeBoundGrant>, AppError> {
-        Ok(time_bound_grants::list(&self.db).await?)
+    pub async fn list_time_bound_grants(
+        &self,
+        status: Option<&str>,
+        resource: Option<&str>,
+        principal: Option<&str>,
+    ) -> Result<Vec<TimeBoundGrant>, AppError> {
+        Ok(time_bound_grants::list(&self.db, status, resource, principal).await?)
+    }
+
+    pub async fn get_time_bound_grant(&self, id: Uuid) -> Result<TimeBoundGrant, AppError> {
+        time_bound_grants::get(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
+    /// Admin: extend a grant's `expires_at` directly (no UC call required —
+    /// the access was already granted; we're only updating the tracking record).
+    pub async fn admin_renew_grant(
+        &self,
+        id: Uuid,
+        body: crate::domain::entities::permission::AdminRenewGrantBody,
+    ) -> Result<TimeBoundGrant, AppError> {
+        if body.expires_at <= Utc::now() {
+            return Err(AppError::QueryFailed(
+                "expires_at must be in the future".into(),
+            ));
+        }
+        time_bound_grants::extend(&self.db, id, body.expires_at)
+            .await?
+            .ok_or_else(|| {
+                AppError::QueryFailed(
+                    "grant not found or already expired/revoked".into(),
+                )
+            })
+    }
+
+    /// Revoke a grant: remove the UC privilege and mark the grant as `revoked`.
+    pub async fn revoke_grant(
+        &self,
+        id: Uuid,
+        body: crate::domain::entities::permission::RevokeGrantBody,
+    ) -> Result<TimeBoundGrant, AppError> {
+        let grant = time_bound_grants::get(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
+        if grant.renewal_status == "revoked" {
+            return Err(AppError::QueryFailed("grant is already revoked".into()));
+        }
+
+        // Revoke UC access for every principal covered by the grant.
+        self.uc_service
+            .revoke_permissions(
+                &grant.scope,
+                &grant.resource,
+                &grant.principal,
+                &[grant.privilege.clone()],
+            )
+            .await
+            .map_err(AppError::QueryFailed)?;
+
+        tracing::info!(
+            grant_id = %id,
+            reason = body.reason.as_deref().unwrap_or(""),
+            "grant revoked — UC privilege removed"
+        );
+
+        time_bound_grants::revoke(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)
     }
 }

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -90,8 +91,8 @@ function formatQueueDecision(
   switch (decision) {
     case "auto-approved":
       return "Auto-approved by policy template"
-    case "reviewer-gate":
-      return "Matched policy template, pending reviewer gate"
+    case "time-bounded":
+      return "Matched policy template, time-bound access pending approval"
     case "security-escalation":
       return "Matched policy template, sent to escalation"
     default:
@@ -147,6 +148,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
       teamId: "",
       privileges: [] as string[],
       rationale: "",
+      requestedDurationDays: "" as string,
     },
     validators: {
       onSubmit: ({ value }) => {
@@ -162,6 +164,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
     },
     onSubmit: async ({ value, formApi }) => {
       setServerError(null)
+      const parsedDuration = parseInt(value.requestedDurationDays, 10)
       const result = await submitPermissionRequestAction({
         submitAs: value.submitAs,
         teamId: value.submitAs === "team" ? value.teamId : undefined,
@@ -171,6 +174,10 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
           .filter((p) => !grantedPrivileges.has(p))
           .sort(),
         rationale: value.rationale.trim(),
+        requestedDurationDays:
+          !Number.isNaN(parsedDuration) && parsedDuration > 0
+            ? parsedDuration
+            : undefined,
       })
       if (result.error) {
         setServerError(result.error)
@@ -395,6 +402,29 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                 placeholder="Describe why you need this access…"
                 className="min-h-20 text-xs"
               />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="requestedDurationDays">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Requested duration (days)
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="e.g. 30 — leave blank for template default"
+                className="text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Capped by the matched policy template's maximum duration.
+              </p>
             </div>
           )}
         </form.Field>
