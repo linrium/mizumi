@@ -18,6 +18,8 @@ dagster_chart := "dagster/dagster"
 dagster_chart_version := "1.13.4"
 dagster_values := "infra/k8s/dagster/helm/values.yaml"
 dagster_image := "mizumi-dagster:1.13.4"
+shared_postgres_namespace := "shared-postgres"
+shared_postgres_manifests := "infra/k8s/shared-postgres"
 
 rustfs_namespace := "rustfs"
 rustfs_release := "rustfs"
@@ -69,9 +71,9 @@ doctor:
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
     docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
+deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
 
-destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy redpanda-destroy rustfs-destroy
+destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
@@ -83,7 +85,7 @@ forward:
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8083:8080 &
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
-    kubectl port-forward -n {{ dagster_namespace }} svc/dagster-postgresql 5433:5432 &
+    kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n controlplane svc/controlplane-svc 4000:6000 &
@@ -175,10 +177,21 @@ rustfs-destroy:
     helm uninstall {{ rustfs_release }} --namespace {{ rustfs_namespace }} || true
     kubectl delete namespace {{ rustfs_namespace }} --ignore-not-found --wait=false
 
+shared-postgres-deploy:
+    kubectl create namespace {{ shared_postgres_namespace }} 2>/dev/null || true
+    kubectl apply -f {{ shared_postgres_manifests }}/postgres.yaml
+    kubectl rollout status statefulset/shared-postgres -n {{ shared_postgres_namespace }} --timeout=300s
+    kubectl get pods,svc,secret -n {{ shared_postgres_namespace }}
+
+shared-postgres-destroy:
+    kubectl delete -f {{ shared_postgres_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ shared_postgres_namespace }} --ignore-not-found --wait=false
+
 keycloak-image-build:
     docker build -t {{ keycloak_image }} packages/keycloak
 
 keycloak-deploy: keycloak-image-build
+    just shared-postgres-deploy
     kubectl create namespace {{ keycloak_namespace }} 2>/dev/null || true
     just shared-postgres-bootstrap
     kubectl apply -f {{ keycloak_manifests }}/postgres.yaml
@@ -289,6 +302,12 @@ dagster-image-build:
     fi
 
 dagster-deploy: dagster-helm-repo dagster-image-build
+    just shared-postgres-deploy
+    kubectl create namespace {{ dagster_namespace }} 2>/dev/null || true
+    kubectl apply -f infra/k8s/dagster/postgres-alias.yaml
+    if ! helm status {{ dagster_release }} -n {{ dagster_namespace }} >/dev/null 2>&1; then \
+      kubectl delete secret dagster-postgresql-secret -n {{ dagster_namespace }} --ignore-not-found; \
+    fi
     helm upgrade --install {{ dagster_release }} {{ dagster_chart }} \
       --namespace {{ dagster_namespace }} \
       --create-namespace \
@@ -300,10 +319,12 @@ dagster-deploy: dagster-helm-repo dagster-image-build
     kubectl get pods -n {{ dagster_namespace }}
 
 shared-postgres-bootstrap:
+    just shared-postgres-deploy
     ./scripts/bootstrap-shared-postgres.sh
 
 dagster-destroy:
     helm uninstall {{ dagster_release }} --namespace {{ dagster_namespace }} || true
+    kubectl delete -f infra/k8s/dagster/postgres-alias.yaml --ignore-not-found || true
     kubectl delete namespace {{ dagster_namespace }} --ignore-not-found --wait=false
 
 unitycatalog-image-build:
@@ -332,6 +353,7 @@ unitycatalog-ui-image-build:
     fi
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
+    just shared-postgres-deploy
     kubectl create namespace {{ unitycatalog_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
     just shared-postgres-bootstrap
@@ -443,6 +465,7 @@ controlplane-image-build:
     fi
 
 controlplane-deploy: controlplane-image-build
+    just shared-postgres-deploy
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
     just openai-secrets-apply

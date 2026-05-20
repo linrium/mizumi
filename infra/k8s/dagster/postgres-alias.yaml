@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dagster-postgresql
+  namespace: dagster
+spec:
+  type: ExternalName
+  externalName: shared-postgres-svc.shared-postgres.svc.cluster.local
+  ports:
+    - port: 5432
+      targetPort: 5432

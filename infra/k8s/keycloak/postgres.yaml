@@ -8,4 +8,4 @@ stringData:
   POSTGRES_DB: keycloak
   POSTGRES_USER: keycloak
   POSTGRES_PASSWORD: keycloak
-  DATABASE_URL: "postgres://keycloak:keycloak@dagster-postgresql.dagster.svc.cluster.local:5432/keycloak"
+  DATABASE_URL: "postgres://keycloak:keycloak@shared-postgres-svc.shared-postgres.svc.cluster.local:5432/keycloak"

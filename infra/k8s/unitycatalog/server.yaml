@@ -24,7 +24,7 @@ data:
     enabled = true
 
     [database]
-    url = "postgres://ucuser:ucpassword@dagster-postgresql.dagster.svc.cluster.local:5432/ucdb"
+    url = "postgres://ucuser:ucpassword@shared-postgres-svc.shared-postgres.svc.cluster.local:5432/ucdb"
     max_connections = 20
 
     [[s3]]

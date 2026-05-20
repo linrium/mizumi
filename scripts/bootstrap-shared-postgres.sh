@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DAGSTER_NAMESPACE="${DAGSTER_NAMESPACE:-dagster}"
-PG_SERVICE="${PG_SERVICE:-dagster-postgresql}"
-PG_SECRET_NAME="${PG_SECRET_NAME:-${PG_SERVICE}}"
+DAGSTER_NAMESPACE="${DAGSTER_NAMESPACE:-shared-postgres}"
+PG_SERVICE="${PG_SERVICE:-shared-postgres-svc}"
+PG_SECRET_NAME="${PG_SECRET_NAME:-shared-postgres-secret}"
 PG_SECRET_KEY="${PG_SECRET_KEY:-}"
 PG_PORT="${PG_PORT:-5432}"
-PG_STATEFULSET_NAME="${PG_STATEFULSET_NAME:-${PG_SERVICE}}"
+PG_STATEFULSET_NAME="${PG_STATEFULSET_NAME:-shared-postgres}"
 PG_ADMIN_USER="${PG_ADMIN_USER:-}"
 PG_ADMIN_PASSWORD="${PG_ADMIN_PASSWORD:-}"
+DAGSTER_DB="${DAGSTER_DB:-dagster}"
+DAGSTER_USER="${DAGSTER_USER:-dagster}"
+DAGSTER_PASSWORD="${DAGSTER_PASSWORD:-dagster_password}"
 CONTROLPLANE_DB="${CONTROLPLANE_DB:-controlplane}"
 CONTROLPLANE_USER="${CONTROLPLANE_USER:-controlplane}"
 CONTROLPLANE_PASSWORD="${CONTROLPLANE_PASSWORD:-controlplane_password}"
@@ -20,7 +23,7 @@ KEYCLOAK_USER="${KEYCLOAK_USER:-keycloak}"
 KEYCLOAK_PASSWORD="${KEYCLOAK_PASSWORD:-keycloak}"
 CLIENT_IMAGE="${CLIENT_IMAGE:-postgres:18}"
 
-kubectl rollout status "statefulset/${PG_SERVICE}" -n "${DAGSTER_NAMESPACE}" --timeout=180s
+kubectl rollout status "statefulset/${PG_STATEFULSET_NAME}" -n "${DAGSTER_NAMESPACE}" --timeout=180s
 
 if [[ -z "${PG_ADMIN_USER}" ]]; then
   PG_ADMIN_USER="$(
@@ -29,6 +32,21 @@ if [[ -z "${PG_ADMIN_USER}" ]]; then
       -o jsonpath="{.spec.template.spec.containers[0].env[?(@.name=='POSTGRES_USER')].value}" \
       2>/dev/null || true
   )"
+fi
+
+if [[ -z "${PG_ADMIN_USER}" ]]; then
+  encoded_user="$(
+    kubectl get secret "${PG_SECRET_NAME}" \
+      -n "${DAGSTER_NAMESPACE}" \
+      -o "jsonpath={.data.POSTGRES_USER}" \
+      2>/dev/null || true
+  )"
+  if [[ -n "${encoded_user}" ]]; then
+    PG_ADMIN_USER="$(
+      python3 -c 'import base64, sys; print(base64.b64decode(sys.stdin.read()).decode(), end="")' \
+        <<<"${encoded_user}"
+    )"
+  fi
 fi
 
 if [[ -z "${PG_ADMIN_USER}" ]]; then
@@ -75,7 +93,7 @@ fi
 
 if [[ -z "${PG_ADMIN_PASSWORD}" ]]; then
   echo "failed to resolve shared postgres admin password from secret ${PG_SECRET_NAME} in namespace ${DAGSTER_NAMESPACE}" >&2
-  echo "set PG_ADMIN_PASSWORD explicitly or redeploy dagster with known credentials" >&2
+  echo "set PG_ADMIN_PASSWORD explicitly or redeploy shared postgres with known credentials" >&2
   exit 1
 fi
 
@@ -99,6 +117,18 @@ kubectl run shared-postgres-bootstrap \
     done
 
     psql -v ON_ERROR_STOP=1 -h \"\$PGHOST\" -p \"\$PGPORT\" -U \"\$PGUSER\" -d postgres <<'SQL'
+SELECT 'CREATE ROLE ${DAGSTER_USER} LOGIN PASSWORD ''${DAGSTER_PASSWORD}'''
+WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DAGSTER_USER}')\gexec
+
+SELECT 'ALTER ROLE ${DAGSTER_USER} WITH LOGIN PASSWORD ''${DAGSTER_PASSWORD}'''
+WHERE EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DAGSTER_USER}')\gexec
+
+SELECT 'CREATE DATABASE ${DAGSTER_DB} OWNER ${DAGSTER_USER}'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DAGSTER_DB}')\gexec
+
+SELECT 'ALTER DATABASE ${DAGSTER_DB} OWNER TO ${DAGSTER_USER}'
+WHERE EXISTS (SELECT FROM pg_database WHERE datname = '${DAGSTER_DB}')\gexec
+
 SELECT 'CREATE ROLE ${CONTROLPLANE_USER} LOGIN PASSWORD ''${CONTROLPLANE_PASSWORD}'''
 WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${CONTROLPLANE_USER}')\gexec
 

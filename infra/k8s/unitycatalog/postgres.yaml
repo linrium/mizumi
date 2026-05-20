@@ -8,4 +8,4 @@ stringData:
   POSTGRES_DB: ucdb
   POSTGRES_USER: ucuser
   POSTGRES_PASSWORD: ucpassword
-  DATABASE_URL: "postgres://ucuser:ucpassword@dagster-postgresql.dagster.svc.cluster.local:5432/ucdb"
+  DATABASE_URL: "postgres://ucuser:ucpassword@shared-postgres-svc.shared-postgres.svc.cluster.local:5432/ucdb"

@@ -1,3 +1,6 @@
+global:
+  postgresqlSecretName: dagster-postgresql-secret
+
 dagster-user-deployments:
   deployments:
     - name: mizumi
@@ -50,19 +53,8 @@ runLauncher:
           memory: 1Gi
 
 postgresql:
-  enabled: true
-  auth:
-    postgresPassword: dagster_postgres_password
-    username: dagster
-    password: dagster_password
-    database: dagster
-  primary:
-    persistence:
-      size: 1Gi
-    resources:
-      requests:
-        cpu: 25m
-        memory: 128Mi
-      limits:
-        cpu: 125m
-        memory: 256Mi
+  enabled: false
+  postgresqlHost: dagster-postgresql
+  postgresqlUsername: dagster
+  postgresqlPassword: dagster_password
+  postgresqlDatabase: dagster

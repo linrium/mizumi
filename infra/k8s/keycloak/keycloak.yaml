@@ -39,7 +39,7 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: jdbc:postgresql://dagster-postgresql.dagster.svc.cluster.local:5432/keycloak
+              value: jdbc:postgresql://shared-postgres-svc.shared-postgres.svc.cluster.local:5432/keycloak
             - name: KC_DB_USERNAME
               valueFrom:
                 secretKeyRef:
