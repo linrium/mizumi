@@ -1,60 +1,48 @@
 "use client"
 
+import { useChat } from "@ai-sdk/react"
 import {
+  Add01Icon,
+  AlertCircleIcon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  Chart01Icon,
+  ChartAreaIcon,
+  ChartColumnIcon,
+  ChartLineData01Icon,
+  ChartScatterIcon,
+  CheckmarkCircle01Icon,
+  Delete01Icon,
+  DragDropIcon,
+  Edit02Icon,
+  Loading03Icon,
+  MoreHorizontalIcon,
+  PieChart01Icon,
+  PlayIcon,
+  Refresh01Icon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import type { ColumnDef } from "@tanstack/react-table"
+import type { UIDataTypes, UIMessage, UIMessagePart, UITools } from "ai"
+import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
+import ReactECharts from "echarts-for-react"
+import {
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react"
-import ReactGridLayout, { useContainerWidth } from "react-grid-layout"
 import type { Layout, LayoutItem } from "react-grid-layout"
-import ReactECharts from "echarts-for-react"
-import type { ColumnDef } from "@tanstack/react-table"
-import { DataGrid } from "@/components/data-grid/data-grid"
-import { useDataGrid } from "@/hooks/use-data-grid"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
-import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai"
+import ReactGridLayout, { useContainerWidth } from "react-grid-layout"
 import { Streamdown } from "streamdown"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import {
-  Add01Icon,
-  Cancel01Icon,
-  Delete01Icon,
-  Edit02Icon,
-  DragDropIcon,
-  MoreHorizontalIcon,
-  Chart01Icon,
-  PlayIcon,
-  Loading03Icon,
-  AlertCircleIcon,
-  CheckmarkCircle01Icon,
-  Refresh01Icon,
-  ChartColumnIcon,
-  ChartLineData01Icon,
-  ChartAreaIcon,
-  PieChart01Icon,
-  ChartScatterIcon,
-  SparklesIcon,
-  ArrowUp01Icon,
-} from "@hugeicons/core-free-icons"
+import { DataGrid } from "@/components/data-grid/data-grid"
+import { SqlCodeEditor } from "@/components/sql-editor"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,9 +50,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
 import { apiFetch, getToken } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import type { PanelSummary } from "@/services/dashboard"
 
@@ -144,7 +144,7 @@ function buildOption(
     yi >= 0
       ? result.rows
           .map((r) => parseFloat(String((r as unknown[])[yi] ?? "0")))
-          .filter(isFinite)
+          .filter(Number.isFinite)
       : []
 
   const textColor = "#71717a"
@@ -525,19 +525,21 @@ function PanelSidebar({
             Run
           </Button>
         </div>
-        <Textarea
+        <div
           id={`${uid}-sql`}
-          value={panel.sql}
-          onChange={(e) => onChange({ ...panel, sql: e.target.value })}
-          placeholder="SELECT col1, col2 FROM table LIMIT 100"
-          className="font-mono text-[11px] resize-none min-h-[100px]"
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault()
+          className="min-h-[160px] overflow-hidden rounded-md border bg-background"
+        >
+          <SqlCodeEditor
+            value={panel.sql}
+            onChange={(value) => onChange({ ...panel, sql: value })}
+            onSubmit={() => {
               if (!isRunning && panel.sql.trim()) onRun(panel)
-            }
-          }}
-        />
+            }}
+            lineNumbers="off"
+            className="h-full"
+            editorClassName="min-h-[160px]"
+          />
+        </div>
         {data.status === "error" && (
           <p className="text-[10px] text-destructive whitespace-pre-wrap">
             {data.error}
@@ -1131,45 +1133,42 @@ export default function DashboardPage() {
 
   const { activeId } = useSessionContext()
 
-  const runQuery = useCallback(
-    async (panel: Panel) => {
-      if (!panel.sql.trim()) return
-      abortRefs.current[panel.id]?.abort()
-      const ctrl = new AbortController()
-      abortRefs.current[panel.id] = ctrl
+  const runQuery = useCallback(async (panel: Panel) => {
+    if (!panel.sql.trim()) return
+    abortRefs.current[panel.id]?.abort()
+    const ctrl = new AbortController()
+    abortRefs.current[panel.id] = ctrl
+    setPanelData((prev) => ({
+      ...prev,
+      [panel.id]: { status: "running", result: null, error: null },
+    }))
+    try {
+      const idToken = await getToken()
+      const res = await apiFetch("/api/sessions/default/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: panel.sql, idToken }),
+        signal: ctrl.signal,
+      })
+      const json = await res.json()
+      if (!res.ok)
+        throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`)
       setPanelData((prev) => ({
         ...prev,
-        [panel.id]: { status: "running", result: null, error: null },
+        [panel.id]: { status: "ok", result: json, error: null },
       }))
-      try {
-        const idToken = await getToken()
-        const res = await apiFetch("/api/sessions/default/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sql: panel.sql, idToken }),
-          signal: ctrl.signal,
-        })
-        const json = await res.json()
-        if (!res.ok)
-          throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`)
-        setPanelData((prev) => ({
-          ...prev,
-          [panel.id]: { status: "ok", result: json, error: null },
-        }))
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return
-        setPanelData((prev) => ({
-          ...prev,
-          [panel.id]: {
-            status: "error",
-            result: null,
-            error: (err as Error).message,
-          },
-        }))
-      }
-    },
-    [],
-  )
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return
+      setPanelData((prev) => ({
+        ...prev,
+        [panel.id]: {
+          status: "error",
+          result: null,
+          error: (err as Error).message,
+        },
+      }))
+    }
+  }, [])
 
   const hasAutoRun = useRef(false)
   useEffect(() => {

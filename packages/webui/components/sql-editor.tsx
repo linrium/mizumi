@@ -6,12 +6,13 @@ import type { Monaco } from "@monaco-editor/react"
 import Editor from "@monaco-editor/react"
 import { useForm } from "@tanstack/react-form"
 import type { ColumnDef } from "@tanstack/react-table"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import type { CatalogCompletionSchema } from "@/app/api/catalog/completions/route"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { Button } from "@/components/ui/button"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { apiFetch } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import {
   executeSessionSqlQuery,
   formatQueryResultsAsTsv,
@@ -323,11 +324,25 @@ const RESULTS_MIN = 80
 const RESULTS_MAX = 800
 const RESULTS_DEFAULT = 300
 
-export function SqlEditor() {
-  const [result, setResult] = useState<SqlQueryResult | null>(null)
-  const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+type SqlCodeEditorProps = {
+  value: string
+  onChange: (value: string) => void
+  onSubmit?: () => void
+  className?: string
+  editorClassName?: string
+  error?: ReactNode
+  lineNumbers?: "on" | "off"
+}
+
+export function SqlCodeEditor({
+  value,
+  onChange,
+  onSubmit,
+  className,
+  editorClassName,
+  error,
+  lineNumbers = "on",
+}: SqlCodeEditorProps) {
   const monacoRef = useRef<Monaco | null>(null)
   const completionDataRef = useRef<CatalogCompletionSchema | null>(null)
   const disposeCompletionsRef = useRef<(() => void) | null>(null)
@@ -356,6 +371,62 @@ export function SqlEditor() {
       disposeCompletionsRef.current = null
     }
   }, [])
+
+  return (
+    <div className={cn("h-full flex flex-col", className)}>
+      <div className={cn("min-h-0 flex-1", editorClassName)}>
+        <Editor
+          height="100%"
+          language="sql"
+          theme="vs"
+          value={value}
+          onChange={(nextValue) => onChange(nextValue ?? "")}
+          onMount={(editor, monaco) => {
+            if (onSubmit) {
+              editor.addCommand(
+                monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                () => onSubmit(),
+              )
+            }
+            monacoRef.current = monaco
+            if (completionDataRef.current) {
+              disposeCompletionsRef.current?.()
+              const { dispose } =
+                monaco.languages.registerCompletionItemProvider(
+                  "sql",
+                  buildCompletionProvider(monaco, completionDataRef.current),
+                )
+              disposeCompletionsRef.current = dispose
+            }
+          }}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 13,
+            lineNumbers,
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+            overviewRulerLanes: 0,
+            renderLineHighlight: "line",
+            padding: { top: 12, bottom: 12 },
+            fontFamily: "var(--font-geist-mono)",
+            lineHeight: 1.6,
+          }}
+        />
+      </div>
+      {error ? (
+        <div className="px-4 py-1 text-xs text-destructive border-t border-destructive/20 bg-destructive/5">
+          {error}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function SqlEditor() {
+  const [result, setResult] = useState<SqlQueryResult | null>(null)
+  const [resultsHeight, setResultsHeight] = useState(RESULTS_DEFAULT)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -440,55 +511,19 @@ export function SqlEditor() {
         >
           <form.Field name="sql" validators={{ onChange: sqlSchema.shape.sql }}>
             {(field) => (
-              <div className="h-full flex flex-col">
-                <Editor
-                  height="100%"
-                  language="sql"
-                  theme="vs"
-                  value={field.state.value}
-                  onChange={(v) => field.handleChange(v ?? "")}
-                  onMount={(editor, monaco) => {
-                    editor.onDidBlurEditorWidget(() => field.handleBlur())
-                    editor.addCommand(
-                      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                      () => form.handleSubmit(),
-                    )
-                    monacoRef.current = monaco
-                    if (completionDataRef.current) {
-                      disposeCompletionsRef.current?.()
-                      const { dispose } =
-                        monaco.languages.registerCompletionItemProvider(
-                          "sql",
-                          buildCompletionProvider(
-                            monaco,
-                            completionDataRef.current,
-                          ),
-                        )
-                      disposeCompletionsRef.current = dispose
-                    }
-                  }}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: "on",
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                    overviewRulerLanes: 0,
-                    renderLineHighlight: "line",
-                    padding: { top: 12, bottom: 12 },
-                    fontFamily: "var(--font-geist-mono)",
-                    lineHeight: 1.6,
-                  }}
-                />
-                {field.state.meta.errors.length > 0 && (
-                  <p className="px-4 py-1 text-xs text-destructive border-t border-destructive/20 bg-destructive/5">
-                    {String(
-                      (field.state.meta.errors[0] as { message?: string })
-                        ?.message ?? field.state.meta.errors[0],
-                    )}
-                  </p>
-                )}
-              </div>
+              <SqlCodeEditor
+                value={field.state.value}
+                onChange={(nextValue) => field.handleChange(nextValue)}
+                onSubmit={() => form.handleSubmit()}
+                error={
+                  field.state.meta.errors.length > 0
+                    ? String(
+                        (field.state.meta.errors[0] as { message?: string })
+                          ?.message ?? field.state.meta.errors[0],
+                      )
+                    : undefined
+                }
+              />
             )}
           </form.Field>
         </form>
