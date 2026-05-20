@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,15 +10,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   type BlastRadiusPreview,
   type LlmRiskStatus,
   listBlastRadius,
-} from "@/services/permissions"
+} from "@/services/permissions";
 
 function formatScopeLabel(scope: string) {
-  return scope[0]?.toUpperCase() + scope.slice(1)
+  return scope[0]?.toUpperCase() + scope.slice(1);
 }
 
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
@@ -27,7 +27,7 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
       <Badge variant="outline" className="animate-pulse text-muted-foreground">
         LLM analysing…
       </Badge>
-    )
+    );
   }
   if (status === "failed") {
     return (
@@ -37,35 +37,35 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
       >
         LLM failed
       </Badge>
-    )
+    );
   }
   if (status === "unknown") {
-    return null
+    return null;
   }
   const variant =
     status === "high"
       ? "destructive"
       : status === "medium"
         ? "secondary"
-        : "outline"
+        : "outline";
   return (
     <Badge variant={variant}>
       LLM {status[0]?.toUpperCase() + status.slice(1)} risk
     </Badge>
-  )
+  );
 }
 
 export default function BlastRadiusPreviewPage() {
-  const [previews, setPreviews] = useState<BlastRadiusPreview[]>([])
-  const [loading, setLoading] = useState(true)
+  const [previews, setPreviews] = useState<BlastRadiusPreview[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     listBlastRadius()
       .then(setPreviews)
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => setLoading(false));
+  }, []);
 
-  const resolvedCount = previews.filter((p) => p.lineage_resolved).length
+  const resolvedCount = previews.filter((p) => p.lineage_resolved).length;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -120,9 +120,6 @@ export default function BlastRadiusPreviewPage() {
                         <span className="font-mono text-xs text-muted-foreground">
                           {item.code}
                         </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.consumers} consuming teams
                       </div>
                     </div>
                   </TableCell>
@@ -183,5 +180,5 @@ export default function BlastRadiusPreviewPage() {
         </Table>
       </div>
     </div>
-  )
+  );
 }

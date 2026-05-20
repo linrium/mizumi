@@ -180,8 +180,8 @@ keycloak-image-build:
 
 keycloak-deploy: keycloak-image-build
     kubectl create namespace {{ keycloak_namespace }} 2>/dev/null || true
+    just shared-postgres-bootstrap
     kubectl apply -f {{ keycloak_manifests }}/postgres.yaml
-    kubectl rollout status statefulset/keycloak-postgres -n {{ keycloak_namespace }} --timeout=300s
     kubectl apply -f {{ keycloak_manifests }}/keycloak.yaml
     kubectl rollout status deployment/keycloak -n {{ keycloak_namespace }} --timeout=300s
     just keycloak-bootstrap
