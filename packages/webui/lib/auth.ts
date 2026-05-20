@@ -3,12 +3,12 @@ import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 import { customSession, genericOAuth } from "better-auth/plugins"
 import type { AppSession } from "@/lib/auth/types"
+import { KEYCLOAK_PROVIDER_ID } from "@/lib/auth/constants"
 import { normalizeGroups, readTokenClaims } from "@/lib/auth/jwt"
 
 const DEFAULT_BASE_URL = "http://localhost:3000"
 const DEFAULT_REALM = "sovico"
 const DEFAULT_KEYCLOAK_PUBLIC_BASE_URL = "http://127.0.0.1:8083"
-const KEYCLOAK_PROVIDER_ID = "keycloak"
 const AUTH_ROUTE_BASE = "/api/auth"
 
 function getBaseUrl() {
@@ -136,7 +136,7 @@ export const auth = betterAuth({
             getKeycloakInternalBaseUrl(),
             "userinfo",
           ),
-          scopes: ["openid", "profile", "email"],
+          scopes: ["openid", "profile", "email", "offline_access"],
         },
       ],
     }),
