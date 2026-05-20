@@ -1033,7 +1033,9 @@ export function LineageGraph({
       ? selectedNodeId
       : (focusedGraph?.root?.id ?? null)
   const { rfNodes, rfEdges } = useMemo(() => {
-    if (!focusedGraph) return { rfNodes: [], rfEdges: [] }
+    if (!focusedGraph) {
+      return { rfNodes: [] as LineageFlowNode[], rfEdges: [] as Edge[] }
+    }
 
     const expandedIds = new Set(expandedNodeIds)
     const graphForLayout = {
@@ -1057,9 +1059,13 @@ export function LineageGraph({
     )
 
     return {
-      rfNodes: layout.rfNodes.map((node) => {
+      rfNodes: layout.rfNodes.map((node): LineageFlowNode => {
+        if (node.type !== "lineageCard") {
+          return node
+        }
+
         const data: LineageNodeData = {
-          ...(node.data as LineageNodeData),
+          ...node.data,
           canExpand:
             enableNeighborhoodSelection &&
             !!selectedNodeId &&
