@@ -89,7 +89,7 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
-    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n controlplane svc/controlplane-svc 4000:4000 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
