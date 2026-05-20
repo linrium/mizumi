@@ -67,14 +67,16 @@ pub async fn get_llm_data(
     .fetch_optional(db)
     .await
     .map(|row| {
-        row.map(|(recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
-            BlastRadiusLlmData {
-                recommended_guardrail,
-                llm_risk,
-                llm_recommendation,
-                llm_explanation,
-            }
-        })
+        row.map(
+            |(recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
+                BlastRadiusLlmData {
+                    recommended_guardrail,
+                    llm_risk,
+                    llm_recommendation,
+                    llm_explanation,
+                }
+            },
+        )
     })
 }
 
@@ -90,17 +92,18 @@ pub async fn list_llm_data(db: &PgPool) -> Result<HashMap<Uuid, BlastRadiusLlmDa
 
     Ok(rows
         .into_iter()
-        .map(|(id, recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
-            (
-                id,
-                BlastRadiusLlmData {
-                    recommended_guardrail,
-                    llm_risk,
-                    llm_recommendation,
-                    llm_explanation,
-                },
-            )
-        })
+        .map(
+            |(id, recommended_guardrail, llm_risk, llm_recommendation, llm_explanation)| {
+                (
+                    id,
+                    BlastRadiusLlmData {
+                        recommended_guardrail,
+                        llm_risk,
+                        llm_recommendation,
+                        llm_explanation,
+                    },
+                )
+            },
+        )
         .collect())
 }
-

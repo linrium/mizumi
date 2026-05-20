@@ -1,0 +1,7 @@
+http://keycloak-svc.keycloak.svc.cluster.local {
+	reverse_proxy 127.0.0.1:8083
+}
+
+http://controlplane-svc.controlplane.svc.cluster.local {
+	reverse_proxy 127.0.0.1:4000
+}

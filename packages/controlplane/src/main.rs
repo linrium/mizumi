@@ -68,9 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
-        k8s_service: Arc::new(K8sQueryService::new(
-            config.duckdb_server.base_url.clone(),
-        )),
+        k8s_service: Arc::new(K8sQueryService::new(config.duckdb_server.base_url.clone())),
         lineage_service: Arc::new(LineageService::new(
             db.clone(),
             config.unity_catalog.base_url.clone(),
@@ -96,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         keycloak_auth: Arc::new(KeycloakAuth::new(
             &config.keycloak.url,
             &config.keycloak.realm,
-            config.keycloak.issuer.as_deref(),
+            config.keycloak.allowed_issuers(),
             config.keycloak.audiences.clone(),
         )),
         bypass_token: config.bypass_token.clone(),

@@ -168,6 +168,26 @@ just caddy-s3-trust
 just caddy-s3-proxy
 ```
 
+### Cluster Service Aliases
+
+If you need local clients to talk to in-cluster HTTP service URLs during dev, this repo includes a local Caddy config at `infra/caddy/ClusterServices.Caddyfile` with these mappings:
+
+- `http://keycloak-svc.keycloak.svc.cluster.local` -> `http://127.0.0.1:8083`
+- `http://controlplane-svc.controlplane.svc.cluster.local` -> `http://127.0.0.1:4000`
+
+Required local machine steps:
+
+```bash
+# 1. Start the local forwards first
+just forward
+
+# 2. Map the in-cluster hostnames to localhost
+echo '127.0.0.1 keycloak-svc.keycloak.svc.cluster.local controlplane-svc.controlplane.svc.cluster.local' | sudo tee -a /etc/hosts
+
+# 3. Run the HTTP proxy on port 80
+just caddy-cluster-services-proxy
+```
+
 To create the example Spark streaming job through `controlplane` after `just forward`:
 
 ```bash

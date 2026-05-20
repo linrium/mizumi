@@ -31,7 +31,19 @@ pub struct KeycloakConfig {
     pub realm: String,
     pub issuer: Option<String>,
     #[serde(default)]
+    pub issuers: Vec<String>,
+    #[serde(default)]
     pub audiences: Vec<String>,
+}
+
+impl KeycloakConfig {
+    pub fn allowed_issuers(&self) -> Vec<String> {
+        if !self.issuers.is_empty() {
+            return self.issuers.clone();
+        }
+
+        self.issuer.iter().cloned().collect()
+    }
 }
 
 #[derive(Clone, Deserialize)]

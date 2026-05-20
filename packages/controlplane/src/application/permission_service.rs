@@ -7,10 +7,7 @@ use crate::{
     adapters::outbound::postgres::{
         blast_radius, lineage, permission_requests, policy_templates, teams, time_bound_grants,
     },
-    application::{
-        llm_service::LlmService,
-        uc_service::UnityCatalogProxyService,
-    },
+    application::{llm_service::LlmService, uc_service::UnityCatalogProxyService},
     domain::{
         entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
@@ -662,10 +659,16 @@ impl PermissionService {
                 let nodes = lineage::list_nodes(&db).await?;
                 let edges = lineage::list_edges(&db).await?;
                 let aliases = lineage::list_aliases(&db).await?;
-                let nodes_by_id = nodes.into_iter().map(|n| (n.id, n)).collect::<HashMap<_, _>>();
+                let nodes_by_id = nodes
+                    .into_iter()
+                    .map(|n| (n.id, n))
+                    .collect::<HashMap<_, _>>();
                 let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
                 for edge in edges {
-                    downstream_edges_by_src.entry(edge.src_node_id).or_default().push(edge);
+                    downstream_edges_by_src
+                        .entry(edge.src_node_id)
+                        .or_default()
+                        .push(edge);
                 }
                 let aliases_map = aliases.into_iter().collect::<HashMap<_, _>>();
                 Ok::<_, sqlx::Error>(Self::build_blast_radius_preview(
@@ -682,7 +685,8 @@ impl PermissionService {
                 Ok(p) => p,
                 Err(e) => {
                     tracing::warn!(request_id = %request_id, error = %e, "LLM task: lineage query failed");
-                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
+                    let _ =
+                        blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
                     return;
                 }
             };
@@ -714,7 +718,8 @@ impl PermissionService {
                 }
                 Err(e) => {
                     tracing::warn!(request_id = %request_id, error = %e, "LLM blast-radius analysis failed");
-                    let _ = blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
+                    let _ =
+                        blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
                 }
             }
         });

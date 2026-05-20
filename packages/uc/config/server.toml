@@ -35,6 +35,7 @@ redirect_port = 8080
 #   Keycloak:         "http://localhost:8083/realms/sovico"
 allowed_issuers = [
   "http://localhost:8083/realms/sovico",
+  "http://127.0.0.1:8083/realms/sovico",
   "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico",
 ]
 

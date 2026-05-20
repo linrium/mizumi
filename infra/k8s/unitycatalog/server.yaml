@@ -16,7 +16,11 @@ data:
     client_id = "webui"
     client_secret = "webui-secret"
     redirect_port = 8082
-    allowed_issuers = ["http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico", "http://127.0.0.1:8083/realms/sovico"]
+    allowed_issuers = [
+      "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico",
+      "http://127.0.0.1:8083/realms/sovico",
+      "http://localhost:8083/realms/sovico",
+    ]
     audiences = ["webui"]
     cookie_timeout = "P5D"
 

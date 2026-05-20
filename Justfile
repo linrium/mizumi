@@ -52,6 +52,8 @@ daft_simple_values := "infra/k8s/daft/helm/simple-values.yaml"
 daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
 caddy_s3_hostname := "s3.ap-southeast-1.amazonaws.com"
 caddy_config := "infra/caddy/Caddyfile"
+caddy_cluster_service_hosts := "keycloak-svc.keycloak.svc.cluster.local controlplane-svc.controlplane.svc.cluster.local"
+caddy_cluster_services_config := "infra/caddy/ClusterServices.Caddyfile"
 
 redpanda_namespace := "redpanda"
 redpanda_manifests := "infra/k8s/redpanda"
@@ -87,14 +89,14 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
-    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
-    kubectl port-forward -n controlplane svc/controlplane-svc 4000:6000 &
+    # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    kubectl port-forward -n controlplane svc/controlplane-svc 4000:4000 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
     echo "Redpanda Admin:   http://127.0.0.1:9644"
     echo "Redpanda UI:      http://127.0.0.1:8081"
-    echo "Keycloak:         http://127.0.0.1:8083"
+    echo "Keycloak:         http://127.0.0.1:8080"
     echo "Dagster UI:       http://127.0.0.1:8088"
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
@@ -115,6 +117,14 @@ caddy-s3-setup:
     @echo "2. Add this host override: 127.0.0.1 {{ caddy_s3_hostname }}"
     @echo "3. Trust Caddy's local CA: just caddy-s3-trust"
     @echo "4. Start the proxy: just caddy-s3-proxy"
+
+caddy-cluster-services-proxy:
+    sudo caddy run --config {{ caddy_cluster_services_config }}
+
+caddy-cluster-services-setup:
+    @echo "1. Ensure Keycloak is reachable on http://127.0.0.1:8083 and controlplane on http://127.0.0.1:4000 (for example: just forward)"
+    @echo "2. Add these host overrides: 127.0.0.1 {{ caddy_cluster_service_hosts }}"
+    @echo "3. Start the proxy on :80: just caddy-cluster-services-proxy"
 
 rustfs-helm-repo:
     helm repo add rustfs https://charts.rustfs.com/ 2>/dev/null || true

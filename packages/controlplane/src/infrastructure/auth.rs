@@ -60,7 +60,7 @@ struct OidcDiscovery {
 pub struct KeycloakAuth {
     http: reqwest::Client,
     pub discovery_issuer: String,
-    pub expected_issuer: String,
+    pub allowed_issuers: Vec<String>,
     pub audiences: Vec<String>,
     jwks_uri: Arc<RwLock<Option<String>>>,
     jwks_cache: Arc<RwLock<Option<JwkSet>>>,
@@ -70,17 +70,19 @@ impl KeycloakAuth {
     pub fn new(
         keycloak_url: &str,
         realm: &str,
-        issuer: Option<&str>,
+        issuers: Vec<String>,
         audiences: Vec<String>,
     ) -> Self {
         let discovery_issuer = format!("{}/realms/{}", keycloak_url.trim_end_matches('/'), realm);
-        let expected_issuer = issuer
-            .map(str::to_owned)
-            .unwrap_or_else(|| discovery_issuer.clone());
+        let allowed_issuers = if issuers.is_empty() {
+            vec![discovery_issuer.clone()]
+        } else {
+            issuers
+        };
         Self {
             http: reqwest::Client::new(),
             discovery_issuer,
-            expected_issuer,
+            allowed_issuers,
             audiences,
             jwks_uri: Arc::new(RwLock::new(None)),
             jwks_cache: Arc::new(RwLock::new(None)),
@@ -195,11 +197,16 @@ impl KeycloakAuth {
             .unwrap_or(Algorithm::RS256);
 
         tracing::debug!("jwk discovery issuer: {}", self.discovery_issuer);
-        tracing::debug!("jwt expected issuer: {}", self.expected_issuer);
+        tracing::debug!("jwt allowed issuers: {:?}", self.allowed_issuers);
         tracing::debug!("jwk audiences: {:?}", self.audiences);
 
         let mut validation = Validation::new(alg);
-        validation.set_issuer(&[&self.expected_issuer]);
+        let issuers = self
+            .allowed_issuers
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        validation.set_issuer(&issuers);
         if self.audiences.is_empty() {
             validation.validate_aud = false;
         } else {
