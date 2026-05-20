@@ -458,7 +458,7 @@ jobs-delete-vietjetair token='test':
     done
 
 controlplane-image-build:
-    docker build -t {{ controlplane_image }} packages/controlplane
+    docker build -f packages/controlplane/Dockerfile -t {{ controlplane_image }} .
     if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
       kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
       kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \

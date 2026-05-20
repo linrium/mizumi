@@ -14,8 +14,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    adapters::outbound::postgres::lineage::{
-        self, NewLineageEdge, NewLineageNode, NewLineageNodeRuntime, NewLineageRun,
+    adapters::outbound::postgres::{
+        lineage::{self, NewLineageEdge, NewLineageNode, NewLineageNodeRuntime, NewLineageRun},
+        streaming_jobs,
     },
     domain::{
         entities::lineage::{
@@ -46,11 +47,7 @@ impl LineageService {
         uc_admin_token: String,
         dagster_base_url: String,
     ) -> Self {
-        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| PathBuf::from("."));
+        let repo_root = resolve_repo_root();
 
         Self {
             db,
@@ -101,6 +98,7 @@ impl LineageService {
         self.ingest_unity_catalog(&mut graph).await?;
         self.ingest_dagster(&mut graph).await?;
         self.ingest_repo_jobs(&mut graph)?;
+        self.ingest_streaming_job_submissions(&mut graph).await?;
 
         let nodes = graph
             .nodes
@@ -758,89 +756,9 @@ impl LineageService {
                 json!({ "path": rel_path, "app_name": app_name }),
             );
             graph.add_alias(job_id, rel_path.clone(), AliasPriority::RepoPath);
+            graph.add_alias(job_id, app_name.clone(), AliasPriority::ShortName);
 
-            for source_var in
-                extract_var_usages(&contents, LOAD_VAR_PATTERN.get_or_init(load_var_regex))
-            {
-                if let Some(value) = constants.get(&source_var) {
-                    if let Some(table_id) = graph.ensure_table_for_path(value) {
-                        graph.add_edge(
-                            table_id,
-                            job_id,
-                            "reads_from",
-                            0.95,
-                            json!({ "source": "repo_scan" }),
-                        );
-                    }
-                }
-            }
-
-            for target_var in
-                extract_var_usages(&contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex))
-            {
-                if let Some(value) = constants.get(&target_var) {
-                    if let Some(table_id) = graph.ensure_table_for_path(value) {
-                        graph.add_edge(
-                            job_id,
-                            table_id,
-                            "writes_to",
-                            0.95,
-                            json!({ "source": "repo_scan" }),
-                        );
-                    }
-                }
-            }
-
-            if is_streaming {
-                if let Some(topic_var) = extract_first_var_usage(
-                    &contents,
-                    TOPIC_VAR_PATTERN.get_or_init(topic_var_regex),
-                ) {
-                    if let Some(topic_name) = constants.get(&topic_var) {
-                        let bootstrap = extract_first_var_usage(
-                            &contents,
-                            BOOTSTRAP_VAR_PATTERN.get_or_init(bootstrap_var_regex),
-                        )
-                        .and_then(|var| constants.get(&var).cloned())
-                        .unwrap_or_else(|| {
-                            "redpanda-svc.redpanda.svc.cluster.local:9092".to_string()
-                        });
-                        let topic_id = graph.ensure_node(
-                            "topic",
-                            "kafka",
-                            &format!("kafka://{bootstrap}"),
-                            topic_name,
-                            topic_name,
-                            json!({ "bootstrap_servers": bootstrap }),
-                        );
-                        graph.add_alias(topic_id, topic_name.clone(), AliasPriority::TopicName);
-                        graph.add_edge(
-                            topic_id,
-                            job_id,
-                            "reads_from",
-                            0.98,
-                            json!({ "source": "repo_scan" }),
-                        );
-                    }
-                }
-
-                if let Some(target_var) = extract_first_var_usage(
-                    &contents,
-                    STREAM_PATH_VAR_PATTERN.get_or_init(stream_path_var_regex),
-                ) {
-                    if let Some(path_value) = constants.get(&target_var) {
-                        if let Some(table_id) = graph.ensure_table_for_path(path_value) {
-                            graph.add_edge(
-                                job_id,
-                                table_id,
-                                "writes_to",
-                                0.98,
-                                json!({ "source": "repo_scan", "mode": "streaming" }),
-                            );
-                        }
-                    }
-                }
-            }
+            add_spark_job_edges(graph, &contents, &constants, job_id, is_streaming);
         }
 
         Ok(())
@@ -976,6 +894,80 @@ impl LineageService {
         Ok(())
     }
 
+    async fn ingest_streaming_job_submissions(
+        &self,
+        graph: &mut GraphBuilder,
+    ) -> Result<(), AppError> {
+        let jobs = streaming_jobs::list(&self.db).await?;
+
+        for job in jobs {
+            let repo_path = normalize_job_path(&job.main_application_file);
+            let job_id = graph
+                .resolve_alias(&repo_path)
+                .or_else(|| graph.resolve_alias(&job.name))
+                .unwrap_or_else(|| {
+                    graph.ensure_node(
+                        "streaming_job",
+                        "spark",
+                        "spark://mizumi",
+                        &repo_path,
+                        &job.name,
+                        json!({
+                            "name": job.name,
+                            "namespace": job.namespace,
+                            "path": repo_path,
+                            "main_application_file": job.main_application_file,
+                            "image": job.image,
+                            "spark_version": job.spark_version,
+                            "spark_conf": job.spark_conf,
+                            "driver_cores": job.driver_cores,
+                            "driver_memory": job.driver_memory,
+                            "executor_instances": job.executor_instances,
+                            "executor_cores": job.executor_cores,
+                            "executor_memory": job.executor_memory,
+                        }),
+                    )
+                });
+
+            graph.add_alias(job_id, job.name.clone(), AliasPriority::ShortName);
+            graph.add_alias(job_id, repo_path.clone(), AliasPriority::RepoPath);
+            graph.add_alias(
+                job_id,
+                job.main_application_file.clone(),
+                AliasPriority::RepoPath,
+            );
+            graph.merge_node_properties(
+                job_id,
+                json!({
+                    "name": job.name,
+                    "namespace": job.namespace,
+                    "path": repo_path,
+                    "main_application_file": job.main_application_file,
+                    "image": job.image,
+                    "spark_version": job.spark_version,
+                    "spark_conf": job.spark_conf,
+                    "driver_cores": job.driver_cores,
+                    "driver_memory": job.driver_memory,
+                    "executor_instances": job.executor_instances,
+                    "executor_cores": job.executor_cores,
+                    "executor_memory": job.executor_memory,
+                }),
+            );
+
+            if let Some(path) = resolve_repo_job_path(&self.repo_root, &job.main_application_file) {
+                let contents = fs::read_to_string(&path).map_err(|e| {
+                    AppError::QueryFailed(format!("failed to read {}: {e}", path.display()))
+                })?;
+                let constants = extract_constants(&contents);
+                let is_streaming = contents.contains("readStream.format(\"kafka\")")
+                    || contents.contains("readStream.format('kafka')");
+                add_spark_job_edges(graph, &contents, &constants, job_id, is_streaming);
+            }
+        }
+
+        Ok(())
+    }
+
     async fn uc_get<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, AppError> {
         tracing::debug!("admin token: {}", self.uc_admin_token);
         let response = self
@@ -1042,6 +1034,41 @@ impl LineageService {
             .data
             .ok_or_else(|| AppError::QueryFailed("Dagster GraphQL returned no data".to_string()))
     }
+}
+
+fn resolve_repo_root() -> PathBuf {
+    if let Ok(value) = std::env::var("REPO_ROOT") {
+        let path = PathBuf::from(value);
+        if looks_like_repo_root(&path) {
+            return path;
+        }
+    }
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        if let Some(path) = find_repo_root_from(&current_dir) {
+            return path;
+        }
+    }
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if let Some(path) = find_repo_root_from(&manifest_dir) {
+        return path;
+    }
+
+    PathBuf::from(".")
+}
+
+fn find_repo_root_from(start: &Path) -> Option<PathBuf> {
+    for candidate in start.ancestors() {
+        if looks_like_repo_root(candidate) {
+            return Some(candidate.to_path_buf());
+        }
+    }
+    None
+}
+
+fn looks_like_repo_root(path: &Path) -> bool {
+    path.join("packages/controlplane").exists() && path.join("packages/spark/jobs").exists()
 }
 
 fn node_to_response(node: LineageNode, runtime: Option<LineageNodeRuntime>) -> LineageNodeResponse {
@@ -1213,6 +1240,10 @@ impl GraphBuilder {
         self.aliases.insert((node_id, alias));
     }
 
+    fn resolve_alias(&self, alias: &str) -> Option<Uuid> {
+        self.alias_index.get(alias).map(|owner| owner.node_id)
+    }
+
     fn add_edge(
         &mut self,
         src: Uuid,
@@ -1229,6 +1260,22 @@ impl GraphBuilder {
             confidence,
             properties,
         });
+    }
+
+    fn merge_node_properties(&mut self, node_id: Uuid, properties: serde_json::Value) {
+        let Some(next) = properties.as_object() else {
+            return;
+        };
+
+        if let Some(node) = self.nodes.values_mut().find(|node| node.id == node_id) {
+            if let Some(existing) = node.properties.as_object_mut() {
+                for (key, value) in next {
+                    existing.insert(key.clone(), value.clone());
+                }
+            } else {
+                node.properties = serde_json::Value::Object(next.clone());
+            }
+        }
     }
 
     fn ensure_table_for_path(&mut self, raw_path: &str) -> Option<Uuid> {
@@ -1512,9 +1559,102 @@ fn extract_metadata_path(body: &str) -> Option<String> {
 }
 
 fn normalize_job_path(path: &str) -> String {
-    path.trim_start_matches("/opt/")
+    path.trim_start_matches("local:///opt/")
+        .trim_start_matches("/opt/")
         .replace("spark/jobs/", "packages/spark/jobs/")
         .replace("daft/jobs/", "packages/daft/jobs/")
+}
+
+fn resolve_repo_job_path(repo_root: &Path, path: &str) -> Option<PathBuf> {
+    let normalized = normalize_job_path(path);
+    let candidate = repo_root.join(&normalized);
+    candidate.exists().then_some(candidate)
+}
+
+fn add_spark_job_edges(
+    graph: &mut GraphBuilder,
+    contents: &str,
+    constants: &HashMap<String, String>,
+    job_id: Uuid,
+    is_streaming: bool,
+) {
+    for source_var in extract_var_usages(contents, LOAD_VAR_PATTERN.get_or_init(load_var_regex)) {
+        if let Some(value) = constants.get(&source_var) {
+            if let Some(table_id) = graph.ensure_table_for_path(value) {
+                graph.add_edge(
+                    table_id,
+                    job_id,
+                    "reads_from",
+                    0.95,
+                    json!({ "source": "repo_scan" }),
+                );
+            }
+        }
+    }
+
+    for target_var in extract_var_usages(contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex)) {
+        if let Some(value) = constants.get(&target_var) {
+            if let Some(table_id) = graph.ensure_table_for_path(value) {
+                graph.add_edge(
+                    job_id,
+                    table_id,
+                    "writes_to",
+                    0.95,
+                    json!({ "source": "repo_scan" }),
+                );
+            }
+        }
+    }
+
+    if !is_streaming {
+        return;
+    }
+
+    if let Some(topic_var) =
+        extract_first_var_usage(contents, TOPIC_VAR_PATTERN.get_or_init(topic_var_regex))
+    {
+        if let Some(topic_name) = constants.get(&topic_var) {
+            let bootstrap = extract_first_var_usage(
+                contents,
+                BOOTSTRAP_VAR_PATTERN.get_or_init(bootstrap_var_regex),
+            )
+            .and_then(|var| constants.get(&var).cloned())
+            .unwrap_or_else(|| "redpanda-svc.redpanda.svc.cluster.local:9092".to_string());
+            let topic_id = graph.ensure_node(
+                "topic",
+                "kafka",
+                &format!("kafka://{bootstrap}"),
+                topic_name,
+                topic_name,
+                json!({ "bootstrap_servers": bootstrap }),
+            );
+            graph.add_alias(topic_id, topic_name.clone(), AliasPriority::TopicName);
+            graph.add_edge(
+                topic_id,
+                job_id,
+                "reads_from",
+                0.98,
+                json!({ "source": "repo_scan" }),
+            );
+        }
+    }
+
+    if let Some(target_var) = extract_first_var_usage(
+        contents,
+        STREAM_PATH_VAR_PATTERN.get_or_init(stream_path_var_regex),
+    ) {
+        if let Some(path_value) = constants.get(&target_var) {
+            if let Some(table_id) = graph.ensure_table_for_path(path_value) {
+                graph.add_edge(
+                    job_id,
+                    table_id,
+                    "writes_to",
+                    0.98,
+                    json!({ "source": "repo_scan", "mode": "streaming" }),
+                );
+            }
+        }
+    }
 }
 
 fn constant_regex() -> Regex {
@@ -1527,11 +1667,11 @@ fn app_name_regex() -> Regex {
 }
 
 fn load_var_regex() -> Regex {
-    Regex::new(r#"\.load\((\w+)\)"#).expect("valid load regex")
+    Regex::new(r#"\.load\(\s*(\w+)\s*\)"#).expect("valid load regex")
 }
 
 fn save_var_regex() -> Regex {
-    Regex::new(r#"\.save\((\w+)\)"#).expect("valid save regex")
+    Regex::new(r#"\.save\(\s*(\w+)\s*\)"#).expect("valid save regex")
 }
 
 fn daft_source_var_regex() -> Regex {
@@ -1588,6 +1728,72 @@ static METADATA_PATH_PATTERN: OnceLock<Regex> = OnceLock::new();
 struct DagsterBlock {
     asset_names: Vec<String>,
     body: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        extract_var_usages, find_repo_root_from, load_var_regex, looks_like_repo_root,
+        normalize_job_path, resolve_repo_job_path, save_var_regex,
+    };
+    use std::path::Path;
+
+    #[test]
+    fn normalize_job_path_supports_controlplane_local_uri() {
+        assert_eq!(
+            normalize_job_path("local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"),
+            "packages/spark/jobs/hdbank/stream_partner_events_to_bronze.py"
+        );
+    }
+
+    #[test]
+    fn resolve_repo_job_path_maps_into_repo_layout() {
+        let repo_root = Path::new("/repo");
+        let path = resolve_repo_job_path(
+            repo_root,
+            "local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py",
+        );
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn find_repo_root_from_walks_up_to_repo_root() {
+        let repo_root = Path::new("/tmp/workspace");
+        let nested = repo_root.join("packages/controlplane/src");
+        let found = find_repo_root_from(&nested);
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn looks_like_repo_root_requires_expected_directories() {
+        assert!(!looks_like_repo_root(Path::new("/definitely/not/a/repo")));
+    }
+
+    #[test]
+    fn save_var_regex_supports_multiline_save_calls() {
+        let contents = r#"
+            df.write.format("delta").save(
+                TARGET_PATH
+            )
+        "#;
+        assert_eq!(
+            extract_var_usages(contents, &save_var_regex()),
+            vec!["TARGET_PATH".to_string()]
+        );
+    }
+
+    #[test]
+    fn load_var_regex_supports_internal_whitespace() {
+        let contents = r#"
+            spark.read.format("delta").load(
+                SOURCE_PATH
+            )
+        "#;
+        assert_eq!(
+            extract_var_usages(contents, &load_var_regex()),
+            vec!["SOURCE_PATH".to_string()]
+        );
+    }
 }
 
 #[derive(Deserialize)]
