@@ -96,7 +96,7 @@ VALUES ('4faec421-980b-40e7-9997-ce2488ac5968', 'linh@gmail.com', 'linh', 'Linh 
 INSERT INTO teams (id, name, workspace)
 VALUES ('10000000-0000-0000-0000-000000000002', 'VietJetair Analytics', 'vietjetair'),
        ('10000000-0000-0000-0000-000000000004', 'Sovico Data Steward', 'partnership'),
-       ('10000000-0000-0000-0000-000000000005', 'HDBank Security', 'hdbank');
+       ('10000000-0000-0000-0000-000000000005', 'HDBank Platform', 'hdbank');
 
 INSERT INTO policy_templates (id, name, scope, resource, team_ids, privileges, approval_mode, risk, usage_30d, owner_id,
                               last_updated)
@@ -129,9 +129,9 @@ VALUES ('50000000-0000-0000-0000-000000000001', 'Khao Pad', 'VietJetair Analytic
         'Seven-day read window for the latest HDBank financing audience refresh.'),
        ('50000000-0000-0000-0000-000000000002', 'Linh Tran', 'Sovico Data Steward',
         'partnership.co_brand_gold.co_brand_offer_audience_v1', 'SELECT',
-        '2026-05-10T00:00:00Z', '2026-05-18T00:00:00Z', 'HDBank Security', 'expiring',
+        '2026-05-10T00:00:00Z', '2026-05-18T00:00:00Z', 'HDBank Platform', 'expiring',
         'Temporary access to validate the shared co-brand outbound audience before launch.'),
-       ('50000000-0000-0000-0000-000000000003', 'Rikki Tarczaly', 'HDBank Security',
+       ('50000000-0000-0000-0000-000000000003', 'Rikki Tarczaly', 'HDBank Platform',
         'hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1', 'SELECT',
         '2026-05-09T00:00:00Z', '2026-05-16T00:00:00Z', 'Sovico Data Steward', 'expired',
         'Completed review of the outbound HDBank activation audience for sensitive-field handling.');
