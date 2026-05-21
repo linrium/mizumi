@@ -73,7 +73,7 @@ doctor:
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
     docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy spark-image-build controlplane-deploy webui-deploy
+deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy controlplane-deploy webui-deploy
 
 destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
 
@@ -276,7 +276,7 @@ duckdb-server-image-build:
 
 duckdb-server-build: duckdb-server-image-build
 
-duckdb-server-deploy: rustfs-s3-proxy-deploy duckdb-server-image-build
+duckdb-server-deploy: rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable rustfs-unitycatalog-anon-read-enable duckdb-server-image-build
     kubectl apply -f infra/k8s/duckdb/server.yaml
     kubectl rollout status deployment/duckdb-server -n {{ spark_namespace }} --timeout=120s
     kubectl get pods,svc -n {{ spark_namespace }} | rg duckdb-server
