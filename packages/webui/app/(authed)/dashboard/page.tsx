@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react"
 import {
   Add01Icon,
   AlertCircleIcon,
+  ArrowDataTransferHorizontalIcon,
   ArrowUp01Icon,
   Cancel01Icon,
   Chart01Icon,
@@ -72,7 +73,7 @@ import "react-grid-layout/css/styles.css"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ChartType = "bar" | "line" | "pie" | "scatter" | "area"
+type ChartType = "bar" | "line" | "pie" | "scatter" | "area" | "sankey"
 
 type QueryResult = {
   columns: string[]
@@ -156,6 +157,44 @@ function buildOption(
       trigger: chartType === "pie" ? "item" : "axis",
       textStyle: { fontSize: 11 },
     },
+  }
+
+  if (chartType === "sankey") {
+    const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
+    const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
+    const valIdx = result.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+
+    const nodeNames = new Set<string>()
+    const links: { source: string; target: string; value: number }[] = []
+
+    for (const row of result.rows) {
+      const r = row as unknown[]
+      const src = String(r[srcIdx] ?? "")
+      const tgt = String(r[tgtIdx] ?? "")
+      const val = parseFloat(String(r[Math.max(0, valIdx)] ?? "0"))
+      if (src && tgt && Number.isFinite(val) && val > 0) {
+        nodeNames.add(src)
+        nodeNames.add(tgt)
+        links.push({ source: src, target: tgt, value: val })
+      }
+    }
+
+    return {
+      ...base,
+      series: [
+        {
+          type: "sankey",
+          emphasis: { focus: "adjacency" },
+          data: [...nodeNames].map((name) => ({ name })),
+          links,
+          lineStyle: { color: "gradient", opacity: 0.45 },
+          label: { fontSize: 11, color: textColor },
+          nodeWidth: 14,
+          nodeGap: 10,
+          right: "10%",
+        },
+      ],
+    }
   }
 
   if (chartType === "pie") {
@@ -265,6 +304,22 @@ const DEFAULT_PANELS: Panel[] = [
     xCol: "priority_band",
     yCol: "customer_count",
   },
+  {
+    id: "p5",
+    title: "Partnership Customer Flow",
+    chartType: "sankey",
+    sql: [
+      "SELECT '↑ ' || source_company AS source, offer_name AS target, SUM(customer_count) AS value",
+      "FROM partnership.co_brand_gold.campaign_summary_v1",
+      "GROUP BY source_company, offer_name",
+      "UNION ALL",
+      "SELECT offer_name AS source, '↓ ' || target_company AS target, SUM(customer_count) AS value",
+      "FROM partnership.co_brand_gold.campaign_summary_v1",
+      "GROUP BY offer_name, target_company",
+    ].join(" "),
+    xCol: "source",
+    yCol: "target",
+  },
 ]
 
 const DEFAULT_LAYOUT: Layout = [
@@ -272,6 +327,7 @@ const DEFAULT_LAYOUT: Layout = [
   { i: "p2", x: 6, y: 0, w: 6, h: 4 },
   { i: "p3", x: 0, y: 4, w: 6, h: 4 },
   { i: "p4", x: 6, y: 4, w: 6, h: 4 },
+  { i: "p5", x: 0, y: 8, w: 12, h: 5 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
@@ -470,6 +526,7 @@ const CHART_TYPE_CONFIG: Record<
   area: { label: "Area", icon: ChartAreaIcon },
   pie: { label: "Pie / Donut", icon: PieChart01Icon },
   scatter: { label: "Scatter", icon: ChartScatterIcon },
+  sankey: { label: "Sankey / Flow", icon: ArrowDataTransferHorizontalIcon },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
