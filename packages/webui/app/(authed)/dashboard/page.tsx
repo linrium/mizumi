@@ -90,6 +90,7 @@ type PanelData = {
 type Panel = {
   id: string
   title: string
+  description?: string
   chartType: ChartType
   sql: string
   xCol: string
@@ -275,6 +276,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p1",
     title: "Shared Customer Overlap — HDBank Side",
+    description: "How many HDBank customers are already shared with VietJet Air vs. exclusive to HDBank. Shared customers are warm cross-sell targets — both companies already have a relationship with them.",
     chartType: "pie",
     sql: "SELECT CASE WHEN shared_customer THEN 'Shared with VietJet' ELSE 'HDBank Only' END AS customer_type, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
     xCol: "customer_type",
@@ -283,6 +285,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p2",
     title: "Shared Customer Overlap — VietJet Side",
+    description: "Mirror view from VietJet's perspective. Comparing both pies shows whether the overlap is symmetric — one side may hold significantly more shared customers, revealing where cross-sell opportunity is concentrated.",
     chartType: "pie",
     sql: "SELECT CASE WHEN shared_customer THEN 'Shared with HDBank' ELSE 'VietJet Only' END AS customer_type, COUNT(*) AS customer_count FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
     xCol: "customer_type",
@@ -291,6 +294,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p3",
     title: "HDBank Segments — VietJet Activation Candidates",
+    description: "Which HDBank customer segments generate the most VietJet cross-sell leads. Bar height = candidate volume; avg propensity score shows which segments are not just large but likely to convert into VietJet flyers.",
     chartType: "bar",
     sql: [
       "SELECT c.segment_name, COUNT(DISTINCT a.customer_id) AS candidates, ROUND(AVG(a.propensity_score), 3) AS avg_propensity_score",
@@ -304,6 +308,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p4",
     title: "VietJet Membership Tier — HDBank Finance Potential",
+    description: "VietJet flyers grouped by membership tier and scored for HDBank finance products (loans, co-brand card). Higher tiers typically travel more frequently, making them stronger candidates for travel financing offers.",
     chartType: "bar",
     sql: [
       "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS finance_candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity_score",
@@ -317,6 +322,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p5",
     title: "Outreach Channels for Cross-sell Targets",
+    description: "Recommended outreach channels across all VietJet activation candidates. Use this to allocate campaign budget — a channel with high candidate count but low avg propensity may need targeting refinement before activation.",
     chartType: "bar",
     sql: [
       "SELECT recommended_channel, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity_score",
@@ -329,6 +335,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p6",
     title: "Co-brand Audience by Priority Band",
+    description: "The unified co-brand audience segmented by activation urgency. High-priority customers carry the strongest combined propensity signals from both companies and should receive the first wave of co-brand outreach.",
     chartType: "pie",
     sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
     xCol: "priority_band",
@@ -337,6 +344,7 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "p7",
     title: "HDBank → VietJet Activation Funnel",
+    description: "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (center), which then route to recommended outreach channels (right). Band width represents the number of customers on each path — thicker bands are higher-volume routes.",
     chartType: "sankey",
     sql: [
       "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value",
@@ -354,13 +362,13 @@ const DEFAULT_PANELS: Panel[] = [
 ]
 
 const DEFAULT_LAYOUT: Layout = [
-  { i: "p1", x: 0, y: 0,  w: 1, h: 4 },
-  { i: "p2", x: 1, y: 0,  w: 1, h: 4 },
-  { i: "p3", x: 0, y: 4,  w: 1, h: 4 },
-  { i: "p4", x: 1, y: 4,  w: 1, h: 4 },
-  { i: "p5", x: 0, y: 8,  w: 1, h: 4 },
-  { i: "p6", x: 1, y: 8,  w: 1, h: 4 },
-  { i: "p7", x: 0, y: 12, w: 2, h: 5 },
+  { i: "p1", x: 0, y: 0,  w: 1, h: 6 },
+  { i: "p2", x: 1, y: 0,  w: 1, h: 6 },
+  { i: "p3", x: 0, y: 6,  w: 1, h: 6 },
+  { i: "p4", x: 1, y: 6,  w: 1, h: 6 },
+  { i: "p5", x: 0, y: 12, w: 1, h: 6 },
+  { i: "p6", x: 1, y: 12, w: 1, h: 6 },
+  { i: "p7", x: 0, y: 18, w: 2, h: 8 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
@@ -544,6 +552,11 @@ function PanelCard({
           </div>
         )}
       </div>
+      {panel.description && (
+        <p className="px-3 py-2 text-xs text-muted-foreground border-t leading-relaxed shrink-0 min-h-[2.5rem] max-h-[5rem] overflow-y-auto">
+          {panel.description}
+        </p>
+      )}
     </div>
   )
 }
@@ -581,8 +594,8 @@ function PanelSidebar({
 
   return (
     <div className="flex flex-col h-full text-xs">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+      <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
           Panel
         </p>
         <Input
@@ -590,6 +603,13 @@ function PanelSidebar({
           onChange={(e) => onChange({ ...panel, title: e.target.value })}
           className="h-7 text-xs"
           placeholder="Panel title"
+        />
+        <textarea
+          value={panel.description ?? ""}
+          onChange={(e) => onChange({ ...panel, description: e.target.value })}
+          rows={2}
+          placeholder="Description (shown below the chart)"
+          className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
         />
       </div>
       <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
