@@ -274,38 +274,68 @@ function buildOption(
 const DEFAULT_PANELS: Panel[] = [
   {
     id: "p1",
-    title: "HDBank Customers by Segment",
+    title: "Shared Customer Overlap — HDBank Side",
     chartType: "pie",
-    sql: "SELECT segment_name, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY segment_name ORDER BY customer_count DESC",
-    xCol: "segment_name",
+    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with VietJet' ELSE 'HDBank Only' END AS customer_type, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
+    xCol: "customer_type",
     yCol: "customer_count",
   },
   {
     id: "p2",
-    title: "Co-brand Campaign Reach by Offer",
-    chartType: "bar",
-    sql: "SELECT offer_name, customer_count, avg_propensity_score FROM partnership.co_brand_gold.campaign_summary_v1 ORDER BY customer_count DESC",
-    xCol: "offer_name",
+    title: "Shared Customer Overlap — VietJet Side",
+    chartType: "pie",
+    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with HDBank' ELSE 'VietJet Only' END AS customer_type, COUNT(*) AS customer_count FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
+    xCol: "customer_type",
     yCol: "customer_count",
   },
   {
     id: "p3",
-    title: "VietJet Activation Candidates by Use Case",
+    title: "HDBank Segments — VietJet Activation Candidates",
     chartType: "bar",
-    sql: "SELECT use_case, COUNT(*) AS candidate_count, ROUND(AVG(propensity_score), 3) AS avg_propensity FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 GROUP BY use_case ORDER BY candidate_count DESC",
-    xCol: "use_case",
-    yCol: "candidate_count",
+    sql: [
+      "SELECT c.segment_name, COUNT(DISTINCT a.customer_id) AS candidates, ROUND(AVG(a.propensity_score), 3) AS avg_propensity_score",
+      "FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c",
+      "JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id",
+      "GROUP BY c.segment_name ORDER BY candidates DESC",
+    ].join(" "),
+    xCol: "segment_name",
+    yCol: "candidates",
   },
   {
     id: "p4",
-    title: "Co-brand Audience by Priority Band",
+    title: "VietJet Membership Tier — HDBank Finance Potential",
     chartType: "bar",
-    sql: "SELECT priority_band, COUNT(*) AS customer_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY customer_count DESC",
-    xCol: "priority_band",
-    yCol: "customer_count",
+    sql: [
+      "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS finance_candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity_score",
+      "FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v",
+      "JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id",
+      "GROUP BY v.membership_tier ORDER BY finance_candidates DESC",
+    ].join(" "),
+    xCol: "membership_tier",
+    yCol: "finance_candidates",
   },
   {
     id: "p5",
+    title: "Outreach Channels for Cross-sell Targets",
+    chartType: "bar",
+    sql: [
+      "SELECT recommended_channel, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity_score",
+      "FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1",
+      "GROUP BY recommended_channel ORDER BY candidates DESC",
+    ].join(" "),
+    xCol: "recommended_channel",
+    yCol: "candidates",
+  },
+  {
+    id: "p6",
+    title: "Co-brand Audience by Priority Band",
+    chartType: "pie",
+    sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
+    xCol: "priority_band",
+    yCol: "audience_count",
+  },
+  {
+    id: "p7",
     title: "HDBank → VietJet Activation Funnel",
     chartType: "sankey",
     sql: [
@@ -324,11 +354,13 @@ const DEFAULT_PANELS: Panel[] = [
 ]
 
 const DEFAULT_LAYOUT: Layout = [
-  { i: "p1", x: 0, y: 0, w: 6, h: 4 },
-  { i: "p2", x: 6, y: 0, w: 6, h: 4 },
-  { i: "p3", x: 0, y: 4, w: 6, h: 4 },
-  { i: "p4", x: 6, y: 4, w: 6, h: 4 },
-  { i: "p5", x: 0, y: 8, w: 12, h: 5 },
+  { i: "p1", x: 0, y: 0,  w: 1, h: 4 },
+  { i: "p2", x: 1, y: 0,  w: 1, h: 4 },
+  { i: "p3", x: 0, y: 4,  w: 1, h: 4 },
+  { i: "p4", x: 1, y: 4,  w: 1, h: 4 },
+  { i: "p5", x: 0, y: 8,  w: 1, h: 4 },
+  { i: "p6", x: 1, y: 8,  w: 1, h: 4 },
+  { i: "p7", x: 0, y: 12, w: 2, h: 5 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
@@ -1260,7 +1292,7 @@ export default function DashboardPage() {
     }))
     setLayout((prev) => [
       ...prev,
-      { i: id, x: 0, y: Infinity, w: 6, h: 4 } as LayoutItem,
+      { i: id, x: 0, y: Infinity, w: 1, h: 4 } as LayoutItem,
     ])
     setSelectedId(id)
   }
@@ -1323,9 +1355,9 @@ export default function DashboardPage() {
             (p, i) =>
               ({
                 i: p.id,
-                x: (i % 2) * 6,
+                x: i % 2,
                 y: Infinity,
-                w: 6,
+                w: 1,
                 h: 4,
               }) as LayoutItem,
           )
@@ -1478,7 +1510,7 @@ export default function DashboardPage() {
             <ReactGridLayout
               width={width}
               layout={layout}
-              gridConfig={{ cols: 12, rowHeight: 60, margin: [8, 8] }}
+              gridConfig={{ cols: 2, rowHeight: 60, margin: [8, 8] }}
               dragConfig={{ enabled: editing, handle: ".panel-drag-handle" }}
               resizeConfig={{ enabled: editing, handles: ["se"] }}
               onLayoutChange={setLayout}
