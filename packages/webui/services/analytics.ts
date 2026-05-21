@@ -226,16 +226,23 @@ export async function handleAnalyticsChat(req: NextRequest) {
           existingRequests.map((r) => [r.resource, r]),
         )
 
-        const tables = object.tables.map((table) => {
-          if (table.accessible) return { ...table, existingRequest: null }
-          const req = requestByResource.get(table.requestResource) ?? null
-          return {
-            ...table,
-            existingRequest: req
-              ? { id: req.id, code: req.code, status: req.status }
-              : null,
-          }
-        })
+        const seen = new Set<string>()
+        const tables = object.tables
+          .filter((table) => {
+            if (seen.has(table.fqn)) return false
+            seen.add(table.fqn)
+            return true
+          })
+          .map((table) => {
+            if (table.accessible) return { ...table, existingRequest: null }
+            const req = requestByResource.get(table.requestResource) ?? null
+            return {
+              ...table,
+              existingRequest: req
+                ? { id: req.id, code: req.code, status: req.status }
+                : null,
+            }
+          })
 
         return { search: search ?? null, tables, overview: object.overview }
       },
