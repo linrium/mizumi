@@ -158,7 +158,7 @@ rustfs-s3-proxy-dns-enable:
         echo "CoreDNS rewrite rules already present, skipping"
         exit 0
     fi
-    patched=$(echo "$corefile" | awk '/^\s*ready$/{print; print "    rewrite name exact s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; print "    rewrite name exact unitycatalog.s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; next}1')
+    patched=$(echo "$corefile" | awk '/^[ \t]*ready$/{print; print "    rewrite name exact s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; print "    rewrite name exact unitycatalog.s3.us-east-1.amazonaws.com rustfs-s3-proxy.rustfs.svc.cluster.local"; next}1')
     kubectl patch configmap coredns -n kube-system --patch "{\"data\":{\"Corefile\":$(printf '%s' "$patched" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}}"
     kubectl rollout restart deployment/coredns -n kube-system
     kubectl rollout status deployment/coredns -n kube-system --timeout=120s
