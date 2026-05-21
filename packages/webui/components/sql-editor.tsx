@@ -345,7 +345,7 @@ export function SqlCodeEditor({
 }: SqlCodeEditorProps) {
   const monacoRef = useRef<Monaco | null>(null)
   const completionDataRef = useRef<CatalogCompletionSchema | null>(null)
-  const disposeCompletionsRef = useRef<(() => void) | null>(null)
+  const disposeCompletionsRef = useRef<{ dispose: () => void } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -355,19 +355,18 @@ export function SqlCodeEditor({
         if (cancelled) return
         completionDataRef.current = data
         if (monacoRef.current) {
-          disposeCompletionsRef.current?.()
-          const { dispose } =
+          disposeCompletionsRef.current?.dispose()
+          disposeCompletionsRef.current =
             monacoRef.current.languages.registerCompletionItemProvider(
               "sql",
               buildCompletionProvider(monacoRef.current, data),
             )
-          disposeCompletionsRef.current = dispose
         }
       })
       .catch(() => {})
     return () => {
       cancelled = true
-      disposeCompletionsRef.current?.()
+      disposeCompletionsRef.current?.dispose()
       disposeCompletionsRef.current = null
     }
   }, [])
@@ -390,13 +389,12 @@ export function SqlCodeEditor({
             }
             monacoRef.current = monaco
             if (completionDataRef.current) {
-              disposeCompletionsRef.current?.()
-              const { dispose } =
+              disposeCompletionsRef.current?.dispose()
+              disposeCompletionsRef.current =
                 monaco.languages.registerCompletionItemProvider(
                   "sql",
                   buildCompletionProvider(monaco, completionDataRef.current),
                 )
-              disposeCompletionsRef.current = dispose
             }
           }}
           options={{
