@@ -849,7 +849,7 @@ function ToolPart({
   part: UIMessagePart<UIDataTypes, UITools>
   onSendMessage?: (text: string) => void
 }) {
-  if (!isToolUIPart(part)) return null
+  if (!part || !isToolUIPart(part)) return null
 
   const name = getToolName(part)
 
@@ -1003,6 +1003,7 @@ function MessageBubble({
   return (
     <div className="px-4 py-1.5 space-y-1.5 max-w-3xl">
       {message.parts.map((part, i) => {
+        if (!part) return null
         if (part.type === "text") {
           if (!part.text.trim()) return null
           return (
