@@ -271,104 +271,138 @@ function buildOption(
 }
 
 // ── Default panels ────────────────────────────────────────────────────────────
+// Panels are organised as four user stories followed by a joint campaign view.
+//
+// Story 1 (HDBank → VietJet): Travel Spender, Not Yet a VietJet Flyer
+// Story 2 (HDBank):           Shared Customer Ready for Credit Limit Upgrade
+// Story 3 (VietJet → HDBank): Frequent Flyer with No HDBank Relationship
+// Story 4 (VietJet):          Lapsing Flyer Reactivated via Financial Incentive
+// Joint:                      Co-brand campaign audience and activation funnel
 
 const DEFAULT_PANELS: Panel[] = [
+  // ── Story 1: Travel Spender, Not Yet a VietJet Flyer ──────────────────────
   {
-    id: "p1",
-    title: "Shared Customer Overlap — HDBank Side",
-    description: "How many HDBank customers are already shared with VietJet Air vs. exclusive to HDBank. Shared customers are warm cross-sell targets — both companies already have a relationship with them.",
+    id: "s1-a",
+    title: "Story 1 · VietJet Spend Gap Among HDBank Travel Customers",
+    description: "Of all HDBank customers with measurable travel spend, how many have never transacted with VietJet. This untapped pool is the primary target for the co-brand card activation — proven travelers who just haven't flown VietJet yet.",
     chartType: "pie",
-    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with VietJet' ELSE 'HDBank Only' END AS customer_type, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
-    xCol: "customer_type",
-    yCol: "customer_count",
+    sql: "SELECT CASE WHEN has_vietjet_spend = 1 THEN 'Already flies VietJet' ELSE 'No VietJet spend yet' END AS spend_group, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 GROUP BY has_vietjet_spend",
+    xCol: "spend_group",
+    yCol: "customers",
   },
   {
-    id: "p2",
-    title: "Shared Customer Overlap — VietJet Side",
-    description: "Mirror view from VietJet's perspective. Comparing both pies shows whether the overlap is symmetric — one side may hold significantly more shared customers, revealing where cross-sell opportunity is concentrated.",
-    chartType: "pie",
-    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with HDBank' ELSE 'VietJet Only' END AS customer_type, COUNT(*) AS customer_count FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
-    xCol: "customer_type",
-    yCol: "customer_count",
-  },
-  {
-    id: "p3",
-    title: "HDBank Segments — VietJet Activation Candidates",
-    description: "Which HDBank customer segments generate the most VietJet cross-sell leads. Bar height = candidate volume; avg propensity score shows which segments are not just large but likely to convert into VietJet flyers.",
+    id: "s1-b",
+    title: "Story 1 · Travel Affinity Score of Untapped Customers",
+    description: "Distribution of travel affinity scores for HDBank customers who have never spent with VietJet. High-affinity customers (0.6+) are proven travelers — the most likely to convert when offered a co-brand VietJet card with miles on existing spend.",
     chartType: "bar",
-    sql: [
-      "SELECT c.segment_name, COUNT(DISTINCT a.customer_id) AS candidates, ROUND(AVG(a.propensity_score), 3) AS avg_propensity_score",
-      "FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c",
-      "JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id",
-      "GROUP BY c.segment_name ORDER BY candidates DESC",
-    ].join(" "),
-    xCol: "segment_name",
+    sql: "SELECT CASE WHEN travel_affinity_score >= 0.8 THEN '0.8–1.0 High' WHEN travel_affinity_score >= 0.6 THEN '0.6–0.8' WHEN travel_affinity_score >= 0.4 THEN '0.4–0.6' WHEN travel_affinity_score >= 0.2 THEN '0.2–0.4' ELSE '0.0–0.2 Low' END AS score_band, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 WHERE has_vietjet_spend = 0 GROUP BY score_band ORDER BY score_band DESC",
+    xCol: "score_band",
+    yCol: "customers",
+  },
+  {
+    id: "s1-c",
+    title: "Story 1 · VietJet Activation Candidates by Offer & Channel",
+    description: "HDBank's gold output: offer propositions assigned to VietJet activation candidates with their recommended outreach channels. The sankey shows which offers flow to which channels — thicker bands are higher-volume paths where campaign spend should concentrate first.",
+    chartType: "sankey",
+    sql: "SELECT offer_name AS source, recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 GROUP BY offer_name, recommended_channel",
+    xCol: "source",
+    yCol: "target",
+  },
+  // ── Story 2: Shared Customer Ready for Credit Limit Upgrade ───────────────
+  {
+    id: "s2-a",
+    title: "Story 2 · Shared VietJet Spenders by Credit Score Tier",
+    description: "HDBank customers who are already shared with VietJet AND have active VietJet card spend, grouped by credit score tier. Prime-tier customers (750+) are pre-qualified for a proactive limit upgrade — no application form needed, offer can be pushed in-app.",
+    chartType: "bar",
+    sql: "SELECT CASE WHEN c.credit_score >= 750 THEN 'Prime (750+)' WHEN c.credit_score >= 650 THEN 'Near-prime (650–749)' ELSE 'Sub-prime (<650)' END AS credit_tier, COUNT(*) AS customers, ROUND(AVG(t.total_card_spend), 0) AS avg_total_spend FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY credit_tier ORDER BY customers DESC",
+    xCol: "credit_tier",
+    yCol: "customers",
+  },
+  {
+    id: "s2-b",
+    title: "Story 2 · Preferred Outreach Channel for Shared Customers",
+    description: "How shared HDBank+VietJet customers prefer to be contacted. Channel alignment is critical — a limit upgrade offer pushed through the wrong channel sees lower open rates and burns campaign budget. Match the channel to the customer's stated preference.",
+    chartType: "bar",
+    sql: "SELECT c.preferred_channel, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY c.preferred_channel ORDER BY customers DESC",
+    xCol: "preferred_channel",
+    yCol: "customers",
+  },
+  // ── Story 3: Frequent Flyer with No HDBank Relationship ───────────────────
+  {
+    id: "s3-a",
+    title: "Story 3 · Non-Shared VietJet Flyers by Loyalty Tier",
+    description: "VietJet frequent flyers who have no existing HDBank relationship, grouped by frequent-flyer score band. High-tier non-shared flyers are HDBank's highest-value acquisition targets — strong travel behaviour signals credit-worthiness with zero existing relationship friction.",
+    chartType: "bar",
+    sql: "SELECT CASE WHEN b.frequent_flyer_score >= 0.7 THEN 'High (0.7+)' WHEN b.frequent_flyer_score >= 0.4 THEN 'Mid (0.4–0.7)' ELSE 'Low (<0.4)' END AS flyer_tier, COUNT(*) AS flyers, ROUND(AVG(b.avg_booking_value), 0) AS avg_booking_value FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 c JOIN vietjetair.vietjetair_partnership_prod_silver.booking_features_v1 b ON c.customer_id = b.customer_id WHERE c.shared_customer = false GROUP BY flyer_tier ORDER BY flyers DESC",
+    xCol: "flyer_tier",
+    yCol: "flyers",
+  },
+  {
+    id: "s3-b",
+    title: "Story 3 · HDBank Finance Candidates by Use Case",
+    description: "VietJet's gold output: which finance propositions were matched to non-shared frequent flyers. Installment plans appeal to high-value occasional bookers; co-brand card offers suit high-frequency travelers. The mix here drives the offer creative and approval workflow.",
+    chartType: "bar",
+    sql: "SELECT use_case, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 GROUP BY use_case ORDER BY candidates DESC",
+    xCol: "use_case",
     yCol: "candidates",
   },
+  // ── Story 4: Lapsing Flyer Reactivated via Financial Incentive ────────────
   {
-    id: "p4",
-    title: "VietJet Membership Tier — HDBank Finance Potential",
-    description: "VietJet flyers grouped by membership tier and scored for HDBank finance products (loans, co-brand card). Higher tiers typically travel more frequently, making them stronger candidates for travel financing offers.",
+    id: "s4-a",
+    title: "Story 4 · Finance Candidates by Membership Tier",
+    description: "VietJet finance candidates grouped by membership tier. Silver and Gold members carry past loyalty signal — a financial incentive (0% instalment for 3 months) is far more likely to re-engage them than a flat discount, because the perceived value scales with booking size.",
     chartType: "bar",
-    sql: [
-      "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS finance_candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity_score",
-      "FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v",
-      "JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id",
-      "GROUP BY v.membership_tier ORDER BY finance_candidates DESC",
-    ].join(" "),
+    sql: "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.membership_tier ORDER BY candidates DESC",
     xCol: "membership_tier",
-    yCol: "finance_candidates",
-  },
-  {
-    id: "p5",
-    title: "Outreach Channels for Cross-sell Targets",
-    description: "Recommended outreach channels across all VietJet activation candidates. Use this to allocate campaign budget — a channel with high candidate count but low avg propensity may need targeting refinement before activation.",
-    chartType: "bar",
-    sql: [
-      "SELECT recommended_channel, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity_score",
-      "FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1",
-      "GROUP BY recommended_channel ORDER BY candidates DESC",
-    ].join(" "),
-    xCol: "recommended_channel",
     yCol: "candidates",
   },
   {
-    id: "p6",
-    title: "Co-brand Audience by Priority Band",
-    description: "The unified co-brand audience segmented by activation urgency. High-priority customers carry the strongest combined propensity signals from both companies and should receive the first wave of co-brand outreach.",
+    id: "s4-b",
+    title: "Story 4 · Email Reachability of Finance Targets",
+    description: "Email opt-in status among VietJet finance candidates. Email is the cheapest reactivation channel, but only works if consent exists. Customers without opt-in must be reached via in-app push or personal outreach — channels with higher cost but no consent gate.",
+    chartType: "pie",
+    sql: "SELECT CASE WHEN v.email_opt_in THEN 'Email reachable' ELSE 'No email consent' END AS reachability, COUNT(*) AS candidates FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.email_opt_in",
+    xCol: "reachability",
+    yCol: "candidates",
+  },
+  // ── Joint Campaign View ────────────────────────────────────────────────────
+  {
+    id: "joint-a",
+    title: "Joint Campaign · Co-brand Audience by Priority Band",
+    description: "Unified co-brand audience across both companies, tiered by activation priority. Band A customers have strong propensity signals from both HDBank and VietJet — they appear in both gold tables and receive the first outreach wave with the strongest co-brand offer.",
     chartType: "pie",
     sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
     xCol: "priority_band",
     yCol: "audience_count",
   },
   {
-    id: "p7",
-    title: "HDBank → VietJet Activation Funnel",
-    description: "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (center), which then route to recommended outreach channels (right). Band width represents the number of customers on each path — thicker bands are higher-volume routes.",
+    id: "joint-b",
+    title: "Joint Campaign · HDBank → VietJet Activation Funnel",
+    description: "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (centre), which route to outreach channels (right). Thicker bands are higher-volume paths. Narrow bands reaching premium channels (e.g. personal banker) mark micro-segments worth dedicated campaign treatment.",
     chartType: "sankey",
-    sql: [
-      "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value",
-      "FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c",
-      "JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id",
-      "GROUP BY c.segment_name, a.use_case",
-      "UNION ALL",
-      "SELECT a.use_case AS source, a.recommended_channel AS target, COUNT(*) AS value",
-      "FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a",
-      "GROUP BY a.use_case, a.recommended_channel",
-    ].join(" "),
+    sql: "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id GROUP BY c.segment_name, a.use_case UNION ALL SELECT a.use_case AS source, a.recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a GROUP BY a.use_case, a.recommended_channel",
     xCol: "source",
     yCol: "target",
   },
 ]
 
 const DEFAULT_LAYOUT: Layout = [
-  { i: "p1", x: 0, y: 0,  w: 1, h: 6 },
-  { i: "p2", x: 1, y: 0,  w: 1, h: 6 },
-  { i: "p3", x: 0, y: 6,  w: 1, h: 6 },
-  { i: "p4", x: 1, y: 6,  w: 1, h: 6 },
-  { i: "p5", x: 0, y: 12, w: 1, h: 6 },
-  { i: "p6", x: 1, y: 12, w: 1, h: 6 },
-  { i: "p7", x: 0, y: 18, w: 2, h: 8 },
+  // Story 1 — Travel Spender, Not Yet a VietJet Flyer
+  { i: "s1-a", x: 0, y: 0,  w: 1, h: 6 },
+  { i: "s1-b", x: 1, y: 0,  w: 1, h: 6 },
+  { i: "s1-c", x: 0, y: 6,  w: 2, h: 8 },
+  // Story 2 — Shared Customer Credit Limit Upgrade
+  { i: "s2-a", x: 0, y: 14, w: 1, h: 6 },
+  { i: "s2-b", x: 1, y: 14, w: 1, h: 6 },
+  // Story 3 — Frequent Flyer with No HDBank Relationship
+  { i: "s3-a", x: 0, y: 20, w: 1, h: 6 },
+  { i: "s3-b", x: 1, y: 20, w: 1, h: 6 },
+  // Story 4 — Lapsing Flyer Reactivation
+  { i: "s4-a", x: 0, y: 26, w: 1, h: 6 },
+  { i: "s4-b", x: 1, y: 26, w: 1, h: 6 },
+  // Joint Campaign
+  { i: "joint-a", x: 0, y: 32, w: 2, h: 6 },
+  { i: "joint-b", x: 0, y: 38, w: 2, h: 8 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
