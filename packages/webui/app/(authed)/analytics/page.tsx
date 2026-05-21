@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, isToolUIPart, getToolName } from "ai"
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai"
 import { Streamdown } from "streamdown"
+import { formatDistanceToNowStrict } from "date-fns"
 import ReactECharts from "echarts-for-react"
 import type { ColumnDef } from "@tanstack/react-table"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -13,6 +14,13 @@ import {
   Loading03Icon,
   ArrowDown01Icon,
   DatabaseIcon,
+  Shield01Icon,
+  Tick02Icon,
+  SecurityIcon,
+  Search01Icon,
+  PlayIcon,
+  LockKeyIcon,
+  CatalogueIcon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,8 +32,8 @@ import {
 } from "@/components/ui/select"
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
-import { useSessionContext } from "@/hooks/use-session-context"
 import { MODELS, type ModelId } from "@/services/ai-models"
+import { createPermissionRequest } from "@/services/permissions"
 import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -53,6 +61,76 @@ type VisualizeChartOutput = {
 
 type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
 type Row = Record<string, unknown>
+
+type AccessRequestPreviewOutput = {
+  resource: string
+  scope: "catalog" | "schema" | "table"
+  privileges: string[]
+  rationale: string
+  suggested_duration_days: number
+  explanation: string
+}
+
+type RequestApprovalStep = {
+  id: string
+  stage_order: number
+  approver_label: string
+  approver_team: string
+  status: string
+  is_current: boolean
+}
+
+type RequestStatusOutput = {
+  id: string
+  code: string
+  resource: string
+  scope: string
+  status: string
+  submitted_at: string
+  expires_at: string
+  expires_in_days: number
+  approval_steps: RequestApprovalStep[]
+  queue_decision: string
+  rationale: string
+  error?: string
+}
+
+type RequestListItem = {
+  id: string
+  code: string
+  resource: string
+  scope: string
+  status: string
+  submitted_at: string
+  privileges: string[]
+  rationale: string
+  expires_in_days: number
+  queue_decision: string
+}
+
+type ListMyAccessRequestsOutput = {
+  requests: RequestListItem[]
+  error?: string
+}
+
+type ExploreCatalogTable = {
+  fqn: string
+  catalog: string
+  schemaName: string
+  tableName: string
+  accessible: boolean
+  summary: string
+  suggestedSql: string | null
+  requestResource: string
+  requestScope: "catalog" | "schema" | "table"
+  existingRequest: { id: string; code: string; status: string } | null
+}
+
+type ExploreCatalogOutput = {
+  search: string | null
+  tables: ExploreCatalogTable[]
+  overview: string
+}
 
 // ── ResultsGrid ───────────────────────────────────────────────────────────────
 
@@ -350,10 +428,428 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
   )
 }
 
+// ── AccessRequestCard ─────────────────────────────────────────────────────────
+
+function AccessRequestCard({
+  output,
+  onSendMessage,
+}: {
+  output: AccessRequestPreviewOutput
+  onSendMessage?: (text: string) => void
+}) {
+  const [rationale, setRationale] = useState(output.rationale)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState<{ code: string; status: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      const req = await createPermissionRequest({
+        submit_as: "personal",
+        resource: output.resource,
+        scope: output.scope,
+        privileges: output.privileges,
+        rationale,
+        requested_duration_days: output.suggested_duration_days,
+      })
+      setSubmitted({ code: req.code, status: req.status })
+      onSendMessage?.(
+        `I just submitted an access request for \`${output.resource}\`. The request code is ${req.code}.`,
+      )
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+        <HugeiconsIcon icon={Shield01Icon} size={12} className="text-muted-foreground shrink-0" />
+        <span className="font-medium flex-1">Request Data Access</span>
+        <span className="text-muted-foreground capitalize">{output.scope}</span>
+      </div>
+
+      <div className="px-3 py-2 space-y-2">
+        <div>
+          <div className="text-muted-foreground mb-0.5">Resource</div>
+          <code className="font-mono text-[11px] bg-muted/40 px-1.5 py-0.5 rounded break-all">
+            {output.resource}
+          </code>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {output.privileges.map((p) => (
+            <span key={p} className="px-1.5 py-0.5 rounded bg-muted/60 font-mono text-[10px]">
+              {p}
+            </span>
+          ))}
+        </div>
+
+        {output.explanation && (
+          <p className="text-muted-foreground text-[11px]">{output.explanation}</p>
+        )}
+
+        {submitted ? (
+          <div className="flex items-center gap-2 py-1 text-emerald-600">
+            <HugeiconsIcon icon={Tick02Icon} size={13} className="shrink-0" />
+            <span>
+              Request submitted — <span className="font-mono font-semibold">{submitted.code}</span>
+            </span>
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="text-muted-foreground mb-1">Rationale</div>
+              <textarea
+                value={rationale}
+                onChange={(e) => setRationale(e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            {error && <div className="text-destructive text-[11px]">{error}</div>}
+            <Button
+              size="sm"
+              disabled={submitting || !rationale.trim()}
+              onClick={handleSubmit}
+              className="h-7 px-3 text-xs"
+            >
+              {submitting ? (
+                <>
+                  <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin mr-1.5" />
+                  Submitting…
+                </>
+              ) : (
+                "Request Access"
+              )}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── RequestStatusCard ─────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "text-amber-600 bg-amber-50 border-amber-200",
+  "needs-info": "text-orange-600 bg-orange-50 border-orange-200",
+  approved: "text-emerald-600 bg-emerald-50 border-emerald-200",
+  cancelled: "text-muted-foreground bg-muted/30 border-border",
+  ready: "text-blue-600 bg-blue-50 border-blue-200",
+}
+
+function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
+  if (output.error) {
+    return (
+      <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-1">
+        {output.error}
+      </div>
+    )
+  }
+
+  const colorClass = STATUS_COLORS[output.status] ?? STATUS_COLORS.pending
+
+  return (
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+        <HugeiconsIcon icon={SecurityIcon} size={12} className="text-muted-foreground shrink-0" />
+        <span className="font-mono font-semibold flex-1">{output.code}</span>
+        <span className={cn("px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize", colorClass)}>
+          {output.status}
+        </span>
+      </div>
+
+      <div className="px-3 py-2 space-y-2">
+        <div>
+          <div className="text-muted-foreground mb-0.5">Resource</div>
+          <code className="font-mono text-[11px] bg-muted/40 px-1.5 py-0.5 rounded break-all">
+            {output.resource}
+          </code>
+          <span className="ml-1.5 text-muted-foreground capitalize">{output.scope}</span>
+        </div>
+
+        {output.approval_steps?.length > 0 && (
+          <div>
+            <div className="text-muted-foreground mb-1.5">Approval steps</div>
+            <div className="space-y-1">
+              {output.approval_steps.map((step) => (
+                <div key={step.id} className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      step.status === "approved"
+                        ? "bg-emerald-500"
+                        : step.is_current
+                          ? "bg-amber-400"
+                          : step.status === "cancelled"
+                            ? "bg-muted-foreground/40"
+                            : "bg-muted-foreground/20",
+                    )}
+                  />
+                  <span className={cn("flex-1", step.is_current && "font-medium")}>
+                    {step.approver_label}
+                  </span>
+                  <span className="text-muted-foreground capitalize text-[10px]">{step.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {output.status === "approved" && output.expires_at && (
+          <div className="text-muted-foreground text-[11px]">
+            Access expires in {output.expires_in_days} day{output.expires_in_days === 1 ? "" : "s"}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── AccessRequestsListCard ────────────────────────────────────────────────────
+
+const REQUEST_STATUS_COLORS: Record<string, { dot: string; badge: string }> = {
+  pending:      { dot: "bg-amber-400",          badge: "text-amber-700 bg-amber-50 border-amber-200" },
+  "needs-info": { dot: "bg-orange-400",          badge: "text-orange-700 bg-orange-50 border-orange-200" },
+  approved:     { dot: "bg-emerald-500",         badge: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  cancelled:    { dot: "bg-muted-foreground/40", badge: "text-muted-foreground bg-muted/30 border-border" },
+  ready:        { dot: "bg-blue-400",            badge: "text-blue-700 bg-blue-50 border-blue-200" },
+}
+
+function AccessRequestsListCard({
+  output,
+  onSendMessage,
+}: {
+  output: ListMyAccessRequestsOutput
+  onSendMessage?: (text: string) => void
+}) {
+  if (output.error) {
+    return (
+      <div className="rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-1">
+        {output.error}
+      </div>
+    )
+  }
+
+  if (output.requests.length === 0) {
+    return (
+      <div className="rounded-lg border px-4 py-6 text-xs text-muted-foreground text-center mt-1">
+        You have no access requests yet.
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+        <HugeiconsIcon icon={SecurityIcon} size={12} className="text-muted-foreground shrink-0" />
+        <span className="font-medium flex-1">My Access Requests</span>
+        <span className="text-muted-foreground">{output.requests.length}</span>
+      </div>
+
+      <div className="divide-y">
+        {output.requests.map((req) => {
+          const colors = REQUEST_STATUS_COLORS[req.status] ?? REQUEST_STATUS_COLORS.pending
+          const ago = formatDistanceToNowStrict(new Date(req.submitted_at), { addSuffix: true })
+
+          return (
+            <button
+              key={req.id}
+              type="button"
+              onClick={() =>
+                onSendMessage?.(
+                  `Tell me about my access request ${req.code} for \`${req.resource}\`.`,
+                )
+              }
+              className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-accent/40 transition-colors text-left"
+            >
+              <div className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0", colors.dot)} />
+
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-semibold">{req.code}</span>
+                  <span
+                    className={cn(
+                      "px-1.5 py-px rounded border text-[10px] font-medium capitalize",
+                      colors.badge,
+                    )}
+                  >
+                    {req.status}
+                  </span>
+                </div>
+                <div className="font-mono text-muted-foreground truncate">{req.resource}</div>
+                {req.rationale && (
+                  <div className="text-muted-foreground line-clamp-1">{req.rationale}</div>
+                )}
+              </div>
+
+              <div className="shrink-0 text-muted-foreground text-[10px] pt-0.5">{ago}</div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── ExploreCatalogCard ────────────────────────────────────────────────────────
+
+function ExploreCatalogCard({
+  output,
+  onSendMessage,
+}: {
+  output: ExploreCatalogOutput
+  onSendMessage?: (text: string) => void
+}) {
+  const accessible = output.tables.filter((t) => t.accessible)
+  const inaccessible = output.tables.filter((t) => !t.accessible)
+
+  return (
+    <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+        <HugeiconsIcon icon={CatalogueIcon} size={12} className="text-muted-foreground shrink-0" />
+        <span className="font-medium flex-1">Catalog Explorer</span>
+        {output.search && (
+          <span className="text-muted-foreground text-[11px] font-mono">
+            &ldquo;{output.search}&rdquo;
+          </span>
+        )}
+        <span className="text-muted-foreground text-[11px]">
+          {output.tables.length} {output.tables.length === 1 ? "table" : "tables"}
+        </span>
+      </div>
+
+      {output.overview && (
+        <p className="px-3 py-2 text-[11px] text-muted-foreground border-b">{output.overview}</p>
+      )}
+
+      {output.tables.length === 0 && (
+        <div className="px-3 py-6 text-center text-muted-foreground text-[11px]">
+          No tables found{output.search ? ` matching &ldquo;${output.search}&rdquo;` : ""}.
+        </div>
+      )}
+
+      {accessible.length > 0 && (
+        <div className="divide-y">
+          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/10">
+            Accessible ({accessible.length})
+          </div>
+          {accessible.map((table) => (
+            <div key={table.fqn} className="px-3 py-2 flex items-start gap-2.5">
+              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-mono font-medium text-[11px] truncate">{table.fqn}</div>
+                <div className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1">
+                  {table.summary}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] shrink-0 gap-1"
+                onClick={() =>
+                  onSendMessage?.(
+                    table.suggestedSql
+                      ? `Run this query: ${table.suggestedSql}`
+                      : `Show me the first 10 rows from ${table.fqn}`,
+                  )
+                }
+              >
+                <HugeiconsIcon icon={PlayIcon} size={9} />
+                Query
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {inaccessible.length > 0 && (
+        <div className={cn("divide-y", accessible.length > 0 && "border-t")}>
+          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/10">
+            Requires Access ({inaccessible.length})
+          </div>
+          {inaccessible.map((table) => {
+            const req = table.existingRequest
+            return (
+              <div key={table.fqn} className="px-3 py-2 flex items-start gap-2.5">
+                <div
+                  className={cn(
+                    "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
+                    req ? REQUEST_STATUS_COLORS[req.status]?.dot ?? "bg-amber-400" : "bg-muted-foreground/30",
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono font-medium text-[11px] truncate text-muted-foreground">
+                    {table.fqn}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-muted-foreground text-[11px] line-clamp-1">
+                      {table.summary}
+                    </span>
+                    {req && (
+                      <span
+                        className={cn(
+                          "px-1 py-px rounded border text-[10px] font-medium capitalize shrink-0",
+                          REQUEST_STATUS_COLORS[req.status]?.badge ?? "text-amber-700 bg-amber-50 border-amber-200",
+                        )}
+                      >
+                        {req.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {req ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px] shrink-0 gap-1"
+                    onClick={() =>
+                      onSendMessage?.(
+                        `Tell me about my access request ${req.code} for \`${table.fqn}\`.`,
+                      )
+                    }
+                  >
+                    <HugeiconsIcon icon={SecurityIcon} size={9} />
+                    {req.code}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px] shrink-0 gap-1"
+                    onClick={() =>
+                      onSendMessage?.(`I want to request access to ${table.fqn}`)
+                    }
+                  >
+                    <HugeiconsIcon icon={LockKeyIcon} size={9} />
+                    Request Access
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── ToolPart ──────────────────────────────────────────────────────────────────
 
-function ToolPart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
-  if (!isToolUIPart(part)) return null
+function ToolPart({
+  part,
+  onSendMessage,
+}: {
+  part: UIMessagePart<UIDataTypes, UITools>
+  onSendMessage?: (text: string) => void
+}) {
+  if (!part || !isToolUIPart(part)) return null
 
   const name = getToolName(part)
 
@@ -373,6 +869,78 @@ function ToolPart({ part }: { part: UIMessagePart<UIDataTypes, UITools> }) {
     }
     if (part.state === "output-available")
       return <QueryResultCard output={part.output as RunQueryOutput} />
+    if (part.state === "output-error")
+      return <ToolError text={part.errorText} />
+  }
+
+  if (name === "exploreCatalog") {
+    if (part.state === "input-streaming" || part.state === "input-available") {
+      const input = part.input as { search?: string } | undefined
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          <HugeiconsIcon icon={Search01Icon} size={11} className="shrink-0" />
+          {input?.search ? `Searching catalog for "${input.search}"…` : "Exploring catalog…"}
+        </div>
+      )
+    }
+    if (part.state === "output-available")
+      return (
+        <ExploreCatalogCard
+          output={part.output as ExploreCatalogOutput}
+          onSendMessage={onSendMessage}
+        />
+      )
+    if (part.state === "output-error") return <ToolError text={part.errorText} />
+  }
+
+  if (name === "listMyAccessRequests") {
+    if (part.state === "input-streaming" || part.state === "input-available") {
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          Loading your access requests…
+        </div>
+      )
+    }
+    if (part.state === "output-available")
+      return (
+        <AccessRequestsListCard
+          output={part.output as ListMyAccessRequestsOutput}
+          onSendMessage={onSendMessage}
+        />
+      )
+    if (part.state === "output-error")
+      return <ToolError text={part.errorText} />
+  }
+
+  if (name === "prepareAccessRequest") {
+    if (part.state === "input-streaming" || part.state === "input-available") {
+      const input = part.input as { resource?: string } | undefined
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          {input?.resource ? `Preparing access request for ${input.resource}…` : "Preparing access request…"}
+        </div>
+      )
+    }
+    if (part.state === "output-available")
+      return <AccessRequestCard output={part.output as AccessRequestPreviewOutput} onSendMessage={onSendMessage} />
+    if (part.state === "output-error")
+      return <ToolError text={part.errorText} />
+  }
+
+  if (name === "checkAccessRequestStatus") {
+    if (part.state === "input-streaming" || part.state === "input-available") {
+      return (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          Checking request status…
+        </div>
+      )
+    }
+    if (part.state === "output-available")
+      return <RequestStatusCard output={part.output as RequestStatusOutput} />
     if (part.state === "output-error")
       return <ToolError text={part.errorText} />
   }
@@ -413,9 +981,11 @@ function ToolError({ text }: { text: string }) {
 function MessageBubble({
   message,
   isAnimating,
+  onSendMessage,
 }: {
   message: UIMessage
   isAnimating: boolean
+  onSendMessage?: (text: string) => void
 }) {
   const isUser = message.role === "user"
 
@@ -433,6 +1003,7 @@ function MessageBubble({
   return (
     <div className="px-4 py-1.5 space-y-1.5 max-w-3xl">
       {message.parts.map((part, i) => {
+        if (!part) return null
         if (part.type === "text") {
           if (!part.text.trim()) return null
           return (
@@ -446,7 +1017,7 @@ function MessageBubble({
             </Streamdown>
           )
         }
-        if (isToolUIPart(part)) return <ToolPart key={i} part={part} />
+        if (isToolUIPart(part)) return <ToolPart key={i} part={part} onSendMessage={onSendMessage} />
         return null
       })}
     </div>
@@ -456,29 +1027,21 @@ function MessageBubble({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "Daily transaction volume by country",
-  "Monthly revenue by merchant category",
-  "Customer risk tier distribution",
-  "Channel usage breakdown",
-  "AML structuring alerts over time",
-  "Account balance trends",
+  "HDBank customer count by segment",
+  "Top VietJet activation candidates by propensity score",
+  "Travel spend vs credit score across HDBank customers",
+  "Co-brand campaign audience by priority band",
+  "Campaign summary: customer count and avg propensity by offer",
+  "VietJet customers by membership tier and booking value",
 ]
 
 export default function AnalyticsPage() {
   const [input, setInput] = useState("")
-  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-mini")
+  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-nano")
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const sessionIdRef = useRef<string | null>(null)
+  const sessionIdRef = useRef<string>("default")
   const modelIdRef = useRef<ModelId>(modelId)
-
-  const { sessions, activeId, setActiveId, createSession } = useSessionContext()
-
-  useEffect(() => {
-    const id = activeId ?? sessions[0]?.session_id ?? null
-    sessionIdRef.current = id
-    if (!activeId && sessions[0]) setActiveId(sessions[0].session_id)
-  }, [activeId, sessions, setActiveId])
 
   useEffect(() => {
     modelIdRef.current = modelId
@@ -508,12 +1071,6 @@ export default function AnalyticsPage() {
     const text = input.trim()
     if (!text || isLoading) return
     setInput("")
-
-    if (!sessionIdRef.current) {
-      const s = await createSession()
-      sessionIdRef.current = s?.session_id ?? null
-    }
-
     await sendMessage({ text })
   }
 
@@ -559,6 +1116,7 @@ export default function AnalyticsPage() {
                 key={msg.id}
                 message={msg}
                 isAnimating={isLoading && msg === messages.at(-1)}
+                onSendMessage={(text) => sendMessage({ text })}
               />
             ))}
 

@@ -1,10 +1,13 @@
+global:
+  postgresqlSecretName: dagster-postgresql-secret
+
 dagster-user-deployments:
   deployments:
     - name: mizumi
       image:
         repository: mizumi-dagster
         tag: "1.13.4"
-        pullPolicy: IfNotPresent
+        pullPolicy: Always
       dagsterApiGrpcArgs:
         - "--python-file"
         - "/app/definitions.py"
@@ -50,14 +53,8 @@ runLauncher:
           memory: 1Gi
 
 postgresql:
-  enabled: true
-  primary:
-    persistence:
-      size: 1Gi
-    resources:
-      requests:
-        cpu: 25m
-        memory: 128Mi
-      limits:
-        cpu: 125m
-        memory: 256Mi
+  enabled: false
+  postgresqlHost: dagster-postgresql
+  postgresqlUsername: dagster
+  postgresqlPassword: dagster_password
+  postgresqlDatabase: dagster

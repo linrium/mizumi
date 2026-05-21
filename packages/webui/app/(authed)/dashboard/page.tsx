@@ -1,60 +1,49 @@
 "use client"
 
+import { useChat } from "@ai-sdk/react"
 import {
+  Add01Icon,
+  AlertCircleIcon,
+  ArrowDataTransferHorizontalIcon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  Chart01Icon,
+  ChartAreaIcon,
+  ChartColumnIcon,
+  ChartLineData01Icon,
+  ChartScatterIcon,
+  CheckmarkCircle01Icon,
+  Delete01Icon,
+  DragDropIcon,
+  Edit02Icon,
+  Loading03Icon,
+  MoreHorizontalIcon,
+  PieChart01Icon,
+  PlayIcon,
+  Refresh01Icon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import type { ColumnDef } from "@tanstack/react-table"
+import type { UIDataTypes, UIMessage, UIMessagePart, UITools } from "ai"
+import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
+import ReactECharts from "echarts-for-react"
+import {
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react"
-import ReactGridLayout, { useContainerWidth } from "react-grid-layout"
 import type { Layout, LayoutItem } from "react-grid-layout"
-import ReactECharts from "echarts-for-react"
-import type { ColumnDef } from "@tanstack/react-table"
-import { DataGrid } from "@/components/data-grid/data-grid"
-import { useDataGrid } from "@/hooks/use-data-grid"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
-import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai"
+import ReactGridLayout, { useContainerWidth } from "react-grid-layout"
 import { Streamdown } from "streamdown"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import {
-  Add01Icon,
-  Cancel01Icon,
-  Delete01Icon,
-  Edit02Icon,
-  DragDropIcon,
-  MoreHorizontalIcon,
-  Chart01Icon,
-  PlayIcon,
-  Loading03Icon,
-  AlertCircleIcon,
-  CheckmarkCircle01Icon,
-  Refresh01Icon,
-  ChartColumnIcon,
-  ChartLineData01Icon,
-  ChartAreaIcon,
-  PieChart01Icon,
-  ChartScatterIcon,
-  SparklesIcon,
-  ArrowUp01Icon,
-} from "@hugeicons/core-free-icons"
+import { DataGrid } from "@/components/data-grid/data-grid"
+import { SqlCodeEditor } from "@/components/sql-editor"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,9 +51,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
-import { readStoredIdToken } from "@/lib/auth/storage"
+import { apiFetch, getToken } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import type { PanelSummary } from "@/services/dashboard"
 
@@ -72,7 +73,7 @@ import "react-grid-layout/css/styles.css"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ChartType = "bar" | "line" | "pie" | "scatter" | "area"
+type ChartType = "bar" | "line" | "pie" | "scatter" | "area" | "sankey"
 
 type QueryResult = {
   columns: string[]
@@ -89,6 +90,7 @@ type PanelData = {
 type Panel = {
   id: string
   title: string
+  description?: string
   chartType: ChartType
   sql: string
   xCol: string
@@ -144,7 +146,7 @@ function buildOption(
     yi >= 0
       ? result.rows
           .map((r) => parseFloat(String((r as unknown[])[yi] ?? "0")))
-          .filter(isFinite)
+          .filter(Number.isFinite)
       : []
 
   const textColor = "#71717a"
@@ -156,6 +158,44 @@ function buildOption(
       trigger: chartType === "pie" ? "item" : "axis",
       textStyle: { fontSize: 11 },
     },
+  }
+
+  if (chartType === "sankey") {
+    const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
+    const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
+    const valIdx = result.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+
+    const nodeNames = new Set<string>()
+    const links: { source: string; target: string; value: number }[] = []
+
+    for (const row of result.rows) {
+      const r = row as unknown[]
+      const src = String(r[srcIdx] ?? "")
+      const tgt = String(r[tgtIdx] ?? "")
+      const val = parseFloat(String(r[Math.max(0, valIdx)] ?? "0"))
+      if (src && tgt && Number.isFinite(val) && val > 0) {
+        nodeNames.add(src)
+        nodeNames.add(tgt)
+        links.push({ source: src, target: tgt, value: val })
+      }
+    }
+
+    return {
+      ...base,
+      series: [
+        {
+          type: "sankey",
+          emphasis: { focus: "adjacency" },
+          data: [...nodeNames].map((name) => ({ name })),
+          links,
+          lineStyle: { color: "gradient", opacity: 0.45 },
+          label: { fontSize: 11, color: textColor },
+          nodeWidth: 14,
+          nodeGap: 10,
+          right: "10%",
+        },
+      ],
+    }
   }
 
   if (chartType === "pie") {
@@ -230,19 +270,106 @@ function buildOption(
   }
 }
 
-// ── Default panel ─────────────────────────────────────────────────────────────
+// ── Default panels ────────────────────────────────────────────────────────────
 
 const DEFAULT_PANELS: Panel[] = [
   {
     id: "p1",
-    title: "Daily Transactions by Country",
+    title: "Shared Customer Overlap — HDBank Side",
+    description: "How many HDBank customers are already shared with VietJet Air vs. exclusive to HDBank. Shared customers are warm cross-sell targets — both companies already have a relationship with them.",
+    chartType: "pie",
+    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with VietJet' ELSE 'HDBank Only' END AS customer_type, COUNT(*) AS customer_count FROM hdbank.hdbank_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
+    xCol: "customer_type",
+    yCol: "customer_count",
+  },
+  {
+    id: "p2",
+    title: "Shared Customer Overlap — VietJet Side",
+    description: "Mirror view from VietJet's perspective. Comparing both pies shows whether the overlap is symmetric — one side may hold significantly more shared customers, revealing where cross-sell opportunity is concentrated.",
+    chartType: "pie",
+    sql: "SELECT CASE WHEN shared_customer THEN 'Shared with HDBank' ELSE 'VietJet Only' END AS customer_type, COUNT(*) AS customer_count FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 GROUP BY shared_customer",
+    xCol: "customer_type",
+    yCol: "customer_count",
+  },
+  {
+    id: "p3",
+    title: "HDBank Segments — VietJet Activation Candidates",
+    description: "Which HDBank customer segments generate the most VietJet cross-sell leads. Bar height = candidate volume; avg propensity score shows which segments are not just large but likely to convert into VietJet flyers.",
     chartType: "bar",
-    sql: "select country_code, sum(transaction_count) as transaction_count from banking.transactions.gold_daily_transaction_summary group by country_code order by transaction_count desc",
-    xCol: "country_code",
-    yCol: "transaction_count",
+    sql: [
+      "SELECT c.segment_name, COUNT(DISTINCT a.customer_id) AS candidates, ROUND(AVG(a.propensity_score), 3) AS avg_propensity_score",
+      "FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c",
+      "JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id",
+      "GROUP BY c.segment_name ORDER BY candidates DESC",
+    ].join(" "),
+    xCol: "segment_name",
+    yCol: "candidates",
+  },
+  {
+    id: "p4",
+    title: "VietJet Membership Tier — HDBank Finance Potential",
+    description: "VietJet flyers grouped by membership tier and scored for HDBank finance products (loans, co-brand card). Higher tiers typically travel more frequently, making them stronger candidates for travel financing offers.",
+    chartType: "bar",
+    sql: [
+      "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS finance_candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity_score",
+      "FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v",
+      "JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id",
+      "GROUP BY v.membership_tier ORDER BY finance_candidates DESC",
+    ].join(" "),
+    xCol: "membership_tier",
+    yCol: "finance_candidates",
+  },
+  {
+    id: "p5",
+    title: "Outreach Channels for Cross-sell Targets",
+    description: "Recommended outreach channels across all VietJet activation candidates. Use this to allocate campaign budget — a channel with high candidate count but low avg propensity may need targeting refinement before activation.",
+    chartType: "bar",
+    sql: [
+      "SELECT recommended_channel, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity_score",
+      "FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1",
+      "GROUP BY recommended_channel ORDER BY candidates DESC",
+    ].join(" "),
+    xCol: "recommended_channel",
+    yCol: "candidates",
+  },
+  {
+    id: "p6",
+    title: "Co-brand Audience by Priority Band",
+    description: "The unified co-brand audience segmented by activation urgency. High-priority customers carry the strongest combined propensity signals from both companies and should receive the first wave of co-brand outreach.",
+    chartType: "pie",
+    sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
+    xCol: "priority_band",
+    yCol: "audience_count",
+  },
+  {
+    id: "p7",
+    title: "HDBank → VietJet Activation Funnel",
+    description: "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (center), which then route to recommended outreach channels (right). Band width represents the number of customers on each path — thicker bands are higher-volume routes.",
+    chartType: "sankey",
+    sql: [
+      "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value",
+      "FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c",
+      "JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id",
+      "GROUP BY c.segment_name, a.use_case",
+      "UNION ALL",
+      "SELECT a.use_case AS source, a.recommended_channel AS target, COUNT(*) AS value",
+      "FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a",
+      "GROUP BY a.use_case, a.recommended_channel",
+    ].join(" "),
+    xCol: "source",
+    yCol: "target",
   },
 ]
-const DEFAULT_LAYOUT: Layout = [{ i: "p1", x: 0, y: 0, w: 6, h: 4 }]
+
+const DEFAULT_LAYOUT: Layout = [
+  { i: "p1", x: 0, y: 0,  w: 1, h: 6 },
+  { i: "p2", x: 1, y: 0,  w: 1, h: 6 },
+  { i: "p3", x: 0, y: 6,  w: 1, h: 6 },
+  { i: "p4", x: 1, y: 6,  w: 1, h: 6 },
+  { i: "p5", x: 0, y: 12, w: 1, h: 6 },
+  { i: "p6", x: 1, y: 12, w: 1, h: 6 },
+  { i: "p7", x: 0, y: 18, w: 2, h: 8 },
+]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
 
@@ -425,6 +552,11 @@ function PanelCard({
           </div>
         )}
       </div>
+      {panel.description && (
+        <p className="px-3 py-2 text-xs text-muted-foreground border-t leading-relaxed shrink-0 min-h-[2.5rem] max-h-[5rem] overflow-y-auto">
+          {panel.description}
+        </p>
+      )}
     </div>
   )
 }
@@ -440,6 +572,7 @@ const CHART_TYPE_CONFIG: Record<
   area: { label: "Area", icon: ChartAreaIcon },
   pie: { label: "Pie / Donut", icon: PieChart01Icon },
   scatter: { label: "Scatter", icon: ChartScatterIcon },
+  sankey: { label: "Sankey / Flow", icon: ArrowDataTransferHorizontalIcon },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
@@ -447,13 +580,11 @@ const CHART_TYPE_CONFIG: Record<
 function PanelSidebar({
   panel,
   data,
-  sessionId,
   onChange,
   onRun,
 }: {
   panel: Panel
   data: PanelData
-  sessionId: string | null
   onChange: (p: Panel) => void
   onRun: (p: Panel) => void
 }) {
@@ -463,8 +594,8 @@ function PanelSidebar({
 
   return (
     <div className="flex flex-col h-full text-xs">
-      <div className="px-4 py-3 border-b shrink-0">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+      <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
           Panel
         </p>
         <Input
@@ -472,6 +603,13 @@ function PanelSidebar({
           onChange={(e) => onChange({ ...panel, title: e.target.value })}
           className="h-7 text-xs"
           placeholder="Panel title"
+        />
+        <textarea
+          value={panel.description ?? ""}
+          onChange={(e) => onChange({ ...panel, description: e.target.value })}
+          rows={2}
+          placeholder="Description (shown below the chart)"
+          className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
         />
       </div>
       <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
@@ -482,7 +620,7 @@ function PanelSidebar({
           <Button
             size="sm"
             className="h-6 gap-1 text-[11px] px-2"
-            disabled={isRunning || !sessionId || !panel.sql.trim()}
+            disabled={isRunning || !panel.sql.trim()}
             onClick={() => onRun(panel)}
           >
             {isRunning ? (
@@ -497,24 +635,21 @@ function PanelSidebar({
             Run
           </Button>
         </div>
-        <Textarea
+        <div
           id={`${uid}-sql`}
-          value={panel.sql}
-          onChange={(e) => onChange({ ...panel, sql: e.target.value })}
-          placeholder="SELECT col1, col2 FROM table LIMIT 100"
-          className="font-mono text-[11px] resize-none min-h-[100px]"
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault()
-              if (!isRunning && sessionId && panel.sql.trim()) onRun(panel)
-            }
-          }}
-        />
-        {!sessionId && (
-          <p className="text-[10px] text-destructive">
-            No session — create one to run queries
-          </p>
-        )}
+          className="min-h-[160px] overflow-hidden rounded-md border bg-background"
+        >
+          <SqlCodeEditor
+            value={panel.sql}
+            onChange={(value) => onChange({ ...panel, sql: value })}
+            onSubmit={() => {
+              if (!isRunning && panel.sql.trim()) onRun(panel)
+            }}
+            lineNumbers="off"
+            className="h-full"
+            editorClassName="min-h-[160px]"
+          />
+        </div>
         {data.status === "error" && (
           <p className="text-[10px] text-destructive whitespace-pre-wrap">
             {data.error}
@@ -653,12 +788,12 @@ function PanelSidebar({
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "Daily transaction volume by country",
-  "Monthly revenue by merchant category",
-  "Customer risk tier distribution",
-  "Channel usage breakdown",
-  "AML structuring alerts over time",
-  "Account balance trends",
+  "HDBank customers by preferred channel",
+  "VietJet membership tiers by average booking value",
+  "Travel affinity score distribution across HDBank customers",
+  "HDBank finance candidates from VietJet by propensity",
+  "Shared customers between HDBank and VietJet",
+  "Co-brand signal value by source company",
 ]
 
 function AiComposer({
@@ -1099,7 +1234,7 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
   const [composerWidth, setComposerWidth] = useState(COMPOSER_DEFAULT)
-  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-mini")
+  const [modelId, setModelId] = useState<ModelId>("gpt-5.4-nano")
   const sidebarDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const composerDragRef = useRef<{ startX: number; startW: number } | null>(
     null,
@@ -1108,61 +1243,53 @@ export default function DashboardPage() {
 
   const { activeId } = useSessionContext()
 
-  const runQuery = useCallback(
-    async (panel: Panel, sessionId: string | null) => {
-      if (!panel.sql.trim()) return
-      abortRefs.current[panel.id]?.abort()
-      const ctrl = new AbortController()
-      abortRefs.current[panel.id] = ctrl
+  const runQuery = useCallback(async (panel: Panel) => {
+    if (!panel.sql.trim()) return
+    abortRefs.current[panel.id]?.abort()
+    const ctrl = new AbortController()
+    abortRefs.current[panel.id] = ctrl
+    setPanelData((prev) => ({
+      ...prev,
+      [panel.id]: { status: "running", result: null, error: null },
+    }))
+    try {
+      const idToken = await getToken()
+      const res = await apiFetch("/api/sessions/default/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sql: panel.sql, idToken }),
+        signal: ctrl.signal,
+      })
+      const json = await res.json()
+      if (!res.ok)
+        throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`)
       setPanelData((prev) => ({
         ...prev,
-        [panel.id]: { status: "running", result: null, error: null },
+        [panel.id]: { status: "ok", result: json, error: null },
       }))
-      try {
-        const url = sessionId
-          ? `/api/sessions/${sessionId}/query`
-          : `/api/query`
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sql: panel.sql,
-            idToken: readStoredIdToken() ?? undefined,
-          }),
-          signal: ctrl.signal,
-        })
-        const json = await res.json()
-        if (!res.ok)
-          throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`)
-        setPanelData((prev) => ({
-          ...prev,
-          [panel.id]: { status: "ok", result: json, error: null },
-        }))
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return
-        setPanelData((prev) => ({
-          ...prev,
-          [panel.id]: {
-            status: "error",
-            result: null,
-            error: (err as Error).message,
-          },
-        }))
-      }
-    },
-    [],
-  )
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return
+      setPanelData((prev) => ({
+        ...prev,
+        [panel.id]: {
+          status: "error",
+          result: null,
+          error: (err as Error).message,
+        },
+      }))
+    }
+  }, [])
 
   const hasAutoRun = useRef(false)
   useEffect(() => {
-    if (!activeId || hasAutoRun.current) return
+    if (hasAutoRun.current) return
     hasAutoRun.current = true
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel, activeId)
+      if (panel.sql.trim()) runQuery(panel)
     }
-    // panels intentionally excluded — only run once when activeId first arrives
+    // panels intentionally excluded — only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, runQuery])
+  }, [runQuery])
 
   const handlePanelChange = useCallback((updated: Panel) => {
     setPanels((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
@@ -1185,7 +1312,7 @@ export default function DashboardPage() {
     }))
     setLayout((prev) => [
       ...prev,
-      { i: id, x: 0, y: Infinity, w: 6, h: 4 } as LayoutItem,
+      { i: id, x: 0, y: Infinity, w: 1, h: 4 } as LayoutItem,
     ])
     setSelectedId(id)
   }
@@ -1248,9 +1375,9 @@ export default function DashboardPage() {
             (p, i) =>
               ({
                 i: p.id,
-                x: (i % 2) * 6,
+                x: i % 2,
                 y: Infinity,
-                w: 6,
+                w: 1,
                 h: 4,
               }) as LayoutItem,
           )
@@ -1262,7 +1389,7 @@ export default function DashboardPage() {
 
   const refreshAll = () => {
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel, activeId)
+      if (panel.sql.trim()) runQuery(panel)
     }
   }
 
@@ -1403,7 +1530,7 @@ export default function DashboardPage() {
             <ReactGridLayout
               width={width}
               layout={layout}
-              gridConfig={{ cols: 12, rowHeight: 60, margin: [8, 8] }}
+              gridConfig={{ cols: 2, rowHeight: 60, margin: [8, 8] }}
               dragConfig={{ enabled: editing, handle: ".panel-drag-handle" }}
               resizeConfig={{ enabled: editing, handles: ["se"] }}
               onLayoutChange={setLayout}
@@ -1461,9 +1588,8 @@ export default function DashboardPage() {
               <PanelSidebar
                 panel={selectedPanel}
                 data={selectedData}
-                sessionId={activeId}
                 onChange={handlePanelChange}
-                onRun={(p) => runQuery(p, activeId)}
+                onRun={runQuery}
               />
             </div>
           </div>

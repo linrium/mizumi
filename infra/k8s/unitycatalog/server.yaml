@@ -16,7 +16,11 @@ data:
     client_id = "webui"
     client_secret = "webui-secret"
     redirect_port = 8082
-    allowed_issuers = ["http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico", "http://127.0.0.1:8083/realms/sovico"]
+    allowed_issuers = [
+      "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico",
+      "http://127.0.0.1:8083/realms/sovico",
+      "http://localhost:8083/realms/sovico",
+    ]
     audiences = ["webui"]
     cookie_timeout = "P5D"
 
@@ -24,7 +28,7 @@ data:
     enabled = true
 
     [database]
-    url = "postgres://ucuser:ucpassword@unitycatalog-postgres-svc:5432/ucdb"
+    url = "postgres://ucuser:ucpassword@shared-postgres-svc.shared-postgres.svc.cluster.local:5432/ucdb"
     max_connections = 20
 
     [[s3]]
@@ -52,7 +56,8 @@ spec:
       containers:
         - name: unitycatalog
           image: mizumi-uc:0.1.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
+          # imagePullPolicy: IfNotPresent
           resources:
             requests:
               cpu: 100m
@@ -79,6 +84,23 @@ spec:
           env:
             - name: RUST_LOG
               value: debug
+            - name: UC__DATABASE__URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DATABASE_URL
+            - name: UC_INTERNAL_SERVER_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: unitycatalog-auth
+                  key: UC_INTERNAL_SERVER_KEY_PEM
+                  optional: true
+            - name: UC_INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: unitycatalog-auth
+                  key: UC_INTERNAL_SERVICE_TOKEN
+                  optional: true
           volumeMounts:
             - name: config
               mountPath: /app/config/server.toml

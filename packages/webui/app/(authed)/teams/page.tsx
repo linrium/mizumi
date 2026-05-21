@@ -50,9 +50,7 @@ export default function TeamsPage() {
         if (!cancelled) setTeams(data)
       } catch (err) {
         if (!cancelled)
-          setError(
-            err instanceof Error ? err.message : "Failed to load teams",
-          )
+          setError(err instanceof Error ? err.message : "Failed to load teams")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -119,7 +117,6 @@ export default function TeamsPage() {
             New team
           </Button>
         </div>
-
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server"
-import { getCatalogs, getSchemas, getTables, getTable } from "@/services/catalog"
+import {
+  getCatalogs,
+  getSchemas,
+  getTables,
+  getTable,
+} from "@/services/catalog"
 
 export type CatalogCompletionSchema = {
   catalogs: string[]
@@ -65,6 +70,9 @@ export async function GET() {
 
     return NextResponse.json(result)
   } catch {
-    return NextResponse.json({ catalogs: [], tables: [] } satisfies CatalogCompletionSchema)
+    return NextResponse.json({
+      catalogs: [],
+      tables: [],
+    } satisfies CatalogCompletionSchema)
   }
 }

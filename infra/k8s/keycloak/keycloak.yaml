@@ -26,7 +26,7 @@ spec:
       containers:
         - name: keycloak
           image: mizumi-keycloak:26.3.3
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - start
             - --optimized
@@ -39,7 +39,7 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: jdbc:postgresql://keycloak-postgres-svc:5432/keycloak
+              value: jdbc:postgresql://shared-postgres-svc.shared-postgres.svc.cluster.local:5432/keycloak
             - name: KC_DB_USERNAME
               valueFrom:
                 secretKeyRef:

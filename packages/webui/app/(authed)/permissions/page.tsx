@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
@@ -36,7 +37,10 @@ import {
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import {
+  type BlastRadiusPreview,
+  listBlastRadius,
   listPermissionRequests,
+  type LlmRiskStatus,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
@@ -77,6 +81,10 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
+function formatRiskLabel(risk: RiskLevel) {
+  return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
+}
+
 function formatStatusLabel(status: RequestStatus) {
   switch (status) {
     case "ready":
@@ -96,7 +104,7 @@ function formatQueueDecision(decision: PermissionRequest["queue_decision"]) {
   switch (decision) {
     case "auto-approved":
       return "Auto-approved by template"
-    case "reviewer-gate":
+    case "time-bounded":
       return "Matched template, routed to reviewer"
     case "security-escalation":
       return "Matched template, escalated"
@@ -113,8 +121,45 @@ function formatSubmitter(request: PermissionRequest) {
   return request.submit_as === "team" ? (request.team ?? "Team") : "Personal"
 }
 
+function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
+  if (status === "processing") {
+    return (
+      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+        LLM analysing…
+      </Badge>
+    )
+  }
+  if (status === "failed") {
+    return (
+      <Badge
+        variant="outline"
+        className="text-destructive border-destructive/40"
+      >
+        LLM failed
+      </Badge>
+    )
+  }
+  if (status === "unknown") {
+    return null
+  }
+  const variant =
+    status === "high"
+      ? "destructive"
+      : status === "medium"
+        ? "secondary"
+        : "outline"
+  return (
+    <Badge variant={variant}>
+      LLM {status[0]?.toUpperCase() + status.slice(1)} risk
+    </Badge>
+  )
+}
+
 export default function PermissionsPage() {
   const [requests, setRequests] = useState<PermissionRequest[]>([])
+  const [blastRadiusByRequestId, setBlastRadiusByRequestId] = useState<
+    Record<string, BlastRadiusPreview>
+  >({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
@@ -126,6 +171,7 @@ export default function PermissionsPage() {
   const [approveTarget, setApproveTarget] = useState<{
     request: PermissionRequest
     stepId?: string
+    durationDays: string
   } | null>(null)
 
   useEffect(() => {
@@ -135,9 +181,17 @@ export default function PermissionsPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await listPermissionRequests({ all: true })
+        const [data, blastRadius] = await Promise.all([
+          listPermissionRequests({ all: true }),
+          listBlastRadius(),
+        ])
         if (!cancelled) {
           setRequests(data)
+          setBlastRadiusByRequestId(
+            Object.fromEntries(
+              blastRadius.map((item) => [item.request_id, item]),
+            ),
+          )
         }
       } catch (err) {
         if (!cancelled) {
@@ -206,6 +260,11 @@ export default function PermissionsPage() {
 
   async function handleApprove() {
     if (!approveTarget || approving) return
+    const days = parseInt(approveTarget.durationDays, 10)
+    if (!days || days < 1) {
+      setError("Grant duration must be at least 1 day")
+      return
+    }
     setApproving(true)
     setError(null)
     try {
@@ -213,6 +272,7 @@ export default function PermissionsPage() {
         approveTarget.request.id,
         "approved",
         approveTarget.stepId,
+        days,
       )
       setRequests((prev) =>
         prev.map((r) => (r.id === updated.id ? updated : r)),
@@ -316,6 +376,7 @@ export default function PermissionsPage() {
               <TableHead>Request</TableHead>
               <TableHead>Resource</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Impact</TableHead>
               <TableHead>Privileges</TableHead>
               <TableHead>Reviewer</TableHead>
               {/*<TableHead>SLA</TableHead>*/}
@@ -342,6 +403,7 @@ export default function PermissionsPage() {
                 const currentSteps = request.approval_steps.filter(
                   (step) => step.is_current,
                 )
+                const blastRadius = blastRadiusByRequestId[request.id]
 
                 return (
                   <TableRow
@@ -371,9 +433,6 @@ export default function PermissionsPage() {
                         <div className="text-muted-foreground">
                           {formatSubmitter(request)}
                         </div>
-                        <div className="line-clamp-1 max-w-[44ch] text-muted-foreground">
-                          {request.rationale}
-                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -385,10 +444,12 @@ export default function PermissionsPage() {
                           <Badge variant="outline">
                             {formatScopeLabel(request.scope)}
                           </Badge>
-                          <Badge variant={getRiskVariant(request.risk)}>
-                            {request.risk} risk
-                          </Badge>
                         </div>
+                        {request.rationale && (
+                          <div className="line-clamp-2 max-w-[44ch] text-xs text-muted-foreground">
+                            {request.rationale}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -425,6 +486,53 @@ export default function PermissionsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
+                      {blastRadius ? (
+                        <div className="space-y-1">
+                          {blastRadius.llm_risk !== "unknown" ? (
+                            <LlmRiskBadge status={blastRadius.llm_risk} />
+                          ) : (
+                            <Badge
+                              variant={getRiskVariant(blastRadius.derived_risk)}
+                            >
+                              {formatRiskLabel(blastRadius.derived_risk)}
+                            </Badge>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            {[
+                              {
+                                v: blastRadius.total_downstream_nodes,
+                                l: "nodes",
+                              },
+                              {
+                                v: blastRadius.downstream_tables,
+                                l: "datasets",
+                              },
+                              { v: blastRadius.downstream_assets, l: "assets" },
+                              { v: blastRadius.downstream_jobs, l: "jobs" },
+                              {
+                                v: blastRadius.downstream_schedules,
+                                l: "schedules",
+                              },
+                            ]
+                              .filter(({ v }) => v > 0)
+                              .map(({ v, l }) => `${v} ${l}`)
+                              .join(" · ")}
+                          </div>
+                          {blastRadius.lineage_resolved ? (
+                            <div className="line-clamp-1 max-w-[28ch] text-xs text-muted-foreground">
+                              Root {blastRadius.lineage_root_display_name}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              No lineage root
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground">Loading…</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="align-top">
                       <div className="flex max-w-[28ch] flex-wrap gap-1">
                         {request.privileges.map((privilege) => (
                           <Badge key={privilege} variant="outline">
@@ -435,7 +543,7 @@ export default function PermissionsPage() {
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="space-y-1">
-                        <div className="font-medium">{request.reviewer}</div>
+                        {/*<div className="font-medium">{request.reviewer}</div>*/}
                         <div className="flex max-w-[28ch] flex-wrap gap-1">
                           {request.approval_steps.map((step) => (
                             <Badge
@@ -490,6 +598,7 @@ export default function PermissionsPage() {
                                 setApproveTarget({
                                   request,
                                   stepId: currentSteps[0]?.id,
+                                  durationDays: String(Math.max(request.expires_in_days, 1)),
                                 })
                               }
                             >
@@ -508,6 +617,7 @@ export default function PermissionsPage() {
                                   setApproveTarget({
                                     request,
                                     stepId: step.id,
+                                    durationDays: String(Math.max(request.expires_in_days, 1)),
                                   })
                                 }
                               >
@@ -673,6 +783,39 @@ export default function PermissionsPage() {
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <Label htmlFor="grant-duration-days" className="text-xs">
+              Grant duration (days)
+            </Label>
+            <Input
+              id="grant-duration-days"
+              type="number"
+              min={1}
+              max={approveTarget?.request.expires_in_days ?? 365}
+              value={approveTarget?.durationDays ?? ""}
+              onChange={(e) =>
+                setApproveTarget((prev) =>
+                  prev ? { ...prev, durationDays: e.target.value } : prev,
+                )
+              }
+              className="h-8 text-sm"
+              placeholder="e.g. 30"
+            />
+            {approveTarget && Number(approveTarget.durationDays) >= 1 && (
+              <p className="text-xs text-muted-foreground">
+                Access expires on{" "}
+                {new Date(
+                  Date.now() +
+                    Number(approveTarget.durationDays) * 86_400_000,
+                ).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -682,7 +825,15 @@ export default function PermissionsPage() {
             >
               Cancel
             </Button>
-            <Button type="button" disabled={approving} onClick={handleApprove}>
+            <Button
+              type="button"
+              disabled={
+                approving ||
+                !approveTarget ||
+                !(Number(approveTarget.durationDays) >= 1)
+              }
+              onClick={handleApprove}
+            >
               {approving ? "Approving…" : "Approve"}
             </Button>
           </DialogFooter>

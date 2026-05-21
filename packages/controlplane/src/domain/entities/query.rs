@@ -8,7 +8,7 @@ pub struct QueryRequest {
     pub id_token: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct QueryResponse {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<Value>>,

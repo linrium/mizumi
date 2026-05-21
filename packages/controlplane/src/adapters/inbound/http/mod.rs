@@ -1,5 +1,6 @@
 pub mod dagster;
 pub mod k8s;
+pub mod lineage;
 pub mod permissions;
 pub mod streaming;
 pub mod teams;
@@ -137,6 +138,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(permissions::get_request).patch(permissions::update_request_status),
         )
         .route(
+            "/api/permissions/requests/{id}/blast-radius",
+            get(permissions::get_blast_radius),
+        )
+        .route(
             "/api/permissions/policy-templates",
             get(permissions::list_policy_templates),
         )
@@ -148,6 +153,23 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/api/permissions/grants",
             get(permissions::list_time_bound_grants),
         )
+        .route(
+            "/api/permissions/grants/{id}",
+            get(permissions::get_time_bound_grant),
+        )
+        .route(
+            "/api/permissions/grants/{id}/revoke",
+            post(permissions::revoke_grant),
+        )
+        .route(
+            "/api/permissions/grants/{id}/renew",
+            post(permissions::admin_renew_grant),
+        )
+        .route("/api/lineage/rebuild", post(lineage::rebuild_lineage))
+        .route("/api/lineage/search", get(lineage::search_lineage))
+        .route("/api/lineage/nodes/{token}", get(lineage::get_lineage_node))
+        .route("/api/lineage/graph", get(lineage::get_lineage_graph))
+        .route("/api/lineage/blast-radius", get(lineage::get_blast_radius))
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))

@@ -8,7 +8,5 @@ export default function TableRequestPermissionsPage() {
   if (!detail) return null
 
   const resource = `${detail.catalog_name}.${detail.schema_name}.${detail.name}`
-  return (
-    <RequestPermissionsPanel resource={resource} scope="table" />
-  )
+  return <RequestPermissionsPanel resource={resource} scope="table" />
 }

@@ -2,7 +2,7 @@
 <module external.system.id="pyproject.toml" type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$/packages/uc-java/ai/integrations/dspy">
-      <sourceFolder url="file://$MODULE_DIR$/packages/uc-java/ai/integrations/dspy/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/uc-java/ai/integrations/dspy/src" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="unitycatalog-ai" exported="" />

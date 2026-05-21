@@ -45,7 +45,10 @@ impl TokenManager {
     pub fn load_or_generate(config_dir: &Path) -> anyhow::Result<Self> {
         let key_path = config_dir.join("server.key");
 
-        let private_pem: String = if key_path.exists() {
+        let private_pem: String = if let Ok(pem) = std::env::var("UC_INTERNAL_SERVER_KEY_PEM") {
+            tracing::info!("Loading internal RSA key from UC_INTERNAL_SERVER_KEY_PEM");
+            pem
+        } else if key_path.exists() {
             tracing::info!("Loading RSA key from {}", key_path.display());
             std::fs::read_to_string(&key_path)?
         } else {
@@ -82,8 +85,20 @@ impl TokenManager {
             service_token: String::new(),
         };
 
-        // Generate the master service token
-        mgr.service_token = mgr.create_service_token()?;
+        // Use the shared service token when explicitly provided; otherwise
+        // generate one from the active signing key.
+        mgr.service_token = if let Ok(token) = std::env::var("UC_INTERNAL_SERVICE_TOKEN") {
+            tracing::info!("Loading master token from UC_INTERNAL_SERVICE_TOKEN");
+            token.trim().to_string()
+        } else {
+            mgr.create_service_token()?
+        };
+
+        if mgr.service_token.is_empty() {
+            anyhow::bail!("UC_INTERNAL_SERVICE_TOKEN is set but empty");
+        }
+        mgr.validate(&mgr.service_token)
+            .map_err(|e| anyhow::anyhow!("invalid internal service token: {e}"))?;
 
         // Write token.txt and certs.json
         std::fs::write(config_dir.join("token.txt"), &mgr.service_token)?;

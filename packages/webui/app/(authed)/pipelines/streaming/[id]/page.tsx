@@ -230,7 +230,9 @@ export default function StreamingJobDetailPage() {
   }
 
   async function doDelete() {
-    const res = await fetchWithAuth(`/api/streaming/jobs/${id}`, { method: "DELETE" })
+    const res = await fetchWithAuth(`/api/streaming/jobs/${id}`, {
+      method: "DELETE",
+    })
     if (res.status !== 204 && !res.ok) {
       const json = await res.json().catch(() => ({}))
       throw new Error(json.error ?? `HTTP ${res.status}`)

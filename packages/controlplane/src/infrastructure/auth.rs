@@ -59,18 +59,30 @@ struct OidcDiscovery {
 
 pub struct KeycloakAuth {
     http: reqwest::Client,
-    pub issuer: String,
+    pub discovery_issuer: String,
+    pub allowed_issuers: Vec<String>,
     pub audiences: Vec<String>,
     jwks_uri: Arc<RwLock<Option<String>>>,
     jwks_cache: Arc<RwLock<Option<JwkSet>>>,
 }
 
 impl KeycloakAuth {
-    pub fn new(keycloak_url: &str, realm: &str, audiences: Vec<String>) -> Self {
-        let issuer = format!("{}/realms/{}", keycloak_url.trim_end_matches('/'), realm);
+    pub fn new(
+        keycloak_url: &str,
+        realm: &str,
+        issuers: Vec<String>,
+        audiences: Vec<String>,
+    ) -> Self {
+        let discovery_issuer = format!("{}/realms/{}", keycloak_url.trim_end_matches('/'), realm);
+        let allowed_issuers = if issuers.is_empty() {
+            vec![discovery_issuer.clone()]
+        } else {
+            issuers
+        };
         Self {
             http: reqwest::Client::new(),
-            issuer,
+            discovery_issuer,
+            allowed_issuers,
             audiences,
             jwks_uri: Arc::new(RwLock::new(None)),
             jwks_cache: Arc::new(RwLock::new(None)),
@@ -83,7 +95,7 @@ impl KeycloakAuth {
         }
         let discovery_url = format!(
             "{}/.well-known/openid-configuration",
-            self.issuer.trim_end_matches('/')
+            self.discovery_issuer.trim_end_matches('/')
         );
         tracing::debug!("fetching OIDC discovery: {}", discovery_url);
         let res = self
@@ -184,11 +196,17 @@ impl KeycloakAuth {
             .and_then(|a| a.to_string().parse::<Algorithm>().ok())
             .unwrap_or(Algorithm::RS256);
 
-        tracing::debug!("jwk issuer: {}", self.issuer);
+        tracing::debug!("jwk discovery issuer: {}", self.discovery_issuer);
+        tracing::debug!("jwt allowed issuers: {:?}", self.allowed_issuers);
         tracing::debug!("jwk audiences: {:?}", self.audiences);
 
         let mut validation = Validation::new(alg);
-        validation.set_issuer(&[&self.issuer]);
+        let issuers = self
+            .allowed_issuers
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        validation.set_issuer(&issuers);
         if self.audiences.is_empty() {
             validation.validate_aud = false;
         } else {

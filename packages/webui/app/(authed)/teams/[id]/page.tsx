@@ -85,9 +85,7 @@ export default function TeamDetailPage({
         }
       } catch (err) {
         if (!cancelled)
-          setError(
-            err instanceof Error ? err.message : "Failed to load team",
-          )
+          setError(err instanceof Error ? err.message : "Failed to load team")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -121,9 +119,7 @@ export default function TeamDetailPage({
       )
       setAddOpen(false)
     } catch (err) {
-      setAddError(
-        err instanceof Error ? err.message : "Failed to add member",
-      )
+      setAddError(err instanceof Error ? err.message : "Failed to add member")
     } finally {
       setAdding(false)
     }
@@ -154,7 +150,10 @@ export default function TeamDetailPage({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
         <p className="text-xs text-destructive">{error ?? "Team not found"}</p>
-        <Link href="/teams" className="text-xs text-muted-foreground hover:underline">
+        <Link
+          href="/teams"
+          className="text-xs text-muted-foreground hover:underline"
+        >
           Back to teams
         </Link>
       </div>
@@ -252,9 +251,12 @@ export default function TeamDetailPage({
       <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={UserMultiple02Icon} size={14} />
-          Members inherit the team's permissions and policy template eligibility.
+          Members inherit the team's permissions and policy template
+          eligibility.
         </div>
-        <span>{members.length} member{members.length !== 1 ? "s" : ""}</span>
+        <span>
+          {members.length} member{members.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       <Dialog
@@ -289,9 +291,7 @@ export default function TeamDetailPage({
                 ))}
               </SelectContent>
             </Select>
-            {addError && (
-              <p className="text-xs text-destructive">{addError}</p>
-            )}
+            {addError && <p className="text-xs text-destructive">{addError}</p>}
           </div>
           <DialogFooter>
             <Button

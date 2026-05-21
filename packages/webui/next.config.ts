@@ -1,6 +1,11 @@
 import type { NextConfig } from "next"
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "http://controlplane-svc.controlplane.svc.cluster.local:4000"
+    : "http://localhost:4000"
+
+const API_BASE_URL = process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -8,6 +13,10 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   async rewrites() {
     return [
+      {
+        source: "/api/lineage/:path*",
+        destination: `${API_BASE_URL}/api/lineage/:path*`,
+      },
       {
         source: "/api/dagster/:path*",
         destination: `${API_BASE_URL}/dagster/:path*`,

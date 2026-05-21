@@ -120,11 +120,12 @@ export type StoredPermissionRequest = {
   policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_owner_id: string | null
   policy_template_owner: string | null
+  renewal_of: string | null
   approval_steps: PermissionApprovalStep[]
   current_approval_step_id: string | null
   queue_decision:
     | "auto-approved"
-    | "reviewer-gate"
+    | "time-bounded"
     | "security-escalation"
     | "manual-review"
 }
@@ -156,10 +157,12 @@ const permissionStore: StoredPermissionRequest[] = [
     risk: "high",
     policy_template_id: "40000000-0000-0000-0000-000000000004",
     policy_template_name: "HDBank chargeback writeback",
-    policy_template_resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
+    policy_template_resource:
+      "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
     policy_template_approval_mode: "escalate",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000005",
     policy_template_owner: "HDBank Security",
+    renewal_of: null,
     approval_steps: [
       {
         id: "step-1042-1",
@@ -183,7 +186,7 @@ const permissionStore: StoredPermissionRequest[] = [
       },
     ],
     current_approval_step_id: "step-1042-2",
-    queue_decision: "reviewer-gate",
+    queue_decision: "time-bounded",
   },
   {
     id: "PR-1041",
@@ -208,6 +211,7 @@ const permissionStore: StoredPermissionRequest[] = [
     policy_template_approval_mode: "review",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
     policy_template_owner: "Partnership Data Platform",
+    renewal_of: null,
     approval_steps: [
       {
         id: "step-1041-1",
@@ -231,7 +235,7 @@ const permissionStore: StoredPermissionRequest[] = [
       },
     ],
     current_approval_step_id: "step-1041-1",
-    queue_decision: "reviewer-gate",
+    queue_decision: "time-bounded",
   },
   {
     id: "PR-1039",
@@ -257,6 +261,7 @@ const permissionStore: StoredPermissionRequest[] = [
     policy_template_approval_mode: "auto",
     policy_template_owner_id: "10000000-0000-0000-0000-000000000002",
     policy_template_owner: "VietJetair Data Platform",
+    renewal_of: null,
     approval_steps: [],
     current_approval_step_id: null,
     queue_decision: "auto-approved",
@@ -289,11 +294,12 @@ type PermissionRequestApiResponse = {
   policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_owner_id: string | null
   policy_template_owner: string | null
+  renewal_of: string | null
   approval_steps: PermissionApprovalStep[]
   current_approval_step_id: string | null
   queue_decision:
     | "auto-approved"
-    | "reviewer-gate"
+    | "time-bounded"
     | "security-escalation"
     | "manual-review"
 }
@@ -328,6 +334,7 @@ function mapPermissionRequest(
     policy_template_approval_mode: request.policy_template_approval_mode,
     policy_template_owner_id: request.policy_template_owner_id,
     policy_template_owner: request.policy_template_owner,
+    renewal_of: request.renewal_of,
     approval_steps: request.approval_steps,
     current_approval_step_id: request.current_approval_step_id,
     queue_decision: request.queue_decision,
@@ -413,6 +420,8 @@ export async function submitPermissionRequestAction(body: {
   scope: RequestScope
   privileges: string[]
   rationale: string
+  requestedDurationDays?: number
+  renewalOf?: string
 }): Promise<{ data?: StoredPermissionRequest; error?: string }> {
   if (!body.privileges.length) {
     return { error: "Select at least one privilege." }
@@ -441,6 +450,10 @@ export async function submitPermissionRequestAction(body: {
         scope: body.scope,
         privileges: body.privileges,
         rationale: body.rationale,
+        ...(body.requestedDurationDays != null && {
+          requested_duration_days: body.requestedDurationDays,
+        }),
+        ...(body.renewalOf != null && { renewal_of: body.renewalOf }),
       }),
     })
 

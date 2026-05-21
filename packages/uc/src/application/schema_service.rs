@@ -91,19 +91,19 @@ impl SchemaUseCase for SchemaService {
             .list(catalog_name, max_results, page_token)
             .await?;
         let next_page_token = response.next_page_token;
-        let catalog_owner = self
+        let catalog_full_access = self
             .authorizer
-            .is_authorized(
+            .is_authorized_any(
                 principal,
                 SecurableType::Catalog,
                 catalog_name,
-                Privilege::Owner,
+                &[Privilege::Owner, Privilege::Browse],
             )
             .await
             .unwrap_or(false);
         let mut allowed = Vec::new();
         for schema in response.schemas {
-            let ok = if catalog_owner {
+            let ok = if catalog_full_access {
                 true
             } else {
                 self.authorizer

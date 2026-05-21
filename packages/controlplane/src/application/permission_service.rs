@@ -1,15 +1,17 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
+use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
 use crate::{
     adapters::outbound::postgres::{
-        blast_radius, permission_requests, policy_templates, teams, time_bound_grants,
+        blast_radius, lineage, permission_requests, policy_templates, teams, time_bound_grants,
     },
-    application::uc_service::UnityCatalogProxyService,
+    application::{llm_service::LlmService, uc_service::UnityCatalogProxyService},
     domain::{
+        entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
-            BlastRadiusPreviewRow, BulkApproveBody, CreatePermissionRequestBody,
+            AffectedComponent, BlastRadiusPreview, BulkApproveBody, CreatePermissionRequestBody,
             PermissionApprovalStep, PermissionRequestResponse, PermissionRequestView,
             PolicyTemplate, PolicyTemplateApprovalStep, TimeBoundGrant, UpdateRequestStatusBody,
         },
@@ -18,8 +20,8 @@ use crate::{
 };
 
 const VALID_STATUSES: &[&str] = &["pending", "ready", "needs-info", "approved", "cancelled"];
-const REVIEWER_VIETJETAIR: &str = "10000000-0000-0000-0000-000000000002"; // VietJetair Data Platform
-const REVIEWER_DEFAULT: &str = "10000000-0000-0000-0000-000000000004"; // HDBank Data Steward
+const REVIEWER_VIETJETAIR: &str = "10000000-0000-0000-0000-000000000002"; // VietJetair Analytics
+const REVIEWER_DEFAULT: &str = "10000000-0000-0000-0000-000000000004"; // Sovico Data Steward
 const SECURITY_TEAM_ID: &str = "10000000-0000-0000-0000-000000000005";
 
 fn default_reviewer_id(resource: &str) -> Uuid {
@@ -38,6 +40,7 @@ struct RequestPolicyMatch {
     template_resource: Option<String>,
     approval_mode: String,
     risk: String,
+    max_grant_duration_days: i32,
     owner_id: Uuid,
     approval_steps: Vec<PolicyTemplateApprovalStep>,
 }
@@ -46,11 +49,20 @@ struct RequestPolicyMatch {
 pub struct PermissionService {
     db: PgPool,
     uc_service: UnityCatalogProxyService,
+    llm_service: Option<LlmService>,
 }
 
 impl PermissionService {
-    pub fn new(db: PgPool, uc_service: UnityCatalogProxyService) -> Self {
-        Self { db, uc_service }
+    pub fn new(
+        db: PgPool,
+        uc_service: UnityCatalogProxyService,
+        llm_service: Option<LlmService>,
+    ) -> Self {
+        Self {
+            db,
+            uc_service,
+            llm_service,
+        }
     }
 
     fn request_code(id: Uuid) -> String {
@@ -74,7 +86,7 @@ impl PermissionService {
         }
 
         if request.policy_template_id.is_some() {
-            return "reviewer-gate".to_string();
+            return "time-bounded".to_string();
         }
 
         "manual-review".to_string()
@@ -118,6 +130,7 @@ impl PermissionService {
             policy_template_approval_mode: request.policy_template_approval_mode,
             policy_template_owner_id: request.policy_template_owner_id,
             policy_template_owner: request.policy_template_owner,
+            renewal_of: request.renewal_of,
             queue_decision,
             approval_steps: request.approval_steps,
             current_approval_step_id,
@@ -128,7 +141,293 @@ impl PermissionService {
         }
     }
 
-    async fn grant_request(&self, request: &PermissionRequestView) -> Result<(), AppError> {
+    fn scope_root_aliases(request: &PermissionRequestView) -> Vec<String> {
+        match request.scope.as_str() {
+            "table" => vec![request.resource.clone()],
+            "schema" => vec![request.resource.clone()],
+            "catalog" => vec![request.resource.clone()],
+            _ => vec![request.resource.clone()],
+        }
+    }
+
+    fn business_tokens(value: &str) -> Vec<String> {
+        const STOPWORDS: &[&str] = &[
+            "hdbank",
+            "vietjetair",
+            "partnership",
+            "sandbox",
+            "prod",
+            "bronze",
+            "silver",
+            "gold",
+            "unitycatalog",
+            "raw",
+            "table",
+            "schema",
+            "catalog",
+            "dagster",
+            "spark",
+            "streaming",
+            "job",
+            "events",
+            "event",
+            "build",
+            "analytics",
+            "data",
+            "asset",
+            "v1",
+            "v2",
+        ];
+
+        value
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter_map(|token| {
+                let token = token.trim().to_lowercase();
+                if token.len() < 4
+                    || STOPWORDS.contains(&token.as_str())
+                    || token.chars().all(|c| c.is_ascii_digit())
+                {
+                    return None;
+                }
+                Some(token)
+            })
+            .collect()
+    }
+
+    fn collect_sensitive_domains(nodes: &[&LineageNode]) -> Vec<String> {
+        let mut counts = HashMap::<String, usize>::new();
+
+        for node in nodes {
+            for value in [
+                node.display_name.as_str(),
+                node.name.as_str(),
+                node.properties
+                    .get("schema_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+                node.properties
+                    .get("catalog_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default(),
+            ] {
+                for token in Self::business_tokens(value) {
+                    *counts.entry(token).or_insert(0) += 1;
+                }
+            }
+        }
+
+        let mut ranked = counts.into_iter().collect::<Vec<_>>();
+        ranked.sort_by(|(left_token, left_count), (right_token, right_count)| {
+            right_count
+                .cmp(left_count)
+                .then_with(|| left_token.cmp(right_token))
+        });
+        ranked.into_iter().take(5).map(|(token, _)| token).collect()
+    }
+
+    fn derived_blast_radius_risk(
+        request: &PermissionRequestView,
+        preview: &BlastRadiusPreview,
+    ) -> String {
+        let mutating = request.privileges.iter().any(|privilege| {
+            matches!(
+                privilege.as_str(),
+                "MODIFY" | "UPDATE" | "DELETE" | "INSERT" | "MERGE" | "WRITE" | "ALTER"
+            )
+        });
+
+        let resource = request.resource.to_lowercase();
+        let bronze_or_raw = resource.contains("bronze") || resource.contains("raw");
+        let has_large_downstream = preview.total_downstream_nodes >= 10
+            || preview.downstream_tables >= 3
+            || preview.downstream_assets > 0
+            || preview.downstream_jobs > 0
+            || preview.downstream_schedules > 0;
+
+        if mutating {
+            if bronze_or_raw
+                || preview
+                    .lineage_root_type
+                    .as_deref()
+                    .is_some_and(|ty| ty == "table" || ty == "schema")
+                || has_large_downstream
+            {
+                return "high".to_string();
+            }
+
+            return "medium".to_string();
+        }
+
+        if preview.downstream_schedules > 0 || preview.total_downstream_nodes >= 15 {
+            return "medium".to_string();
+        }
+
+        if has_large_downstream {
+            return "medium".to_string();
+        }
+
+        "low".to_string()
+    }
+
+    fn build_blast_radius_preview(
+        request: &PermissionRequestView,
+        nodes_by_id: &HashMap<Uuid, LineageNode>,
+        downstream_edges_by_src: &HashMap<Uuid, Vec<LineageEdge>>,
+        aliases: &HashMap<String, Uuid>,
+        llm_data: Option<&blast_radius::BlastRadiusLlmData>,
+    ) -> BlastRadiusPreview {
+        let root = Self::scope_root_aliases(request)
+            .into_iter()
+            .find_map(|alias| {
+                aliases
+                    .get(&alias)
+                    .and_then(|id| nodes_by_id.get(id))
+                    .cloned()
+            });
+
+        let Some(root) = root else {
+            let mut preview = BlastRadiusPreview {
+                request_id: request.id,
+                code: Self::request_code(request.id),
+                requester: request.requester.clone(),
+                resource: request.resource.clone(),
+                scope: request.scope.clone(),
+                risk: request.risk.clone(),
+                lineage_resolved: false,
+                lineage_root_id: None,
+                lineage_root_display_name: None,
+                lineage_root_type: None,
+                total_downstream_nodes: 0,
+                direct_downstream_nodes: 0,
+                downstream_tables: 0,
+                downstream_assets: 0,
+                downstream_jobs: 0,
+                downstream_schedules: 0,
+                dashboards: 0,
+                consumers: 0,
+                sensitive_domains: Vec::new(),
+                derived_risk: String::new(),
+                recommended_guardrail: llm_data
+                    .map(|d| d.recommended_guardrail.clone())
+                    .unwrap_or_default(),
+                llm_risk: llm_data
+                    .map(|d| d.llm_risk.clone())
+                    .unwrap_or_else(|| "unknown".to_string()),
+                llm_recommendation: llm_data
+                    .map(|d| d.llm_recommendation.clone())
+                    .unwrap_or_default(),
+                llm_explanation: llm_data
+                    .map(|d| d.llm_explanation.clone())
+                    .unwrap_or_default(),
+                affected_nodes: Vec::new(),
+            };
+            preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
+            return preview;
+        };
+
+        let mut visited = HashSet::from([root.id]);
+        let mut queue = VecDeque::from([root.id]);
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(edges) = downstream_edges_by_src.get(&current) {
+                for edge in edges {
+                    if visited.insert(edge.dst_node_id) {
+                        queue.push_back(edge.dst_node_id);
+                    }
+                }
+            }
+        }
+
+        let direct_downstream_nodes = downstream_edges_by_src
+            .get(&root.id)
+            .map(|edges| {
+                edges
+                    .iter()
+                    .map(|edge| edge.dst_node_id)
+                    .collect::<HashSet<_>>()
+                    .len() as i32
+            })
+            .unwrap_or(0);
+
+        let downstream_nodes = visited
+            .into_iter()
+            .filter(|node_id| *node_id != root.id)
+            .filter_map(|node_id| nodes_by_id.get(&node_id))
+            .collect::<Vec<_>>();
+
+        let mut downstream_tables = 0i32;
+        let mut downstream_assets = 0i32;
+        let mut downstream_jobs = 0i32;
+        let mut downstream_schedules = 0i32;
+        let mut dashboards = 0i32;
+        let mut consumers = 0i32;
+
+        for node in &downstream_nodes {
+            match node.node_type.as_str() {
+                "table" | "topic" => downstream_tables += 1,
+                "dagster_asset" => downstream_assets += 1,
+                "spark_job" | "streaming_job" | "daft_job" | "dagster_job" => downstream_jobs += 1,
+                "schedule" => downstream_schedules += 1,
+                "dashboard" => dashboards += 1,
+                "consumer" => consumers += 1,
+                _ => {}
+            }
+        }
+
+        let mut domain_nodes = Vec::with_capacity(downstream_nodes.len() + 1);
+        domain_nodes.push(&root);
+        domain_nodes.extend(downstream_nodes.iter().copied());
+
+        let mut preview = BlastRadiusPreview {
+            request_id: request.id,
+            code: Self::request_code(request.id),
+            requester: request.requester.clone(),
+            resource: request.resource.clone(),
+            scope: request.scope.clone(),
+            risk: request.risk.clone(),
+            derived_risk: String::new(),
+            lineage_resolved: true,
+            lineage_root_id: Some(root.id),
+            lineage_root_display_name: Some(root.display_name.clone()),
+            lineage_root_type: Some(root.node_type.clone()),
+            total_downstream_nodes: downstream_nodes.len() as i32,
+            direct_downstream_nodes,
+            downstream_tables,
+            downstream_assets,
+            downstream_jobs,
+            downstream_schedules,
+            dashboards,
+            consumers,
+            sensitive_domains: Self::collect_sensitive_domains(&domain_nodes),
+            recommended_guardrail: llm_data
+                .map(|d| d.recommended_guardrail.clone())
+                .unwrap_or_default(),
+            llm_risk: llm_data
+                .map(|d| d.llm_risk.clone())
+                .unwrap_or_else(|| "unknown".to_string()),
+            llm_recommendation: llm_data
+                .map(|d| d.llm_recommendation.clone())
+                .unwrap_or_default(),
+            llm_explanation: llm_data
+                .map(|d| d.llm_explanation.clone())
+                .unwrap_or_default(),
+            affected_nodes: downstream_nodes
+                .iter()
+                .map(|n| AffectedComponent {
+                    display_name: n.display_name.clone(),
+                    node_type: n.node_type.clone(),
+                })
+                .collect(),
+        };
+        preview.derived_risk = Self::derived_blast_radius_risk(request, &preview);
+        preview
+    }
+
+    async fn grant_request(
+        &self,
+        request: &PermissionRequestView,
+        expires_at_override: Option<DateTime<Utc>>,
+    ) -> Result<(), AppError> {
         let principals: Vec<String> = if request.submit_as == "team" {
             if let Some(team_id) = request.team_id {
                 teams::list_members(&self.db, team_id)
@@ -156,26 +455,128 @@ impl PermissionService {
                 .map_err(AppError::QueryFailed)?;
         }
 
+        let team_name = request
+            .team
+            .as_deref()
+            .unwrap_or(&request.requester);
+        let started_at = Utc::now();
+        // Reviewer override takes precedence; fall back to the duration baked
+        // into the request at creation time (already policy-capped).
+        let effective_expires_at = expires_at_override.unwrap_or(request.expires_at);
+
+        // Renewal: extend the existing grant's expiry instead of inserting duplicates.
+        if let Some(renewal_grant_id) = request.renewal_of {
+            match time_bound_grants::extend(&self.db, renewal_grant_id, effective_expires_at).await {
+                Ok(Some(_)) => tracing::info!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    expires_at = %effective_expires_at,
+                    "grant renewed — expires_at extended"
+                ),
+                Ok(None) => tracing::warn!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    "renewal target grant not found or already expired/revoked"
+                ),
+                Err(e) => tracing::error!(
+                    request_id = %request.id,
+                    grant_id = %renewal_grant_id,
+                    error = %e,
+                    "failed to extend grant on renewal"
+                ),
+            }
+            self.apply_guardrail_if_ready(request.id).await;
+            return Ok(());
+        }
+
+        for principal in &principals {
+            for privilege in &request.privileges {
+                if let Err(e) = time_bound_grants::insert(
+                    &self.db,
+                    principal,
+                    team_name,
+                    &request.resource,
+                    &request.scope,
+                    privilege,
+                    started_at,
+                    effective_expires_at,
+                    &request.reviewer,
+                    &request.rationale,
+                    request.id,
+                )
+                .await
+                {
+                    tracing::error!(
+                        request_id = %request.id,
+                        principal = %principal,
+                        privilege = %privilege,
+                        error = %e,
+                        "failed to record time_bound_grant — UC access was granted but grant tracking is missing"
+                    );
+                }
+            }
+        }
+
+        self.apply_guardrail_if_ready(request.id).await;
+
         Ok(())
     }
 
-    fn best_template_match(
-        request: &PermissionRequestView,
+    /// Apply the blast-radius guardrail cap to the grants linked to `request_id`
+    /// if the LLM analysis is already available.  This is called right after
+    /// inserting grants so manual-approved requests get the cap applied
+    /// immediately when the LLM finished before the reviewer acted.
+    async fn apply_guardrail_if_ready(&self, request_id: Uuid) {
+        match blast_radius::get_llm_data(&self.db, request_id).await {
+            Ok(Some(llm_data)) => {
+                if let Some(cap_days) = Self::guardrail_cap_days(&llm_data.llm_risk) {
+                    match time_bound_grants::apply_guardrail_cap(&self.db, request_id, cap_days)
+                        .await
+                    {
+                        Ok(rows) => tracing::info!(
+                            request_id = %request_id,
+                            cap_days,
+                            rows_affected = rows,
+                            "guardrail cap applied at grant time"
+                        ),
+                        Err(e) => tracing::warn!(
+                            request_id = %request_id,
+                            cap_days,
+                            error = %e,
+                            "guardrail cap update failed at grant time"
+                        ),
+                    }
+                }
+            }
+            Ok(None) => {} // LLM not done yet; spawn_llm_analysis will apply it later
+            Err(e) => tracing::warn!(
+                request_id = %request_id,
+                error = %e,
+                "failed to query LLM data when checking guardrail at grant time"
+            ),
+        }
+    }
+
+    fn find_best_template(
+        scope: &str,
+        resource: &str,
+        team_id: Option<Uuid>,
+        privileges: &[String],
         templates: &[PolicyTemplate],
     ) -> Option<RequestPolicyMatch> {
         let mut matches = templates
             .iter()
             .filter(|template| {
-                template.scope == request.scope
+                template.scope == scope
                     && (template.resource.is_none()
-                        || template.resource.as_deref() == Some(request.resource.as_str()))
-                    && request.team_id.as_ref().is_some_and(|request_team_id| {
+                        || template.resource.as_deref() == Some(resource))
+                    && team_id.as_ref().is_some_and(|request_team_id| {
                         template
                             .team_ids
                             .iter()
                             .any(|team_id| team_id == request_team_id)
                     })
-                    && request.privileges.iter().all(|privilege| {
+                    && privileges.iter().all(|privilege| {
                         template
                             .privileges
                             .iter()
@@ -205,9 +606,55 @@ impl PermissionService {
                 template_resource: template.resource,
                 approval_mode: template.approval_mode,
                 risk: template.risk,
+                max_grant_duration_days: template.max_grant_duration_days,
                 owner_id: template.owner_id,
                 approval_steps: template.approval_steps,
             })
+    }
+
+    fn best_template_match(
+        request: &PermissionRequestView,
+        templates: &[PolicyTemplate],
+    ) -> Option<RequestPolicyMatch> {
+        Self::find_best_template(
+            &request.scope,
+            &request.resource,
+            request.team_id,
+            &request.privileges,
+            templates,
+        )
+    }
+
+    /// Returns the effective `expires_at` for a new permission request.
+    ///
+    /// The requested duration (from the caller) is capped by the matched
+    /// template's `max_grant_duration_days`. When neither is provided the
+    /// service falls back to `DEFAULT_DURATION_DAYS`.
+    fn effective_expires_at(requested_days: Option<i32>, template_max: Option<i32>) -> DateTime<Utc> {
+        const DEFAULT_DURATION_DAYS: i64 = 7;
+        const MAX_DURATION_DAYS: i64 = 365;
+
+        let requested = requested_days
+            .map(|d| d.max(1) as i64)
+            .unwrap_or(DEFAULT_DURATION_DAYS)
+            .min(MAX_DURATION_DAYS);
+
+        let effective = match template_max {
+            Some(max) => requested.min(max as i64),
+            None => requested,
+        };
+
+        Utc::now() + chrono::Duration::days(effective)
+    }
+
+    /// Returns the guardrail cap in days for a given LLM risk level, or `None`
+    /// when no cap should be applied (low risk or analysis not yet complete).
+    fn guardrail_cap_days(llm_risk: &str) -> Option<i32> {
+        match llm_risk {
+            "high" => Some(7),
+            "medium" => Some(30),
+            _ => None,
+        }
     }
 
     fn default_approval_steps_for_mode(
@@ -242,7 +689,11 @@ impl PermissionService {
     }
 
     fn manual_review_chain(resource: &str) -> Vec<(i32, Uuid, String)> {
-        vec![(1, default_reviewer_id(resource), "Manual review".to_string())]
+        vec![(
+            1,
+            default_reviewer_id(resource),
+            "Manual review".to_string(),
+        )]
     }
 
     fn approval_chain_from_policy_match(
@@ -345,6 +796,111 @@ impl PermissionService {
         ))
     }
 
+    /// Spawn a background Tokio task that calls the LLM to analyze the request's blast radius
+    /// and updates `blast_radius_previews` with the result.
+    fn spawn_llm_analysis(&self, request: PermissionRequestView) {
+        let Some(llm) = self.llm_service.clone() else {
+            return;
+        };
+        let db = self.db.clone();
+        let request_id = request.id;
+
+        tokio::spawn(async move {
+            tracing::info!(request_id = %request_id, "starting LLM blast-radius analysis");
+
+            // Build blast-radius preview from current lineage data.
+            let preview = async {
+                let nodes = lineage::list_nodes(&db).await?;
+                let edges = lineage::list_edges(&db).await?;
+                let aliases = lineage::list_aliases(&db).await?;
+                let nodes_by_id = nodes
+                    .into_iter()
+                    .map(|n| (n.id, n))
+                    .collect::<HashMap<_, _>>();
+                let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+                for edge in edges {
+                    downstream_edges_by_src
+                        .entry(edge.src_node_id)
+                        .or_default()
+                        .push(edge);
+                }
+                let aliases_map = aliases.into_iter().collect::<HashMap<_, _>>();
+                Ok::<_, sqlx::Error>(Self::build_blast_radius_preview(
+                    &request,
+                    &nodes_by_id,
+                    &downstream_edges_by_src,
+                    &aliases_map,
+                    None,
+                ))
+            }
+            .await;
+
+            let preview = match preview {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::warn!(request_id = %request_id, error = %e, "LLM task: lineage query failed");
+                    let _ =
+                        blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
+                    return;
+                }
+            };
+
+            match llm
+                .analyze_blast_radius(
+                    &request.resource,
+                    &request.scope,
+                    &request.privileges,
+                    &request.rationale,
+                    &preview,
+                )
+                .await
+            {
+                Ok(analysis) => {
+                    tracing::info!(
+                        request_id = %request_id,
+                        risk = %analysis.risk_level,
+                        "LLM blast-radius analysis complete"
+                    );
+                    let _ = blast_radius::update_llm_result(
+                        &db,
+                        request_id,
+                        &analysis.recommendation,
+                        &analysis.risk_level,
+                        &analysis.explanation,
+                    )
+                    .await;
+
+                    // Apply guardrail cap to any grants that already exist
+                    // (covers auto-approved requests where grants were created
+                    // before the LLM analysis finished).
+                    if let Some(cap_days) = Self::guardrail_cap_days(&analysis.risk_level) {
+                        match time_bound_grants::apply_guardrail_cap(&db, request_id, cap_days)
+                            .await
+                        {
+                            Ok(rows) => tracing::info!(
+                                request_id = %request_id,
+                                cap_days,
+                                rows_affected = rows,
+                                "guardrail cap applied after LLM analysis"
+                            ),
+                            Err(e) => tracing::warn!(
+                                request_id = %request_id,
+                                cap_days,
+                                error = %e,
+                                "guardrail cap update failed after LLM analysis"
+                            ),
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(request_id = %request_id, error = %e, "LLM blast-radius analysis failed");
+                    let _ =
+                        blast_radius::update_llm_result(&db, request_id, "", "failed", "").await;
+                }
+            }
+        });
+    }
+
     pub async fn list_requests(
         &self,
         resource: Option<&str>,
@@ -406,6 +962,26 @@ impl PermissionService {
             ));
         }
 
+        if let Some(d) = body.requested_duration_days {
+            if d < 1 {
+                return Err(AppError::QueryFailed(
+                    "requested_duration_days must be at least 1".into(),
+                ));
+            }
+        }
+
+        // Validate renewal target if provided.
+        if let Some(renewal_grant_id) = body.renewal_of {
+            let grant = time_bound_grants::get(&self.db, renewal_grant_id)
+                .await?
+                .ok_or_else(|| AppError::QueryFailed("renewal_of grant not found".into()))?;
+            if matches!(grant.renewal_status.as_str(), "expired" | "revoked") {
+                return Err(AppError::QueryFailed(
+                    "cannot renew an expired or revoked grant".into(),
+                ));
+            }
+        }
+
         let team = match body.submit_as.as_str() {
             "personal" => None,
             "team" => {
@@ -432,6 +1008,21 @@ impl PermissionService {
             }
         };
 
+        // Fetch templates before inserting so we can compute the correct
+        // expires_at from the same template that will govern the request.
+        let templates = policy_templates::list(&self.db).await?;
+        let pre_match = Self::find_best_template(
+            &body.scope,
+            &body.resource,
+            team,
+            &body.privileges,
+            &templates,
+        );
+        let expires_at = Self::effective_expires_at(
+            body.requested_duration_days,
+            pre_match.as_ref().map(|m| m.max_grant_duration_days),
+        );
+
         let request = permission_requests::create(
             &self.db,
             body.requester_id,
@@ -440,10 +1031,13 @@ impl PermissionService {
             &body.scope,
             &body.privileges,
             &body.rationale,
+            expires_at,
+            body.renewal_of,
         )
         .await?;
 
-        let templates = policy_templates::list(&self.db).await?;
+        // Reuse the same templates slice — the result is deterministic for the
+        // same inputs, so matched_template == pre_match.
         let matched_template = Self::best_template_match(&request, &templates);
         let approval_chain =
             Self::approval_chain_from_policy_match(matched_template.as_ref(), &request.resource);
@@ -482,7 +1076,8 @@ impl PermissionService {
             let inserted_steps =
                 permission_requests::replace_approval_steps(&self.db, request.id, &new_steps)
                     .await?;
-            let (status, reviewer_id) = Self::derive_request_state(&inserted_steps, &request.resource);
+            let (status, reviewer_id) =
+                Self::derive_request_state(&inserted_steps, &request.resource);
             permission_requests::update_policy_metadata(
                 &self.db,
                 request.id,
@@ -509,7 +1104,16 @@ impl PermissionService {
         }
 
         if request.status == "approved" {
-            self.grant_request(&request).await?;
+            self.grant_request(&request, None).await?;
+        }
+
+        // Insert the blast-radius preview row with llm_risk = 'processing' and
+        // spawn a background task that calls the LLM to fill in the guardrail and risk.
+        let request_id = request.id;
+        if let Err(e) = blast_radius::upsert_processing(&self.db, request_id).await {
+            tracing::warn!(request_id = %request_id, error = %e, "failed to upsert blast_radius_previews row");
+        } else {
+            self.spawn_llm_analysis(request.clone());
         }
 
         Ok(Self::into_response(request))
@@ -545,6 +1149,12 @@ impl PermissionService {
                 self.sync_request_state(id, &existing.resource).await?
             }
             "approved" => {
+                // If the reviewer supplied an explicit duration, compute a new
+                // expires_at from now. This overrides the value baked into the
+                // request at creation time (which is already policy-capped).
+                let expires_at_override = body.grant_duration_days.map(|days| {
+                    Utc::now() + chrono::Duration::days(days)
+                });
                 if existing.approval_steps.is_empty() {
                     let reviewer_id = existing.reviewer_id;
                     let request = permission_requests::update_status_and_reviewer(
@@ -555,7 +1165,7 @@ impl PermissionService {
                     )
                     .await?
                     .ok_or(AppError::NotFound)?;
-                    self.grant_request(&request).await?;
+                    self.grant_request(&request, expires_at_override).await?;
                     request
                 } else {
                     let step_id = Self::resolve_target_step_id(
@@ -572,7 +1182,7 @@ impl PermissionService {
                     permission_requests::activate_next_stage_if_ready(&self.db, id).await?;
                     let request = self.sync_request_state(id, &existing.resource).await?;
                     if request.status == "approved" {
-                        self.grant_request(&request).await?;
+                        self.grant_request(&request, expires_at_override).await?;
                     }
                     request
                 }
@@ -614,7 +1224,7 @@ impl PermissionService {
         for request in &requests {
             permission_requests::approve_all_steps(&self.db, request.id).await?;
             if request.status != "approved" {
-                self.grant_request(request).await?;
+                self.grant_request(request, None).await?;
             }
         }
 
@@ -627,11 +1237,141 @@ impl PermissionService {
         Ok(policy_templates::list(&self.db).await?)
     }
 
-    pub async fn list_blast_radius(&self) -> Result<Vec<BlastRadiusPreviewRow>, AppError> {
-        Ok(blast_radius::list(&self.db).await?)
+    pub async fn list_blast_radius(&self) -> Result<Vec<BlastRadiusPreview>, AppError> {
+        let requests = permission_requests::list(&self.db, None, None).await?;
+        let nodes = lineage::list_nodes(&self.db).await?;
+        let edges = lineage::list_edges(&self.db).await?;
+        let aliases = lineage::list_aliases(&self.db).await?;
+        let llm_map = blast_radius::list_llm_data(&self.db).await?;
+
+        let nodes_by_id = nodes
+            .into_iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+        for edge in edges {
+            downstream_edges_by_src
+                .entry(edge.src_node_id)
+                .or_default()
+                .push(edge);
+        }
+        let aliases = aliases.into_iter().collect::<HashMap<_, _>>();
+
+        Ok(requests
+            .iter()
+            .map(|request| {
+                let llm_data = llm_map.get(&request.id);
+                Self::build_blast_radius_preview(
+                    request,
+                    &nodes_by_id,
+                    &downstream_edges_by_src,
+                    &aliases,
+                    llm_data,
+                )
+            })
+            .collect())
     }
 
-    pub async fn list_time_bound_grants(&self) -> Result<Vec<TimeBoundGrant>, AppError> {
-        Ok(time_bound_grants::list(&self.db).await?)
+    pub async fn get_blast_radius(&self, request_id: Uuid) -> Result<BlastRadiusPreview, AppError> {
+        let request = permission_requests::get(&self.db, request_id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        let nodes = lineage::list_nodes(&self.db).await?;
+        let edges = lineage::list_edges(&self.db).await?;
+        let aliases = lineage::list_aliases(&self.db).await?;
+        let llm_data = blast_radius::get_llm_data(&self.db, request_id).await?;
+
+        let nodes_by_id = nodes
+            .into_iter()
+            .map(|node| (node.id, node))
+            .collect::<HashMap<_, _>>();
+        let mut downstream_edges_by_src = HashMap::<Uuid, Vec<LineageEdge>>::new();
+        for edge in edges {
+            downstream_edges_by_src
+                .entry(edge.src_node_id)
+                .or_default()
+                .push(edge);
+        }
+        let aliases = aliases.into_iter().collect::<HashMap<_, _>>();
+
+        Ok(Self::build_blast_radius_preview(
+            &request,
+            &nodes_by_id,
+            &downstream_edges_by_src,
+            &aliases,
+            llm_data.as_ref(),
+        ))
+    }
+
+    pub async fn list_time_bound_grants(
+        &self,
+        status: Option<&str>,
+        resource: Option<&str>,
+        principal: Option<&str>,
+    ) -> Result<Vec<TimeBoundGrant>, AppError> {
+        Ok(time_bound_grants::list(&self.db, status, resource, principal).await?)
+    }
+
+    pub async fn get_time_bound_grant(&self, id: Uuid) -> Result<TimeBoundGrant, AppError> {
+        time_bound_grants::get(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
+    /// Admin: extend a grant's `expires_at` directly (no UC call required —
+    /// the access was already granted; we're only updating the tracking record).
+    pub async fn admin_renew_grant(
+        &self,
+        id: Uuid,
+        body: crate::domain::entities::permission::AdminRenewGrantBody,
+    ) -> Result<TimeBoundGrant, AppError> {
+        if body.expires_at <= Utc::now() {
+            return Err(AppError::QueryFailed(
+                "expires_at must be in the future".into(),
+            ));
+        }
+        time_bound_grants::extend(&self.db, id, body.expires_at)
+            .await?
+            .ok_or_else(|| {
+                AppError::QueryFailed(
+                    "grant not found or already expired/revoked".into(),
+                )
+            })
+    }
+
+    /// Revoke a grant: remove the UC privilege and mark the grant as `revoked`.
+    pub async fn revoke_grant(
+        &self,
+        id: Uuid,
+        body: crate::domain::entities::permission::RevokeGrantBody,
+    ) -> Result<TimeBoundGrant, AppError> {
+        let grant = time_bound_grants::get(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)?;
+
+        if grant.renewal_status == "revoked" {
+            return Err(AppError::QueryFailed("grant is already revoked".into()));
+        }
+
+        // Revoke UC access for every principal covered by the grant.
+        self.uc_service
+            .revoke_permissions(
+                &grant.scope,
+                &grant.resource,
+                &grant.principal,
+                &[grant.privilege.clone()],
+            )
+            .await
+            .map_err(AppError::QueryFailed)?;
+
+        tracing::info!(
+            grant_id = %id,
+            reason = body.reason.as_deref().unwrap_or(""),
+            "grant revoked — UC privilege removed"
+        );
+
+        time_bound_grants::revoke(&self.db, id)
+            .await?
+            .ok_or(AppError::NotFound)
     }
 }

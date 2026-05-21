@@ -139,7 +139,8 @@ export default function PolicyTemplateDetailPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b px-3 py-2 shrink-0">
+      {/* Page header */}
+      <div className="border-b px-6 py-3 shrink-0">
         <div className="min-w-0">
           <Link
             href="/permissions/policy-templates"
@@ -167,18 +168,20 @@ export default function PolicyTemplateDetailPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="grid gap-3 p-3 xl:grid-cols-[minmax(0,1.7fr)_320px]">
-          <div className="space-y-3">
+      {/* Body: scrollable main content + sticky rightbar */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Main content */}
+        <div className="flex-1 min-w-0 overflow-auto">
+          <div className="max-w-2xl mx-auto px-6 py-5 space-y-4">
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Template summary</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Scope, owner, update cadence, and usage footprint.
                 </p>
               </div>
               <Separator />
-              <div className="grid gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-2">
+              <div className="grid gap-x-4 gap-y-3 px-4 py-4 md:grid-cols-2">
                 <div className="space-y-2.5">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -243,11 +246,11 @@ export default function PolicyTemplateDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">Access envelope</h2>
               </div>
               <Separator />
-              <div className="space-y-3 px-3 py-3">
+              <div className="space-y-3 px-4 py-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -278,7 +281,7 @@ export default function PolicyTemplateDetailPage() {
             </section>
 
             <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
+              <div className="px-4 py-3">
                 <h2 className="text-sm font-semibold">
                   Recent matched requests
                 </h2>
@@ -287,7 +290,7 @@ export default function PolicyTemplateDetailPage() {
                 </p>
               </div>
               <Separator />
-              <div className="px-3 py-3">
+              <div className="px-4 py-4">
                 {recentRequests.length > 0 ? (
                   <div className="space-y-1.5">
                     {recentRequests.map((request) => (
@@ -334,18 +337,26 @@ export default function PolicyTemplateDetailPage() {
               </div>
             </section>
           </div>
+        </div>
 
-          <div className="space-y-3">
-            <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
-                <h2 className="text-sm font-semibold">Approval flow</h2>
+        {/* Right sidebar */}
+        <aside className="hidden lg:flex w-72 shrink-0 flex-col border-l overflow-auto">
+          <div className="divide-y">
+            {/* Approval flow */}
+            <div>
+              <div className="px-4 py-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Approval flow
+                </h2>
               </div>
-              <Separator />
-              <div className="px-3 py-3">
+              <div className="px-4 pb-4">
                 {template.approval_steps.length > 0 ? (
                   <div className="space-y-1.5">
                     {template.approval_steps.map((step) => (
-                      <div key={step.id} className="rounded-md border px-3 py-2">
+                      <div
+                        key={step.id}
+                        className="rounded-md border px-3 py-2"
+                      >
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-medium">
                             {`Stage ${step.stage_order} · ${step.approver_team}`}
@@ -358,20 +369,22 @@ export default function PolicyTemplateDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    This template does not define explicit approval steps. Its
-                    approval mode is handled directly.
+                  <p className="text-xs text-muted-foreground">
+                    No explicit approval steps. Approval mode is handled
+                    directly.
                   </p>
                 )}
               </div>
-            </section>
+            </div>
 
-            <section className="rounded-lg border bg-card">
-              <div className="px-3 py-2">
-                <h2 className="text-sm font-semibold">Design intent</h2>
+            {/* Design intent */}
+            <div>
+              <div className="px-4 py-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Design intent
+                </h2>
               </div>
-              <Separator />
-              <div className="space-y-2.5 px-3 py-3 text-sm text-muted-foreground">
+              <div className="space-y-2.5 px-4 pb-4 text-xs text-muted-foreground">
                 <p>
                   This template standardizes a recurring access path so teams
                   can request a known privilege set without manual policy
@@ -389,9 +402,9 @@ export default function PolicyTemplateDetailPage() {
                     : "Requests matching this template will still enter review, but with a pre-defined approver chain and risk posture."}
                 </p>
               </div>
-            </section>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

@@ -1,13 +1,14 @@
 import { headers } from "next/headers"
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
-import { customSession, genericOAuth, keycloak } from "better-auth/plugins"
+import { customSession, genericOAuth } from "better-auth/plugins"
 import type { AppSession } from "@/lib/auth/types"
+import { KEYCLOAK_PROVIDER_ID } from "@/lib/auth/constants"
 import { normalizeGroups, readTokenClaims } from "@/lib/auth/jwt"
 
 const DEFAULT_BASE_URL = "http://localhost:3000"
 const DEFAULT_REALM = "sovico"
-const KEYCLOAK_PROVIDER_ID = "keycloak"
+const DEFAULT_KEYCLOAK_PUBLIC_BASE_URL = "http://127.0.0.1:8083"
 const AUTH_ROUTE_BASE = "/api/auth"
 
 function getBaseUrl() {
@@ -24,8 +25,24 @@ function getBaseUrl() {
 function getKeycloakIssuer() {
   return (
     process.env.KEYCLOAK_ISSUER ??
-    `${process.env.KEYCLOAK_PUBLIC_BASE_URL ?? "http://127.0.0.1:8083"}/realms/${process.env.KEYCLOAK_REALM ?? DEFAULT_REALM}`
+    `${getKeycloakPublicBaseUrl()}/realms/${getKeycloakRealm()}`
   )
+}
+
+function getKeycloakRealm() {
+  return process.env.KEYCLOAK_REALM ?? DEFAULT_REALM
+}
+
+function getKeycloakPublicBaseUrl() {
+  return process.env.KEYCLOAK_PUBLIC_BASE_URL ?? DEFAULT_KEYCLOAK_PUBLIC_BASE_URL
+}
+
+function getKeycloakInternalBaseUrl() {
+  return process.env.KEYCLOAK_INTERNAL_BASE_URL ?? getKeycloakPublicBaseUrl()
+}
+
+function getKeycloakEndpoint(baseUrl: string, path: string) {
+  return `${baseUrl.replace(/\/$/, "")}/realms/${getKeycloakRealm()}/protocol/openid-connect/${path}`
 }
 
 function getRealmFromIssuer(issuer: string) {
@@ -105,12 +122,22 @@ export const auth = betterAuth({
   plugins: [
     genericOAuth({
       config: [
-        keycloak({
+        {
+          providerId: KEYCLOAK_PROVIDER_ID,
           clientId: process.env.KEYCLOAK_CLIENT_ID ?? "webui",
           clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? "webui-secret",
           issuer: getKeycloakIssuer(),
-          scopes: ["openid", "profile", "email"],
-        }),
+          authorizationUrl: getKeycloakEndpoint(
+            getKeycloakPublicBaseUrl(),
+            "auth",
+          ),
+          tokenUrl: getKeycloakEndpoint(getKeycloakInternalBaseUrl(), "token"),
+          userInfoUrl: getKeycloakEndpoint(
+            getKeycloakInternalBaseUrl(),
+            "userinfo",
+          ),
+          scopes: ["openid", "profile", "email", "offline_access"],
+        },
       ],
     }),
     customSession(async ({ session, user }, ctx) => {

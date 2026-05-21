@@ -4,15 +4,24 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use crate::infrastructure::config::Config;
+
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+static DAGSTER_BASE_URL: OnceLock<String> = OnceLock::new();
 
 fn client() -> &'static reqwest::Client {
     CLIENT.get_or_init(reqwest::Client::new)
 }
 
 fn dagster_graphql_url() -> String {
-    std::env::var("DAGSTER_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
-        + "/graphql"
+    let base_url = DAGSTER_BASE_URL
+        .get_or_init(|| {
+            Config::load()
+                .map(|config| config.dagster.base_url)
+                .unwrap_or_else(|_| "http://localhost:8080".to_string())
+        })
+        .clone();
+    format!("{}/graphql", base_url.trim_end_matches('/'))
 }
 
 pub(crate) const REPO_LOCATION: &str = "mizumi";

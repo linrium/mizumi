@@ -81,10 +81,15 @@ async fn main() -> anyhow::Result<()> {
     let auth_enabled = config.server.authorization.to_lowercase() == "enable";
     let (jwt_validator, oauth2) = if auth_enabled {
         let srv = &config.server;
-        let issuer = srv.allowed_issuers.first().cloned().unwrap_or_default();
+        let discovery_issuer = srv.allowed_issuers.first().cloned().unwrap_or_default();
+        let allowed_issuers = srv.allowed_issuers.clone();
         let audiences = srv.audiences.clone();
 
-        let validator = Arc::new(JwtValidator::new(issuer, audiences));
+        let validator = Arc::new(JwtValidator::new(
+            discovery_issuer,
+            allowed_issuers,
+            audiences,
+        ));
 
         let public_port = config.server.redirect_port.unwrap_or(config.server.port);
         let public_url = config.server.public_url.clone().unwrap_or_else(|| {
@@ -103,7 +108,11 @@ async fn main() -> anyhow::Result<()> {
             client_secret: srv.client_secret.clone().unwrap_or_default(),
             redirect_uri,
         };
-        tracing::info!("Authorization enabled (issuer: {})", validator.issuer);
+        tracing::info!(
+            "Authorization enabled (discovery issuer: {}, allowed issuers: {:?})",
+            validator.discovery_issuer,
+            validator.allowed_issuers
+        );
         (Some(validator), Some(oauth2))
     } else {
         tracing::warn!("Authorization is DISABLED — all API endpoints are public");

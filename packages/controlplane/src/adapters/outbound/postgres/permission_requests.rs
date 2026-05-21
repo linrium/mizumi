@@ -32,6 +32,7 @@ const REQUEST_VIEW_SELECT: &str = r#"
         pt.approval_mode AS policy_template_approval_mode,
         pt.owner_id AS policy_template_owner_id,
         template_owner.name AS policy_template_owner,
+        pr.renewal_of,
         pr.created_at,
         pr.updated_at
     FROM permission_requests pr
@@ -74,6 +75,7 @@ struct PermissionRequestRow {
     pub policy_template_approval_mode: Option<String>,
     pub policy_template_owner_id: Option<Uuid>,
     pub policy_template_owner: Option<String>,
+    pub renewal_of: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -115,6 +117,7 @@ fn map_request_row(row: PermissionRequestRow) -> PermissionRequestView {
         policy_template_approval_mode: row.policy_template_approval_mode,
         policy_template_owner_id: row.policy_template_owner_id,
         policy_template_owner: row.policy_template_owner,
+        renewal_of: row.renewal_of,
         created_at: row.created_at,
         updated_at: row.updated_at,
         approval_steps: Vec::new(),
@@ -196,17 +199,21 @@ pub async fn create(
     scope: &str,
     privileges: &[String],
     rationale: &str,
+    expires_at: chrono::DateTime<chrono::Utc>,
+    renewal_of: Option<Uuid>,
 ) -> Result<PermissionRequestView, sqlx::Error> {
     let request = sqlx::query_as::<_, PermissionRequestRow>(&format!(
         r#"
         WITH inserted AS (
             INSERT INTO permission_requests (
                 requester_id, team, resource, scope, privileges,
-                submitted_at, expires_at, status, reviewer_id, rationale, risk, submit_as
+                submitted_at, expires_at, status, reviewer_id, rationale, risk, submit_as,
+                renewal_of
             ) VALUES (
                 $1, $2, $3, $4, $5,
-                NOW(), NOW() + INTERVAL '7 days', 'pending',
-                $7::uuid, $6, 'low', $8
+                NOW(), $9, 'pending',
+                $7::uuid, $6, 'low', $8,
+                $10
             )
             RETURNING *
         )
@@ -234,6 +241,7 @@ pub async fn create(
             pt.approval_mode AS policy_template_approval_mode,
             pt.owner_id AS policy_template_owner_id,
             template_owner.name AS policy_template_owner,
+            inserted.renewal_of,
             inserted.created_at,
             inserted.updated_at
         FROM inserted
@@ -252,6 +260,8 @@ pub async fn create(
     .bind(rationale)
     .bind(DEFAULT_REVIEWER_ID)
     .bind(if team.is_some() { "team" } else { "personal" })
+    .bind(expires_at)
+    .bind(renewal_of)
     .fetch_one(db)
     .await
     .map(map_request_row)?;
@@ -319,6 +329,7 @@ pub async fn update_status_and_reviewer(
             pt.approval_mode AS policy_template_approval_mode,
             pt.owner_id AS policy_template_owner_id,
             template_owner.name AS policy_template_owner,
+            updated.renewal_of,
             updated.created_at,
             updated.updated_at
         FROM updated
@@ -381,6 +392,7 @@ pub async fn bulk_update_status(
             pt.approval_mode AS policy_template_approval_mode,
             pt.owner_id AS policy_template_owner_id,
             template_owner.name AS policy_template_owner,
+            updated.renewal_of,
             updated.created_at,
             updated.updated_at
         FROM updated
@@ -464,6 +476,7 @@ pub async fn update_policy_metadata(
             pt.approval_mode AS policy_template_approval_mode,
             pt.owner_id AS policy_template_owner_id,
             template_owner.name AS policy_template_owner,
+            updated.renewal_of,
             updated.created_at,
             updated.updated_at
         FROM updated

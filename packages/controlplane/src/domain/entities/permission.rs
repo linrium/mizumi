@@ -48,6 +48,7 @@ pub struct PermissionRequestView {
     pub policy_template_approval_mode: Option<String>,
     pub policy_template_owner_id: Option<Uuid>,
     pub policy_template_owner: Option<String>,
+    pub renewal_of: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub approval_steps: Vec<PermissionApprovalStep>,
@@ -78,6 +79,7 @@ pub struct PermissionRequestResponse {
     pub policy_template_approval_mode: Option<String>,
     pub policy_template_owner_id: Option<Uuid>,
     pub policy_template_owner: Option<String>,
+    pub renewal_of: Option<Uuid>,
     pub queue_decision: String,
     pub approval_steps: Vec<PermissionApprovalStep>,
     pub current_approval_step_id: Option<Uuid>,
@@ -91,6 +93,10 @@ pub struct PermissionRequestResponse {
 pub struct UpdateRequestStatusBody {
     pub status: String,
     pub approval_step_id: Option<Uuid>,
+    /// Reviewer-supplied grant duration override (days from now). When set and
+    /// status == "approved", the grant's expires_at is capped to this value
+    /// instead of the duration baked into the request at creation time.
+    pub grant_duration_days: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,6 +113,21 @@ pub struct CreatePermissionRequestBody {
     pub scope: String,
     pub privileges: Vec<String>,
     pub rationale: String,
+    pub requested_duration_days: Option<i32>,
+    /// If set, this request is a renewal of the referenced `time_bound_grant`.
+    /// On approval the original grant's `expires_at` is extended rather than
+    /// creating new grant rows.
+    pub renewal_of: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminRenewGrantBody {
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RevokeGrantBody {
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -120,6 +141,7 @@ pub struct PolicyTemplate {
     pub privileges: Vec<String>,
     pub approval_mode: String,
     pub risk: String,
+    pub max_grant_duration_days: i32,
     pub usage_30d: i32,
     pub owner_id: Uuid,
     pub owner: String,
@@ -129,18 +151,39 @@ pub struct PolicyTemplate {
     pub approval_steps: Vec<PolicyTemplateApprovalStep>,
 }
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
-pub struct BlastRadiusPreviewRow {
+#[derive(Debug, Clone, Serialize)]
+pub struct AffectedComponent {
+    pub display_name: String,
+    pub node_type: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BlastRadiusPreview {
     pub request_id: Uuid,
-    pub requester_id: Uuid,
+    pub code: String,
+    pub requester: String,
     pub resource: String,
     pub scope: String,
     pub risk: String,
+    pub derived_risk: String,
+    pub lineage_resolved: bool,
+    pub lineage_root_id: Option<Uuid>,
+    pub lineage_root_display_name: Option<String>,
+    pub lineage_root_type: Option<String>,
+    pub total_downstream_nodes: i32,
+    pub direct_downstream_nodes: i32,
+    pub downstream_tables: i32,
     pub downstream_assets: i32,
+    pub downstream_jobs: i32,
+    pub downstream_schedules: i32,
     pub dashboards: i32,
     pub consumers: i32,
     pub sensitive_domains: Vec<String>,
     pub recommended_guardrail: String,
+    pub llm_risk: String,
+    pub llm_recommendation: String,
+    pub llm_explanation: String,
+    pub affected_nodes: Vec<AffectedComponent>,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -149,12 +192,14 @@ pub struct TimeBoundGrant {
     pub principal: String,
     pub team: String,
     pub resource: String,
+    pub scope: String,
     pub privilege: String,
     pub started_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub reviewer_id: String,
     pub renewal_status: String,
     pub reason: String,
+    pub source_request_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

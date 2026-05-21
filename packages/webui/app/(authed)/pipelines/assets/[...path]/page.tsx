@@ -215,9 +215,12 @@ function useAssetStatus(pathSegments: string[]) {
 
     async function poll() {
       try {
-        const res = await fetchWithAuth(`/api/dagster/asset-status/${pathKey}`, {
-          cache: "no-store",
-        })
+        const res = await fetchWithAuth(
+          `/api/dagster/asset-status/${pathKey}`,
+          {
+            cache: "no-store",
+          },
+        )
         if (!res.ok) return
         const data = (await res.json()) as AssetStatus
         if (!cancelled) {

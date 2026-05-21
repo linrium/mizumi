@@ -10,9 +10,10 @@ use rdkafka::{ClientConfig, producer::FutureProducer};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use adapters::inbound::http::create_router;
-use adapters::outbound::{http::uc::UnityCatalogHttpProxy, kubernetes::duckdb::SessionStore};
+use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
-    dagster_service::DagsterService, k8s_service::K8sQueryService,
+    dagster_service::DagsterService, expiry_worker::ExpiryWorker, k8s_service::K8sQueryService,
+    lineage_service::LineageService, llm_service::LlmService,
     permission_service::PermissionService, streaming_service::StreamingJobService,
     team_service::TeamService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService, user_service::UserService,
@@ -61,34 +62,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("failed to run migrations");
 
-    let session_store = SessionStore::new();
+    let llm_service = LlmService::new(&config.openai);
+    if llm_service.is_none() {
+        tracing::warn!("OpenAI API key not configured; LLM blast-radius analysis is disabled");
+    }
     let state = Arc::new(AppState {
         dagster_service: Arc::new(DagsterService),
-        k8s_service: Arc::new(K8sQueryService::new(session_store)),
+        k8s_service: Arc::new(K8sQueryService::new(config.duckdb_server.base_url.clone())),
+        lineage_service: Arc::new(LineageService::new(
+            db.clone(),
+            config.unity_catalog.base_url.clone(),
+            uc_admin_token.clone(),
+            config.dagster.base_url.clone(),
+        )),
         permission_service: Arc::new(PermissionService::new(
             db.clone(),
             UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
                 config.unity_catalog.base_url.clone(),
                 uc_admin_token.clone(),
             )),
+            llm_service,
         )),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         team_service: Arc::new(TeamService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
         uc_service: Arc::new(UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
             config.unity_catalog.base_url.clone(),
-            uc_admin_token,
+            uc_admin_token.clone(),
         ))),
         user_service: Arc::new(UserService::new(db.clone())),
         keycloak_auth: Arc::new(KeycloakAuth::new(
             &config.keycloak.url,
             &config.keycloak.realm,
+            config.keycloak.allowed_issuers(),
             config.keycloak.audiences.clone(),
         )),
         bypass_token: config.bypass_token.clone(),
     });
 
     let app = create_router(state);
+
+    // Start the background expiry worker — runs for the lifetime of the process.
+    let expiry_uc = UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
+        config.unity_catalog.base_url.clone(),
+        uc_admin_token.clone(),
+    ));
+    ExpiryWorker::new(db.clone(), expiry_uc).start();
+
     tracing::info!("listening on {}", config.bind_addr);
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
     axum::serve(listener, app).await?;

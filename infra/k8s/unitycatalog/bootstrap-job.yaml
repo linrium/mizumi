@@ -30,20 +30,21 @@ data:
     import os
     import sys
     import urllib.error
+    import urllib.parse
     import urllib.request
 
     base_url = os.environ["UC_URL"].rstrip("/")
     token = os.environ["UC_TOKEN"]
 
 
-    def request(method: str, path: str, payload: dict) -> None:
+    def request(method: str, path: str, payload: dict | None = None):
         req = urllib.request.Request(
             f"{base_url}{path}",
-            data=json.dumps(payload).encode(),
             headers={
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             },
+            data=None if payload is None else json.dumps(payload).encode(),
             method=method,
         )
         try:
@@ -51,23 +52,320 @@ data:
                 body = resp.read().decode()
                 if body:
                     print(body)
+                    return json.loads(body)
+                return None
         except urllib.error.HTTPError as err:
             body = err.read().decode()
             if err.code == 409:
                 print(f"already exists: {path}")
-                return
+                return None
             print(f"{method} {path} failed: {err.code} {body}", file=sys.stderr)
             raise
 
 
-    users = [
+    def list_catalog_names() -> set[str]:
+        response = request("GET", "/api/2.1/unity-catalog/catalogs")
+        return {catalog["name"] for catalog in (response or {}).get("catalogs", [])}
+
+
+    def list_schema_names(catalog_name: str) -> set[str]:
+        response = request("GET", f"/api/2.1/unity-catalog/schemas?catalog_name={catalog_name}")
+        return {schema["name"] for schema in (response or {}).get("schemas", [])}
+
+
+    def list_table_names(catalog_name: str, schema_name: str) -> set[str]:
+        response = request(
+            "GET",
+            f"/api/2.1/unity-catalog/tables?catalog_name={catalog_name}&schema_name={schema_name}",
+        )
+        return {table["name"] for table in (response or {}).get("tables", [])}
+
+
+    def get_table(catalog_name: str, schema_name: str, table_name: str) -> dict | None:
+        full_name = f"{catalog_name}.{schema_name}.{table_name}"
+        encoded = urllib.parse.quote(full_name, safe="")
+        try:
+            return request("GET", f"/api/2.1/unity-catalog/tables/{encoded}")
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                return None
+            raise
+
+
+    def delete_table(catalog_name: str, schema_name: str, table_name: str) -> None:
+        full_name = f"{catalog_name}.{schema_name}.{table_name}"
+        encoded = urllib.parse.quote(full_name, safe="")
+        request("DELETE", f"/api/2.1/unity-catalog/tables/{encoded}")
+
+
+    def table_matches(existing: dict, desired: dict) -> bool:
+        if existing.get("storage_location") != desired["storage_location"]:
+            return False
+
+        existing_columns = existing.get("columns") or []
+        desired_columns = desired["columns"]
+        if len(existing_columns) != len(desired_columns):
+            return False
+
+        comparable_fields = (
+            "name",
+            "type_name",
+            "type_text",
+            "type_json",
+            "position",
+            "nullable",
+            "partition_index",
+        )
+        for existing_col, desired_col in zip(existing_columns, desired_columns):
+            for field in comparable_fields:
+                if existing_col.get(field) != desired_col.get(field):
+                    return False
+        return True
+
+
+    def ensure_catalog(catalog_name: str, comment: str, existing_catalogs: set[str]) -> None:
+        if catalog_name in existing_catalogs:
+            print(f"already exists: /api/2.1/unity-catalog/catalogs/{catalog_name}")
+            return
+        try:
+            request("POST", "/api/2.1/unity-catalog/catalogs", {"name": catalog_name, "comment": comment})
+        except urllib.error.HTTPError:
+            refreshed = list_catalog_names()
+            if catalog_name not in refreshed:
+                raise
+            print(f"already exists after retry check: /api/2.1/unity-catalog/catalogs/{catalog_name}")
+            existing_catalogs.update(refreshed)
+            return
+        existing_catalogs.add(catalog_name)
+
+
+    def ensure_schema(catalog_name: str, schema_name: str, comment: str, existing_schemas: set[str]) -> None:
+        if schema_name in existing_schemas:
+            print(f"already exists: /api/2.1/unity-catalog/schemas/{catalog_name}.{schema_name}")
+            return
+        try:
+            request(
+                "POST",
+                "/api/2.1/unity-catalog/schemas",
+                {"catalog_name": catalog_name, "name": schema_name, "comment": comment},
+            )
+        except urllib.error.HTTPError:
+            refreshed = list_schema_names(catalog_name)
+            if schema_name not in refreshed:
+                raise
+            print(f"already exists after retry check: /api/2.1/unity-catalog/schemas/{catalog_name}.{schema_name}")
+            existing_schemas.update(refreshed)
+            return
+        existing_schemas.add(schema_name)
+
+
+    def ensure_table(catalog_name: str, schema_name: str, table: dict, existing_tables: set[str]) -> None:
+        table_name = table["name"]
+        if table_name in existing_tables:
+            existing_table = get_table(catalog_name, schema_name, table_name)
+            if existing_table and table_matches(existing_table, table):
+                print(f"already exists: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
+                return
+            print(f"recreating stale table metadata: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
+            delete_table(catalog_name, schema_name, table_name)
+            existing_tables.discard(table_name)
+        try:
+            request(
+                "POST",
+                "/api/2.1/unity-catalog/tables",
+                {
+                    "catalog_name": catalog_name,
+                    "schema_name": schema_name,
+                    "name": table_name,
+                    "table_type": "EXTERNAL",
+                    "data_source_format": "DELTA",
+                    "columns": table["columns"],
+                    "url": table["storage_location"],
+                    "comment": table["comment"],
+                },
+            )
+        except urllib.error.HTTPError:
+            refreshed = list_table_names(catalog_name, schema_name)
+            if table_name not in refreshed:
+                raise
+            print(f"already exists after retry check: /api/2.1/unity-catalog/tables/{catalog_name}.{schema_name}.{table_name}")
+            existing_tables.update(refreshed)
+            return
+        existing_tables.add(table_name)
+
+
+    def col(name: str, type_name: str, type_text: str, json_type: str, pos: int) -> dict:
+        return {
+            "name": name,
+            "type_text": type_text,
+            "type_json": json.dumps(
+                {"name": name, "type": json_type, "nullable": True, "metadata": {}},
+                separators=(",", ":"),
+            ),
+            "type_name": type_name,
+            "type_precision": 0,
+            "type_scale": 0,
+            "type_interval_type": "",
+            "position": pos,
+            "comment": "",
+            "nullable": True,
+            "partition_index": -1,
+        }
+
+
+    def build_cols(specs: list[tuple[str, str, str, str]]) -> list[dict]:
+        return [col(name, type_name, type_text, json_type, pos) for pos, (name, type_name, type_text, json_type) in enumerate(specs)]
+
+
+    PARTNER_EVENTS_V1 = build_cols(
+        [
+            ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
+            ("key", "STRING", "string", "string"),
+            ("event_type", "STRING", "string", "string"),
+            ("value", "STRING", "string", "string"),
+        ]
+    )
+
+    HDBANK_BRONZE_CUSTOMERS_V1 = build_cols(
+        [
+            ("unified_customer_id", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("segment_name", "STRING", "string", "string"),
+            ("preferred_channel", "STRING", "string", "string"),
+            ("monthly_income", "DOUBLE", "double", "double"),
+            ("credit_score", "INT", "int", "integer"),
+            ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    HDBANK_CUSTOMERS_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("segment_name", "STRING", "string", "string"),
+            ("kyc_status", "STRING", "string", "string"),
+            ("preferred_channel", "STRING", "string", "string"),
+            ("monthly_income", "DOUBLE", "double", "double"),
+            ("credit_score", "INT", "int", "integer"),
+            ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    HDBANK_TRAVEL_SPEND_FEATURES_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("transaction_count", "INT", "int", "integer"),
+            ("total_card_spend", "DOUBLE", "double", "double"),
+            ("travel_spend", "DOUBLE", "double", "double"),
+            ("has_vietjet_spend", "INT", "int", "integer"),
+            ("last_payment_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("travel_affinity_score", "DOUBLE", "double", "double"),
+        ]
+    )
+
+    HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("offer_name", "STRING", "string", "string"),
+            ("use_case", "STRING", "string", "string"),
+            ("propensity_score", "DOUBLE", "double", "double"),
+            ("recommended_channel", "STRING", "string", "string"),
+            ("signal_value", "DOUBLE", "double", "double"),
+        ]
+    )
+
+    VIETJETAIR_BRONZE_CUSTOMERS_V1 = build_cols(
+        [
+            ("unified_customer_id", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("membership_tier", "STRING", "string", "string"),
+            ("home_airport", "STRING", "string", "string"),
+            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    VIETJETAIR_CUSTOMERS_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("membership_tier", "STRING", "string", "string"),
+            ("home_airport", "STRING", "string", "string"),
+            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    VIETJETAIR_BOOKING_FEATURES_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("booking_count", "INT", "int", "integer"),
+            ("gross_booking_value", "DOUBLE", "double", "double"),
+            ("avg_booking_value", "DOUBLE", "double", "double"),
+            ("last_booking_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("frequent_flyer_score", "DOUBLE", "double", "double"),
+        ]
+    )
+
+    VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("offer_name", "STRING", "string", "string"),
+            ("use_case", "STRING", "string", "string"),
+            ("propensity_score", "DOUBLE", "double", "double"),
+            ("recommended_channel", "STRING", "string", "string"),
+            ("signal_value", "DOUBLE", "double", "double"),
+        ]
+    )
+
+    PARTNERSHIP_CO_BRAND_AUDIENCE_V1 = build_cols(
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("offer_name", "STRING", "string", "string"),
+            ("use_case", "STRING", "string", "string"),
+            ("propensity_score", "DOUBLE", "double", "double"),
+            ("recommended_channel", "STRING", "string", "string"),
+            ("signal_value", "DOUBLE", "double", "double"),
+            ("source_company", "STRING", "string", "string"),
+            ("target_company", "STRING", "string", "string"),
+            ("priority_band", "STRING", "string", "string"),
+        ]
+    )
+
+    PARTNERSHIP_CAMPAIGN_SUMMARY_V1 = build_cols(
+        [
+            ("campaign_name", "STRING", "string", "string"),
+            ("source_company", "STRING", "string", "string"),
+            ("target_company", "STRING", "string", "string"),
+            ("offer_name", "STRING", "string", "string"),
+            ("customer_count", "INT", "int", "integer"),
+            ("avg_propensity_score", "DOUBLE", "double", "double"),
+            ("total_signal_value", "DOUBLE", "double", "double"),
+        ]
+    )
+
+
+    for display_name, email in [
         ("Linh Tran", "linh@gmail.com"),
         ("Khao Soi", "khaosoi@gmail.com"),
         ("Khao Pad", "khaopad@gmail.com"),
         ("Rikki Tarczaly", "rikki@gmail.com"),
-    ]
-
-    for display_name, email in users:
+    ]:
         request(
             "POST",
             "/api/1.0/unity-control/scim2/Users",
@@ -77,498 +375,204 @@ data:
             },
         )
 
-    OWNERS = ["linh@gmail.com", "rikki@gmail.com"]
+    catalogs = {
+        "hdbank": {
+            "comment": "HDBank demo catalog for co-branded travel card and ticket financing.",
+            "schemas": {
+                "hdbank_partnership_prod_bronze": {
+                    "comment": "Raw HDBank partner events from the single company topic.",
+                    "tables": [
+                        {
+                            "name": "partner_events_v1",
+                            "comment": "Mixed HDBank customer and card transaction events.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1",
+                            "columns": PARTNER_EVENTS_V1,
+                        },
+                        {
+                            "name": "customers_v1",
+                            "comment": "Seeded HDBank customer master rows for the partnership demo.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/customers_v1",
+                            "columns": HDBANK_BRONZE_CUSTOMERS_V1,
+                        }
+                    ],
+                },
+                "hdbank_partnership_prod_silver": {
+                    "comment": "HDBank customer and travel-affinity features.",
+                    "tables": [
+                        {
+                            "name": "customers_v1",
+                            "comment": "Latest HDBank customer profiles for cross-sell analysis.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/customers_v1",
+                            "columns": HDBANK_CUSTOMERS_V1,
+                        },
+                        {
+                            "name": "travel_spend_features_v1",
+                            "comment": "Travel affinity features from HDBank card transactions.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_silver/travel_spend_features_v1",
+                            "columns": HDBANK_TRAVEL_SPEND_FEATURES_V1,
+                        },
+                    ],
+                },
+                "hdbank_partnership_prod_gold": {
+                    "comment": "HDBank outbound activation targets for VietJet.",
+                    "tables": [
+                        {
+                            "name": "vietjet_activation_candidates_v1",
+                            "comment": "HDBank customers most likely to convert into VietJet flyers.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_gold/vietjet_activation_candidates_v1",
+                            "columns": HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1,
+                        }
+                    ],
+                },
+            },
+        },
+        "vietjetair": {
+            "comment": "VietJet Air demo catalog for HDBank travel financing cross-sell.",
+            "schemas": {
+                "vietjetair_partnership_prod_bronze": {
+                    "comment": "Raw VietJet partner events from the single company topic.",
+                    "tables": [
+                        {
+                            "name": "partner_events_v1",
+                            "comment": "Mixed VietJet customer and booking events.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1",
+                            "columns": PARTNER_EVENTS_V1,
+                        },
+                        {
+                            "name": "customers_v1",
+                            "comment": "Seeded VietJet customer master rows for the partnership demo.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/customers_v1",
+                            "columns": VIETJETAIR_BRONZE_CUSTOMERS_V1,
+                        }
+                    ],
+                },
+                "vietjetair_partnership_prod_silver": {
+                    "comment": "VietJet customer and booking features.",
+                    "tables": [
+                        {
+                            "name": "customers_v1",
+                            "comment": "Latest VietJet customer profiles for cross-sell analysis.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/customers_v1",
+                            "columns": VIETJETAIR_CUSTOMERS_V1,
+                        },
+                        {
+                            "name": "booking_features_v1",
+                            "comment": "Booking intensity features for HDBank finance targeting.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1",
+                            "columns": VIETJETAIR_BOOKING_FEATURES_V1,
+                        },
+                    ],
+                },
+                "vietjetair_partnership_prod_gold": {
+                    "comment": "VietJet outbound activation targets for HDBank.",
+                    "tables": [
+                        {
+                            "name": "hdbank_finance_candidates_v1",
+                            "comment": "VietJet flyers most likely to take HDBank financing or a co-brand card.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/hdbank_finance_candidates_v1",
+                            "columns": VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1,
+                        }
+                    ],
+                },
+            },
+        },
+        "partnership": {
+            "comment": "Shared partnership outputs for co-brand campaign planning.",
+            "schemas": {
+                "co_brand_gold": {
+                    "comment": "Joint campaign audience and summary outputs.",
+                    "tables": [
+                        {
+                            "name": "co_brand_offer_audience_v1",
+                            "comment": "Unified outbound audience for the co-brand travel use case.",
+                            "storage_location": "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1",
+                            "columns": PARTNERSHIP_CO_BRAND_AUDIENCE_V1,
+                        },
+                        {
+                            "name": "campaign_summary_v1",
+                            "comment": "Compact campaign summary for activation planning.",
+                            "storage_location": "s3://unitycatalog/partnership/co_brand_gold/campaign_summary_v1",
+                            "columns": PARTNERSHIP_CAMPAIGN_SUMMARY_V1,
+                        },
+                    ],
+                }
+            },
+        },
+    }
 
-    def owner_changes(others: list) -> list:
-        changes = [{"principal": p, "add": ["USE_CATALOG", "OWNER"], "remove": []} for p in OWNERS]
-        changes.extend(others)
-        return changes
+    existing_catalogs = list_catalog_names()
+    for catalog_name, catalog_spec in catalogs.items():
+        ensure_catalog(catalog_name, catalog_spec["comment"], existing_catalogs)
 
-    def schema_owner_changes(others: list) -> list:
-        changes = [{"principal": p, "add": ["USE_SCHEMA", "OWNER"], "remove": []} for p in OWNERS]
-        changes.extend(others)
-        return changes
+        existing_schemas = list_schema_names(catalog_name)
+        for schema_name, schema_spec in catalog_spec["schemas"].items():
+            ensure_schema(catalog_name, schema_name, schema_spec["comment"], existing_schemas)
 
-    def table_owner_changes(others: list) -> list:
-        changes = [{"principal": p, "add": ["SELECT", "OWNER"], "remove": []} for p in OWNERS]
-        changes.extend(others)
-        return changes
+            existing_tables = list_table_names(catalog_name, schema_name)
+            for table in schema_spec["tables"]:
+                ensure_table(catalog_name, schema_name, table, existing_tables)
 
-    catalog_permissions = [
-        (
-            "/api/2.1/unity-catalog/permissions/catalog/hdbank",
-            {"changes": owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/catalog/vietjetair",
-            {"changes": owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/catalog/hdbank_sandbox",
-            {"changes": owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/catalog/vietjetair_sandbox",
-            {"changes": owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/catalog/partnership_sandbox",
-            {"changes": owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_CATALOG"], "remove": []},
-            ])},
-        ),
-    ]
+    linh = "linh@gmail.com"
 
-    schema_permissions = [
-        # hdbank prod schemas
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_bronze",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_silver",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank.hdbank_payments_prod_gold",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        # vietjetair prod schemas
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_bronze",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_silver",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair.vietjetair_bookings_prod_gold",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        # hdbank_sandbox schemas
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_bronze",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_silver",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/hdbank_sandbox.hdbank_payments_sandbox_gold",
-            {"changes": schema_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        # vietjetair_sandbox schemas
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_silver",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        # partnership_sandbox schemas
-        (
-            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.credit_risk",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.cross_promotion",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/schema/partnership_sandbox.analytics",
-            {"changes": schema_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["USE_SCHEMA"], "remove": []},
-            ])},
-        ),
-    ]
+    # Catalog-level grants
+    # linh: full owner; rikki: browse partnership only;
+    # khaosoi: use+browse hdbank, browse partnership;
+    # khaopad: use+browse vietjetair, browse partnership
+    catalog_grants = {
+        "hdbank": {
+            linh: ["OWNER"],
+            "khaosoi@gmail.com": ["USE_CATALOG", "BROWSE"],
+        },
+        "vietjetair": {
+            linh: ["OWNER"],
+            "khaopad@gmail.com": ["USE_CATALOG", "BROWSE"],
+        },
+        "partnership": {
+            linh: ["OWNER"],
+            "rikki@gmail.com": ["BROWSE"],
+            "khaosoi@gmail.com": ["BROWSE"],
+            "khaopad@gmail.com": ["BROWSE"],
+        },
+    }
+    for catalog_name, grants in catalog_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
+        request("PATCH", f"/api/2.1/unity-catalog/permissions/catalog/{catalog_name}", {"changes": changes})
 
-    table_permissions = [
-        # hdbank prod tables
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.card_payment_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_silver.customers_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.risk_detection_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.merchant_revenue_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank.hdbank_payments_prod_gold.user_spend_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        # vietjetair prod tables
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.ticket_bookings_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.customers_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_silver.flights_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.booking_revenue_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair.vietjetair_bookings_prod_gold.customer_spend_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["BROWSE"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        # hdbank_sandbox tables
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_bronze.raw_card_payment_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_bronze.raw_loan_application_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.card_payment_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.customers_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_silver.loan_applications_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.user_spend_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.bnpl_exposure_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/hdbank_sandbox.hdbank_payments_sandbox_gold.credit_risk_features_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        # vietjetair_sandbox tables
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze.raw_booking_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_bronze.raw_ancillary_events_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.ticket_bookings_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.customers_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.flights_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_silver.ancillary_purchases_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.booking_revenue_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.customer_spend_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.ancillary_revenue_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/vietjetair_sandbox.vietjetair_bookings_sandbox_gold.route_performance_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        # partnership_sandbox tables
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.travel_credit_features_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.bnpl_decisions_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.credit_risk.loan_decision_log_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.cross_promotion.vietjet_to_hdbank_prospects_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.cross_promotion.hdbank_to_vietjet_prospects_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.analytics.customer_360_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-        (
-            "/api/2.1/unity-catalog/permissions/table/partnership_sandbox.analytics.partnership_revenue_v1",
-            {"changes": table_owner_changes([
-                {"principal": "khaosoi@gmail.com", "add": ["SELECT"], "remove": []},
-                {"principal": "khaopad@gmail.com", "add": ["SELECT"], "remove": []},
-            ])},
-        ),
-    ]
+    # Schema-level grants
+    # linh: owner on all; khaosoi: use_schema on hdbank; khaopad: use_schema on vietjetair
+    schema_grants = {
+        "hdbank.hdbank_partnership_prod_bronze": {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "hdbank.hdbank_partnership_prod_silver": {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "hdbank.hdbank_partnership_prod_gold":   {linh: ["OWNER", "USE_SCHEMA"], "khaosoi@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_bronze": {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_silver": {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "vietjetair.vietjetair_partnership_prod_gold":   {linh: ["OWNER", "USE_SCHEMA"], "khaopad@gmail.com": ["USE_SCHEMA"]},
+        "partnership.co_brand_gold": {linh: ["OWNER", "USE_SCHEMA"]},
+    }
+    for schema_name, grants in schema_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
+        request("PATCH", f"/api/2.1/unity-catalog/permissions/schema/{schema_name}", {"changes": changes})
 
-    for path, payload in catalog_permissions:
-        request("PATCH", path, payload)
-
-    for path, payload in schema_permissions:
-        request("PATCH", path, payload)
-
-    for path, payload in table_permissions:
-        request("PATCH", path, payload)
+    # Table-level grants
+    # linh: owner+select on all; khaosoi: select on hdbank; khaopad: select on vietjetair
+    table_grants = {
+        "hdbank.hdbank_partnership_prod_bronze.partner_events_v1":             {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_bronze.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_silver.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1":      {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1":{linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.partner_events_v1":     {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_silver.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "partnership.co_brand_gold.co_brand_offer_audience_v1": {linh: ["OWNER", "SELECT"]},
+        "partnership.co_brand_gold.campaign_summary_v1":        {linh: ["OWNER", "SELECT"]},
+    }
+    for table_name, grants in table_grants.items():
+        changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
+        request("PATCH", f"/api/2.1/unity-catalog/permissions/table/{table_name}", {"changes": changes})
     PY
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: unitycatalog-bootstrap-role
-  namespace: unitycatalog
-rules:
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: unitycatalog-bootstrap-rb
-  namespace: unitycatalog
-subjects:
-  - kind: ServiceAccount
-    name: unitycatalog-bootstrap-sa
-    namespace: unitycatalog
-roleRef:
-  kind: Role
-  name: unitycatalog-bootstrap-role
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: batch/v1
 kind: Job
@@ -599,25 +603,6 @@ spec:
                 echo "waiting for unitycatalog..."; sleep 3
               done
               echo "unitycatalog ready"
-        - name: fetch-token
-          image: bitnami/kubectl:latest
-          resources:
-            requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              cpu: 50m
-              memory: 128Mi
-          command:
-            - sh
-            - -c
-            - |
-              POD=$(kubectl get pod -n unitycatalog -l app=unitycatalog -o jsonpath='{.items[0].metadata.name}')
-              kubectl exec -n unitycatalog "$POD" -- cat /app/config/token.txt > /token/uc-token
-              echo "Token fetched."
-          volumeMounts:
-            - name: token
-              mountPath: /token
         - name: create-buckets
           image: minio/mc:latest
           resources:
@@ -633,9 +618,9 @@ spec:
             - |
               mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
               mc mb --ignore-existing rustfs/unitycatalog
-              echo "buckets ready"
+              echo "bucket ready"
         - name: create-topics
-          image: redpandadata/redpanda:latest
+          image: docker.redpanda.com/redpandadata/redpanda:v24.3.11
           resources:
             requests:
               cpu: 25m
@@ -648,16 +633,10 @@ spec:
             - -ec
             - |
               BROKERS="redpanda-svc.redpanda.svc.cluster.local:9092"
-              for topic in \
-                hdbank.hdbank_payments_prod_bronze.raw_card_payment_events_v1 \
-                hdbank.hdbank_payments_prod_bronze.raw_customer_events_v1 \
-                vietjetair.vietjetair_bookings_prod_bronze.raw_customer_events_v1 \
-                vietjetair.vietjetair_bookings_prod_bronze.raw_flight_events_v1 \
-                vietjetair.vietjetair_bookings_prod_bronze.raw_booking_events_v1; do
+              for topic in hdbank.partner_events_v1 vietjetair.partner_events_v1; do
                 rpk topic create "$topic" --brokers "$BROKERS" || true
               done
               echo "topics ready"
-
       containers:
         - name: bootstrap
           image: python:3.11-alpine
@@ -671,771 +650,23 @@ spec:
           command:
             - sh
             - -c
-            - |
-              cat > /tmp/bootstrap.py << 'PYEOF'
-              import json, os, sys, urllib.request, urllib.error
-
-              UC = "http://unitycatalog-svc:8080/api/2.1/unity-catalog"
-              TOKEN = os.environ.get("UC_TOKEN", "")
-
-              def _headers(extra=None):
-                  h = {}
-                  if TOKEN:
-                      h["Authorization"] = f"Bearer {TOKEN}"
-                  if extra:
-                      h.update(extra)
-                  return h
-
-              def post(path, data):
-                  req = urllib.request.Request(
-                      f"{UC}/{path}",
-                      data=json.dumps(data).encode(),
-                      headers=_headers({"Content-Type": "application/json"}),
-                      method="POST",
-                  )
-                  try:
-                      with urllib.request.urlopen(req) as r:
-                          print("  ok:", json.loads(r.read()).get("name", ""))
-                  except urllib.error.HTTPError as e:
-                      msg = e.read().decode()
-                      if e.code == 409:
-                          print("  already exists")
-                      else:
-                          print(f"  ERROR {e.code}: {msg[:300]}", file=sys.stderr)
-
-              def col(name, type_name, type_text, json_type, pos, nullable=True, partition_index=-1):
-                  return {
-                      "name": name,
-                      "type_text": type_text,
-                      "type_json": json.dumps({
-                          "name": name,
-                          "type": json_type,
-                          "nullable": nullable,
-                          "metadata": {},
-                      }, separators=(",", ":")),
-                      "type_name": type_name,
-                      "type_precision": 0,
-                      "type_scale": 0,
-                      "type_interval_type": "",
-                      "position": pos,
-                      "comment": "",
-                      "nullable": nullable,
-                      "partition_index": partition_index,
-                  }
-
-              def build_cols(specs):
-                  return [col(name, type_name, type_text, json_type, pos) for pos, (name, type_name, type_text, json_type) in enumerate(specs)]
-
-              HDBANK_RAW_CARD_PAYMENT_EVENTS_V1 = build_cols([
-                  ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("key", "STRING", "string", "string"),
-                  ("value", "STRING", "string", "string"),
-              ])
-
-              HDBANK_RAW_CUSTOMER_EVENTS_V1 = build_cols([
-                  ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("key", "STRING", "string", "string"),
-                  ("value", "STRING", "string", "string"),
-              ])
-
-              HDBANK_CARD_PAYMENT_EVENTS_V1 = build_cols([
-                  ("payment_event_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("account_id", "STRING", "string", "string"),
-                  ("transaction_reference", "STRING", "string", "string"),
-                  ("merchant_name", "STRING", "string", "string"),
-                  ("merchant_category", "STRING", "string", "string"),
-                  ("amount", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-                  ("payment_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("note", "STRING", "string", "string"),
-              ])
-
-              HDBANK_CUSTOMER_PROFILE_V1 = build_cols([
-                  ("customer_id", "STRING", "string", "string"),
-                  ("customer_name", "STRING", "string", "string"),
-                  ("segment_name", "STRING", "string", "string"),
-                  ("kyc_status", "STRING", "string", "string"),
-                  ("preferred_channel", "STRING", "string", "string"),
-                  ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              HDBANK_RISK_DETECTION_V1 = build_cols([
-                  ("detection_date", "DATE", "date", "date"),
-                  ("payment_event_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("account_id", "STRING", "string", "string"),
-                  ("note_signal", "STRING", "string", "string"),
-                  ("risk_score", "DOUBLE", "double", "double"),
-                  ("risk_label", "STRING", "string", "string"),
-                  ("model_version", "STRING", "string", "string"),
-              ])
-
-              HDBANK_MERCHANT_REVENUE_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("merchant_name", "STRING", "string", "string"),
-                  ("merchant_category", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
-                  ("transaction_count", "INT", "int", "integer"),
-                  ("gross_payment_volume", "DOUBLE", "double", "double"),
-                  ("fee_revenue", "DOUBLE", "double", "double"),
-              ])
-
-              HDBANK_USER_SPEND_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("account_id", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
-                  ("transaction_count", "INT", "int", "integer"),
-                  ("total_spend", "DOUBLE", "double", "double"),
-                  ("avg_ticket_size", "DOUBLE", "double", "double"),
-                  ("top_merchant_category", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_RAW_CUSTOMER_EVENTS_V1 = build_cols([
-                  ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("key", "STRING", "string", "string"),
-                  ("value", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_RAW_FLIGHT_EVENTS_V1 = build_cols([
-                  ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("key", "STRING", "string", "string"),
-                  ("value", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_RAW_BOOKING_EVENTS_V1 = build_cols([
-                  ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("key", "STRING", "string", "string"),
-                  ("value", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_TICKET_BOOKINGS_V1 = build_cols([
-                  ("booking_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("pnr_code", "STRING", "string", "string"),
-                  ("payment_reference", "STRING", "string", "string"),
-                  ("route_code", "STRING", "string", "string"),
-                  ("ticket_amount", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-                  ("booking_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              VIETJETAIR_CUSTOMERS_V1 = build_cols([
-                  ("customer_id", "STRING", "string", "string"),
-                  ("customer_name", "STRING", "string", "string"),
-                  ("membership_tier", "STRING", "string", "string"),
-                  ("home_airport", "STRING", "string", "string"),
-                  ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
-                  ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              VIETJETAIR_FLIGHTS_V1 = build_cols([
-                  ("flight_id", "STRING", "string", "string"),
-                  ("flight_number", "STRING", "string", "string"),
-                  ("route_code", "STRING", "string", "string"),
-                  ("departure_airport", "STRING", "string", "string"),
-                  ("arrival_airport", "STRING", "string", "string"),
-                  ("scheduled_departure_time", "TIMESTAMP", "timestamp", "timestamp"),
-                  ("aircraft_type", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_BOOKING_REVENUE_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("route_code", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
-                  ("booking_count", "INT", "int", "integer"),
-                  ("ticket_revenue", "DOUBLE", "double", "double"),
-                  ("ancillary_revenue", "DOUBLE", "double", "double"),
-              ])
-
-              VIETJETAIR_CUSTOMER_SPEND_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("currency", "STRING", "string", "string"),
-                  ("booking_count", "INT", "int", "integer"),
-                  ("total_ticket_spend", "DOUBLE", "double", "double"),
-                  ("avg_booking_value", "DOUBLE", "double", "double"),
-                  ("favorite_route_code", "STRING", "string", "string"),
-              ])
-
-              # ── Sandbox column schemas ───────────────────────────────────────────
-
-              HDBANK_LOAN_APPLICATIONS_V1 = build_cols([
-                  ("loan_application_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("loan_type", "STRING", "string", "string"),
-                  ("requested_amount_vnd", "DOUBLE", "double", "double"),
-                  ("vietjet_booking_reference", "STRING", "string", "string"),
-                  ("kyc_score", "DOUBLE", "double", "double"),
-                  ("status", "STRING", "string", "string"),
-                  ("applied_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              HDBANK_BNPL_EXPOSURE_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("active_bnpl_count", "INT", "int", "integer"),
-                  ("total_outstanding_vnd", "DOUBLE", "double", "double"),
-                  ("avg_ticket_vnd", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-              ])
-
-              HDBANK_CREDIT_RISK_FEATURES_V1 = build_cols([
-                  ("snapshot_date", "DATE", "date", "date"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("avg_monthly_spend", "DOUBLE", "double", "double"),
-                  ("num_transactions_90d", "INT", "int", "integer"),
-                  ("num_declined_90d", "INT", "int", "integer"),
-                  ("travel_frequency_score", "DOUBLE", "double", "double"),
-                  ("top_merchant_category", "STRING", "string", "string"),
-                  ("credit_utilization_pct", "DOUBLE", "double", "double"),
-              ])
-
-              VIETJETAIR_ANCILLARY_PURCHASES_V1 = build_cols([
-                  ("ancillary_id", "STRING", "string", "string"),
-                  ("booking_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("ancillary_type", "STRING", "string", "string"),
-                  ("item_name", "STRING", "string", "string"),
-                  ("amount", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-                  ("purchased_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              VIETJETAIR_ANCILLARY_REVENUE_V1 = build_cols([
-                  ("business_date", "DATE", "date", "date"),
-                  ("route_code", "STRING", "string", "string"),
-                  ("ancillary_type", "STRING", "string", "string"),
-                  ("purchase_count", "INT", "int", "integer"),
-                  ("total_revenue", "DOUBLE", "double", "double"),
-                  ("avg_item_price", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-              ])
-
-              VIETJETAIR_ROUTE_PERFORMANCE_V1 = build_cols([
-                  ("flight_date", "DATE", "date", "date"),
-                  ("route_code", "STRING", "string", "string"),
-                  ("scheduled_flights", "INT", "int", "integer"),
-                  ("avg_load_factor", "DOUBLE", "double", "double"),
-                  ("avg_ticket_price", "DOUBLE", "double", "double"),
-                  ("on_time_rate", "DOUBLE", "double", "double"),
-                  ("currency", "STRING", "string", "string"),
-              ])
-
-              PARTNERSHIP_TRAVEL_CREDIT_FEATURES_V1 = build_cols([
-                  ("feature_date", "DATE", "date", "date"),
-                  ("hdbank_customer_id", "STRING", "string", "string"),
-                  ("vietjet_customer_id", "STRING", "string", "string"),
-                  ("travel_frequency_score", "DOUBLE", "double", "double"),
-                  ("avg_booking_value", "DOUBLE", "double", "double"),
-                  ("loyalty_tier", "STRING", "string", "string"),
-                  ("distinct_routes_count", "INT", "int", "integer"),
-                  ("ancillary_spend_ratio", "DOUBLE", "double", "double"),
-              ])
-
-              PARTNERSHIP_BNPL_DECISIONS_V1 = build_cols([
-                  ("decision_id", "STRING", "string", "string"),
-                  ("booking_id", "STRING", "string", "string"),
-                  ("vietjet_customer_id", "STRING", "string", "string"),
-                  ("hdbank_customer_id", "STRING", "string", "string"),
-                  ("booking_amount", "DOUBLE", "double", "double"),
-                  ("approved_credit_line", "DOUBLE", "double", "double"),
-                  ("bnpl_term_months", "INT", "int", "integer"),
-                  ("interest_rate_bps", "INT", "int", "integer"),
-                  ("decision", "STRING", "string", "string"),
-                  ("decided_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              PARTNERSHIP_LOAN_DECISION_LOG_V1 = build_cols([
-                  ("decision_id", "STRING", "string", "string"),
-                  ("customer_id", "STRING", "string", "string"),
-                  ("loan_type", "STRING", "string", "string"),
-                  ("features_snapshot_date", "DATE", "date", "date"),
-                  ("model_version", "STRING", "string", "string"),
-                  ("probability_default", "DOUBLE", "double", "double"),
-                  ("decision", "STRING", "string", "string"),
-                  ("credit_limit_vnd", "DOUBLE", "double", "double"),
-                  ("decided_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              PARTNERSHIP_VJ_TO_HD_PROSPECTS_V1 = build_cols([
-                  ("prospect_id", "STRING", "string", "string"),
-                  ("vietjet_customer_id", "STRING", "string", "string"),
-                  ("customer_name", "STRING", "string", "string"),
-                  ("home_airport", "STRING", "string", "string"),
-                  ("membership_tier", "STRING", "string", "string"),
-                  ("annual_flight_spend_vnd", "DOUBLE", "double", "double"),
-                  ("recommended_product", "STRING", "string", "string"),
-                  ("propensity_score", "DOUBLE", "double", "double"),
-                  ("campaign_id", "STRING", "string", "string"),
-              ])
-
-              PARTNERSHIP_HD_TO_VJ_PROSPECTS_V1 = build_cols([
-                  ("prospect_id", "STRING", "string", "string"),
-                  ("hdbank_customer_id", "STRING", "string", "string"),
-                  ("customer_name", "STRING", "string", "string"),
-                  ("travel_spend_share", "DOUBLE", "double", "double"),
-                  ("top_airline_merchant", "STRING", "string", "string"),
-                  ("recommended_tier", "STRING", "string", "string"),
-                  ("propensity_score", "DOUBLE", "double", "double"),
-                  ("campaign_id", "STRING", "string", "string"),
-              ])
-
-              PARTNERSHIP_CUSTOMER_360_V1 = build_cols([
-                  ("snapshot_date", "DATE", "date", "date"),
-                  ("unified_customer_id", "STRING", "string", "string"),
-                  ("hdbank_customer_id", "STRING", "string", "string"),
-                  ("vietjet_customer_id", "STRING", "string", "string"),
-                  ("total_card_spend_vnd", "DOUBLE", "double", "double"),
-                  ("total_flight_spend_vnd", "DOUBLE", "double", "double"),
-                  ("bnpl_outstanding_vnd", "DOUBLE", "double", "double"),
-                  ("loyalty_tier", "STRING", "string", "string"),
-                  ("segment", "STRING", "string", "string"),
-                  ("last_activity_at", "TIMESTAMP", "timestamp", "timestamp"),
-              ])
-
-              PARTNERSHIP_REVENUE_V1 = build_cols([
-                  ("business_month", "STRING", "string", "string"),
-                  ("revenue_type", "STRING", "string", "string"),
-                  ("product", "STRING", "string", "string"),
-                  ("customer_count", "INT", "int", "integer"),
-                  ("total_revenue_vnd", "DOUBLE", "double", "double"),
-                  ("avg_revenue_per_customer", "DOUBLE", "double", "double"),
-              ])
-
-              CATALOGS = {
-                  "hdbank": {
-                      "comment": "HDBank demo catalog with Kafka bronze events and banking silver/gold marts",
-                      "schemas": {
-                          "hdbank_payments_prod_bronze": {
-                              "comment": "Raw HDBank Kafka events for payments and customers",
-                              "tables": [
-                                  {
-                                      "name": "raw_card_payment_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_bronze/raw_card_payment_events_v1",
-                                      "columns": HDBANK_RAW_CARD_PAYMENT_EVENTS_V1,
-                                      "comment": "Raw HDBank card payment Kafka events with event metadata and payload fields",
-                                  },
-                                  {
-                                      "name": "raw_customer_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_bronze/raw_customer_events_v1",
-                                      "columns": HDBANK_RAW_CUSTOMER_EVENTS_V1,
-                                      "comment": "Raw HDBank customer Kafka events with event metadata and payload fields",
-                                  },
-                              ],
-                          },
-                          "hdbank_payments_prod_silver": {
-                              "comment": "Conformed HDBank payment and customer entities",
-                              "tables": [
-                                  {
-                                      "name": "card_payment_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_silver/card_payment_events_v1",
-                                      "columns": HDBANK_CARD_PAYMENT_EVENTS_V1,
-                                      "comment": "Conformed HDBank payment events with transaction note retained for downstream ML",
-                                  },
-                                  {
-                                      "name": "customers_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_silver/customers_v1",
-                                      "columns": HDBANK_CUSTOMER_PROFILE_V1,
-                                      "comment": "Conformed HDBank customer profile dimension built from customer events",
-                                  },
-                              ],
-                          },
-                          "hdbank_payments_prod_gold": {
-                              "comment": "Business-ready HDBank risk and monetization marts",
-                              "tables": [
-                                  {
-                                      "name": "risk_detection_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_gold/risk_detection_v1",
-                                      "columns": HDBANK_RISK_DETECTION_V1,
-                                      "comment": "Gold risk detections from transaction behavior and note-text ML scoring",
-                                  },
-                                  {
-                                      "name": "merchant_revenue_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_gold/merchant_revenue_v1",
-                                      "columns": HDBANK_MERCHANT_REVENUE_V1,
-                                      "comment": "Gold merchant revenue mart for payment fee and GPV analysis",
-                                  },
-                                  {
-                                      "name": "user_spend_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank/hdbank_payments_prod_gold/user_spend_v1",
-                                      "columns": HDBANK_USER_SPEND_V1,
-                                      "comment": "Gold user spend mart by customer and account",
-                                  },
-                              ],
-                          },
-                      },
-                  },
-                  "vietjetair": {
-                      "comment": "VietJet Air demo catalog with Kafka bronze events and aviation silver/gold marts",
-                      "schemas": {
-                          "vietjetair_bookings_prod_bronze": {
-                              "comment": "Raw VietJet Kafka events for customers, flights, and bookings",
-                              "tables": [
-                                  {
-                                      "name": "raw_customer_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_bronze/raw_customer_events_v1",
-                                      "columns": VIETJETAIR_RAW_CUSTOMER_EVENTS_V1,
-                                      "comment": "Raw VietJet customer Kafka events with event metadata and payload fields",
-                                  },
-                                  {
-                                      "name": "raw_flight_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_bronze/raw_flight_events_v1",
-                                      "columns": VIETJETAIR_RAW_FLIGHT_EVENTS_V1,
-                                      "comment": "Raw VietJet flight Kafka events with operational metadata and payload fields",
-                                  },
-                                  {
-                                      "name": "raw_booking_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_bronze/raw_booking_events_v1",
-                                      "columns": VIETJETAIR_RAW_BOOKING_EVENTS_V1,
-                                      "comment": "Raw VietJet booking Kafka events with payment and booking payload fields",
-                                  },
-                              ],
-                          },
-                          "vietjetair_bookings_prod_silver": {
-                              "comment": "Conformed VietJet customer, flight, and booking entities",
-                              "tables": [
-                                  {
-                                      "name": "ticket_bookings_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_silver/ticket_bookings_v1",
-                                      "columns": VIETJETAIR_TICKET_BOOKINGS_V1,
-                                      "comment": "Conformed VietJet ticket bookings with payment reference and route context",
-                                  },
-                                  {
-                                      "name": "customers_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_silver/customers_v1",
-                                      "columns": VIETJETAIR_CUSTOMERS_V1,
-                                      "comment": "Conformed VietJet customer dimension built from customer events",
-                                  },
-                                  {
-                                      "name": "flights_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_silver/flights_v1",
-                                      "columns": VIETJETAIR_FLIGHTS_V1,
-                                      "comment": "Conformed VietJet flight dimension built from flight events",
-                                  },
-                              ],
-                          },
-                          "vietjetair_bookings_prod_gold": {
-                              "comment": "Business-ready VietJet revenue and customer value marts",
-                              "tables": [
-                                  {
-                                      "name": "booking_revenue_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_gold/booking_revenue_v1",
-                                      "columns": VIETJETAIR_BOOKING_REVENUE_V1,
-                                      "comment": "Gold booking revenue mart by route and business date",
-                                  },
-                                  {
-                                      "name": "customer_spend_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair/vietjetair_bookings_prod_gold/customer_spend_v1",
-                                      "columns": VIETJETAIR_CUSTOMER_SPEND_V1,
-                                      "comment": "Gold customer spend mart across bookings and routes",
-                                  },
-                              ],
-                          },
-                      },
-                  },
-                  "hdbank_sandbox": {
-                      "comment": "HDBank sandbox with synthetic payment, loan, BNPL, and credit-risk data for cross-company analytics",
-                      "schemas": {
-                          "hdbank_payments_sandbox_bronze": {
-                              "comment": "Synthetic raw HDBank events for payments and loan applications",
-                              "tables": [
-                                  {
-                                      "name": "raw_card_payment_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_bronze/raw_card_payment_events_v1",
-                                      "columns": HDBANK_RAW_CARD_PAYMENT_EVENTS_V1,
-                                      "comment": "Synthetic raw card payment events for sandbox development",
-                                  },
-                                  {
-                                      "name": "raw_loan_application_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_bronze/raw_loan_application_events_v1",
-                                      "columns": HDBANK_RAW_CARD_PAYMENT_EVENTS_V1,
-                                      "comment": "Synthetic raw loan application events with VietJet booking references",
-                                  },
-                              ],
-                          },
-                          "hdbank_payments_sandbox_silver": {
-                              "comment": "Conformed sandbox payment, customer, and loan entities",
-                              "tables": [
-                                  {
-                                      "name": "card_payment_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/card_payment_events_v1",
-                                      "columns": HDBANK_CARD_PAYMENT_EVENTS_V1,
-                                      "comment": "Synthetic conformed card payment events for sandbox development",
-                                  },
-                                  {
-                                      "name": "customers_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/customers_v1",
-                                      "columns": HDBANK_CUSTOMER_PROFILE_V1,
-                                      "comment": "Synthetic HDBank customer profiles shared with VietJet sandbox customers",
-                                  },
-                                  {
-                                      "name": "loan_applications_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_silver/loan_applications_v1",
-                                      "columns": HDBANK_LOAN_APPLICATIONS_V1,
-                                      "comment": "Conformed loan applications with VietJet booking references for BNPL workflows",
-                                  },
-                              ],
-                          },
-                          "hdbank_payments_sandbox_gold": {
-                              "comment": "Sandbox monetization and credit-risk gold marts",
-                              "tables": [
-                                  {
-                                      "name": "user_spend_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/user_spend_v1",
-                                      "columns": HDBANK_USER_SPEND_V1,
-                                      "comment": "Sandbox user spend mart by customer and account",
-                                  },
-                                  {
-                                      "name": "bnpl_exposure_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/bnpl_exposure_v1",
-                                      "columns": HDBANK_BNPL_EXPOSURE_V1,
-                                      "comment": "Daily BNPL outstanding exposure per customer for VietJet flight purchases",
-                                  },
-                                  {
-                                      "name": "credit_risk_features_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/hdbank_sandbox/hdbank_payments_sandbox_gold/credit_risk_features_v1",
-                                      "columns": HDBANK_CREDIT_RISK_FEATURES_V1,
-                                      "comment": "Cross-company credit risk feature snapshot combining banking and travel signals",
-                                  },
-                              ],
-                          },
-                      },
-                  },
-                  "vietjetair_sandbox": {
-                      "comment": "VietJet Air sandbox with synthetic booking, ancillary, and route performance data",
-                      "schemas": {
-                          "vietjetair_bookings_sandbox_bronze": {
-                              "comment": "Synthetic raw VietJet events for bookings and ancillary purchases",
-                              "tables": [
-                                  {
-                                      "name": "raw_booking_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_bronze/raw_booking_events_v1",
-                                      "columns": VIETJETAIR_RAW_BOOKING_EVENTS_V1,
-                                      "comment": "Synthetic raw booking events for sandbox development",
-                                  },
-                                  {
-                                      "name": "raw_ancillary_events_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_bronze/raw_ancillary_events_v1",
-                                      "columns": VIETJETAIR_RAW_BOOKING_EVENTS_V1,
-                                      "comment": "Synthetic raw ancillary purchase events (baggage, meals, seat upgrades)",
-                                  },
-                              ],
-                          },
-                          "vietjetair_bookings_sandbox_silver": {
-                              "comment": "Conformed sandbox booking, customer, flight, and ancillary entities",
-                              "tables": [
-                                  {
-                                      "name": "ticket_bookings_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/ticket_bookings_v1",
-                                      "columns": VIETJETAIR_TICKET_BOOKINGS_V1,
-                                      "comment": "Synthetic conformed ticket bookings for sandbox development",
-                                  },
-                                  {
-                                      "name": "customers_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/customers_v1",
-                                      "columns": VIETJETAIR_CUSTOMERS_V1,
-                                      "comment": "Synthetic VietJet customer dimension shared with HDBank sandbox customers",
-                                  },
-                                  {
-                                      "name": "flights_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/flights_v1",
-                                      "columns": VIETJETAIR_FLIGHTS_V1,
-                                      "comment": "Synthetic VietJet flight dimension with Vietnam domestic routes",
-                                  },
-                                  {
-                                      "name": "ancillary_purchases_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_silver/ancillary_purchases_v1",
-                                      "columns": VIETJETAIR_ANCILLARY_PURCHASES_V1,
-                                      "comment": "Conformed ancillary purchases with type and booking linkage",
-                                  },
-                              ],
-                          },
-                          "vietjetair_bookings_sandbox_gold": {
-                              "comment": "Sandbox revenue and operational performance gold marts",
-                              "tables": [
-                                  {
-                                      "name": "booking_revenue_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/booking_revenue_v1",
-                                      "columns": VIETJETAIR_BOOKING_REVENUE_V1,
-                                      "comment": "Sandbox booking revenue mart by route and business date",
-                                  },
-                                  {
-                                      "name": "customer_spend_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/customer_spend_v1",
-                                      "columns": VIETJETAIR_CUSTOMER_SPEND_V1,
-                                      "comment": "Sandbox customer spend mart across bookings and routes",
-                                  },
-                                  {
-                                      "name": "ancillary_revenue_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/ancillary_revenue_v1",
-                                      "columns": VIETJETAIR_ANCILLARY_REVENUE_V1,
-                                      "comment": "Gold ancillary revenue mart by type and route for margin analysis",
-                                  },
-                                  {
-                                      "name": "route_performance_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/vietjetair_sandbox/vietjetair_bookings_sandbox_gold/route_performance_v1",
-                                      "columns": VIETJETAIR_ROUTE_PERFORMANCE_V1,
-                                      "comment": "Gold route performance mart with load factor and on-time rate metrics",
-                                  },
-                              ],
-                          },
-                      },
-                  },
-                  "partnership_sandbox": {
-                      "comment": "Cross-company sandbox combining HDBank and VietJet data for BNPL, credit risk, and cross-sell analytics",
-                      "schemas": {
-                          "credit_risk": {
-                              "comment": "Cross-company credit risk and BNPL decision features",
-                              "tables": [
-                                  {
-                                      "name": "travel_credit_features_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/travel_credit_features_v1",
-                                      "columns": PARTNERSHIP_TRAVEL_CREDIT_FEATURES_V1,
-                                      "comment": "VietJet travel behavior features joined to HDBank customer IDs for credit scoring",
-                                  },
-                                  {
-                                      "name": "bnpl_decisions_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/bnpl_decisions_v1",
-                                      "columns": PARTNERSHIP_BNPL_DECISIONS_V1,
-                                      "comment": "HDBank BNPL approval decisions on VietJet flight bookings with credit line and terms",
-                                  },
-                                  {
-                                      "name": "loan_decision_log_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/credit_risk/loan_decision_log_v1",
-                                      "columns": PARTNERSHIP_LOAN_DECISION_LOG_V1,
-                                      "comment": "Loan decision audit log with model version, PD score, and approved credit limit",
-                                  },
-                              ],
-                          },
-                          "cross_promotion": {
-                              "comment": "Cross-sell prospect lists and campaign definitions",
-                              "tables": [
-                                  {
-                                      "name": "vietjet_to_hdbank_prospects_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/cross_promotion/vietjet_to_hdbank_prospects_v1",
-                                      "columns": PARTNERSHIP_VJ_TO_HD_PROSPECTS_V1,
-                                      "comment": "VietJet frequent flyers scored for HDBank travel card cross-sell campaigns",
-                                  },
-                                  {
-                                      "name": "hdbank_to_vietjet_prospects_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/cross_promotion/hdbank_to_vietjet_prospects_v1",
-                                      "columns": PARTNERSHIP_HD_TO_VJ_PROSPECTS_V1,
-                                      "comment": "HDBank cardholders with travel spend scored for VietJet loyalty membership upsell",
-                                  },
-                              ],
-                          },
-                          "analytics": {
-                              "comment": "Unified partnership analytics and P&L reporting",
-                              "tables": [
-                                  {
-                                      "name": "customer_360_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/analytics/customer_360_v1",
-                                      "columns": PARTNERSHIP_CUSTOMER_360_V1,
-                                      "comment": "Unified customer view combining HDBank card spend, VietJet flight spend, and BNPL exposure",
-                                  },
-                                  {
-                                      "name": "partnership_revenue_v1",
-                                      "data_source_format": "DELTA",
-                                      "url": "s3://unitycatalog/partnership_sandbox/analytics/partnership_revenue_v1",
-                                      "columns": PARTNERSHIP_REVENUE_V1,
-                                      "comment": "Monthly partnership P&L by revenue type (BNPL interest, card fee, referral, ancillary commission)",
-                                  },
-                              ],
-                          },
-                      },
-                  },
-              }
-
-              # ── Bootstrap ─────────────────────────────────────────────────────────
-
-              for catalog_name, catalog in CATALOGS.items():
-                  print(f"\nCreating catalog: {catalog_name}")
-                  post("catalogs", {"name": catalog_name, "comment": catalog["comment"]})
-
-                  for schema_name, schema in catalog["schemas"].items():
-                      print(f"\nCreating schema: {catalog_name}.{schema_name}")
-                      post("schemas", {
-                          "name": schema_name,
-                          "catalog_name": catalog_name,
-                          "comment": schema["comment"],
-                      })
-
-                      for t in schema["tables"]:
-                          print(f"  Registering table: {t['name']}")
-                          post("tables", {
-                              "catalog_name": catalog_name,
-                              "schema_name": schema_name,
-                              "table_type": "EXTERNAL",
-                              **t,
-                          })
-
-              print("\nBootstrap complete.")
-              for catalog_name, catalog in CATALOGS.items():
-                  for schema_name in catalog["schemas"]:
-                      with urllib.request.urlopen(
-                          urllib.request.Request(
-                              f"{UC}/tables?catalog_name={catalog_name}&schema_name={schema_name}",
-                              headers=_headers(),
-                          )
-                      ) as r:
-                          data = json.loads(r.read())
-                          names = [t.get("name") for t in data.get("tables", [])]
-                          print(f"  {catalog_name}.{schema_name}: {names}")
-              PYEOF
-              UC_TOKEN=$(cat /token/uc-token) python3 /tmp/bootstrap.py
-              /bootstrap/init.sh
+            - /scripts/init.sh
+          env:
+            - name: UC_URL
+              value: http://unitycatalog-svc:8080
           volumeMounts:
+            - name: scripts
+              mountPath: /scripts
             - name: token
               mountPath: /token
-            - name: bootstrap-script
-              mountPath: /bootstrap/init.sh
-              subPath: init.sh
-              readOnly: true
       volumes:
-        - name: token
-          emptyDir: {}
-        - name: bootstrap-script
+        - name: scripts
           configMap:
             name: unitycatalog-bootstrap-script
             defaultMode: 0755
+        - name: token
+          secret:
+            secretName: unitycatalog-auth
+            items:
+              - key: UC_INTERNAL_SERVICE_TOKEN
+                path: uc-token

@@ -4,15 +4,31 @@ bypass_token = "test"
 [database]
 url = "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
 
+[dagster]
+base_url = "http://localhost:8088"
+
 [kafka]
 bootstrap_servers = "127.0.0.1:19092"
 
 [unity_catalog]
 base_url = "http://localhost:8082/api/2.1/unity-catalog"
-admin_token = ""
-admin_token_file = "../uc/config/token.txt"
+admin_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6IjA5MWJlZjFhMjc0ODY0MDc1MTkwYjZkMjFkNjI0YTEzOWQ0NmFjMTAifQ.eyJzdWIiOiJhZG1pbiIsImlzcyI6ImludGVybmFsIiwiaWF0IjoxNzc5MDkzOTM4LCJqdGkiOiI2NWFhMTRkZC00ZDNlLTQxOTEtYjg4OC01YTE5Zjg0NGE4ZTAiLCJ0eXBlIjoiU0VSVklDRSJ9.C6IqFZMcL32JjhxgFWhzR9DhOewwTt7WOjol1BypZmRYlgp6jAjz9PWdrRmTidlTrp_90co9n9zP7UAwuu_fKlSiJ43_PjjnhuhLGrKR1jHOnC4VeqmDNjQR1pjcYP8gnahOW8Y5rP-sA3oBW33NnPnBhbYRg0eh_1Lv9gpC1XMPggu7rxswCySsC6V_4-wyOMn5iXImTDjlL0hghqHsdOqI69dtcWwgf6uu1t-bFTYjxhT15rp2CvqiSpO78sSuQUDUlbdEOvLjN4PaMC5sKs-WsfqF8HgbQGh6cFlrOLbWpHzgHa3K54PKG1qEmY14WWCZ7nrcfGVixnW-wMGiUQ"
+#admin_token_file = "../uc/config/token.txt"
 
 [keycloak]
 url = "http://keycloak-svc.keycloak.svc.cluster.local:8080"
 realm = "sovico"
+issuers = [
+  "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico",
+  "http://127.0.0.1:8083/realms/sovico",
+  "http://localhost:8083/realms/sovico",
+]
 audiences = []
+
+[duckdb_server]
+base_url = "http://localhost:8090"
+
+[openai]
+api_key = ""
+model = "gpt-5.4-nano"
+base_url = "https://api.openai.com/v1"

@@ -22,4 +22,7 @@ dependencies = [
     "ray>=2.55.1",
     "zstandard>=0.25.0",
     "duckdb>=1.5.2",
+    "deltalake>=1.5.1",
+    "fastapi>=0.136.1",
+    "uvicorn>=0.47.0",
 ]

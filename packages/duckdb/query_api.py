@@ -43,7 +43,6 @@ def main() -> None:
     debug_log(
         "Starting DuckDB query API",
         uc_endpoint=UC_ENDPOINT,
-        uc_token=UC_TOKEN,
         query=SQL,
     )
 
@@ -56,8 +55,6 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        debug_log(f"UC_TOKEN: {UC_TOKEN}")
-        
         con = duckdb.connect()
         debug_log("Connected to DuckDB")
 
@@ -88,14 +85,17 @@ def main() -> None:
             AWS_REGION '{sql_quote(UC_AWS_REGION)}'
         )
         """
-        debug_log("Creating Unity Catalog secret", sql=create_secret_sql)
+        debug_log(
+            "Creating Unity Catalog secret",
+            endpoint=UC_ENDPOINT,
+            aws_region=UC_AWS_REGION,
+        )
         con.execute(create_secret_sql)
 
         hdbank_attach_sql = """
         ATTACH 'hdbank' AS hdbank (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'hdbank_payments_prod_bronze'
+            READ_ONLY
         )
         """
         debug_log("Attaching Unity Catalog catalog", catalog="hdbank", sql=hdbank_attach_sql)
@@ -104,8 +104,7 @@ def main() -> None:
         vietjetair_attach_sql = """
         ATTACH 'vietjetair' AS vietjetair (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'vietjetair_bookings_prod_bronze'
+            READ_ONLY
         )
         """
         debug_log(
@@ -115,35 +114,14 @@ def main() -> None:
         )
         con.execute(vietjetair_attach_sql)
 
-        hdbank_sandbox_attach_sql = """
-        ATTACH 'hdbank_sandbox' AS hdbank_sandbox (
+        partnership_attach_sql = """
+        ATTACH 'partnership' AS partnership (
             TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'hdbank_payments_sandbox_bronze'
+            READ_ONLY
         )
         """
-        debug_log("Attaching Unity Catalog catalog", catalog="hdbank_sandbox", sql=hdbank_sandbox_attach_sql)
-        con.execute(hdbank_sandbox_attach_sql)
-
-        vietjetair_sandbox_attach_sql = """
-        ATTACH 'vietjetair_sandbox' AS vietjetair_sandbox (
-            TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'vietjetair_bookings_sandbox_bronze'
-        )
-        """
-        debug_log("Attaching Unity Catalog catalog", catalog="vietjetair_sandbox", sql=vietjetair_sandbox_attach_sql)
-        con.execute(vietjetair_sandbox_attach_sql)
-
-        partnership_sandbox_attach_sql = """
-        ATTACH 'partnership_sandbox' AS partnership_sandbox (
-            TYPE unity_catalog,
-            READ_ONLY,
-            DEFAULT_SCHEMA 'credit_risk'
-        )
-        """
-        debug_log("Attaching Unity Catalog catalog", catalog="partnership_sandbox", sql=partnership_sandbox_attach_sql)
-        con.execute(partnership_sandbox_attach_sql)
+        debug_log("Attaching Unity Catalog catalog", catalog="partnership", sql=partnership_attach_sql)
+        con.execute(partnership_attach_sql)
 
         debug_log("Executing query", sql=SQL)
         result = con.execute(SQL).fetchdf()

@@ -41,17 +41,19 @@ struct OidcDiscovery {
 /// refreshed whenever a `kid` is not found (handles key rotation).
 pub struct JwtValidator {
     http: reqwest::Client,
-    pub issuer: String,
+    pub discovery_issuer: String,
+    pub allowed_issuers: Vec<String>,
     pub audiences: Vec<String>,
     jwks_uri: Arc<RwLock<Option<String>>>,
     jwks_cache: Arc<RwLock<Option<JwkSet>>>,
 }
 
 impl JwtValidator {
-    pub fn new(issuer: String, audiences: Vec<String>) -> Self {
+    pub fn new(discovery_issuer: String, allowed_issuers: Vec<String>, audiences: Vec<String>) -> Self {
         Self {
             http: reqwest::Client::new(),
-            issuer,
+            discovery_issuer,
+            allowed_issuers,
             audiences,
             jwks_uri: Arc::new(RwLock::new(None)),
             jwks_cache: Arc::new(RwLock::new(None)),
@@ -66,7 +68,7 @@ impl JwtValidator {
         }
         let discovery_url = format!(
             "{}/.well-known/openid-configuration",
-            self.issuer.trim_end_matches('/')
+            self.discovery_issuer.trim_end_matches('/')
         );
         let doc: OidcDiscovery = self
             .http
@@ -164,7 +166,12 @@ impl JwtValidator {
             .unwrap_or(Algorithm::RS256);
 
         let mut validation = Validation::new(alg);
-        validation.set_issuer(&[&self.issuer]);
+        let issuers = self
+            .allowed_issuers
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        validation.set_issuer(&issuers);
         if !self.audiences.is_empty() {
             validation.set_audience(&self.audiences);
         }

@@ -1,17 +1,29 @@
 import asyncio
 import json as _json
 import os
-import sys
 import threading
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
-import duckdb
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+CADDY_ROOT_CERT = Path.home() / "Library/Application Support/Caddy/pki/authorities/local/root.crt"
+CLUSTER_PROXY_CERT = Path(
+    os.getenv("DUCKDB_CA_CERT_PATH", "/etc/rustfs-s3-proxy/tls.crt")
+)
+
+if CADDY_ROOT_CERT.exists():
+    cert_path = str(CADDY_ROOT_CERT)
+    os.environ.setdefault("SSL_CERT_FILE", cert_path)
+    os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
+
+import duckdb
 
 UC_ENDPOINT = os.getenv("DUCKDB_UC_ENDPOINT", "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080")
 UC_AWS_REGION = os.getenv("DUCKDB_UC_AWS_REGION", "us-east-1")
@@ -22,18 +34,18 @@ S3_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 PORT = int(os.getenv("PORT", "8080"))
 IDLE_TIMEOUT_SECS = int(os.getenv("IDLE_TIMEOUT_SECS", "300"))
 
+# Keep this aligned with infra/k8s/unitycatalog/bootstrap-job.yaml.
 CATALOGS = [
-    ("hdbank", "hdbank_payments_prod_bronze"),
-    ("vietjetair", "vietjetair_bookings_prod_bronze"),
-    ("hdbank_sandbox", "hdbank_payments_sandbox_bronze"),
-    ("vietjetair_sandbox", "vietjetair_bookings_sandbox_bronze"),
-    ("partnership_sandbox", "credit_risk"),
+    "hdbank",
+    "vietjetair",
+    "partnership",
 ]
 
 con: duckdb.DuckDBPyConnection | None = None
 lock = threading.Lock()
 catalogs_attached = False
 last_request_time = time.time()
+current_uc_token: str | None = None
 
 
 def sql_quote(s: str) -> str:
@@ -60,14 +72,24 @@ def init_duckdb() -> duckdb.DuckDBPyConnection:
 
 
 def attach_catalogs() -> None:
-    for name, schema in CATALOGS:
+    for name in CATALOGS:
         con.execute(f"""
             ATTACH IF NOT EXISTS '{name}' AS {name} (
                 TYPE unity_catalog,
-                READ_ONLY,
-                DEFAULT_SCHEMA '{schema}'
+                READ_ONLY
             )
         """)
+
+
+def create_uc_secret(token: str) -> None:
+    con.execute(f"""
+        CREATE SECRET(
+            TYPE unity_catalog,
+            TOKEN '{sql_quote(token)}',
+            ENDPOINT '{sql_quote(UC_ENDPOINT)}',
+            AWS_REGION '{sql_quote(UC_AWS_REGION)}'
+        )
+    """)
 
 
 async def idle_watcher() -> None:
@@ -102,20 +124,26 @@ def health():
 
 @app.post("/query")
 def query(req: QueryRequest):
-    global last_request_time, catalogs_attached
+    global con, last_request_time, catalogs_attached, current_uc_token
     last_request_time = time.time()
 
     with lock:
         try:
-            if req.uc_token:
-                con.execute(f"""
-                    CREATE OR REPLACE SECRET __uc__ (
-                        TYPE unity_catalog,
-                        TOKEN '{sql_quote(req.uc_token)}',
-                        ENDPOINT '{sql_quote(UC_ENDPOINT)}',
-                        AWS_REGION '{sql_quote(UC_AWS_REGION)}'
-                    )
-                """)
+            if not req.uc_token and not current_uc_token:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "uc_token is required for Unity Catalog queries"},
+                )
+
+            if req.uc_token and req.uc_token != current_uc_token:
+                try:
+                    con.close()
+                except Exception:
+                    pass
+                con = init_duckdb()
+                catalogs_attached = False
+                create_uc_secret(req.uc_token)
+                current_uc_token = req.uc_token
 
             if not catalogs_attached:
                 attach_catalogs()

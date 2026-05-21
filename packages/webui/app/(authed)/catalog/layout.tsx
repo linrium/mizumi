@@ -51,8 +51,9 @@ export default function CatalogLayout({
   const activeCat = parts[1]
   const resourceParts = parts.slice(2)
   const activeSch =
-    resourceParts[0] && resourceParts[0] !== "permissions"
-      && resourceParts[0] !== "request-permissions"
+    resourceParts[0] &&
+    resourceParts[0] !== "permissions" &&
+    resourceParts[0] !== "request-permissions"
       ? resourceParts[0]
       : undefined
   const activeTbl =

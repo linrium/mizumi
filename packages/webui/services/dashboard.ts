@@ -8,7 +8,7 @@ import { MODELS, type ModelId } from "@/services/ai-models"
 import { getServerSession } from "@/lib/auth"
 import { fetchSchema } from "@/services/unity-catalog"
 
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:3000"
+const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
 
 const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",
@@ -18,14 +18,20 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-async function ensureSession(sessionId: string | null, token?: string): Promise<string> {
+async function ensureSession(
+  sessionId: string | null,
+  token?: string,
+): Promise<string> {
   if (sessionId) {
     return sessionId
   }
 
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API_BASE}/api/sessions`, { method: "POST", headers })
+  const res = await fetch(`${API_BASE}/api/sessions`, {
+    method: "POST",
+    headers,
+  })
   if (!res.ok) {
     throw new Error(`Failed to create session: HTTP ${res.status}`)
   }
@@ -40,7 +46,7 @@ async function runSql(sessionId: string, sql: string, token?: string) {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ sql }),
+    body: JSON.stringify({ sql, idToken: token }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -50,8 +56,8 @@ async function runSql(sessionId: string, sql: string, token?: string) {
 }
 
 function resolveModel(modelId: ModelId): LanguageModel {
-  if (modelId === "gpt-5.4-mini") {
-    return openai("gpt-5.4-mini")
+  if (modelId === "gpt-5.4-nano") {
+    return openai("gpt-5.4-nano")
   }
   if (modelId === "mlx-community/Qwen3.5-9B-MLX-4bit") {
     return omlx("mlx-community/Qwen3.5-9B-MLX-4bit")
@@ -92,7 +98,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     lastCreatedIds: string[]
   }
 
-  const model = resolveModel(modelId ?? "gpt-5.4-mini")
+  const model = resolveModel(modelId ?? "gpt-5.4-nano")
   const resolvedSessionId = await ensureSession(sessionId, idToken)
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 
@@ -271,7 +277,10 @@ ${contextHints ? `## Context:\n${contextHints}` : ""}
 - After tool calls, write 1–2 sentences summarizing what changed.
 
 ## SQL rules:
-- Always use fully qualified names: <catalog>.<schema>.<table>
+- ONLY use catalogs, schemas, and tables from the "Available tables" list below.
+- NEVER invent or guess catalog, schema, or table names — if it is not in the list, do not use it.
+- Always use fully qualified 3-part names: <catalog>.<schema>.<table>
+- Valid catalogs are: hdbank, vietjetair, partnership
 - For time-series: ORDER BY the date/time column ascending
 
 ## Chart types:

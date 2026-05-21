@@ -1,6 +1,10 @@
 "use client"
 
-import {DatabaseIcon, Key01Icon, SecurityIcon} from "@hugeicons/core-free-icons"
+import {
+  DatabaseIcon,
+  Key01Icon,
+  SecurityIcon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
