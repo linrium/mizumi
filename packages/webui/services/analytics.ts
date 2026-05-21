@@ -1,12 +1,12 @@
 import { deepseek } from "@ai-sdk/deepseek"
 import { createOpenAI } from "@ai-sdk/openai"
 import type { LanguageModel } from "ai"
-import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
+import { convertToModelMessages, generateObject, stepCountIs, streamText, tool } from "ai"
 import type { NextRequest } from "next/server"
 import { z } from "zod"
 import { MODELS, type ModelId } from "@/services/ai-models"
 import { getServerSession } from "@/lib/auth"
-import { fetchSchema, fetchMatchingSchema } from "@/services/unity-catalog"
+import { fetchSchema, FALLBACK_SCHEMA } from "@/services/unity-catalog"
 
 const API_BASE =
   process.env.API_BASE_URL ??
@@ -154,7 +154,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         "  - 'what data does X have' / 'does X have Y'",
         "  - 'can I access X' / 'get me access to X'",
         "  - ANY mention of a catalog or company name (hdbank, vietjet, partnership) NOT in 'Available tables'",
-        "Returns full table schemas (columns + types) so you can describe what data exists and what it contains.",
+        "Returns structured catalog results with accessibility status and suggested actions.",
         "For `search`: extract the main subject keywords from the user's message (e.g. 'I want to access hdbank customers' → search='hdbank customer'; 'interesting data in hdbank' → search='hdbank').",
       ].join(" "),
       inputSchema: z.object({
@@ -166,9 +166,78 @@ export async function handleAnalyticsChat(req: NextRequest) {
           ),
       }),
       execute: async ({ search }) => {
-        console.log("Fetching schema with search:", search)
-        const schema = fetchMatchingSchema(search)
-        return { schema, search: search ?? null }
+        const catalogTableSchema = z.object({
+          tables: z.array(
+            z.object({
+              fqn: z.string().describe("Fully qualified table name: catalog.schema.table"),
+              catalog: z.string(),
+              schemaName: z.string(),
+              tableName: z.string(),
+              accessible: z
+                .boolean()
+                .describe("True if this table appears in the user's accessible schema"),
+              summary: z.string().describe("One sentence describing what data this table contains"),
+              suggestedSql: z
+                .string()
+                .nullable()
+                .describe("A simple SELECT query the user can run, or null for inaccessible tables"),
+              requestResource: z
+                .string()
+                .describe("Fully qualified resource path to use in an access request"),
+              requestScope: z.enum(["catalog", "schema", "table"]),
+            }),
+          ),
+          overview: z
+            .string()
+            .describe(
+              "1-2 sentences summarizing what was found and what actions the user can take",
+            ),
+        })
+
+        const [{ object }, existingRequests] = await Promise.all([
+          generateObject({
+            model,
+            schema: catalogTableSchema,
+            prompt: [
+              "You are a data catalog assistant for the Mizumi lakehouse platform.",
+              "",
+              "## Full Platform Catalog (ALL available tables on the platform):",
+              FALLBACK_SCHEMA,
+              "",
+              "## User's Accessible Tables (tables this user can query right now):",
+              schema,
+              "",
+              `## User's search query: "${search ?? "(show all tables)"}"`,
+              "",
+              "Instructions:",
+              "1. Find all tables in the Full Platform Catalog that match the search query (catalog name, schema name, table name, or column names).",
+              "2. For each matching table, check whether it appears in the User's Accessible Tables — set accessible=true only if it does.",
+              "3. For accessible tables, write a practical SELECT query with meaningful columns and LIMIT 20.",
+              "4. Set requestResource to the fully qualified table name (e.g. hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1).",
+              "5. Set requestScope to 'table' unless the user's search matches an entire schema or catalog.",
+              "6. Write an overview describing which tables were found and what next steps the user has (query or request access).",
+            ].join("\n"),
+          }),
+          fetchMyPermissionRequests(undefined, idToken).catch(() => [] as Awaited<ReturnType<typeof fetchMyPermissionRequests>>),
+        ])
+
+        // Index requests by resource for O(1) lookup
+        const requestByResource = new Map(
+          existingRequests.map((r) => [r.resource, r]),
+        )
+
+        const tables = object.tables.map((table) => {
+          if (table.accessible) return { ...table, existingRequest: null }
+          const req = requestByResource.get(table.requestResource) ?? null
+          return {
+            ...table,
+            existingRequest: req
+              ? { id: req.id, code: req.code, status: req.status }
+              : null,
+          }
+        })
+
+        return { search: search ?? null, tables, overview: object.overview }
       },
     }),
     prepareAccessRequest: tool({

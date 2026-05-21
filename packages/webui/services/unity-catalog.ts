@@ -14,7 +14,7 @@ type TableDetail = {
 
 // Fallback schema derived from infra/k8s/unitycatalog/bootstrap-job.yaml.
 // Used when Unity Catalog is unreachable so the model always has accurate context.
-const FALLBACK_SCHEMA = `\
+export const FALLBACK_SCHEMA = `\
 TABLE hdbank.hdbank_partnership_prod_bronze.partner_events_v1:
   timestamp timestamp,
   key string,
@@ -426,6 +426,7 @@ export async function fetchSchema(token?: string): Promise<string> {
     "/catalogs?max_results=100",
     token,
   )
+  debugger;
   const catalogs = (catalogsData?.catalogs ?? []).filter(
     (c) => c.name !== "unity",
   )
