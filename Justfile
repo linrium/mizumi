@@ -77,9 +77,9 @@ doctor:
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
     docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy controlplane-deploy webui-deploy
+deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy controlplane-deploy webui-deploy lancedb-deploy lancedb-embed-schema
 
-destroy: webui-destroy controlplane-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
+destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
 
 forward:
     #!/usr/bin/env bash
