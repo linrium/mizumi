@@ -55,13 +55,20 @@ spec:
                 -H 'Content-Type: application/json' \
                 -d '{
                   "rows": [
-                    {"id": 1, "text": "apple",      "vector": [0.1, 0.2, 0.3, 0.4]},
-                    {"id": 2, "text": "banana",     "vector": [0.2, 0.3, 0.4, 0.5]},
-                    {"id": 3, "text": "cherry",     "vector": [0.9, 0.8, 0.7, 0.6]},
-                    {"id": 4, "text": "date",       "vector": [0.4, 0.3, 0.2, 0.1]},
-                    {"id": 5, "text": "elderberry", "vector": [0.5, 0.6, 0.7, 0.8]}
+                    {"id": 1, "text": "apple is a red fruit",      "vector": [0.1, 0.2, 0.3, 0.4]},
+                    {"id": 2, "text": "banana is a yellow fruit",  "vector": [0.2, 0.3, 0.4, 0.5]},
+                    {"id": 3, "text": "cherry is a small red fruit","vector": [0.9, 0.8, 0.7, 0.6]},
+                    {"id": 4, "text": "date is a sweet brown fruit","vector": [0.4, 0.3, 0.2, 0.1]},
+                    {"id": 5, "text": "elderberry is a dark fruit", "vector": [0.5, 0.6, 0.7, 0.8]}
                   ]
                 }'
+              echo
+
+              # Create BM25 full-text search index on 'text' field
+              echo "--- creating FTS index ---"
+              curl -fsS -X POST "$base/tables/demo/index/fts" \
+                -H 'Content-Type: application/json' \
+                -d '{"field": "text", "replace": true}'
               echo
 
               # List tables
@@ -69,11 +76,25 @@ spec:
               curl -fsS "$base/tables"
               echo
 
-              # Vector similarity search
-              echo "--- searching nearest to [0.1, 0.2, 0.3, 0.4] ---"
+              # Vector search
+              echo "--- vector search: nearest to [0.1, 0.2, 0.3, 0.4] ---"
               curl -fsS -X POST "$base/tables/demo/search" \
                 -H 'Content-Type: application/json' \
-                -d '{"vector": [0.1, 0.2, 0.3, 0.4], "limit": 3, "metric": "cosine"}'
+                -d '{"query_type": "vector", "vector": [0.1, 0.2, 0.3, 0.4], "limit": 3, "metric": "cosine"}'
+              echo
+
+              # FTS search
+              echo "--- FTS search: 'red fruit' ---"
+              curl -fsS -X POST "$base/tables/demo/search" \
+                -H 'Content-Type: application/json' \
+                -d '{"query_type": "fts", "text": "red fruit", "limit": 3}'
+              echo
+
+              # Hybrid search (vector + BM25, merged with RRF)
+              echo "--- hybrid search: vector + 'red fruit' ---"
+              curl -fsS -X POST "$base/tables/demo/search" \
+                -H 'Content-Type: application/json' \
+                -d '{"query_type": "hybrid", "vector": [0.1, 0.2, 0.3, 0.4], "text": "red fruit", "limit": 3}'
               echo
 
               echo "lancedb bootstrap complete"

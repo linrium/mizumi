@@ -6,6 +6,7 @@ import boto3
 import pyarrow as pa
 import uvicorn
 import lancedb
+from lancedb.index import FTS
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -66,14 +67,49 @@ class CreateTableRequest(BaseModel):
     mode: str = "create"
 
 
+class CreateFtsIndexRequest(BaseModel):
+    field: str = "text"
+    replace: bool = True
+
+
 class InsertRequest(BaseModel):
     rows: list[dict[str, Any]]
 
 
 class SearchRequest(BaseModel):
-    vector: list[float]
+    query_type: str = "vector"  # "vector" | "fts" | "hybrid"
+    vector: list[float] | None = None
+    text: str | None = None
     limit: int = 10
     metric: str = "cosine"
+    rrf_k: int = 60  # Reciprocal Rank Fusion constant
+
+
+def arrow_to_rows(tbl: pa.Table) -> list[dict]:
+    pydict = tbl.to_pydict()
+    return [
+        {k: (v[i].tolist() if hasattr(v[i], "tolist") else v[i]) for k, v in pydict.items()}
+        for i in range(len(tbl))
+    ]
+
+
+def rrf_merge(vec_rows: list[dict], fts_rows: list[dict], k: int, limit: int) -> list[dict]:
+    scores: dict[Any, float] = {}
+    data: dict[Any, dict] = {}
+
+    for rank, row in enumerate(vec_rows):
+        rid = row["id"]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
+        data[rid] = row
+
+    for rank, row in enumerate(fts_rows):
+        rid = row["id"]
+        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
+        if rid not in data:
+            data[rid] = row
+
+    top = sorted(scores, key=scores.__getitem__, reverse=True)[:limit]
+    return [{**data[rid], "_rrf_score": scores[rid]} for rid in top]
 
 
 @app.get("/health")
@@ -98,6 +134,16 @@ async def create_table(name: str, req: CreateTableRequest):
     ])
     await db.create_table(name, schema=schema, mode=req.mode)
     return {"table": name, "dimension": req.dimension}
+
+
+@app.post("/tables/{name}/index/fts")
+async def create_fts_index(name: str, req: CreateFtsIndexRequest):
+    try:
+        table = await db.open_table(name)
+    except Exception:
+        raise HTTPException(404, f"table '{name}' not found")
+    await table.create_index(req.field, config=FTS(with_position=True), replace=req.replace)
+    return {"table": name, "index": "fts", "field": req.field}
 
 
 @app.post("/tables/{name}/insert")
@@ -136,18 +182,34 @@ async def search(name: str, req: SearchRequest):
     except Exception:
         raise HTTPException(404, f"table '{name}' not found")
 
-    query = await table.search(req.vector, vector_column_name="vector")
-    arrow_result = await query.distance_type(req.metric).limit(req.limit).to_arrow()
-    pydict = arrow_result.to_pydict()
-    n = len(arrow_result)
-    rows = [
-        {
-            k: (v[i].tolist() if hasattr(v[i], "tolist") else v[i])
-            for k, v in pydict.items()
-        }
-        for i in range(n)
-    ]
-    return {"results": rows, "count": n}
+    if req.query_type == "vector":
+        if req.vector is None:
+            raise HTTPException(400, "vector is required for query_type='vector'")
+        q = await table.search(req.vector, vector_column_name="vector")
+        result = await q.distance_type(req.metric).limit(req.limit).to_arrow()
+        rows = arrow_to_rows(result)
+
+    elif req.query_type == "fts":
+        if req.text is None:
+            raise HTTPException(400, "text is required for query_type='fts'")
+        q = await table.search(req.text, query_type="fts")
+        result = await q.limit(req.limit).to_arrow()
+        rows = arrow_to_rows(result)
+
+    elif req.query_type == "hybrid":
+        if req.vector is None or req.text is None:
+            raise HTTPException(400, "both vector and text are required for query_type='hybrid'")
+        fetch = req.limit * 2  # oversample before RRF merge
+        vec_q = await table.search(req.vector, vector_column_name="vector")
+        vec_rows = arrow_to_rows(await vec_q.distance_type(req.metric).limit(fetch).to_arrow())
+        fts_q = await table.search(req.text, query_type="fts")
+        fts_rows = arrow_to_rows(await fts_q.limit(fetch).to_arrow())
+        rows = rrf_merge(vec_rows, fts_rows, req.rrf_k, req.limit)
+
+    else:
+        raise HTTPException(400, f"unknown query_type '{req.query_type}', must be 'vector', 'fts', or 'hybrid'")
+
+    return {"results": rows, "count": len(rows)}
 
 
 @app.delete("/tables/{name}")
