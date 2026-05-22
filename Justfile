@@ -26,6 +26,12 @@ rustfs_release := "rustfs"
 rustfs_chart := "rustfs/rustfs"
 rustfs_chart_version := "0.1.0"
 rustfs_values := "infra/k8s/rustfs/helm/values.yaml"
+rustfs_endpoint := "http://host.docker.internal:9000"
+rustfs_access_key := "rustfsadmin"
+rustfs_secret_key := "rustfsadmin"
+rustfs_train_dir := "data/train"
+rustfs_train_bucket := "datasets"
+rustfs_train_prefix := "train"
 
 keycloak_namespace := "keycloak"
 keycloak_manifests := "infra/k8s/keycloak"
@@ -41,6 +47,7 @@ spark_image := "mizumi-spark-rustfs:4.1.3"
 duckdb_image := "mizumi-duckdb:1.1.6"
 duckdb_server_image := "mizumi-duckdb-server:0.1.0"
 daft_image := "mizumi-daft:0.7.10"
+daft_baggage_classifier_image := "mizumi-daft-baggage-classifier:0.1.0"
 
 daft_namespace := "daft"
 daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
@@ -144,6 +151,31 @@ rustfs-deploy: rustfs-helm-repo
       --values {{ rustfs_values }}
     kubectl rollout status deployment/{{ rustfs_release }} -n {{ rustfs_namespace }} --timeout=180s
     kubectl get pods,svc,pvc -n {{ rustfs_namespace }}
+
+rustfs-train-upload bucket=rustfs_train_bucket prefix=rustfs_train_prefix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d {{ rustfs_train_dir }} ]]; then
+        echo "missing local directory: {{ rustfs_train_dir }}" >&2
+        exit 1
+    fi
+    kubectl port-forward -n {{ rustfs_namespace }} svc/rustfs-svc 9000:9000 >/tmp/rustfs-train-upload.port-forward.log 2>&1 &
+    port_forward_pid=$!
+    cleanup() {
+        kill "$port_forward_pid" 2>/dev/null || true
+        wait "$port_forward_pid" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+    sleep 3
+    echo "Uploading {{ rustfs_train_dir }} to s3://{{ bucket }}/{{ prefix }}/"
+    docker run --rm \
+      --entrypoint /bin/sh \
+      -v "$PWD/{{ rustfs_train_dir }}:/upload:ro" \
+      minio/mc:latest -ec '\
+        mc alias set rustfs {{ rustfs_endpoint }} {{ rustfs_access_key }} {{ rustfs_secret_key }} && \
+        mc mb --ignore-existing rustfs/{{ bucket }} && \
+        mc mirror --overwrite /upload rustfs/{{ bucket }}/{{ prefix }}'
+    echo "Upload complete"
 
 rustfs-s3-proxy-deploy:
     kubectl create namespace {{ rustfs_namespace }} 2>/dev/null || true
@@ -300,6 +332,20 @@ duckdb-test-job:
 
 daft-image-build:
     docker build -t {{ daft_image }} -f packages/daft/Dockerfile .
+
+daft-baggage-classifier-image-build:
+    docker build -t {{ daft_baggage_classifier_image }} -f packages/daft/Dockerfile.baggage-classifier .
+
+daft-baggage-classify-local: daft-baggage-classifier-image-build
+    docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
+      -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
+      -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
+      -e SOURCE_BUCKET={{ rustfs_train_bucket }} \
+      -e SOURCE_PREFIX={{ rustfs_train_prefix }} \
+      -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1 \
+      {{ daft_baggage_classifier_image }}
 
 spark-destroy:
     helm uninstall {{ spark_operator_release }} --namespace {{ spark_operator_namespace }} || true

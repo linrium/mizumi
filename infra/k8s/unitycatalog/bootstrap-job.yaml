@@ -320,6 +320,25 @@ data:
         ]
     )
 
+    VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1 = build_cols(
+        [
+            ("image_uri", "STRING", "string", "string"),
+            ("bucket", "STRING", "string", "string"),
+            ("object_key", "STRING", "string", "string"),
+            ("file_name", "STRING", "string", "string"),
+            ("etag", "STRING", "string", "string"),
+            ("size_bytes", "INT", "int", "integer"),
+            ("last_modified", "TIMESTAMP", "timestamp", "timestamp"),
+            ("damage_label", "STRING", "string", "string"),
+            ("damage_score", "DOUBLE", "double", "double"),
+            ("label_rankings_json", "STRING", "string", "string"),
+            ("model_id", "STRING", "string", "string"),
+            ("classification_status", "STRING", "string", "string"),
+            ("error_message", "STRING", "string", "string"),
+            ("classified_at", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
     VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1 = build_cols(
         [
             ("customer_id", "STRING", "string", "string"),
@@ -461,6 +480,12 @@ data:
                             "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1",
                             "columns": VIETJETAIR_BOOKING_FEATURES_V1,
                         },
+                        {
+                            "name": "baggage_damage_classifications_v1",
+                            "comment": "Local Daft image classifications for damaged baggage photos uploaded to datasets/train/.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1",
+                            "columns": VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1,
+                        },
                     ],
                 },
                 "vietjetair_partnership_prod_gold": {
@@ -565,6 +590,7 @@ data:
         "vietjetair.vietjetair_partnership_prod_bronze.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_silver.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_silver.baggage_damage_classifications_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "partnership.co_brand_gold.co_brand_offer_audience_v1": {linh: ["OWNER", "SELECT"]},
         "partnership.co_brand_gold.campaign_summary_v1":        {linh: ["OWNER", "SELECT"]},
