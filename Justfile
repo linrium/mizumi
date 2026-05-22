@@ -96,7 +96,7 @@ forward:
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
-    kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:4000 &
+    kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
