@@ -15,5 +15,5 @@ packages/uc-java
 packages/uc-java/
 packages/duckdb_uc/
 
-data/train/
+data/
 .DS_Store
