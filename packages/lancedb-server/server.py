@@ -7,7 +7,6 @@ import pyarrow as pa
 import uvicorn
 import lancedb
 from lancedb.index import FTS
-from lancedb.rerankers import RRFReranker
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -83,7 +82,7 @@ class SearchRequest(BaseModel):
     text: str | None = None
     limit: int = 10
     metric: str = "cosine"
-    rerank: bool = False
+    rerank: bool = True
     rrf_k: int = 60  # RRF constant — lower values amplify rank differences
     return_score: str = "relevance"  # "relevance" | "all"
 
@@ -184,25 +183,38 @@ async def search(name: str, req: SearchRequest):
         if req.vector is None or req.text is None:
             raise HTTPException(400, "both vector and text are required for query_type='hybrid'")
 
-        fetch = req.limit * 2  # oversample so reranker has enough candidates
+        fetch = req.limit * 2  # oversample so merger has enough candidates
         vec_q = await table.search(req.vector, vector_column_name="vector")
-        vec_result = await vec_q.distance_type(req.metric).limit(fetch).with_row_id(True).to_arrow()
+        vec_result = await vec_q.distance_type(req.metric).limit(fetch).to_arrow()
 
         fts_q = await table.search(req.text, query_type="fts")
-        fts_result = await fts_q.limit(fetch).with_row_id(True).to_arrow()
+        fts_result = await fts_q.limit(fetch).to_arrow()
+
+        vec_rows = arrow_to_rows(vec_result)
+        fts_rows = arrow_to_rows(fts_result)
 
         if req.rerank:
-            reranker = RRFReranker(K=req.rrf_k, return_score=req.return_score)
-            merged = reranker.rerank_multivector([vec_result, fts_result])
-            rows = arrow_to_rows(merged.slice(0, req.limit))
+            # Manual RRF: score by reciprocal rank from each retriever, merge by id
+            def rrf(rank: int) -> float:
+                return 1.0 / (req.rrf_k + rank)
+
+            by_id: dict[int, dict] = {}
+            scores: dict[int, float] = {}
+            for rank, row in enumerate(vec_rows):
+                rid = row["id"]
+                by_id[rid] = row
+                scores[rid] = scores.get(rid, 0.0) + rrf(rank)
+            for rank, row in enumerate(fts_rows):
+                rid = row["id"]
+                by_id[rid] = row
+                scores[rid] = scores.get(rid, 0.0) + rrf(rank)
+            rows = [by_id[rid] for rid, _ in sorted(scores.items(), key=lambda x: -x[1])][:req.limit]
         else:
-            # Interleave vec + fts results, deduplicate by row id, take limit
+            # Interleave vec then fts, deduplicate by id
             seen: set = set()
             interleaved: list[dict] = []
-            vec_rows = arrow_to_rows(vec_result)
-            fts_rows = arrow_to_rows(fts_result)
             for row in vec_rows + fts_rows:
-                rid = row.get("_rowid")
+                rid = row.get("id")
                 if rid not in seen:
                     seen.add(rid)
                     interleaved.append(row)

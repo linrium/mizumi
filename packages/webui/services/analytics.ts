@@ -44,20 +44,20 @@ type SchemaHit = {
 
 async function hybridSearchSchema(
   query: string,
-  limit = 10,
+  limit = 3,
 ): Promise<SchemaHit[]> {
   try {
-    // const { embedding } = await embed({
-    //   model: openai.embedding(SCHEMA_EMBED_MODEL),
-    //   value: query,
-    // });
-    const res = await fetch(`${LANCEDB_BASE}/tables/schema_embeddings/search?rerank=false`, {
+    const { embedding } = await embed({
+      model: openai.embedding(SCHEMA_EMBED_MODEL),
+      value: query,
+    });
+    const res = await fetch(`${LANCEDB_BASE}/tables/schema_embeddings/search?rerank=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        query_type: "fts",
+        query_type: "hybrid",
         text: query,
-        // vector: embedding,
+        vector: embedding,
         limit,
       }),
       cache: "no-store",
@@ -284,7 +284,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
           };
         }
 
-        const hits = await hybridSearchSchema(search, 20);
+        const hits = await hybridSearchSchema(search, 5);
         console.log("Schema search hits:", hits);
         const accessibleCatalogs = new Set(getAccessibleCatalogs(schema));
 

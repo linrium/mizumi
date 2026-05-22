@@ -31,7 +31,7 @@ import {
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { MODELS, type ModelId } from "@/services/ai-models"
-import { createPermissionRequest } from "@/services/permissions"
+import { createPermissionRequest, listPermissionRequests, type PermissionRequest } from "@/services/permissions"
 import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -451,9 +451,7 @@ function AccessRequestCard({
         requested_duration_days: output.suggested_duration_days,
       })
       setSubmitted({ code: req.code, status: req.status })
-      onSendMessage?.(
-        `I just submitted an access request for \`${output.resource}\`. The request code is ${req.code}.`,
-      )
+      onSendMessage?.(`Check my access request status for ${req.code}`)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -700,10 +698,14 @@ function CatalogTableList({
   tables,
   catalogs,
   locked,
+  requestByFqn,
+  onSendMessage,
 }: {
   tables: ExploreCatalogTable[]
   catalogs: string[]
   locked?: boolean
+  requestByFqn?: Map<string, PermissionRequest>
+  onSendMessage?: (text: string) => void
 }) {
   const byCatalog = catalogs.map((catalog) => ({
     catalog,
@@ -747,16 +749,14 @@ function CatalogTableList({
               const summary = descLine
                 ? descLine.replace(/^Description:\s*/, "")
                 : t.description.split("\n")[1] ?? ""
+              const existingRequest = requestByFqn?.get(t.fqn)
 
               return (
                 <div
                   key={t.fqn}
-                  className={cn(
-                    "px-3 py-2 flex items-start gap-2.5 pl-6",
-                    locked && "opacity-50",
-                  )}
+                  className="px-3 py-2 flex items-start gap-2.5 pl-6"
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className={cn("flex-1 min-w-0", locked && "opacity-50")}>
                     <div className="flex items-baseline gap-1.5 min-w-0">
                       <span className="font-mono text-[11px] font-medium truncate">{t.table}</span>
                       <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
@@ -769,6 +769,45 @@ function CatalogTableList({
                       </div>
                     )}
                   </div>
+
+                  {!locked && onSendMessage && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSendMessage(`SELECT * FROM ${t.fqn} LIMIT 20`)
+                      }
+                      className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                    >
+                      <HugeiconsIcon icon={DatabaseIcon} size={10} />
+                      Query
+                    </button>
+                  )}
+
+                  {locked && onSendMessage && (
+                    existingRequest ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSendMessage(`Check my access request status for ${existingRequest.code}`)
+                        }
+                        className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors"
+                      >
+                        <HugeiconsIcon icon={SecurityIcon} size={10} />
+                        {existingRequest.code}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSendMessage(`I want to request access to ${t.fqn}`)
+                        }}
+                        className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                      >
+                        <HugeiconsIcon icon={Shield01Icon} size={10} />
+                        Request Access
+                      </button>
+                    )
+                  )}
                 </div>
               )
             })}
@@ -781,15 +820,26 @@ function CatalogTableList({
 
 function ExploreCatalogCard({
   output,
+  onSendMessage,
 }: {
   output: ExploreCatalogOutput
+  onSendMessage?: (text: string) => void
 }) {
+  const [requestByFqn, setRequestByFqn] = useState<Map<string, PermissionRequest>>(new Map())
+
+  useEffect(() => {
+    listPermissionRequests().then((reqs) => {
+      setRequestByFqn(new Map(reqs.map((r) => [r.resource, r])))
+    }).catch(() => {})
+  }, [])
+
   const tables = output.tables ?? []
   const inaccessibleTables = output.inaccessible_tables ?? []
   const inaccessibleCatalogs = output.inaccessible_catalogs ?? []
   const tableCount = tables.length
   const catalogCount = output.catalogs.length
   const hasInaccessible = inaccessibleCatalogs.length > 0 || inaccessibleTables.length > 0
+
 
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
@@ -822,7 +872,11 @@ function ExploreCatalogCard({
 
       {/* Accessible catalogs + tables */}
       {catalogCount > 0 && (
-        <CatalogTableList tables={tables} catalogs={output.catalogs} />
+        <CatalogTableList
+          tables={tables}
+          catalogs={output.catalogs}
+          onSendMessage={onSendMessage}
+        />
       )}
 
       {/* Inaccessible section */}
@@ -841,6 +895,8 @@ function ExploreCatalogCard({
             tables={inaccessibleTables}
             catalogs={inaccessibleCatalogs}
             locked
+            requestByFqn={requestByFqn}
+            onSendMessage={onSendMessage}
           />
         </>
       )}
@@ -896,6 +952,7 @@ function ToolPart({
       return (
         <ExploreCatalogCard
           output={part.output as ExploreCatalogOutput}
+          onSendMessage={onSendMessage}
         />
       )
     if (part.state === "output-error") return <ToolError text={part.errorText} />
