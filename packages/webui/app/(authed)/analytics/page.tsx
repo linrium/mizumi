@@ -111,9 +111,20 @@ type ListMyAccessRequestsOutput = {
   error?: string
 }
 
+type ExploreCatalogTable = {
+  fqn: string
+  catalog: string
+  schema: string
+  table: string
+  description: string
+}
+
 type ExploreCatalogOutput = {
   search: string | null
   catalogs: string[]
+  tables: ExploreCatalogTable[]
+  inaccessible_catalogs: string[]
+  inaccessible_tables: ExploreCatalogTable[]
   overview: string
 }
 
@@ -685,13 +696,104 @@ function AccessRequestsListCard({
 
 // ── ExploreCatalogCard ────────────────────────────────────────────────────────
 
+function CatalogTableList({
+  tables,
+  catalogs,
+  locked,
+}: {
+  tables: ExploreCatalogTable[]
+  catalogs: string[]
+  locked?: boolean
+}) {
+  const byCatalog = catalogs.map((catalog) => ({
+    catalog,
+    tables: tables.filter((t) => t.catalog === catalog),
+  }))
+
+  return (
+    <>
+      {byCatalog.map(({ catalog, tables: catalogTables }) => (
+        <div key={catalog}>
+          <div className="px-3 py-1.5 flex items-center gap-2 bg-muted/10 border-b">
+            <div
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                locked ? "bg-muted-foreground/40" : "bg-emerald-500",
+              )}
+            />
+            <span
+              className={cn(
+                "font-mono font-semibold text-[11px]",
+                locked && "text-muted-foreground",
+              )}
+            >
+              {catalog}
+            </span>
+            <span className="text-muted-foreground text-[10px]">
+              {catalogTables.length} {catalogTables.length === 1 ? "table" : "tables"}
+            </span>
+            {locked && (
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-px rounded">
+                no access
+              </span>
+            )}
+          </div>
+
+          <div className="divide-y">
+            {catalogTables.map((t) => {
+              const descLine = t.description
+                .split("\n")
+                .find((l) => l.startsWith("Description:"))
+              const summary = descLine
+                ? descLine.replace(/^Description:\s*/, "")
+                : t.description.split("\n")[1] ?? ""
+
+              return (
+                <div
+                  key={t.fqn}
+                  className={cn(
+                    "px-3 py-2 flex items-start gap-2.5 pl-6",
+                    locked && "opacity-50",
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="font-mono text-[11px] font-medium truncate">{t.table}</span>
+                      <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
+                        {t.schema}
+                      </span>
+                    </div>
+                    {summary && (
+                      <div className="text-muted-foreground text-[11px] mt-0.5 line-clamp-2">
+                        {summary}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
 function ExploreCatalogCard({
   output,
 }: {
   output: ExploreCatalogOutput
 }) {
+  const tables = output.tables ?? []
+  const inaccessibleTables = output.inaccessible_tables ?? []
+  const inaccessibleCatalogs = output.inaccessible_catalogs ?? []
+  const tableCount = tables.length
+  const catalogCount = output.catalogs.length
+  const hasInaccessible = inaccessibleCatalogs.length > 0 || inaccessibleTables.length > 0
+
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
+      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
         <HugeiconsIcon icon={CatalogueIcon} size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1">Catalog Explorer</span>
@@ -701,37 +803,46 @@ function ExploreCatalogCard({
           </span>
         )}
         <span className="text-muted-foreground text-[11px]">
-          {output.catalogs.length} {output.catalogs.length === 1 ? "catalog" : "catalogs"}
+          {tableCount} {tableCount === 1 ? "table" : "tables"} · {catalogCount}{" "}
+          {catalogCount === 1 ? "catalog" : "catalogs"}
         </span>
       </div>
 
+      {/* Overview */}
       {output.overview && (
         <p className="px-3 py-2 text-[11px] text-muted-foreground border-b">{output.overview}</p>
       )}
 
-      {output.catalogs.length === 0 && (
+      {/* Empty state */}
+      {catalogCount === 0 && !hasInaccessible && (
         <div className="px-3 py-6 text-center text-muted-foreground text-[11px]">
-          No catalogs found{output.search ? ` matching &ldquo;${output.search}&rdquo;` : ""}.
+          No tables found{output.search ? ` matching "${output.search}"` : ""}.
         </div>
       )}
 
-      {output.catalogs.length > 0 && (
-        <div className="divide-y">
-          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/10">
-            Accessible ({output.catalogs.length})
+      {/* Accessible catalogs + tables */}
+      {catalogCount > 0 && (
+        <CatalogTableList tables={tables} catalogs={output.catalogs} />
+      )}
+
+      {/* Inaccessible section */}
+      {hasInaccessible && (
+        <>
+          <div className="px-3 py-1.5 flex items-center gap-2 bg-muted/5 border-t border-b">
+            <HugeiconsIcon icon={Shield01Icon} size={11} className="text-muted-foreground shrink-0" />
+            <span className="text-[11px] text-muted-foreground font-medium">
+              Additional results — access required
+            </span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {inaccessibleTables.length} {inaccessibleTables.length === 1 ? "table" : "tables"}
+            </span>
           </div>
-          {output.catalogs.map((catalog) => (
-            <div key={catalog} className="px-3 py-2 flex items-start gap-2.5">
-              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-mono font-medium text-[11px] truncate">{catalog}</div>
-                <div className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1">
-                  Accessible catalog
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+          <CatalogTableList
+            tables={inaccessibleTables}
+            catalogs={inaccessibleCatalogs}
+            locked
+          />
+        </>
       )}
     </div>
   )

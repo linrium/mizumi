@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lancedb-embed-schema
+  namespace: lancedb
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: embed
+          image: mizumi-lancedb-server:0.1.0
+          imagePullPolicy: Always
+          command: ["python", "/opt/lancedb-server/embed_schema.py"]
+          env:
+            - name: LANCEDB_URI
+              value: s3://lancedb/
+            - name: LANCEDB_BUCKET
+              value: lancedb
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ENDPOINT_URL
+              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+            - name: AWS_ACCESS_KEY_ID
+              value: rustfsadmin
+            - name: AWS_SECRET_ACCESS_KEY
+              value: rustfsadmin
+            - name: EMBEDDING_MODEL
+              value: text-embedding-3-small
+            - name: EMBEDDING_DIM
+              value: "1536"
+            - name: OPENAI_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: lancedb-secret
+                  key: OPENAI_BASE_URL
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lancedb-secret
+                  key: OPENAI_API_KEY
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -7,6 +7,7 @@ import pyarrow as pa
 import uvicorn
 import lancedb
 from lancedb.index import FTS
+from lancedb.rerankers import RRFReranker
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -82,7 +83,9 @@ class SearchRequest(BaseModel):
     text: str | None = None
     limit: int = 10
     metric: str = "cosine"
-    rrf_k: int = 60  # Reciprocal Rank Fusion constant
+    rerank: bool = False
+    rrf_k: int = 60  # RRF constant — lower values amplify rank differences
+    return_score: str = "relevance"  # "relevance" | "all"
 
 
 def arrow_to_rows(tbl: pa.Table) -> list[dict]:
@@ -91,25 +94,6 @@ def arrow_to_rows(tbl: pa.Table) -> list[dict]:
         {k: (v[i].tolist() if hasattr(v[i], "tolist") else v[i]) for k, v in pydict.items()}
         for i in range(len(tbl))
     ]
-
-
-def rrf_merge(vec_rows: list[dict], fts_rows: list[dict], k: int, limit: int) -> list[dict]:
-    scores: dict[Any, float] = {}
-    data: dict[Any, dict] = {}
-
-    for rank, row in enumerate(vec_rows):
-        rid = row["id"]
-        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
-        data[rid] = row
-
-    for rank, row in enumerate(fts_rows):
-        rid = row["id"]
-        scores[rid] = scores.get(rid, 0.0) + 1.0 / (k + rank + 1)
-        if rid not in data:
-            data[rid] = row
-
-    top = sorted(scores, key=scores.__getitem__, reverse=True)[:limit]
-    return [{**data[rid], "_rrf_score": scores[rid]} for rid in top]
 
 
 @app.get("/health")
@@ -199,12 +183,30 @@ async def search(name: str, req: SearchRequest):
     elif req.query_type == "hybrid":
         if req.vector is None or req.text is None:
             raise HTTPException(400, "both vector and text are required for query_type='hybrid'")
-        fetch = req.limit * 2  # oversample before RRF merge
+
+        fetch = req.limit * 2  # oversample so reranker has enough candidates
         vec_q = await table.search(req.vector, vector_column_name="vector")
-        vec_rows = arrow_to_rows(await vec_q.distance_type(req.metric).limit(fetch).to_arrow())
+        vec_result = await vec_q.distance_type(req.metric).limit(fetch).with_row_id(True).to_arrow()
+
         fts_q = await table.search(req.text, query_type="fts")
-        fts_rows = arrow_to_rows(await fts_q.limit(fetch).to_arrow())
-        rows = rrf_merge(vec_rows, fts_rows, req.rrf_k, req.limit)
+        fts_result = await fts_q.limit(fetch).with_row_id(True).to_arrow()
+
+        if req.rerank:
+            reranker = RRFReranker(K=req.rrf_k, return_score=req.return_score)
+            merged = reranker.rerank_multivector([vec_result, fts_result])
+            rows = arrow_to_rows(merged.slice(0, req.limit))
+        else:
+            # Interleave vec + fts results, deduplicate by row id, take limit
+            seen: set = set()
+            interleaved: list[dict] = []
+            vec_rows = arrow_to_rows(vec_result)
+            fts_rows = arrow_to_rows(fts_result)
+            for row in vec_rows + fts_rows:
+                rid = row.get("_rowid")
+                if rid not in seen:
+                    seen.add(rid)
+                    interleaved.append(row)
+            rows = interleaved[: req.limit]
 
     else:
         raise HTTPException(400, f"unknown query_type '{req.query_type}', must be 'vector', 'fts', or 'hybrid'")

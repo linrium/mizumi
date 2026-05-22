@@ -147,7 +147,7 @@ async function ucGet<T>(path: string, token?: string): Promise<T | null> {
   }
 }
 
-type StaticCol = { name: string; type: string }
+type StaticCol = { name: string; type: string; description: string }
 type StaticTable = { name: string; comment: string; columns: StaticCol[] }
 type StaticSchema = { name: string; comment: string; tables: StaticTable[] }
 type StaticCatalog = { name: string; comment: string; schemas: StaticSchema[] }
@@ -165,28 +165,28 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "partner_events_v1",
             comment: "Mixed HDBank customer and card transaction events.",
             columns: [
-              { name: "timestamp", type: "timestamp" },
-              { name: "key", type: "string" },
-              { name: "event_type", type: "string" },
-              { name: "value", type: "string" },
+              { name: "timestamp", type: "timestamp", description: "Kafka message ingestion timestamp" },
+              { name: "key", type: "string", description: "Kafka partition key identifying the customer or entity" },
+              { name: "event_type", type: "string", description: "Event discriminator, e.g. card_transaction, customer_update, credit_check" },
+              { name: "value", type: "string", description: "JSON-encoded payload of the event" },
             ],
           },
           {
             name: "customers_v1",
             comment: "Seeded HDBank customer master rows for the partnership demo.",
             columns: [
-              { name: "unified_customer_id", type: "string" },
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "city", type: "string" },
-              { name: "age", type: "int" },
-              { name: "segment_name", type: "string" },
-              { name: "preferred_channel", type: "string" },
-              { name: "monthly_income", type: "double" },
-              { name: "credit_score", type: "int" },
-              { name: "has_credit_card", type: "boolean" },
-              { name: "shared_customer", type: "boolean" },
-              { name: "seed_timestamp", type: "timestamp" },
+              { name: "unified_customer_id", type: "string", description: "Cross-company identifier linking HDBank and VietJet customer records" },
+              { name: "customer_id", type: "string", description: "HDBank internal customer identifier" },
+              { name: "customer_name", type: "string", description: "Full name of the HDBank customer" },
+              { name: "city", type: "string", description: "City of residence" },
+              { name: "age", type: "int", description: "Customer age in years" },
+              { name: "segment_name", type: "string", description: "HDBank customer segment, e.g. Mass, Affluent, Premier" },
+              { name: "preferred_channel", type: "string", description: "Preferred contact channel, e.g. mobile, branch, email" },
+              { name: "monthly_income", type: "double", description: "Declared or estimated monthly income in VND" },
+              { name: "credit_score", type: "int", description: "HDBank internal credit score" },
+              { name: "has_credit_card", type: "boolean", description: "Whether the customer holds an active HDBank credit card" },
+              { name: "shared_customer", type: "boolean", description: "Whether this customer record is also shared with VietJet" },
+              { name: "seed_timestamp", type: "timestamp", description: "Timestamp when the seed record was loaded into the bronze layer" },
             ],
           },
         ],
@@ -199,29 +199,29 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "customers_v1",
             comment: "Latest HDBank customer profiles for cross-sell analysis.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "segment_name", type: "string" },
-              { name: "kyc_status", type: "string" },
-              { name: "preferred_channel", type: "string" },
-              { name: "monthly_income", type: "double" },
-              { name: "credit_score", type: "int" },
-              { name: "has_credit_card", type: "boolean" },
-              { name: "shared_customer", type: "boolean" },
-              { name: "updated_at", type: "timestamp" },
+              { name: "customer_id", type: "string", description: "HDBank internal customer identifier" },
+              { name: "customer_name", type: "string", description: "Full name of the customer" },
+              { name: "segment_name", type: "string", description: "HDBank customer segment, e.g. Mass, Affluent, Premier" },
+              { name: "kyc_status", type: "string", description: "KYC verification status, e.g. verified, pending, rejected" },
+              { name: "preferred_channel", type: "string", description: "Preferred contact channel, e.g. mobile, branch, email" },
+              { name: "monthly_income", type: "double", description: "Monthly income in VND" },
+              { name: "credit_score", type: "int", description: "HDBank internal credit score" },
+              { name: "has_credit_card", type: "boolean", description: "Active HDBank credit card flag" },
+              { name: "shared_customer", type: "boolean", description: "Whether this customer is also known to VietJet" },
+              { name: "updated_at", type: "timestamp", description: "Timestamp of the most recent profile update" },
             ],
           },
           {
             name: "travel_spend_features_v1",
             comment: "Travel affinity features from HDBank card transactions.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "transaction_count", type: "int" },
-              { name: "total_card_spend", type: "double" },
-              { name: "travel_spend", type: "double" },
-              { name: "has_vietjet_spend", type: "int" },
-              { name: "last_payment_at", type: "timestamp" },
-              { name: "travel_affinity_score", type: "double" },
+              { name: "customer_id", type: "string", description: "HDBank customer identifier" },
+              { name: "transaction_count", type: "int", description: "Total number of card transactions observed" },
+              { name: "total_card_spend", type: "double", description: "Total card spend across all merchants in VND" },
+              { name: "travel_spend", type: "double", description: "Spend on travel-related merchants in VND" },
+              { name: "has_vietjet_spend", type: "int", description: "1 if the customer has any VietJet-related card spend, 0 otherwise" },
+              { name: "last_payment_at", type: "timestamp", description: "Timestamp of the most recent card payment" },
+              { name: "travel_affinity_score", type: "double", description: "Derived score (0–1) indicating likelihood of VietJet conversion based on travel spend patterns" },
             ],
           },
         ],
@@ -234,13 +234,13 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "vietjet_activation_candidates_v1",
             comment: "HDBank customers most likely to convert into VietJet flyers.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "offer_name", type: "string" },
-              { name: "use_case", type: "string" },
-              { name: "propensity_score", type: "double" },
-              { name: "recommended_channel", type: "string" },
-              { name: "signal_value", type: "double" },
+              { name: "customer_id", type: "string", description: "HDBank customer identifier" },
+              { name: "customer_name", type: "string", description: "Customer full name" },
+              { name: "offer_name", type: "string", description: "Co-brand offer name being recommended, e.g. vietjet_co_brand_card" },
+              { name: "use_case", type: "string", description: "Business use case driving the recommendation, e.g. co_brand_travel_card" },
+              { name: "propensity_score", type: "double", description: "Model-derived propensity score (0–1); higher means more likely to convert" },
+              { name: "recommended_channel", type: "string", description: "Best contact channel for activating this customer" },
+              { name: "signal_value", type: "double", description: "Aggregate monetary signal (VND) driving the recommendation" },
             ],
           },
         ],
@@ -259,26 +259,26 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "partner_events_v1",
             comment: "Mixed VietJet customer and booking events.",
             columns: [
-              { name: "timestamp", type: "timestamp" },
-              { name: "key", type: "string" },
-              { name: "event_type", type: "string" },
-              { name: "value", type: "string" },
+              { name: "timestamp", type: "timestamp", description: "Kafka message ingestion timestamp" },
+              { name: "key", type: "string", description: "Kafka partition key identifying the customer or booking" },
+              { name: "event_type", type: "string", description: "Event discriminator, e.g. booking, cancellation, customer_update" },
+              { name: "value", type: "string", description: "JSON-encoded payload of the event" },
             ],
           },
           {
             name: "customers_v1",
             comment: "Seeded VietJet customer master rows for the partnership demo.",
             columns: [
-              { name: "unified_customer_id", type: "string" },
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "city", type: "string" },
-              { name: "age", type: "int" },
-              { name: "membership_tier", type: "string" },
-              { name: "home_airport", type: "string" },
-              { name: "email_opt_in", type: "boolean" },
-              { name: "shared_customer", type: "boolean" },
-              { name: "seed_timestamp", type: "timestamp" },
+              { name: "unified_customer_id", type: "string", description: "Cross-company identifier linking VietJet and HDBank customer records" },
+              { name: "customer_id", type: "string", description: "VietJet internal customer identifier" },
+              { name: "customer_name", type: "string", description: "Full name of the VietJet customer" },
+              { name: "city", type: "string", description: "City of residence" },
+              { name: "age", type: "int", description: "Customer age in years" },
+              { name: "membership_tier", type: "string", description: "VietJet loyalty program tier, e.g. Sky Boss, SkyJoy Silver, SkyJoy Gold" },
+              { name: "home_airport", type: "string", description: "Primary departure airport IATA code, e.g. SGN, HAN" },
+              { name: "email_opt_in", type: "boolean", description: "Whether the customer has opted into email marketing" },
+              { name: "shared_customer", type: "boolean", description: "Whether this customer record is also shared with HDBank" },
+              { name: "seed_timestamp", type: "timestamp", description: "Timestamp when the seed record was loaded into the bronze layer" },
             ],
           },
         ],
@@ -291,25 +291,25 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "customers_v1",
             comment: "Latest VietJet customer profiles for cross-sell analysis.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "membership_tier", type: "string" },
-              { name: "home_airport", type: "string" },
-              { name: "email_opt_in", type: "boolean" },
-              { name: "shared_customer", type: "boolean" },
-              { name: "updated_at", type: "timestamp" },
+              { name: "customer_id", type: "string", description: "VietJet internal customer identifier" },
+              { name: "customer_name", type: "string", description: "Full name of the customer" },
+              { name: "membership_tier", type: "string", description: "VietJet loyalty tier" },
+              { name: "home_airport", type: "string", description: "Primary departure airport IATA code" },
+              { name: "email_opt_in", type: "boolean", description: "Email marketing opt-in flag" },
+              { name: "shared_customer", type: "boolean", description: "Whether this customer is also known to HDBank" },
+              { name: "updated_at", type: "timestamp", description: "Timestamp of the most recent profile update" },
             ],
           },
           {
             name: "booking_features_v1",
             comment: "Booking intensity features for HDBank finance targeting.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "booking_count", type: "int" },
-              { name: "gross_booking_value", type: "double" },
-              { name: "avg_booking_value", type: "double" },
-              { name: "last_booking_at", type: "timestamp" },
-              { name: "frequent_flyer_score", type: "double" },
+              { name: "customer_id", type: "string", description: "VietJet customer identifier" },
+              { name: "booking_count", type: "int", description: "Total number of VietJet flight bookings" },
+              { name: "gross_booking_value", type: "double", description: "Total value of all bookings in VND" },
+              { name: "avg_booking_value", type: "double", description: "Average booking value per trip in VND" },
+              { name: "last_booking_at", type: "timestamp", description: "Timestamp of the most recent booking" },
+              { name: "frequent_flyer_score", type: "double", description: "Derived score (0–1) measuring booking intensity and recency" },
             ],
           },
         ],
@@ -322,13 +322,13 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "hdbank_finance_candidates_v1",
             comment: "VietJet flyers most likely to take HDBank financing or a co-brand card.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "offer_name", type: "string" },
-              { name: "use_case", type: "string" },
-              { name: "propensity_score", type: "double" },
-              { name: "recommended_channel", type: "string" },
-              { name: "signal_value", type: "double" },
+              { name: "customer_id", type: "string", description: "VietJet customer identifier" },
+              { name: "customer_name", type: "string", description: "Customer full name" },
+              { name: "offer_name", type: "string", description: "Financing or co-brand offer name, e.g. hdbank_ticket_financing" },
+              { name: "use_case", type: "string", description: "Business use case, e.g. ticket_financing, co_brand_card" },
+              { name: "propensity_score", type: "double", description: "Model-derived propensity score (0–1)" },
+              { name: "recommended_channel", type: "string", description: "Best contact channel for activating this customer" },
+              { name: "signal_value", type: "double", description: "Aggregate monetary signal driving the recommendation" },
             ],
           },
         ],
@@ -347,29 +347,29 @@ const STATIC_CATALOGS: StaticCatalog[] = [
             name: "co_brand_offer_audience_v1",
             comment: "Unified outbound audience for the co-brand travel use case.",
             columns: [
-              { name: "customer_id", type: "string" },
-              { name: "customer_name", type: "string" },
-              { name: "offer_name", type: "string" },
-              { name: "use_case", type: "string" },
-              { name: "propensity_score", type: "double" },
-              { name: "recommended_channel", type: "string" },
-              { name: "signal_value", type: "double" },
-              { name: "source_company", type: "string" },
-              { name: "target_company", type: "string" },
-              { name: "priority_band", type: "string" },
+              { name: "customer_id", type: "string", description: "Unified cross-company customer identifier" },
+              { name: "customer_name", type: "string", description: "Customer full name" },
+              { name: "offer_name", type: "string", description: "Co-brand offer being promoted" },
+              { name: "use_case", type: "string", description: "Business use case driving the audience selection" },
+              { name: "propensity_score", type: "double", description: "Propensity score (0–1) for offer acceptance" },
+              { name: "recommended_channel", type: "string", description: "Best contact channel for activation" },
+              { name: "signal_value", type: "double", description: "Monetary signal value in VND" },
+              { name: "source_company", type: "string", description: "Company that contributed this customer (hdbank or vietjetair)" },
+              { name: "target_company", type: "string", description: "Company that will activate the offer" },
+              { name: "priority_band", type: "string", description: "Campaign priority tier: high, medium, or low" },
             ],
           },
           {
             name: "campaign_summary_v1",
             comment: "Compact campaign summary for activation planning.",
             columns: [
-              { name: "campaign_name", type: "string" },
-              { name: "source_company", type: "string" },
-              { name: "target_company", type: "string" },
-              { name: "offer_name", type: "string" },
-              { name: "customer_count", type: "int" },
-              { name: "avg_propensity_score", type: "double" },
-              { name: "total_signal_value", type: "double" },
+              { name: "campaign_name", type: "string", description: "Unique campaign identifier" },
+              { name: "source_company", type: "string", description: "Company contributing the audience" },
+              { name: "target_company", type: "string", description: "Company activating the offer" },
+              { name: "offer_name", type: "string", description: "Co-brand offer name" },
+              { name: "customer_count", type: "int", description: "Number of customers in the campaign audience" },
+              { name: "avg_propensity_score", type: "double", description: "Average propensity score across the audience" },
+              { name: "total_signal_value", type: "double", description: "Sum of signal values for the entire audience in VND" },
             ],
           },
         ],
@@ -380,8 +380,58 @@ const STATIC_CATALOGS: StaticCatalog[] = [
 
 function formatTableBlock(catalog: string, schema: string, table: StaticTable): string {
   const fqn = `${catalog}.${schema}.${table.name}`
-  const cols = table.columns.map((c) => `  ${c.name} ${c.type}`).join(",\n")
+  const cols = table.columns
+    .map((c) => `  ${c.name} ${c.type}  -- ${c.description}`)
+    .join(",\n")
   return `TABLE ${fqn}:\n  -- ${table.comment}\n${cols}`
+}
+
+export type StaticSchemaHit = {
+  fqn: string
+  catalog: string
+  schema_name: string
+  table_name: string
+  text: string
+}
+
+/**
+ * Returns structured table entries from STATIC_CATALOGS matching `search`.
+ * Same shape as the LanceDB SchemaHit so the two sources can be merged.
+ */
+export function searchStaticCatalogs(search?: string): StaticSchemaHit[] {
+  const q = search?.toLowerCase()
+  const hits: StaticSchemaHit[] = []
+
+  for (const catalog of STATIC_CATALOGS) {
+    for (const schema of catalog.schemas) {
+      for (const table of schema.tables) {
+        if (q) {
+          const haystack = [
+            catalog.name,
+            catalog.comment,
+            schema.name,
+            schema.comment,
+            table.name,
+            table.comment,
+            ...table.columns.map((c) => `${c.name} ${c.description}`),
+          ]
+            .join(" ")
+            .toLowerCase()
+          if (!haystack.includes(q)) continue
+        }
+        const fqn = `${catalog.name}.${schema.name}.${table.name}`
+        hits.push({
+          fqn,
+          catalog: catalog.name,
+          schema_name: schema.name,
+          table_name: table.name,
+          text: formatTableBlock(catalog.name, schema.name, table),
+        })
+      }
+    }
+  }
+
+  return hits
 }
 
 /**
@@ -404,7 +454,7 @@ export function fetchMatchingSchema(search?: string): string {
             schema.comment,
             table.name,
             table.comment,
-            ...table.columns.map((c) => c.name),
+            ...table.columns.map((c) => `${c.name} ${c.description}`),
           ]
             .join(" ")
             .toLowerCase()

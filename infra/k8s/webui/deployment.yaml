@@ -48,6 +48,10 @@ spec:
               value: xohzlCDjF8FoDU+SFb1Dcw9BCkYFGs7NaipxrZE6rwk=
             - name: API_BASE_URL
               value: http://controlplane-svc.controlplane.svc.cluster.local:4000
+            - name: LANCEDB_BASE_URL
+              value: http://lancedb-svc.lancedb.svc.cluster.local:8080
+            - name: EMBEDDING_MODEL
+              value: text-embedding-3-small
             - name: OPENAI_BASE_URL
               valueFrom:
                 secretKeyRef:

@@ -1,117 +1,171 @@
-import { deepseek } from "@ai-sdk/deepseek"
-import { createOpenAI } from "@ai-sdk/openai"
-import type { LanguageModel } from "ai"
-import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
-import type { NextRequest } from "next/server"
-import { z } from "zod"
-import { MODELS, type ModelId } from "@/services/ai-models"
-import { getServerSession } from "@/lib/auth"
-import { fetchSchema, FALLBACK_SCHEMA } from "@/services/unity-catalog"
+import { deepseek } from "@ai-sdk/deepseek";
+import { createOpenAI } from "@ai-sdk/openai";
+import type { LanguageModel } from "ai";
+import {
+  convertToModelMessages,
+  embed,
+  stepCountIs,
+  streamText,
+  tool,
+} from "ai";
+import type { NextRequest } from "next/server";
+import { z } from "zod";
+import { MODELS, type ModelId } from "@/services/ai-models";
+import { getServerSession } from "@/lib/auth";
+import { fetchSchema, FALLBACK_SCHEMA } from "@/services/unity-catalog";
 
 const API_BASE =
   process.env.API_BASE_URL ??
   (process.env.NODE_ENV === "production"
     ? "http://controlplane-svc.controlplane.svc.cluster.local:4000"
-    : "http://localhost:4000")
+    : "http://localhost:4000");
 
 const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",
-})
+});
 const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
+
+const LANCEDB_BASE =
+  process.env.LANCEDB_BASE_URL ??
+  "http://lancedb-svc.lancedb.svc.cluster.local:8080";
+const SCHEMA_EMBED_MODEL =
+  process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
+
+type SchemaHit = {
+  fqn: string;
+  catalog: string;
+  schema_name: string;
+  table_name: string;
+  text: string;
+};
+
+async function hybridSearchSchema(
+  query: string,
+  limit = 10,
+): Promise<SchemaHit[]> {
+  try {
+    // const { embedding } = await embed({
+    //   model: openai.embedding(SCHEMA_EMBED_MODEL),
+    //   value: query,
+    // });
+    const res = await fetch(`${LANCEDB_BASE}/tables/schema_embeddings/search?rerank=false`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query_type: "fts",
+        text: query,
+        // vector: embedding,
+        limit,
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results ?? []) as SchemaHit[];
+  } catch {
+    return [];
+  }
+}
 
 async function fetchMyPermissionRequests(status?: string, token?: string) {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const url = new URL(`${API_BASE}/api/permissions/requests`)
-  if (status && status !== "all") url.searchParams.set("status", status)
+  const url = new URL(`${API_BASE}/api/permissions/requests`);
+  if (status && status !== "all") url.searchParams.set("status", status);
 
-  const res = await fetch(url.toString(), { headers })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = await res.json()
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
   return data.requests as Array<{
-    id: string
-    code: string
-    resource: string
-    scope: string
-    status: string
-    submitted_at: string
-    privileges: string[]
-    rationale: string
-    expires_in_days: number
-    queue_decision: string
-  }>
+    id: string;
+    code: string;
+    resource: string;
+    scope: string;
+    status: string;
+    submitted_at: string;
+    privileges: string[];
+    rationale: string;
+    expires_in_days: number;
+    queue_decision: string;
+  }>;
 }
 
 async function fetchPermissionRequest(idOrCode: string, token?: string) {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const code = idOrCode.trim()
+  const code = idOrCode.trim();
 
   // UUID format — direct lookup
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
+  ) {
     const res = await fetch(
       `${API_BASE}/api/permissions/requests/${encodeURIComponent(code)}`,
       { headers },
-    )
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json()
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   }
 
   // PR-XXXXXXXX format — extract the 8-char suffix and search
   const suffix = code.toUpperCase().startsWith("PR-")
     ? code.slice(3).toLowerCase()
-    : code.toLowerCase()
+    : code.toLowerCase();
   const res = await fetch(
     `${API_BASE}/api/permissions/requests?search=${encodeURIComponent(suffix)}`,
     { headers },
-  )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = (await res.json()) as { requests: Array<{ code: string }> }
-  const requests = data.requests ?? []
-  const normalized = code.toUpperCase().startsWith("PR-") ? code.toUpperCase() : `PR-${code.toUpperCase()}`
-  const match = requests.find((r) => r.code.toUpperCase() === normalized)
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { requests: Array<{ code: string }> };
+  const requests = data.requests ?? [];
+  const normalized = code.toUpperCase().startsWith("PR-")
+    ? code.toUpperCase()
+    : `PR-${code.toUpperCase()}`;
+  const match = requests.find((r) => r.code.toUpperCase() === normalized);
   if (!match) {
-    if (requests.length > 0) return requests[0]
-    throw new Error(`Request "${code}" not found`)
+    if (requests.length > 0) return requests[0];
+    throw new Error(`Request "${code}" not found`);
   }
-  return match
+  return match;
 }
 
 async function runSql(sessionId: string | null, sql: string, token?: string) {
-  const sid = sessionId ?? "default"
-  const url = `${API_BASE}/api/sessions/${sid}/query`
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (token) headers.Authorization = `Bearer ${token}`
+  const sid = sessionId ?? "default";
+  const url = `${API_BASE}/api/sessions/${sid}/query`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify({ sql, idToken: token }),
-  })
-  const data = await res.json()
+  });
+  const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error ?? `HTTP ${res.status}`)
+    throw new Error(data.error ?? `HTTP ${res.status}`);
   }
-  return data as { columns: string[]; rows: unknown[][]; row_count: number }
+  return data as { columns: string[]; rows: unknown[][]; row_count: number };
 }
 
 type AccessibleTableRef = {
-  catalog: string
-  schemaName: string
-  tableName: string
-  searchText: string
-}
+  catalog: string;
+  schemaName: string;
+  tableName: string;
+  searchText: string;
+};
 
 function parseAccessibleTables(schema: string): AccessibleTableRef[] {
   return schema.split(/\n\s*\n/).flatMap((block) => {
-    const match = block.match(/^TABLE\s+([^.]+)\.([^.]+)\.([^:\n]+):/m)
-    if (!match) return []
+    const match = block.match(/^TABLE\s+([^.]+)\.([^.]+)\.([^:\n]+):/m);
+    if (!match) return [];
 
-    const [, catalog, schemaName, tableName] = match
+    const [, catalog, schemaName, tableName] = match;
     return [
       {
         catalog,
@@ -119,48 +173,45 @@ function parseAccessibleTables(schema: string): AccessibleTableRef[] {
         tableName,
         searchText: block.toLowerCase(),
       },
-    ]
-  })
+    ];
+  });
 }
 
 function getAccessibleCatalogs(schema: string, search?: string): string[] {
-  const terms = (search ?? "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
+  const terms = (search ?? "").toLowerCase().split(/\s+/).filter(Boolean);
 
-  const catalogs = new Set<string>()
+  const catalogs = new Set<string>();
 
   for (const table of parseAccessibleTables(schema)) {
-    const haystack = `${table.catalog} ${table.schemaName} ${table.tableName} ${table.searchText}`
+    const haystack = `${table.catalog} ${table.schemaName} ${table.tableName} ${table.searchText}`;
     if (terms.length > 0 && !terms.every((term) => haystack.includes(term))) {
-      continue
+      continue;
     }
-    catalogs.add(table.catalog)
+    catalogs.add(table.catalog);
   }
 
-  return [...catalogs].sort((a, b) => a.localeCompare(b))
+  return [...catalogs].sort((a, b) => a.localeCompare(b));
 }
 
 function resolveModel(modelId: ModelId): LanguageModel {
   if (modelId === "gpt-5.4-nano") {
-    return openai("gpt-5.4-nano")
+    return openai("gpt-5.4-nano");
   }
   if (modelId === "mlx-community/Qwen3.5-9B-MLX-4bit") {
-    return omlx("mlx-community/Qwen3.5-9B-MLX-4bit")
+    return omlx("mlx-community/Qwen3.5-9B-MLX-4bit");
   }
   if (modelId === "mlx-community/Qwen3.6-35B-A3B-4bit") {
-    return omlx("mlx-community/Qwen3.6-35B-A3B-4bit")
+    return omlx("mlx-community/Qwen3.6-35B-A3B-4bit");
   }
-  return deepseek("deepseek-chat")
+  return deepseek("deepseek-chat");
 }
 
 export async function handleAnalyticsChat(req: NextRequest) {
-  const { messages, sessionId, modelId } = await req.json()
-  const session = await getServerSession()
-  const idToken = session?.idToken
-  const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-nano")
-  const schema = await fetchSchema(idToken).catch(() => "(schema unavailable)")
+  const { messages, sessionId, modelId } = await req.json();
+  const session = await getServerSession();
+  const idToken = session?.idToken;
+  const model = resolveModel((modelId as ModelId) ?? "gpt-5.4-nano");
+  const schema = await fetchSchema(idToken).catch(() => "(schema unavailable)");
 
   const tools = {
     runQuery: tool({
@@ -174,16 +225,16 @@ export async function handleAnalyticsChat(req: NextRequest) {
       }),
       execute: async ({ sql, explanation }) => {
         try {
-          const data = await runSql(sessionId, sql, idToken)
+          const data = await runSql(sessionId, sql, idToken);
           return {
             sql,
             explanation,
             columns: data.columns,
             rows: data.rows,
             row_count: data.row_count,
-          }
+          };
         } catch (error) {
-          return { sql, explanation, error: (error as Error).message }
+          return { sql, explanation, error: (error as Error).message };
         }
       },
     }),
@@ -213,18 +264,71 @@ export async function handleAnalyticsChat(req: NextRequest) {
           return {
             search: search ?? null,
             catalogs: [],
+            tables: [],
             overview:
               "I could not load your access-scoped catalog right now, so I’m not returning any catalogs. Try again when your Unity Catalog access list is available.",
-          }
+          };
         }
 
-        const catalogs = getAccessibleCatalogs(schema, search)
-        const overview =
-          catalogs.length > 0
-            ? `You can access ${catalogs.length} catalog${catalogs.length === 1 ? "" : "s"} right now.`
-            : `No accessible catalogs matched ${search ? `"${search}"` : "your current filter"}.`
+        console.log("Exploring catalog with search:", search);
 
-        return { search: search ?? null, catalogs, overview }
+        if (!search) {
+          const catalogs = getAccessibleCatalogs(schema);
+          return {
+            search: null,
+            catalogs,
+            tables: [],
+            overview: `You have access to the following catalogs: ${catalogs.join(
+              ", ",
+            )}. You can ask about specific catalogs or tables to see more details.`,
+          };
+        }
+
+        const hits = await hybridSearchSchema(search, 20);
+        console.log("Schema search hits:", hits);
+        const accessibleCatalogs = new Set(getAccessibleCatalogs(schema));
+
+        const toTableEntry = (h: SchemaHit) => ({
+          fqn: h.fqn,
+          catalog: h.catalog,
+          schema: h.schema_name,
+          table: h.table_name,
+          description: h.text,
+        });
+
+        if (hits.length > 0) {
+          const accessible = hits.filter((h) => accessibleCatalogs.has(h.catalog));
+          const inaccessible = hits.filter((h) => !accessibleCatalogs.has(h.catalog));
+
+          const catalogs = [...new Set(accessible.map((h) => h.catalog))];
+          const tables = accessible.map(toTableEntry);
+          const inaccessible_catalogs = [...new Set(inaccessible.map((h) => h.catalog))];
+          const inaccessible_tables = inaccessible.map(toTableEntry);
+
+          const overview =
+            catalogs.length > 0
+              ? `Found ${tables.length} table(s) across ${catalogs.length} accessible catalog(s) matching "${search}".`
+              : `No accessible catalogs matched "${search}".`;
+
+          return { search, catalogs, tables, inaccessible_catalogs, inaccessible_tables, overview };
+        }
+
+        // Fallback: keyword search over the live schema string
+        const fallbackCatalogs = getAccessibleCatalogs(schema, search);
+        const fallbackTables = parseAccessibleTables(schema)
+          .filter((t) => fallbackCatalogs.includes(t.catalog))
+          .map((t) => ({
+            fqn: `${t.catalog}.${t.schemaName}.${t.tableName}`,
+            catalog: t.catalog,
+            schema: t.schemaName,
+            table: t.tableName,
+            description: t.searchText,
+          }));
+        const overview =
+          fallbackCatalogs.length > 0
+            ? `Found ${fallbackTables.length} table(s) across ${fallbackCatalogs.length} catalog(s) matching "${search}".`
+            : `No accessible catalogs matched "${search}".`;
+        return { search, catalogs: fallbackCatalogs, tables: fallbackTables, inaccessible_catalogs: [], inaccessible_tables: [], overview };
       },
     }),
     prepareAccessRequest: tool({
@@ -246,7 +350,9 @@ export async function handleAnalyticsChat(req: NextRequest) {
           ),
         rationale: z
           .string()
-          .describe("Pre-filled rationale explaining why the user needs this data"),
+          .describe(
+            "Pre-filled rationale explaining why the user needs this data",
+          ),
         suggested_duration_days: z
           .number()
           .default(30)
@@ -257,7 +363,14 @@ export async function handleAnalyticsChat(req: NextRequest) {
             "Short explanation shown to the user about what this data is and why they might want it",
           ),
       }),
-      execute: async ({ resource, scope, privileges, rationale, suggested_duration_days, explanation }) => ({
+      execute: async ({
+        resource,
+        scope,
+        privileges,
+        rationale,
+        suggested_duration_days,
+        explanation,
+      }) => ({
         resource,
         scope,
         privileges,
@@ -271,16 +384,23 @@ export async function handleAnalyticsChat(req: NextRequest) {
         "List all of the current user's own permission requests. Use when the user asks 'show my requests', 'what access have I requested', 'my pending requests', 'show me my access requests', etc.",
       inputSchema: z.object({
         status: z
-          .enum(["all", "pending", "approved", "cancelled", "needs-info", "ready"])
+          .enum([
+            "all",
+            "pending",
+            "approved",
+            "cancelled",
+            "needs-info",
+            "ready",
+          ])
           .optional()
           .describe("Filter by status. Omit to return all statuses."),
       }),
       execute: async ({ status }) => {
         try {
-          const requests = await fetchMyPermissionRequests(status, idToken)
-          return { requests }
+          const requests = await fetchMyPermissionRequests(status, idToken);
+          return { requests };
         } catch (error) {
-          return { requests: [], error: (error as Error).message }
+          return { requests: [], error: (error as Error).message };
         }
       },
     }),
@@ -296,9 +416,9 @@ export async function handleAnalyticsChat(req: NextRequest) {
       }),
       execute: async ({ request_id }) => {
         try {
-          return await fetchPermissionRequest(request_id, idToken)
+          return await fetchPermissionRequest(request_id, idToken);
         } catch (error) {
-          return { error: (error as Error).message }
+          return { error: (error as Error).message };
         }
       },
     }),
@@ -321,7 +441,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
       }),
       execute: async ({ sql, title, chartType, x, y, explanation }) => {
         try {
-          const data = await runSql(sessionId, sql, idToken)
+          const data = await runSql(sessionId, sql, idToken);
           return {
             sql,
             title,
@@ -331,7 +451,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
             explanation,
             columns: data.columns,
             rows: data.rows,
-          }
+          };
         } catch (error) {
           return {
             sql,
@@ -341,11 +461,11 @@ export async function handleAnalyticsChat(req: NextRequest) {
             y,
             explanation,
             error: (error as Error).message,
-          }
+          };
         }
       },
     }),
-  }
+  };
 
   const result = streamText({
     model,
@@ -414,7 +534,7 @@ ${schema}
     messages: await convertToModelMessages(messages, { tools }),
     tools,
     stopWhen: stepCountIs(10),
-  })
+  });
 
-  return result.toUIMessageStreamResponse()
+  return result.toUIMessageStreamResponse();
 }

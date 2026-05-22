@@ -415,7 +415,7 @@ openai-secrets-apply:
     set -euo pipefail
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
-    for namespace in {{ controlplane_namespace }} {{ webui_namespace }}; do
+    for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
       secret_name="${namespace}-secret"
       kubectl create secret generic "$secret_name" \
         -n "$namespace" \
@@ -587,6 +587,12 @@ lancedb-bootstrap:
 
 lancedb-forward:
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080
+
+lancedb-embed-schema: lancedb-image-build
+    kubectl delete job lancedb-embed-schema -n {{ lancedb_namespace }} --ignore-not-found
+    kubectl apply -f {{ lancedb_manifests }}/embed-schema-job.yaml
+    kubectl wait --for=condition=complete job/lancedb-embed-schema -n {{ lancedb_namespace }} --timeout=300s
+    kubectl logs job/lancedb-embed-schema -n {{ lancedb_namespace }}
 
 lancedb-destroy:
     kubectl delete -f {{ lancedb_manifests }}/ --ignore-not-found || true
