@@ -73,10 +73,16 @@ const chartTypeEnum = z.enum(["bar", "line", "area", "pie", "scatter"])
 export type PanelSummary = {
   id: string
   title: string
+  description?: string
   chartType: string
   sql: string
   xCol: string
   yCol: string
+  resultPreview?: {
+    columns: string[]
+    rows: unknown[][]
+    rowCount: number
+  }
 }
 
 export async function handleDashboardGenerate(req: NextRequest) {
@@ -88,6 +94,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     modelId,
     panels,
     selectedPanelId,
+    mentionedPanelIds,
     lastCreatedIds,
   } = (await req.json()) as {
     messages: unknown
@@ -95,6 +102,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     modelId: ModelId
     panels: PanelSummary[]
     selectedPanelId: string | null
+    mentionedPanelIds: string[]
     lastCreatedIds: string[]
   }
 
@@ -107,13 +115,31 @@ export async function handleDashboardGenerate(req: NextRequest) {
       ? (panels ?? [])
           .map(
             (panel) =>
-              `  id=${panel.id} title="${panel.title}" chartType=${panel.chartType} xCol=${panel.xCol} yCol=${panel.yCol}`,
+              [
+                `  id=${panel.id} title="${panel.title}" chartType=${panel.chartType} xCol=${panel.xCol} yCol=${panel.yCol}`,
+                panel.description
+                  ? `  description="${panel.description}"`
+                  : null,
+                `  sql=${JSON.stringify(panel.sql)}`,
+                panel.resultPreview
+                  ? [
+                      `  top_rows_columns=${JSON.stringify(panel.resultPreview.columns)}`,
+                      `  top_rows=${JSON.stringify(panel.resultPreview.rows)}`,
+                      `  row_count=${panel.resultPreview.rowCount}`,
+                    ].join("\n")
+                  : "  top_rows=(unavailable)",
+              ]
+                .filter(Boolean)
+                .join("\n"),
           )
           .join("\n")
       : "  (none)"
 
   const contextHints = [
     selectedPanelId ? `Selected panel id: ${selectedPanelId}` : null,
+    mentionedPanelIds?.length
+      ? `Mentioned panel ids: ${mentionedPanelIds.join(", ")}`
+      : null,
     lastCreatedIds?.length
       ? `Last created panel ids: ${lastCreatedIds.join(", ")}`
       : null,
@@ -263,9 +289,16 @@ ${panelList}
 
 ${contextHints ? `## Context:\n${contextHints}` : ""}
 
+## Interpretation rules:
+- If the user asks what a panel means, what it shows, whether it looks correct, or asks for an explanation of the dashboard, answer directly from the panel title, description, SQL, and top rows.
+- Do not call tools for explanation-only questions unless the user explicitly asks to create or modify panels.
+- When interpreting a panel, explain the business meaning of the metric, the grouping implied by the SQL, and any obvious caveats from the sample rows.
+- If mentionedPanelIds are present, treat those panels as the user's explicit scope unless they clearly ask about something broader.
+
 ## When to use each tool:
 - createPanel: user asks to add, show, visualize, or create something new
 - editPanel: user asks to change, update, rename, fix, switch chart type, or modify an existing panel
+  - explicit @mentions → use mentionedPanelIds first
   - "this panel" / "the selected one" → use selectedPanelId
   - "the last one" / "those panels" / "what you just created" → use lastCreatedIds
   - by name (e.g. "the revenue chart") → match against the panels list by title

@@ -54,6 +54,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -62,6 +67,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
 import { apiFetch, getToken } from "@/lib/api-client"
@@ -638,12 +644,12 @@ function PanelSidebar({
           className="h-7 text-xs"
           placeholder="Panel title"
         />
-        <textarea
+        <Textarea
           value={panel.description ?? ""}
           onChange={(e) => onChange({ ...panel, description: e.target.value })}
-          rows={2}
+          rows={4}
           placeholder="Description (shown below the chart)"
-          className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+          className="min-h-24 text-xs"
         />
       </div>
       <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
@@ -830,10 +836,43 @@ const SUGGESTIONS = [
   "Co-brand signal value by source company",
 ]
 
+const PANEL_MENTION_RE = /@\[(.*?)\]\(panel:([^)]+)\)/g
+
+function extractMentionedPanelIds(text: string) {
+  const ids: string[] = []
+  for (const match of text.matchAll(PANEL_MENTION_RE)) {
+    const id = match[2]
+    if (id && !ids.includes(id)) ids.push(id)
+  }
+  return ids
+}
+
+function stripPanelMentionMarkup(text: string) {
+  return text.replace(PANEL_MENTION_RE, (_, label: string) => `@${label}`)
+}
+
+function getActiveMention(text: string, caret: number) {
+  const uptoCaret = text.slice(0, caret)
+  const at = uptoCaret.lastIndexOf("@")
+  if (at === -1) return null
+
+  const fragment = uptoCaret.slice(at)
+  if (fragment.startsWith("@[")) return null
+  if (fragment.includes("\n")) return null
+  if (/\s/.test(fragment.slice(1))) return null
+
+  return {
+    start: at,
+    end: caret,
+    query: fragment.slice(1),
+  }
+}
+
 function AiComposer({
   sessionId,
   modelId,
   panels,
+  panelData,
   selectedPanelId,
   onModelChange,
   onPanelsCreated,
@@ -842,6 +881,7 @@ function AiComposer({
   sessionId: string | null
   modelId: ModelId
   panels: Panel[]
+  panelData: Record<string, PanelData>
   selectedPanelId: string | null
   onModelChange: (m: ModelId) => void
   onPanelsCreated: (
@@ -853,12 +893,16 @@ function AiComposer({
   ) => void
 }) {
   const [input, setInput] = useState("")
+  const [caretPos, setCaretPos] = useState(0)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const sessionIdRef = useRef(sessionId)
   const modelIdRef = useRef(modelId)
   const panelsRef = useRef(panels)
+  const panelDataRef = useRef(panelData)
   const selectedPanelIdRef = useRef(selectedPanelId)
+  const mentionedPanelIdsRef = useRef<string[]>([])
   const lastCreatedIdsRef = useRef<string[]>([])
   const onPanelsCreatedRef = useRef(onPanelsCreated)
   const onPanelsEditedRef = useRef(onPanelsEdited)
@@ -875,6 +919,9 @@ function AiComposer({
     panelsRef.current = panels
   }, [panels])
   useEffect(() => {
+    panelDataRef.current = panelData
+  }, [panelData])
+  useEffect(() => {
     selectedPanelIdRef.current = selectedPanelId
   }, [selectedPanelId])
   useEffect(() => {
@@ -883,6 +930,27 @@ function AiComposer({
   useEffect(() => {
     onPanelsEditedRef.current = onPanelsEdited
   }, [onPanelsEdited])
+
+  const activeMention = useMemo(
+    () => getActiveMention(input, caretPos),
+    [input, caretPos],
+  )
+
+  const mentionPanels = useMemo(() => {
+    if (!activeMention) return []
+    const query = activeMention.query.trim().toLowerCase()
+    return panels.filter((panel) => {
+      if (!query) return true
+      return (
+        panel.title.toLowerCase().includes(query) ||
+        (panel.description ?? "").toLowerCase().includes(query)
+      )
+    })
+  }, [activeMention, panels])
+
+  useEffect(() => {
+    setMentionIndex(0)
+  }, [activeMention?.query])
 
   const transport = useMemo(
     () =>
@@ -894,12 +962,23 @@ function AiComposer({
           panels: panelsRef.current.map<PanelSummary>((p) => ({
             id: p.id,
             title: p.title,
+            description: p.description,
             chartType: p.chartType,
             sql: p.sql,
             xCol: p.xCol,
             yCol: p.yCol,
+            resultPreview:
+              panelDataRef.current[p.id]?.status === "ok" &&
+              panelDataRef.current[p.id]?.result
+                ? {
+                    columns: panelDataRef.current[p.id]!.result!.columns,
+                    rows: panelDataRef.current[p.id]!.result!.rows.slice(0, 10),
+                    rowCount: panelDataRef.current[p.id]!.result!.row_count,
+                  }
+                : undefined,
           })),
           selectedPanelId: selectedPanelIdRef.current,
+          mentionedPanelIds: mentionedPanelIdsRef.current,
           lastCreatedIds: lastCreatedIdsRef.current,
         }),
         fetch: async (input, init) => {
@@ -988,14 +1067,62 @@ function AiComposer({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const insertPanelMention = useCallback(
+    (panel: Panel) => {
+      if (!activeMention) return
+      const token = `@[${panel.title}](panel:${panel.id}) `
+      const next =
+        input.slice(0, activeMention.start) + token + input.slice(caretPos)
+      const nextCaret = activeMention.start + token.length
+      setInput(next)
+      setCaretPos(nextCaret)
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus()
+        textareaRef.current?.setSelectionRange(nextCaret, nextCaret)
+      })
+    },
+    [activeMention, caretPos, input],
+  )
+
   const handleSend = () => {
     const text = input.trim()
     if (!text || isLoading) return
+    mentionedPanelIdsRef.current = extractMentionedPanelIds(text)
     setInput("")
-    sendMessage({ text })
+    setCaretPos(0)
+    sendMessage({ text: stripPanelMentionMarkup(text) })
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (activeMention && mentionPanels.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setMentionIndex((idx) => (idx + 1) % mentionPanels.length)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setMentionIndex((idx) => (idx - 1 + mentionPanels.length) % mentionPanels.length)
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault()
+        insertPanelMention(mentionPanels[mentionIndex] ?? mentionPanels[0]!)
+        return
+      }
+    }
+    if (activeMention && e.key === "Escape") {
+      e.preventDefault()
+      setCaretPos(activeMention.start)
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus()
+        textareaRef.current?.setSelectionRange(
+          activeMention.start,
+          activeMention.start,
+        )
+      })
+      return
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -1009,7 +1136,7 @@ function AiComposer({
         {messages.length === 0 ? (
           <div className="p-3 flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">
-              Ask about your data and AI will generate dashboard panels.
+              Ask about your data or what an existing panel means.
             </p>
             <div className="flex flex-col gap-1.5 mt-1">
               {SUGGESTIONS.map((s) => (
@@ -1053,15 +1180,70 @@ function AiComposer({
 
       {/* Input */}
       <div className="shrink-0 border-t p-2.5 flex flex-col gap-2">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about revenue, trends, customers…"
-          rows={3}
-          className="w-full resize-none text-xs rounded-md border bg-background px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
-        />
+        <Popover open={!!activeMention}>
+          <PopoverAnchor asChild>
+            <div>
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  setCaretPos(e.target.selectionStart ?? e.target.value.length)
+                }}
+                onClick={(e) => setCaretPos(e.currentTarget.selectionStart ?? 0)}
+                onKeyDown={handleKeyDown}
+                onSelect={(e) =>
+                  setCaretPos(e.currentTarget.selectionStart ?? 0)
+                }
+                placeholder="Ask about revenue, trends, customers… Use @ to mention a panel."
+                rows={3}
+                className="min-h-[84px] text-xs"
+              />
+            </div>
+          </PopoverAnchor>
+          <PopoverContent
+            align="start"
+            side="top"
+            className="w-[320px] p-1.5"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <div className="px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+              Mention Panel
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {mentionPanels.length > 0 ? (
+                mentionPanels.map((panel, idx) => (
+                  <button
+                    key={panel.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => insertPanelMention(panel)}
+                    className={cn(
+                      "flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                      idx === mentionIndex
+                        ? "bg-muted text-foreground"
+                        : "text-foreground/85 hover:bg-muted/70",
+                    )}
+                  >
+                    <span className="font-medium">{panel.title}</span>
+                    {panel.description ? (
+                      <span className="line-clamp-2 text-[11px] text-muted-foreground">
+                        {panel.description}
+                      </span>
+                    ) : null}
+                  </button>
+                ))
+              ) : (
+                <div className="px-2 py-3 text-xs text-muted-foreground">
+                  No matching panels
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <p className="text-[10px] text-muted-foreground">
+          Type `@` to mention a panel and scope your question.
+        </p>
         <div className="flex items-center gap-2">
           <Select
             value={modelId}
@@ -1521,6 +1703,7 @@ export default function DashboardPage() {
               sessionId={activeId}
               modelId={modelId}
               panels={panels}
+              panelData={panelData}
               selectedPanelId={selectedId}
               onModelChange={setModelId}
               onPanelsCreated={handlePanelsCreated}
