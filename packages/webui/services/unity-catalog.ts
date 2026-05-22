@@ -426,7 +426,6 @@ export async function fetchSchema(token?: string): Promise<string> {
     "/catalogs?max_results=100",
     token,
   )
-  debugger;
   const catalogs = (catalogsData?.catalogs ?? []).filter(
     (c) => c.name !== "unity",
   )

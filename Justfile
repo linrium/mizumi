@@ -50,6 +50,10 @@ daft_distributed_script := "infra/k8s/daft/scripts/distributed_job.py"
 daft_simple_release := "daft-simple"
 daft_simple_values := "infra/k8s/daft/helm/simple-values.yaml"
 daft_simple_script := "infra/k8s/daft/scripts/simple_job.py"
+lancedb_namespace := "lancedb"
+lancedb_manifests := "infra/k8s/lancedb"
+lancedb_image := "mizumi-lancedb-server:0.1.0"
+
 caddy_s3_hostname := "s3.ap-southeast-1.amazonaws.com"
 caddy_config := "infra/caddy/Caddyfile"
 caddy_cluster_service_hosts := "keycloak-svc.keycloak.svc.cluster.local controlplane-svc.controlplane.svc.cluster.local"
@@ -90,7 +94,7 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
-    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n controlplane svc/controlplane-svc 4000:4000 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
@@ -562,3 +566,28 @@ daft-simple-destroy:
 
 daft-destroy: daft-distributed-destroy daft-simple-destroy
     kubectl delete namespace {{ daft_namespace }} --ignore-not-found --wait=false
+
+lancedb-image-build:
+    docker build -t {{ lancedb_image }} packages/lancedb-server
+    if kubectl get deployment/lancedb-server -n {{ lancedb_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/lancedb-server -n {{ lancedb_namespace }}; \
+      kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s; \
+    fi
+
+lancedb-deploy: lancedb-image-build
+    kubectl apply -f {{ lancedb_manifests }}/server.yaml
+    kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s
+    kubectl get pods,svc -n {{ lancedb_namespace }}
+
+lancedb-bootstrap:
+    kubectl delete job lancedb-bootstrap -n {{ lancedb_namespace }} --ignore-not-found
+    kubectl apply -f {{ lancedb_manifests }}/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/lancedb-bootstrap -n {{ lancedb_namespace }} --timeout=120s
+    kubectl logs job/lancedb-bootstrap -n {{ lancedb_namespace }}
+
+lancedb-forward:
+    kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080
+
+lancedb-destroy:
+    kubectl delete -f {{ lancedb_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ lancedb_namespace }} --ignore-not-found --wait=false

@@ -1,7 +1,7 @@
 import { deepseek } from "@ai-sdk/deepseek"
 import { createOpenAI } from "@ai-sdk/openai"
 import type { LanguageModel } from "ai"
-import { convertToModelMessages, generateObject, stepCountIs, streamText, tool } from "ai"
+import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
 import type { NextRequest } from "next/server"
 import { z } from "zod"
 import { MODELS, type ModelId } from "@/services/ai-models"
@@ -99,6 +99,49 @@ async function runSql(sessionId: string | null, sql: string, token?: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
+type AccessibleTableRef = {
+  catalog: string
+  schemaName: string
+  tableName: string
+  searchText: string
+}
+
+function parseAccessibleTables(schema: string): AccessibleTableRef[] {
+  return schema.split(/\n\s*\n/).flatMap((block) => {
+    const match = block.match(/^TABLE\s+([^.]+)\.([^.]+)\.([^:\n]+):/m)
+    if (!match) return []
+
+    const [, catalog, schemaName, tableName] = match
+    return [
+      {
+        catalog,
+        schemaName,
+        tableName,
+        searchText: block.toLowerCase(),
+      },
+    ]
+  })
+}
+
+function getAccessibleCatalogs(schema: string, search?: string): string[] {
+  const terms = (search ?? "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  const catalogs = new Set<string>()
+
+  for (const table of parseAccessibleTables(schema)) {
+    const haystack = `${table.catalog} ${table.schemaName} ${table.tableName} ${table.searchText}`
+    if (terms.length > 0 && !terms.every((term) => haystack.includes(term))) {
+      continue
+    }
+    catalogs.add(table.catalog)
+  }
+
+  return [...catalogs].sort((a, b) => a.localeCompare(b))
+}
+
 function resolveModel(modelId: ModelId): LanguageModel {
   if (modelId === "gpt-5.4-nano") {
     return openai("gpt-5.4-nano")
@@ -154,7 +197,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         "  - 'what data does X have' / 'does X have Y'",
         "  - 'can I access X' / 'get me access to X'",
         "  - ANY mention of a catalog or company name (hdbank, vietjet, partnership) NOT in 'Available tables'",
-        "Returns structured catalog results with accessibility status and suggested actions.",
+        "Returns only the catalogs the current user can already access.",
         "For `search`: extract the main subject keywords from the user's message (e.g. 'I want to access hdbank customers' → search='hdbank customer'; 'interesting data in hdbank' → search='hdbank').",
       ].join(" "),
       inputSchema: z.object({
@@ -162,89 +205,26 @@ export async function handleAnalyticsChat(req: NextRequest) {
           .string()
           .optional()
           .describe(
-            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all tables.",
+            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all accessible catalogs.",
           ),
       }),
       execute: async ({ search }) => {
-        const catalogTableSchema = z.object({
-          tables: z.array(
-            z.object({
-              fqn: z.string().describe("Fully qualified table name: catalog.schema.table"),
-              catalog: z.string(),
-              schemaName: z.string(),
-              tableName: z.string(),
-              accessible: z
-                .boolean()
-                .describe("True if this table appears in the user's accessible schema"),
-              summary: z.string().describe("One sentence describing what data this table contains"),
-              suggestedSql: z
-                .string()
-                .nullable()
-                .describe("A simple SELECT query the user can run, or null for inaccessible tables"),
-              requestResource: z
-                .string()
-                .describe("Fully qualified resource path to use in an access request"),
-              requestScope: z.enum(["catalog", "schema", "table"]),
-            }),
-          ),
-          overview: z
-            .string()
-            .describe(
-              "1-2 sentences summarizing what was found and what actions the user can take",
-            ),
-        })
+        if (schema === "(schema unavailable)" || schema === FALLBACK_SCHEMA) {
+          return {
+            search: search ?? null,
+            catalogs: [],
+            overview:
+              "I could not load your access-scoped catalog right now, so I’m not returning any catalogs. Try again when your Unity Catalog access list is available.",
+          }
+        }
 
-        const [{ object }, existingRequests] = await Promise.all([
-          generateObject({
-            model,
-            schema: catalogTableSchema,
-            prompt: [
-              "You are a data catalog assistant for the Mizumi lakehouse platform.",
-              "",
-              "## Full Platform Catalog (ALL available tables on the platform):",
-              FALLBACK_SCHEMA,
-              "",
-              "## User's Accessible Tables (tables this user can query right now):",
-              schema,
-              "",
-              `## User's search query: "${search ?? "(show all tables)"}"`,
-              "",
-              "Instructions:",
-              "1. Find all tables in the Full Platform Catalog that match the search query (catalog name, schema name, table name, or column names).",
-              "2. For each matching table, check whether it appears in the User's Accessible Tables — set accessible=true only if it does.",
-              "3. For accessible tables, write a practical SELECT query with meaningful columns and LIMIT 20.",
-              "4. Set requestResource to the fully qualified table name (e.g. hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1).",
-              "5. Set requestScope to 'table' unless the user's search matches an entire schema or catalog.",
-              "6. Write an overview describing which tables were found and what next steps the user has (query or request access).",
-            ].join("\n"),
-          }),
-          fetchMyPermissionRequests(undefined, idToken).catch(() => [] as Awaited<ReturnType<typeof fetchMyPermissionRequests>>),
-        ])
+        const catalogs = getAccessibleCatalogs(schema, search)
+        const overview =
+          catalogs.length > 0
+            ? `You can access ${catalogs.length} catalog${catalogs.length === 1 ? "" : "s"} right now.`
+            : `No accessible catalogs matched ${search ? `"${search}"` : "your current filter"}.`
 
-        // Index requests by resource for O(1) lookup
-        const requestByResource = new Map(
-          existingRequests.map((r) => [r.resource, r]),
-        )
-
-        const seen = new Set<string>()
-        const tables = object.tables
-          .filter((table) => {
-            if (seen.has(table.fqn)) return false
-            seen.add(table.fqn)
-            return true
-          })
-          .map((table) => {
-            if (table.accessible) return { ...table, existingRequest: null }
-            const req = requestByResource.get(table.requestResource) ?? null
-            return {
-              ...table,
-              existingRequest: req
-                ? { id: req.id, code: req.code, status: req.status }
-                : null,
-            }
-          })
-
-        return { search: search ?? null, tables, overview: object.overview }
+        return { search: search ?? null, catalogs, overview }
       },
     }),
     prepareAccessRequest: tool({
@@ -399,13 +379,13 @@ export async function handleAnalyticsChat(req: NextRequest) {
 ## Tool quick reference:
 - runQuery → query data the user can access
 - visualizeChart → chart data the user can access
-- exploreCatalog(search) → discover tables + full column schemas anywhere on the platform; use for ANY "want to access / where can I get / interesting data in X" question
+- exploreCatalog(search) → list the catalogs the user can access right now; use for ANY "want to access / where can I get / interesting data in X" question
 - listMyAccessRequests → show the user's own permission requests
 - prepareAccessRequest → ONLY when the user explicitly asks to request access, or when a query returns a permission error
 - checkAccessRequestStatus → look up a specific request by code or ID
 
 ## Discovery → access workflow:
-1. exploreCatalog returns results → tell the user which tables exist, what catalog/schema they are in, and briefly what each table contains based on its columns
+1. exploreCatalog returns results → tell the user which accessible catalogs exist
 2. STOP. Do NOT call prepareAccessRequest automatically.
 3. Only call prepareAccessRequest if the user explicitly asks to request access (e.g. "request access", "I want access", "how do I get access to this")
 

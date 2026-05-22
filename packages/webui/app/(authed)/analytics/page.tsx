@@ -18,8 +18,6 @@ import {
   Tick02Icon,
   SecurityIcon,
   Search01Icon,
-  PlayIcon,
-  LockKeyIcon,
   CatalogueIcon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
@@ -113,22 +111,9 @@ type ListMyAccessRequestsOutput = {
   error?: string
 }
 
-type ExploreCatalogTable = {
-  fqn: string
-  catalog: string
-  schemaName: string
-  tableName: string
-  accessible: boolean
-  summary: string
-  suggestedSql: string | null
-  requestResource: string
-  requestScope: "catalog" | "schema" | "table"
-  existingRequest: { id: string; code: string; status: string } | null
-}
-
 type ExploreCatalogOutput = {
   search: string | null
-  tables: ExploreCatalogTable[]
+  catalogs: string[]
   overview: string
 }
 
@@ -702,14 +687,9 @@ function AccessRequestsListCard({
 
 function ExploreCatalogCard({
   output,
-  onSendMessage,
 }: {
   output: ExploreCatalogOutput
-  onSendMessage?: (text: string) => void
 }) {
-  const accessible = output.tables.filter((t) => t.accessible)
-  const inaccessible = output.tables.filter((t) => !t.accessible)
-
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
@@ -721,7 +701,7 @@ function ExploreCatalogCard({
           </span>
         )}
         <span className="text-muted-foreground text-[11px]">
-          {output.tables.length} {output.tables.length === 1 ? "table" : "tables"}
+          {output.catalogs.length} {output.catalogs.length === 1 ? "catalog" : "catalogs"}
         </span>
       </div>
 
@@ -729,111 +709,28 @@ function ExploreCatalogCard({
         <p className="px-3 py-2 text-[11px] text-muted-foreground border-b">{output.overview}</p>
       )}
 
-      {output.tables.length === 0 && (
+      {output.catalogs.length === 0 && (
         <div className="px-3 py-6 text-center text-muted-foreground text-[11px]">
-          No tables found{output.search ? ` matching &ldquo;${output.search}&rdquo;` : ""}.
+          No catalogs found{output.search ? ` matching &ldquo;${output.search}&rdquo;` : ""}.
         </div>
       )}
 
-      {accessible.length > 0 && (
+      {output.catalogs.length > 0 && (
         <div className="divide-y">
           <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/10">
-            Accessible ({accessible.length})
+            Accessible ({output.catalogs.length})
           </div>
-          {accessible.map((table) => (
-            <div key={table.fqn} className="px-3 py-2 flex items-start gap-2.5">
+          {output.catalogs.map((catalog) => (
+            <div key={catalog} className="px-3 py-2 flex items-start gap-2.5">
               <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="font-mono font-medium text-[11px] truncate">{table.fqn}</div>
+                <div className="font-mono font-medium text-[11px] truncate">{catalog}</div>
                 <div className="text-muted-foreground text-[11px] mt-0.5 line-clamp-1">
-                  {table.summary}
+                  Accessible catalog
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-[10px] shrink-0 gap-1"
-                onClick={() =>
-                  onSendMessage?.(
-                    table.suggestedSql
-                      ? `Run this query: ${table.suggestedSql}`
-                      : `Show me the first 10 rows from ${table.fqn}`,
-                  )
-                }
-              >
-                <HugeiconsIcon icon={PlayIcon} size={9} />
-                Query
-              </Button>
             </div>
           ))}
-        </div>
-      )}
-
-      {inaccessible.length > 0 && (
-        <div className={cn("divide-y", accessible.length > 0 && "border-t")}>
-          <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/10">
-            Requires Access ({inaccessible.length})
-          </div>
-          {inaccessible.map((table) => {
-            const req = table.existingRequest
-            return (
-              <div key={table.fqn} className="px-3 py-2 flex items-start gap-2.5">
-                <div
-                  className={cn(
-                    "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
-                    req ? REQUEST_STATUS_COLORS[req.status]?.dot ?? "bg-amber-400" : "bg-muted-foreground/30",
-                  )}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono font-medium text-[11px] truncate text-muted-foreground">
-                    {table.fqn}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-muted-foreground text-[11px] line-clamp-1">
-                      {table.summary}
-                    </span>
-                    {req && (
-                      <span
-                        className={cn(
-                          "px-1 py-px rounded border text-[10px] font-medium capitalize shrink-0",
-                          REQUEST_STATUS_COLORS[req.status]?.badge ?? "text-amber-700 bg-amber-50 border-amber-200",
-                        )}
-                      >
-                        {req.status}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {req ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-2 text-[10px] shrink-0 gap-1"
-                    onClick={() =>
-                      onSendMessage?.(
-                        `Tell me about my access request ${req.code} for \`${table.fqn}\`.`,
-                      )
-                    }
-                  >
-                    <HugeiconsIcon icon={SecurityIcon} size={9} />
-                    {req.code}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-2 text-[10px] shrink-0 gap-1"
-                    onClick={() =>
-                      onSendMessage?.(`I want to request access to ${table.fqn}`)
-                    }
-                  >
-                    <HugeiconsIcon icon={LockKeyIcon} size={9} />
-                    Request Access
-                  </Button>
-                )}
-              </div>
-            )
-          })}
         </div>
       )}
     </div>
@@ -888,7 +785,6 @@ function ToolPart({
       return (
         <ExploreCatalogCard
           output={part.output as ExploreCatalogOutput}
-          onSendMessage={onSendMessage}
         />
       )
     if (part.state === "output-error") return <ToolError text={part.errorText} />

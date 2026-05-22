@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lancedb-bootstrap
+  namespace: lancedb
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: curlimages/curl:8.13.0
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - sh
+            - -ec
+            - |
+              set -euo pipefail
+
+              base="http://lancedb-svc.lancedb.svc.cluster.local:8080"
+
+              # Wait for server to become ready
+              for i in $(seq 1 60); do
+                if curl -fsS "$base/health" >/dev/null 2>&1; then
+                  echo "lancedb-server ready"
+                  break
+                fi
+                echo "waiting for lancedb-server ($i/60)"
+                sleep 2
+              done
+
+              if ! curl -fsS "$base/health" >/dev/null 2>&1; then
+                echo "lancedb-server never became ready" >&2
+                exit 1
+              fi
+
+              # Create demo table (4-dimensional vectors)
+              echo "--- creating table 'demo' ---"
+              curl -fsS -X POST "$base/tables/demo" \
+                -H 'Content-Type: application/json' \
+                -d '{"dimension": 4, "mode": "overwrite"}'
+              echo
+
+              # Insert example rows
+              echo "--- inserting rows ---"
+              curl -fsS -X POST "$base/tables/demo/insert" \
+                -H 'Content-Type: application/json' \
+                -d '{
+                  "rows": [
+                    {"id": 1, "text": "apple",      "vector": [0.1, 0.2, 0.3, 0.4]},
+                    {"id": 2, "text": "banana",     "vector": [0.2, 0.3, 0.4, 0.5]},
+                    {"id": 3, "text": "cherry",     "vector": [0.9, 0.8, 0.7, 0.6]},
+                    {"id": 4, "text": "date",       "vector": [0.4, 0.3, 0.2, 0.1]},
+                    {"id": 5, "text": "elderberry", "vector": [0.5, 0.6, 0.7, 0.8]}
+                  ]
+                }'
+              echo
+
+              # List tables
+              echo "--- listing tables ---"
+              curl -fsS "$base/tables"
+              echo
+
+              # Vector similarity search
+              echo "--- searching nearest to [0.1, 0.2, 0.3, 0.4] ---"
+              curl -fsS -X POST "$base/tables/demo/search" \
+                -H 'Content-Type: application/json' \
+                -d '{"vector": [0.1, 0.2, 0.3, 0.4], "limit": 3, "metric": "cosine"}'
+              echo
+
+              echo "lancedb bootstrap complete"
