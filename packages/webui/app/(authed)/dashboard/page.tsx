@@ -467,6 +467,7 @@ function PanelCard({
   editing,
   selected,
   onClick,
+  onConfigure,
   onDelete,
 }: {
   panel: Panel
@@ -474,6 +475,7 @@ function PanelCard({
   editing: boolean
   selected: boolean
   onClick: () => void
+  onConfigure: () => void
   onDelete: () => void
 }) {
   const option = useMemo(() => {
@@ -540,7 +542,7 @@ function PanelCard({
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation()
-                onClick()
+                onConfigure()
               }}
             >
               <HugeiconsIcon icon={Edit02Icon} size={12} className="mr-2" />
@@ -564,7 +566,7 @@ function PanelCard({
         {data.status === "idle" && (
           <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
             <HugeiconsIcon icon={ChartColumnIcon} size={22} />
-            <p className="text-[11px]">Click to configure</p>
+            <p className="text-[11px]">Use menu to configure</p>
           </div>
         )}
         {data.status === "running" && <Skeleton className="h-full w-full" />}
@@ -873,7 +875,9 @@ function AiComposer({
   modelId,
   panels,
   panelData,
-  selectedPanelId,
+  selectedPanelIds,
+  onRemoveSelectedPanel,
+  onClearSelectedPanels,
   onModelChange,
   onPanelsCreated,
   onPanelsEdited,
@@ -882,7 +886,9 @@ function AiComposer({
   modelId: ModelId
   panels: Panel[]
   panelData: Record<string, PanelData>
-  selectedPanelId: string | null
+  selectedPanelIds: string[]
+  onRemoveSelectedPanel: (id: string) => void
+  onClearSelectedPanels: () => void
   onModelChange: (m: ModelId) => void
   onPanelsCreated: (
     panels: Panel[],
@@ -901,7 +907,7 @@ function AiComposer({
   const modelIdRef = useRef(modelId)
   const panelsRef = useRef(panels)
   const panelDataRef = useRef(panelData)
-  const selectedPanelIdRef = useRef(selectedPanelId)
+  const selectedPanelIdsRef = useRef(selectedPanelIds)
   const mentionedPanelIdsRef = useRef<string[]>([])
   const lastCreatedIdsRef = useRef<string[]>([])
   const onPanelsCreatedRef = useRef(onPanelsCreated)
@@ -922,8 +928,8 @@ function AiComposer({
     panelDataRef.current = panelData
   }, [panelData])
   useEffect(() => {
-    selectedPanelIdRef.current = selectedPanelId
-  }, [selectedPanelId])
+    selectedPanelIdsRef.current = selectedPanelIds
+  }, [selectedPanelIds])
   useEffect(() => {
     onPanelsCreatedRef.current = onPanelsCreated
   }, [onPanelsCreated])
@@ -934,6 +940,13 @@ function AiComposer({
   const activeMention = useMemo(
     () => getActiveMention(input, caretPos),
     [input, caretPos],
+  )
+  const selectedPanels = useMemo(
+    () =>
+      selectedPanelIds
+        .map((id) => panels.find((panel) => panel.id === id) ?? null)
+        .filter((panel): panel is Panel => !!panel),
+    [panels, selectedPanelIds],
   )
 
   const mentionPanels = useMemo(() => {
@@ -977,7 +990,11 @@ function AiComposer({
                   }
                 : undefined,
           })),
-          selectedPanelId: selectedPanelIdRef.current,
+          selectedPanelIds: selectedPanelIdsRef.current,
+          selectedPanelId:
+            selectedPanelIdsRef.current[
+              selectedPanelIdsRef.current.length - 1
+            ] ?? null,
           mentionedPanelIds: mentionedPanelIdsRef.current,
           lastCreatedIds: lastCreatedIdsRef.current,
         }),
@@ -1179,10 +1196,41 @@ function AiComposer({
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t p-2.5 flex flex-col gap-2">
+      <div className="shrink-0 min-w-0 overflow-x-hidden border-t p-2.5 flex flex-col gap-2">
+        {selectedPanels.length > 0 ? (
+          <div className="flex min-w-0 items-stretch gap-2 rounded-md border bg-muted/20 p-1.5">
+            <button
+              type="button"
+              className="flex shrink-0 items-center justify-center self-stretch rounded-md border bg-background px-2 text-muted-foreground hover:text-foreground"
+              onClick={onClearSelectedPanels}
+              title="Clear selected panels"
+              aria-label="Clear selected panels"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+            </button>
+            <div className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto whitespace-nowrap">
+              {selectedPanels.map((panel) => (
+                <button
+                  key={panel.id}
+                  type="button"
+                  onClick={() => onRemoveSelectedPanel(panel.id)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] text-foreground/85 hover:bg-accent"
+                  title={panel.title}
+                >
+                  <span>{panel.title}</span>
+                  <HugeiconsIcon
+                    icon={Cancel01Icon}
+                    size={10}
+                    className="shrink-0 text-muted-foreground"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <Popover open={!!activeMention}>
           <PopoverAnchor asChild>
-            <div>
+            <div className="min-w-0 w-full max-w-full overflow-x-hidden">
               <Textarea
                 ref={textareaRef}
                 value={input}
@@ -1197,7 +1245,7 @@ function AiComposer({
                 }
                 placeholder="Ask about revenue, trends, customers… Use @ to mention a panel."
                 rows={3}
-                className="min-h-[84px] text-xs"
+                className="min-h-[84px] w-full max-w-full overflow-x-hidden text-xs [field-sizing:fixed]"
               />
             </div>
           </PopoverAnchor>
@@ -1447,7 +1495,8 @@ export default function DashboardPage() {
   )
   const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT)
   const [editing, setEditing] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [configPanelId, setConfigPanelId] = useState<string | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
   const [composerWidth, setComposerWidth] = useState(COMPOSER_DEFAULT)
   const [modelId, setModelId] = useState<ModelId>("gpt-5.4-nano")
@@ -1530,7 +1579,8 @@ export default function DashboardPage() {
       ...prev,
       { i: id, x: 0, y: Infinity, w: 1, h: 4 } as LayoutItem,
     ])
-    setSelectedId(id)
+    setSelectedIds([id])
+    setConfigPanelId(id)
   }
 
   const handleDeletePanel = (id: string) => {
@@ -1542,7 +1592,8 @@ export default function DashboardPage() {
       return next
     })
     setLayout((prev) => prev.filter((l) => l.i !== id))
-    if (selectedId === id) setSelectedId(null)
+    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id))
+    if (configPanelId === id) setConfigPanelId(null)
   }
 
   // Called by AiComposer when editPanel tool calls complete
@@ -1641,9 +1692,9 @@ export default function DashboardPage() {
       window.addEventListener("mouseup", onUp)
     }
 
-  const selectedPanel = panels.find((p) => p.id === selectedId) ?? null
-  const selectedData = selectedId
-    ? (panelData[selectedId] ?? { status: "idle", result: null, error: null })
+  const configPanel = panels.find((p) => p.id === configPanelId) ?? null
+  const configPanelData = configPanelId
+    ? (panelData[configPanelId] ?? { status: "idle", result: null, error: null })
     : null
 
   return (
@@ -1676,7 +1727,7 @@ export default function DashboardPage() {
             className="h-7 gap-1.5 text-xs"
             onClick={() => {
               setEditing((v) => !v)
-              if (editing) setSelectedId(null)
+              if (editing) setSelectedIds([])
             }}
           >
             {editing ? (
@@ -1704,7 +1755,11 @@ export default function DashboardPage() {
               modelId={modelId}
               panels={panels}
               panelData={panelData}
-              selectedPanelId={selectedId}
+              selectedPanelIds={selectedIds}
+              onRemoveSelectedPanel={(id) =>
+                setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id))
+              }
+              onClearSelectedPanels={() => setSelectedIds([])}
               onModelChange={setModelId}
               onPanelsCreated={handlePanelsCreated}
               onPanelsEdited={handlePanelsEdited}
@@ -1728,7 +1783,7 @@ export default function DashboardPage() {
           ref={containerRef}
           className="flex-1 min-w-0 overflow-auto p-3"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedId(null)
+            if (e.target === e.currentTarget) setSelectedIds([])
           }}
         >
           {panels.length === 0 ? (
@@ -1764,12 +1819,20 @@ export default function DashboardPage() {
                       }
                     }
                     editing={editing}
-                    selected={selectedId === panel.id}
+                    selected={selectedIds.includes(panel.id)}
                     onClick={() =>
-                      setSelectedId((prev) =>
-                        prev === panel.id ? null : panel.id,
+                      setSelectedIds((prev) =>
+                        prev.includes(panel.id)
+                          ? prev.filter((id) => id !== panel.id)
+                          : [...prev, panel.id],
                       )
                     }
+                    onConfigure={() => {
+                      setSelectedIds((prev) =>
+                        prev.includes(panel.id) ? prev : [...prev, panel.id],
+                      )
+                      setConfigPanelId(panel.id)
+                    }}
                     onDelete={() => handleDeletePanel(panel.id)}
                   />
                 </div>
@@ -1779,7 +1842,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right: Panel config sidebar */}
-        {selectedPanel && selectedData && (
+        {configPanel && configPanelData && (
           <div className="flex shrink-0 h-full" style={{ width: sidebarWidth }}>
             <div
               className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors bg-border"
@@ -1797,14 +1860,14 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground"
-                  onClick={() => setSelectedId(null)}
+                  onClick={() => setConfigPanelId(null)}
                 >
                   <HugeiconsIcon icon={Cancel01Icon} size={13} />
                 </button>
               </div>
               <PanelSidebar
-                panel={selectedPanel}
-                data={selectedData}
+                panel={configPanel}
+                data={configPanelData}
                 onChange={handlePanelChange}
                 onRun={runQuery}
               />

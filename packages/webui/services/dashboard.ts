@@ -93,6 +93,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     sessionId,
     modelId,
     panels,
+    selectedPanelIds,
     selectedPanelId,
     mentionedPanelIds,
     lastCreatedIds,
@@ -101,6 +102,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     sessionId: string | null
     modelId: ModelId
     panels: PanelSummary[]
+    selectedPanelIds: string[]
     selectedPanelId: string | null
     mentionedPanelIds: string[]
     lastCreatedIds: string[]
@@ -136,6 +138,9 @@ export async function handleDashboardGenerate(req: NextRequest) {
       : "  (none)"
 
   const contextHints = [
+    selectedPanelIds?.length
+      ? `Selected panel ids: ${selectedPanelIds.join(", ")}`
+      : null,
     selectedPanelId ? `Selected panel id: ${selectedPanelId}` : null,
     mentionedPanelIds?.length
       ? `Mentioned panel ids: ${mentionedPanelIds.join(", ")}`
@@ -214,7 +219,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
     editPanel: tool({
       description:
         "Edit an existing dashboard panel. Use this when the user asks to change, update, fix, rename, or modify a panel. " +
-        'To identify the target: use selectedPanelId when the user says "this panel" or "the selected one"; ' +
+        'To identify the target: use selectedPanelIds when the user says "these panels" or refers to the current selection; use selectedPanelId when the user says "this panel" or "the selected one"; ' +
         'use lastCreatedIds when the user says "the last one" or "those panels"; ' +
         "otherwise match by title from the panels list. " +
         "Only include fields that need to change — omit unchanged ones.",
@@ -293,12 +298,14 @@ ${contextHints ? `## Context:\n${contextHints}` : ""}
 - If the user asks what a panel means, what it shows, whether it looks correct, or asks for an explanation of the dashboard, answer directly from the panel title, description, SQL, and top rows.
 - Do not call tools for explanation-only questions unless the user explicitly asks to create or modify panels.
 - When interpreting a panel, explain the business meaning of the metric, the grouping implied by the SQL, and any obvious caveats from the sample rows.
+- If selectedPanelIds are present, treat them as the current UI selection.
 - If mentionedPanelIds are present, treat those panels as the user's explicit scope unless they clearly ask about something broader.
 
 ## When to use each tool:
 - createPanel: user asks to add, show, visualize, or create something new
 - editPanel: user asks to change, update, rename, fix, switch chart type, or modify an existing panel
   - explicit @mentions → use mentionedPanelIds first
+  - "these panels" / current multi-selection → use selectedPanelIds
   - "this panel" / "the selected one" → use selectedPanelId
   - "the last one" / "those panels" / "what you just created" → use lastCreatedIds
   - by name (e.g. "the revenue chart") → match against the panels list by title
