@@ -1741,8 +1741,8 @@ mod tests {
     #[test]
     fn normalize_job_path_supports_controlplane_local_uri() {
         assert_eq!(
-            normalize_job_path("local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"),
-            "packages/spark/jobs/hdbank/stream_partner_events_to_bronze.py"
+            normalize_job_path("local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"),
+            "packages/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"
         );
     }
 
@@ -1751,7 +1751,7 @@ mod tests {
         let repo_root = Path::new("/repo");
         let path = resolve_repo_job_path(
             repo_root,
-            "local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py",
+            "local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py",
         );
         assert!(path.is_none());
     }

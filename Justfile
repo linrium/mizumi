@@ -244,7 +244,7 @@ rustfs-s3-proxy-dns-disable:
 
 rustfs-unitycatalog-anon-read-enable:
     kubectl delete job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --ignore-not-found
-    kubectl create job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc anonymous set download rustfs/unitycatalog'
+    kubectl create job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc mb --ignore-existing rustfs/unitycatalog && mc anonymous set download rustfs/unitycatalog'
     kubectl wait --for=condition=complete job/rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --timeout=120s
     kubectl logs job/rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }}
 
@@ -526,20 +526,25 @@ jobs-submit-hdbank token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"hdbank-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-banking-transactions-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"}' \
       | jq
 
 jobs-submit-vietjetair token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"vietjetair-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py"}' \
+      -d '{"name":"vietjetair-stream-flight-tickets-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_flight_tickets_to_bronze.py"}' \
+      | jq
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{ token }}" \
+      -d '{"name":"vietjetair-stream-flight-incidents-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_flight_incidents_to_bronze.py"}' \
       | jq
 
 jobs-delete-hdbank token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in hdbank-stream-partner-events-to-bronze; do
+    for name in hdbank-stream-banking-transactions-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
@@ -550,7 +555,7 @@ jobs-delete-hdbank token='test':
 jobs-delete-vietjetair token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in vietjetair-stream-partner-events-to-bronze; do
+    for name in vietjetair-stream-flight-tickets-to-bronze vietjetair-stream-flight-incidents-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
@@ -685,13 +690,33 @@ synthetic-server-image-build:
       kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s; \
     fi
 
+synthetic-bootstrap:
+    kubectl create namespace {{ synthetic_namespace }} 2>/dev/null || true
+    kubectl delete job synthetic-bootstrap -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl apply -f {{ synthetic_manifests }}/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/synthetic-bootstrap -n {{ synthetic_namespace }} --timeout=120s
+    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }}
+
 synthetic-server-deploy: synthetic-server-image-build
+    just synthetic-bootstrap
     kubectl apply -f {{ synthetic_manifests }}/server.yaml
     kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s
     kubectl get pods,svc -n {{ synthetic_namespace }}
 
 synthetic-server-forward:
     kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092
+
+synthetic-brand-customers-upload: synthetic-server-image-build
+    just synthetic-bootstrap
+    kubectl delete job synthetic-brand-customers-upload -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl delete configmap synthetic-brand-customers-upload-config -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl apply -f {{ synthetic_manifests }}/brand-customers-upload-job.yaml
+    kubectl wait --for=condition=complete job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} --timeout=300s
+    kubectl logs job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} -c generator
+    kubectl logs job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} -c uploader
+    kubectl apply -f {{ synthetic_manifests }}/server.yaml
+    kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=180s
+    kubectl logs deployment/synthetic-server -n {{ synthetic_namespace }} --tail=50
 
 synthetic-server-destroy:
     kubectl delete -f {{ synthetic_manifests }}/ --ignore-not-found || true

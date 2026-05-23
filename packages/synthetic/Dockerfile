@@ -6,7 +6,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY src/ ./src/
-COPY server.ts ./
+COPY server.ts index.ts generate.ts generate.config.json ./
 
 EXPOSE 3000
 CMD ["bun", "server.ts"]

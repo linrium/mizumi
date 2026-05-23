@@ -2,21 +2,29 @@ import dagster as dg
 from dagster_k8s import PipesK8sClient
 
 from .assets.cross_sell_pipeline import (
-    build_gold_cross_sell,
+    cross_sell_daily_schedule,
+    hdbank_bronze_customers,
+    hdbank_gold_vietjet_activation_candidates,
+    partnership_gold_co_brand_offer_audience,
+    partnership_gold_campaign_summary,
+    partnership_silver_customer_360,
     build_hdbank_silver,
     build_vietjetair_silver,
-    cross_sell_daily_schedule,
-    partnership_gold_campaign_summary,
-    seed_partner_bronze_events,
+    vietjetair_bronze_customers,
+    vietjetair_gold_hdbank_finance_candidates,
 )
 
 
 defs = dg.Definitions(
     assets=[
-        seed_partner_bronze_events,
+        hdbank_bronze_customers,
+        vietjetair_bronze_customers,
         build_hdbank_silver,
         build_vietjetair_silver,
-        build_gold_cross_sell,
+        partnership_silver_customer_360,
+        hdbank_gold_vietjet_activation_candidates,
+        vietjetair_gold_hdbank_finance_candidates,
+        partnership_gold_co_brand_offer_audience,
         partnership_gold_campaign_summary,
     ],
     schedules=[
