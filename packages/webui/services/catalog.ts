@@ -3,10 +3,13 @@ import {
   type Catalog,
   CatalogApiError,
   type PermissionsResponse,
+  type RegisteredModelSummary,
   type ResourceType,
   type Schema,
   type TableDetail,
   type TableSummary,
+  type VolumeDetail,
+  type VolumeSummary,
 } from "@/services/catalog-types"
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
@@ -77,6 +80,26 @@ export async function getTables(catalog: string, schema: string) {
 
 export async function getTable(catalog: string, schema: string, table: string) {
   return ucFetch<TableDetail>(`/tables/${catalog}.${schema}.${table}`)
+}
+
+export async function getVolumes(catalog: string, schema: string) {
+  return ucFetch<{ volumes: VolumeSummary[] }>(
+    `/volumes?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+  )
+}
+
+export async function getVolume(
+  catalog: string,
+  schema: string,
+  volume: string,
+) {
+  return ucFetch<VolumeDetail>(`/volumes/${catalog}.${schema}.${volume}`)
+}
+
+export async function getModels(catalog: string, schema: string) {
+  return ucFetch<{ registered_models: RegisteredModelSummary[] }>(
+    `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+  )
 }
 
 export async function getPermissions(

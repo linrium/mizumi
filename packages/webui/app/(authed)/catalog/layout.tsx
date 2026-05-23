@@ -1,11 +1,11 @@
 "use client"
 
-import { IconBook2, IconDatabase, IconTable } from "@tabler/icons-react"
+import { IconBook2, IconCarFan, IconDatabase, IconFolder, IconTable } from "@tabler/icons-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import type { Catalog, Schema, TableSummary } from "@/services/catalog-types"
-import { getCatalogsAction, getSchemasAction, getTablesAction } from "./actions"
+import type { Catalog, RegisteredModelSummary, Schema, TableSummary, VolumeSummary } from "@/services/catalog-types"
+import { getCatalogsAction, getModelsAction, getSchemasAction, getTablesAction, getVolumesAction } from "./actions"
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -43,6 +43,8 @@ export default function CatalogLayout({
   const [catalogs, setCatalogs] = useState<Catalog[]>([])
   const [schemas, setSchemas] = useState<Record<string, Schema[]>>({})
   const [tables, setTables] = useState<Record<string, TableSummary[]>>({})
+  const [volumes, setVolumes] = useState<Record<string, VolumeSummary[]>>({})
+  const [models, setModels] = useState<Record<string, RegisteredModelSummary[]>>({})
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(360)
@@ -59,9 +61,15 @@ export default function CatalogLayout({
     resourceParts[1] &&
     resourceParts[1] !== "permissions" &&
     resourceParts[1] !== "request-permissions" &&
-    resourceParts[1] !== "preview"
+    resourceParts[1] !== "preview" &&
+    resourceParts[1] !== "volumes" &&
+    resourceParts[1] !== "models"
       ? resourceParts[1]
       : undefined
+  const activeVol =
+    resourceParts[1] === "volumes" && resourceParts[2] ? resourceParts[2] : undefined
+  const activeMod =
+    resourceParts[1] === "models" && resourceParts[2] ? resourceParts[2] : undefined
   const activeItemClass =
     "bg-primary/12 text-foreground font-medium ring-1 ring-primary/20"
   const activeIconClass = "text-primary"
@@ -95,8 +103,14 @@ export default function CatalogLayout({
     const key = `${activeCat}.${activeSch}`
     if (tables[key]) return
 
-    void getTablesAction(activeCat, activeSch).then((data) => {
-      setTables((prev) => ({ ...prev, [key]: data.tables ?? [] }))
+    void Promise.all([
+      getTablesAction(activeCat, activeSch),
+      getVolumesAction(activeCat, activeSch).catch(() => ({ volumes: [] as VolumeSummary[] })),
+      getModelsAction(activeCat, activeSch).catch(() => ({ registered_models: [] as RegisteredModelSummary[] })),
+    ]).then(([tablesData, volumesData, modelsData]) => {
+      setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
+      setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
+      setModels((prev) => ({ ...prev, [key]: modelsData.registered_models ?? [] }))
     })
   }, [activeCat, activeSch, tables])
 
@@ -122,13 +136,27 @@ export default function CatalogLayout({
     toggle(key)
     router.push(`/catalog/${cat}/${sch}`)
     if (!tables[key]) {
-      const data = await getTablesAction(cat, sch)
-      setTables((prev) => ({ ...prev, [key]: data.tables ?? [] }))
+      const [tablesData, volumesData, modelsData] = await Promise.all([
+        getTablesAction(cat, sch),
+        getVolumesAction(cat, sch).catch(() => ({ volumes: [] as VolumeSummary[] })),
+        getModelsAction(cat, sch).catch(() => ({ registered_models: [] as RegisteredModelSummary[] })),
+      ])
+      setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
+      setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
+      setModels((prev) => ({ ...prev, [key]: modelsData.registered_models ?? [] }))
     }
   }
 
   function handleTable(cat: string, sch: string, tbl: string) {
     router.push(`/catalog/${cat}/${sch}/${tbl}`)
+  }
+
+  function handleVolume(cat: string, sch: string, vol: string) {
+    router.push(`/catalog/${cat}/${sch}/volumes/${vol}`)
+  }
+
+  function handleModel(cat: string, sch: string, mod: string) {
+    router.push(`/catalog/${cat}/${sch}/models/${mod}`)
   }
 
   function startResize(event: React.MouseEvent<HTMLButtonElement>) {
@@ -205,7 +233,9 @@ export default function CatalogLayout({
                     const schActive =
                       activeCat === cat.name &&
                       activeSch === sch.name &&
-                      !activeTbl
+                      !activeTbl &&
+                      !activeVol &&
+                      !activeMod
 
                     return (
                       <div key={schKey}>
@@ -228,36 +258,99 @@ export default function CatalogLayout({
                           <span className="truncate flex-1">{sch.name}</span>
                         </button>
 
-                        {schOpen &&
-                          (tables[schKey] ?? []).map((tbl) => {
-                            const tblActive =
-                              activeCat === cat.name &&
-                              activeSch === sch.name &&
-                              activeTbl === tbl.name
+                        {schOpen && (
+                          <>
+                            {(tables[schKey] ?? []).map((tbl) => {
+                              const tblActive =
+                                activeCat === cat.name &&
+                                activeSch === sch.name &&
+                                activeTbl === tbl.name
 
-                            return (
-                              <button
-                                key={tbl.name}
-                                type="button"
-                                onClick={() =>
-                                  handleTable(cat.name, sch.name, tbl.name)
-                                }
-                                className={cn(
-                                  "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                  tblActive && activeItemClass,
-                                )}
-                              >
-                                <IconTable
-                                  size={15}
+                              return (
+                                <button
+                                  key={tbl.name}
+                                  type="button"
+                                  onClick={() =>
+                                    handleTable(cat.name, sch.name, tbl.name)
+                                  }
                                   className={cn(
-                                    "shrink-0 text-muted-foreground",
-                                    tblActive && activeIconClass,
+                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
+                                    tblActive && activeItemClass,
                                   )}
-                                />
-                                <span className="truncate">{tbl.name}</span>
-                              </button>
-                            )
-                          })}
+                                >
+                                  <IconTable
+                                    size={15}
+                                    className={cn(
+                                      "shrink-0 text-muted-foreground",
+                                      tblActive && activeIconClass,
+                                    )}
+                                  />
+                                  <span className="truncate">{tbl.name}</span>
+                                </button>
+                              )
+                            })}
+
+                            {(volumes[schKey] ?? []).map((vol) => {
+                              const volActive =
+                                activeCat === cat.name &&
+                                activeSch === sch.name &&
+                                activeVol === vol.name
+
+                              return (
+                                <button
+                                  key={`vol:${vol.name}`}
+                                  type="button"
+                                  onClick={() =>
+                                    handleVolume(cat.name, sch.name, vol.name)
+                                  }
+                                  className={cn(
+                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
+                                    volActive && activeItemClass,
+                                  )}
+                                >
+                                  <IconFolder
+                                    size={15}
+                                    className={cn(
+                                      "shrink-0 text-muted-foreground",
+                                      volActive && activeIconClass,
+                                    )}
+                                  />
+                                  <span className="truncate">{vol.name}</span>
+                                </button>
+                              )
+                            })}
+
+                            {(models[schKey] ?? []).map((mod) => {
+                              const modActive =
+                                activeCat === cat.name &&
+                                activeSch === sch.name &&
+                                activeMod === mod.name
+
+                              return (
+                                <button
+                                  key={`mod:${mod.name}`}
+                                  type="button"
+                                  onClick={() =>
+                                    handleModel(cat.name, sch.name, mod.name)
+                                  }
+                                  className={cn(
+                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
+                                    modActive && activeItemClass,
+                                  )}
+                                >
+                                  <IconCarFan
+                                    size={15}
+                                    className={cn(
+                                      "shrink-0 text-muted-foreground",
+                                      modActive && activeIconClass,
+                                    )}
+                                  />
+                                  <span className="truncate">{mod.name}</span>
+                                </button>
+                              )
+                            })}
+                          </>
+                        )}
                       </div>
                     )
                   })}

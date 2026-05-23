@@ -4,12 +4,16 @@ import { getServerSession } from "@/lib/auth"
 import {
   getCatalogs,
   getEffectivePrivileges,
+  getModels,
   getPermissions,
   getSchemas,
   getTable,
   getTables,
+  getVolume,
+  getVolumes,
   patchPermissions,
 } from "@/services/catalog"
+import { listS3Objects } from "@/services/rustfs"
 import type {
   PermissionApprovalStep,
   RequestScope,
@@ -51,6 +55,32 @@ export async function getSchemasAction(catalog: string) {
 
 export async function getTablesAction(catalog: string, schema: string) {
   return getTables(catalog, schema)
+}
+
+export async function getVolumesAction(catalog: string, schema: string) {
+  return getVolumes(catalog, schema)
+}
+
+export async function getVolumeAction(
+  catalog: string,
+  schema: string,
+  volume: string,
+) {
+  return getVolume(catalog, schema, volume)
+}
+
+export async function listVolumeFilesAction(
+  storageLocation: string,
+  continuationToken?: string,
+) {
+  const match = storageLocation.match(/^s3:\/\/([^/]+)\/(.+)$/)
+  if (!match) throw new Error(`Invalid storage location: ${storageLocation}`)
+  const [, bucket, prefix] = match as [string, string, string]
+  return listS3Objects(bucket, prefix, { continuationToken })
+}
+
+export async function getModelsAction(catalog: string, schema: string) {
+  return getModels(catalog, schema)
 }
 
 export async function getTableAction(

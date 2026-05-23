@@ -194,6 +194,77 @@ data:
         existing_tables.add(table_name)
 
 
+    def list_volume_names(catalog_name: str, schema_name: str) -> set[str]:
+        response = request(
+            "GET",
+            f"/api/2.1/unity-catalog/volumes?catalog_name={catalog_name}&schema_name={schema_name}",
+        )
+        return {v["name"] for v in (response or {}).get("volumes", [])}
+
+
+    def ensure_volume(catalog_name: str, schema_name: str, volume: dict, existing_volumes: set[str]) -> None:
+        volume_name = volume["name"]
+        if volume_name in existing_volumes:
+            print(f"already exists: /api/2.1/unity-catalog/volumes/{catalog_name}.{schema_name}.{volume_name}")
+            return
+        try:
+            request(
+                "POST",
+                "/api/2.1/unity-catalog/volumes",
+                {
+                    "catalog_name": catalog_name,
+                    "schema_name": schema_name,
+                    "name": volume_name,
+                    "volume_type": volume["volume_type"],
+                    "storage_location": volume.get("storage_location"),
+                    "comment": volume.get("comment"),
+                },
+            )
+        except urllib.error.HTTPError:
+            refreshed = list_volume_names(catalog_name, schema_name)
+            if volume_name not in refreshed:
+                raise
+            print(f"already exists after retry check: /api/2.1/unity-catalog/volumes/{catalog_name}.{schema_name}.{volume_name}")
+            existing_volumes.update(refreshed)
+            return
+        existing_volumes.add(volume_name)
+
+
+    def list_model_names(catalog_name: str, schema_name: str) -> set[str]:
+        response = request(
+            "GET",
+            f"/api/2.1/unity-catalog/models?catalog_name={catalog_name}&schema_name={schema_name}",
+        )
+        return {m["name"] for m in (response or {}).get("registered_models", [])}
+
+
+    def ensure_registered_model(catalog_name: str, schema_name: str, model: dict, existing_models: set[str]) -> None:
+        model_name = model["name"]
+        if model_name in existing_models:
+            print(f"already exists: /api/2.1/unity-catalog/models/{catalog_name}.{schema_name}.{model_name}")
+            return
+        try:
+            request(
+                "POST",
+                "/api/2.1/unity-catalog/models",
+                {
+                    "catalog_name": catalog_name,
+                    "schema_name": schema_name,
+                    "name": model_name,
+                    "comment": model.get("comment"),
+                    "storage_location": model.get("storage_location"),
+                },
+            )
+        except urllib.error.HTTPError:
+            refreshed = list_model_names(catalog_name, schema_name)
+            if model_name not in refreshed:
+                raise
+            print(f"already exists after retry check: /api/2.1/unity-catalog/models/{catalog_name}.{schema_name}.{model_name}")
+            existing_models.update(refreshed)
+            return
+        existing_models.add(model_name)
+
+
     def col(name: str, type_name: str, type_text: str, json_type: str, pos: int) -> dict:
         return {
             "name": name,
@@ -537,6 +608,31 @@ data:
             for table in schema_spec["tables"]:
                 ensure_table(catalog_name, schema_name, table, existing_tables)
 
+    existing_volumes = list_volume_names("vietjetair", "vietjetair_partnership_prod_silver")
+    ensure_volume(
+        "vietjetair",
+        "vietjetair_partnership_prod_silver",
+        {
+            "name": "baggage_damaged_reports",
+            "volume_type": "EXTERNAL",
+            "storage_location": "s3://unitycatalog/vietjetair/baggage_damaged_reports",
+            "comment": "Raw damaged baggage photo uploads from VietJet ground operations.",
+        },
+        existing_volumes,
+    )
+
+    existing_models = list_model_names("vietjetair", "vietjetair_partnership_prod_silver")
+    ensure_registered_model(
+        "vietjetair",
+        "vietjetair_partnership_prod_silver",
+        {
+            "name": "baggage_damage_detector",
+            "comment": "Image classification model that detects and scores baggage damage from inspection photos.",
+            "storage_location": "s3://unitycatalog/vietjetair/models/baggage_damage_detector",
+        },
+        existing_models,
+    )
+
     linh = "linh@gmail.com"
 
     # Catalog-level grants
@@ -598,6 +694,26 @@ data:
     for table_name, grants in table_grants.items():
         changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]
         request("PATCH", f"/api/2.1/unity-catalog/permissions/table/{table_name}", {"changes": changes})
+
+    # Volume grants
+    request(
+        "PATCH",
+        "/api/2.1/unity-catalog/permissions/volume/vietjetair.vietjetair_partnership_prod_silver.baggage_damaged_reports",
+        {"changes": [
+            {"principal": linh, "add": ["OWNER", "READ_VOLUME"], "remove": []},
+            {"principal": "khaopad@gmail.com", "add": ["READ_VOLUME"], "remove": []},
+        ]},
+    )
+
+    # Model grants
+    request(
+        "PATCH",
+        "/api/2.1/unity-catalog/permissions/registered_model/vietjetair.vietjetair_partnership_prod_silver.baggage_damage_detector",
+        {"changes": [
+            {"principal": linh, "add": ["OWNER"], "remove": []},
+            {"principal": "khaopad@gmail.com", "add": ["BROWSE"], "remove": []},
+        ]},
+    )
     PY
 ---
 apiVersion: batch/v1

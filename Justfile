@@ -32,6 +32,7 @@ rustfs_secret_key := "rustfsadmin"
 rustfs_train_dir := "data/train"
 rustfs_train_bucket := "datasets"
 rustfs_train_prefix := "train"
+rustfs_baggage_dir := "packages/synthetic/data/train"
 
 keycloak_namespace := "keycloak"
 keycloak_manifests := "infra/k8s/keycloak"
@@ -102,7 +103,7 @@ forward:
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
-    kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
+    # kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
@@ -175,6 +176,31 @@ rustfs-train-upload bucket=rustfs_train_bucket prefix=rustfs_train_prefix:
         mc alias set rustfs {{ rustfs_endpoint }} {{ rustfs_access_key }} {{ rustfs_secret_key }} && \
         mc mb --ignore-existing rustfs/{{ bucket }} && \
         mc mirror --overwrite /upload rustfs/{{ bucket }}/{{ prefix }}'
+    echo "Upload complete"
+
+rustfs-baggage-upload:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d {{ rustfs_baggage_dir }} ]]; then
+        echo "missing local directory: {{ rustfs_baggage_dir }}" >&2
+        exit 1
+    fi
+    kubectl port-forward -n {{ rustfs_namespace }} svc/rustfs-svc 9000:9000 >/tmp/rustfs-baggage-upload.port-forward.log 2>&1 &
+    port_forward_pid=$!
+    cleanup() {
+        kill "$port_forward_pid" 2>/dev/null || true
+        wait "$port_forward_pid" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+    sleep 3
+    echo "Uploading {{ rustfs_baggage_dir }} to s3://unitycatalog/vietjetair/baggage_damaged_reports/"
+    docker run --rm \
+      --entrypoint /bin/sh \
+      -v "$PWD/{{ rustfs_baggage_dir }}:/upload:ro" \
+      minio/mc:latest -ec '\
+        mc alias set rustfs {{ rustfs_endpoint }} {{ rustfs_access_key }} {{ rustfs_secret_key }} && \
+        mc mb --ignore-existing rustfs/unitycatalog && \
+        mc mirror --overwrite /upload rustfs/unitycatalog/vietjetair/baggage_damaged_reports'
     echo "Upload complete"
 
 rustfs-s3-proxy-deploy:
