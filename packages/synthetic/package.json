@@ -1,0 +1,27 @@
+{
+	"name": "synthetic",
+	"module": "index.ts",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"generate:vietnamese-residents": "bun run index.ts",
+		"generate:banking-transactions": "bun run index.ts banking-transactions",
+		"generate:brand-customers": "bun run index.ts brand-customers",
+		"generate:flight-incidents": "bun run index.ts flight-incidents",
+		"generate:flight-tickets": "bun run index.ts flight-tickets"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.15",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"@ai-sdk/openai": "^3.0.65",
+		"@faker-js/faker": "^10.4.0",
+		"ai": "^6.0.190",
+		"vietnam-address-database": "^1.0.0",
+		"zod": "^4.4.3"
+	}
+}

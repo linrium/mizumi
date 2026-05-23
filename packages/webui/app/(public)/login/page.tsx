@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { getServerSession } from "@/lib/auth"
 import { signInWithKeycloak } from "@/lib/auth/actions"
+import { HoleBackground } from "@/components/animate-ui/components/backgrounds/hole"
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -20,9 +21,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,oklch(0.97_0.11_126)_0%,transparent_28%),linear-gradient(180deg,oklch(0.995_0.01_120)_0%,oklch(0.98_0.02_130)_45%,oklch(0.955_0.03_135)_100%)] px-6 py-16">
-      <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(18,56,32,0.04)_35%,transparent_70%)]" />
-      <div className="relative w-full max-w-md rounded-3xl border border-emerald-950/10 bg-white/88 p-6 shadow-[0_24px_80px_rgba(34,84,61,0.18)] backdrop-blur">
+    <HoleBackground className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="z-50 relative w-full max-w-md rounded-3xl border border-emerald-950/10 bg-white/88 p-6 shadow-[0_24px_80px_rgba(34,84,61,0.18)] backdrop-blur">
         <div className="mb-8 space-y-3">
           <Badge
             variant="outline"
@@ -65,6 +65,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </p>
         </div>
       </div>
-    </div>
+    </HoleBackground>
   )
+
 }
