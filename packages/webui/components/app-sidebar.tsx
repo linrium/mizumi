@@ -7,21 +7,21 @@ import {
   IconCode,
   IconCopy,
   IconKey,
-  IconLayoutDashboard,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
   IconLogout2,
+  IconPipeline,
   IconPlane,
   IconRipple,
-  IconTopologyStar3,
-  IconUsersGroup,
-  IconPipeline,
-  type TablerIcon,
-  IconUsers,
   IconSparkle2,
+  IconUsers,
+  type TablerIcon,
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { startTransition } from "react"
 import { toast } from "sonner"
+import { SessionSelector } from "@/components/session-selector"
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +33,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { signOut } from "@/lib/auth/actions"
 import type { AppSession } from "@/lib/auth/types"
@@ -72,7 +74,12 @@ type AppSidebarProps = {
 
 export function AppSidebar({ session }: AppSidebarProps) {
   const pathname = usePathname()
+  const { state } = useSidebar()
   const groupsLabel = session.groups?.join(", ")
+  const isCollapsed = state === "collapsed"
+  const TriggerIcon = isCollapsed
+    ? IconLayoutSidebarLeftExpand
+    : IconLayoutSidebarLeftCollapse
 
   async function copyDebugToken() {
     if (!session.idToken) {
@@ -91,12 +98,38 @@ export function AppSidebar({ session }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-3">
-        <div className="flex items-center gap-2 mx-1">
-          <IconRipple size={16} className="shrink-0" />
-          <span className="text-sm font-semibold tracking-tight truncate group-data-[collapsible=icon]:hidden">
-            Mizumi
-          </span>
+        <div className="flex items-center">
+          {isCollapsed ? (
+            <SidebarTrigger
+              className="mx-auto size-8 [&_svg]:size-4"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <TriggerIcon size={16} />
+            </SidebarTrigger>
+          ) : (
+            <>
+              <div className="mx-1 flex min-w-0 items-center gap-2">
+                <IconRipple size={16} className="shrink-0" />
+                <span className="truncate text-sm font-semibold tracking-tight">
+                  Mizumi
+                </span>
+              </div>
+              <SidebarTrigger
+                className="ml-auto size-8 [&_svg]:size-4"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+              >
+                <TriggerIcon size={16} />
+              </SidebarTrigger>
+            </>
+          )}
         </div>
+        {!isCollapsed ? (
+          <div className="px-1 pt-2">
+            <SessionSelector />
+          </div>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
