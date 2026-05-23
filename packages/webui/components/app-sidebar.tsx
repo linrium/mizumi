@@ -16,6 +16,7 @@ import {
   IconPipeline,
   type TablerIcon,
   IconUsers,
+  IconSparkle2,
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -42,8 +43,8 @@ const navItems = [
   { title: "Teams", href: "/teams", icon: IconUsers },
   { title: "SQL Editor", href: "/editor", icon: IconCode },
   { title: "Pipelines", href: "/pipelines", icon: IconPipeline },
-  { title: "Analytics", href: "/analytics", icon: IconChartBar },
-  { title: "Dashboard", href: "/dashboard", icon: IconLayoutDashboard },
+  { title: "Agent", href: "/analytics", icon: IconSparkle2 },
+  { title: "Dashboard", href: "/dashboard", icon: IconChartBar },
 ]
 
 const appItems = [
@@ -91,7 +92,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-3">
         <div className="flex items-center gap-2">
-          <IconRipple size={18} className="shrink-0" />
+          <IconRipple size={16} className="shrink-0" />
           <span className="text-sm font-semibold font-mono tracking-tight truncate group-data-[collapsible=icon]:hidden">
             Mizumi
           </span>
@@ -121,7 +122,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Apps</SidebarGroupLabel>
+          <SidebarGroupLabel>Synthetics</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {appItems.map((item: NavItem) => (
