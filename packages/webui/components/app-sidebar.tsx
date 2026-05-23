@@ -91,9 +91,9 @@ export function AppSidebar({ session }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mx-1">
           <IconRipple size={16} className="shrink-0" />
-          <span className="text-sm font-semibold font-mono tracking-tight truncate group-data-[collapsible=icon]:hidden">
+          <span className="text-sm font-semibold tracking-tight truncate group-data-[collapsible=icon]:hidden">
             Mizumi
           </span>
         </div>
