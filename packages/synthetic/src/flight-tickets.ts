@@ -723,6 +723,30 @@ function flightTicketToCsvRow(ticket: FlightTicketInfo): string {
 	).join(",")}\n`
 }
 
+export function generateFlightTickets(
+	residents: VietnameseResidentInfo[],
+	count: number,
+	seed?: number,
+): FlightTicketInfo[] {
+	if (seed !== undefined) {
+		faker.seed(seed)
+	}
+
+	const profiles = residents.map(buildTravelProfile)
+	const counts = allocateTicketCounts(profiles, count)
+	const tickets: FlightTicketInfo[] = []
+
+	for (let index = 0; index < residents.length; index += 1) {
+		const resident = residents[index]
+		if (!resident) {
+			continue
+		}
+		tickets.push(...generateTicketsForResident(resident, counts[index] ?? 0))
+	}
+
+	return tickets
+}
+
 export async function streamFlightTicketsToCsv(
 	options: FlightTicketGeneratorOptions,
 ): Promise<string> {

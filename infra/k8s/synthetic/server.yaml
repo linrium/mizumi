@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: synthetic
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synthetic-server
+  namespace: synthetic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synthetic-server
+  template:
+    metadata:
+      labels:
+        app: synthetic-server
+    spec:
+      containers:
+        - name: synthetic-server
+          image: mizumi-synthetic-server:0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8092
+              name: http
+          env:
+            - name: PORT
+              value: "8092"
+            - name: SEED
+              value: "42"
+            - name: POOL_RESIDENTS
+              value: "500"
+            - name: POOL_BANKING_TRANSACTIONS
+              value: "5000"
+            - name: POOL_FLIGHT_TICKETS
+              value: "8092"
+            - name: POOL_FLIGHT_INCIDENTS
+              value: "1000"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8092
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8092
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: synthetic-server-svc
+  namespace: synthetic
+spec:
+  selector:
+    app: synthetic-server
+  ports:
+    - name: http
+      port: 8092
+      targetPort: 8092

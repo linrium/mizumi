@@ -62,6 +62,10 @@ lancedb_namespace := "lancedb"
 lancedb_manifests := "infra/k8s/lancedb"
 lancedb_image := "mizumi-lancedb-server:0.1.0"
 
+synthetic_namespace := "synthetic"
+synthetic_manifests := "infra/k8s/synthetic"
+synthetic_image := "mizumi-synthetic-server:0.1.0"
+
 caddy_s3_hostname := "s3.ap-southeast-1.amazonaws.com"
 caddy_config := "infra/caddy/Caddyfile"
 caddy_cluster_service_hosts := "keycloak-svc.keycloak.svc.cluster.local controlplane-svc.controlplane.svc.cluster.local"
@@ -105,6 +109,7 @@ forward:
     # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     # kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
+    kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092 &
     echo "RustFS console:   http://127.0.0.1:9001"
     echo "RustFS S3 API:    http://127.0.0.1:9000"
     echo "Redpanda Kafka:   127.0.0.1:19092"
@@ -115,6 +120,8 @@ forward:
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "DuckDB Server:    http://127.0.0.1:8090"
+    echo "LanceDB:          http://127.0.0.1:8091"
+    echo "Synthetic API:    http://127.0.0.1:8092"
     echo "Controlplane API: http://127.0.0.1:4000"
     echo "Shared Postgres:  localhost:5433"
     echo "WebUI:            http://127.0.0.1:3000"
@@ -670,3 +677,22 @@ lancedb-embed-schema: lancedb-image-build
 lancedb-destroy:
     kubectl delete -f {{ lancedb_manifests }}/ --ignore-not-found || true
     kubectl delete namespace {{ lancedb_namespace }} --ignore-not-found --wait=false
+
+synthetic-server-image-build:
+    docker build -t {{ synthetic_image }} packages/synthetic
+    if kubectl get deployment/synthetic-server -n {{ synthetic_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/synthetic-server -n {{ synthetic_namespace }}; \
+      kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s; \
+    fi
+
+synthetic-server-deploy: synthetic-server-image-build
+    kubectl apply -f {{ synthetic_manifests }}/server.yaml
+    kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s
+    kubectl get pods,svc -n {{ synthetic_namespace }}
+
+synthetic-server-forward:
+    kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092
+
+synthetic-server-destroy:
+    kubectl delete -f {{ synthetic_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ synthetic_namespace }} --ignore-not-found --wait=false

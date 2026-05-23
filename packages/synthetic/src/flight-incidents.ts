@@ -272,6 +272,34 @@ function buildIncidentReport(
 	}
 }
 
+export function generateFlightIncidents(
+	tickets: FlightTicketInfo[],
+	count: number,
+	seed?: number,
+): FlightIncidentReportInfo[] {
+	if (seed !== undefined) {
+		faker.seed(seed)
+	}
+
+	const eligibleTickets = tickets
+		.filter((ticket) => ticket.airline === "Vietjet Air")
+		.map((ticket) => ({
+			ticket,
+			incidentScore: ticketIncidentScore(ticket),
+		}))
+
+	if (eligibleTickets.length === 0) {
+		return []
+	}
+
+	const selectedTickets = selectTicketsWithoutReplacement(
+		eligibleTickets,
+		Math.min(count, eligibleTickets.length),
+	)
+
+	return selectedTickets.map((eligibleTicket) => buildIncidentReport(eligibleTicket, null))
+}
+
 export async function streamFlightIncidentsToCsv(
 	options: FlightIncidentGeneratorOptions,
 ): Promise<string> {

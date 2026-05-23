@@ -503,6 +503,30 @@ function bankingTransactionToCsvRow(transaction: BankingTransactionInfo): string
 	).join(",")}\n`
 }
 
+export function generateBankingTransactions(
+	residents: VietnameseResidentInfo[],
+	count: number,
+	seed?: number,
+): BankingTransactionInfo[] {
+	if (seed !== undefined) {
+		faker.seed(seed)
+	}
+
+	const profiles = residents.map(buildBankingUserProfile)
+	const counts = allocateTransactionCounts(profiles, count)
+	const transactions: BankingTransactionInfo[] = []
+
+	for (let index = 0; index < profiles.length; index += 1) {
+		const profile = profiles[index]
+		if (!profile) {
+			continue
+		}
+		transactions.push(...generateTransactionsForProfile(profile, counts[index] ?? 0))
+	}
+
+	return transactions
+}
+
 export async function streamBankingTransactionsToCsv(
 	options: BankingTransactionGeneratorOptions,
 ): Promise<string> {
