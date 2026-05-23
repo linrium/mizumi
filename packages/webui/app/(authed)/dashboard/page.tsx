@@ -52,12 +52,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from "@/components/ui/popover"
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea,
+} from "@/components/ui/input-group"
+import { Label } from "@/components/ui/label"
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -67,7 +68,6 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
 import { apiFetch, getToken } from "@/lib/api-client"
@@ -169,7 +169,9 @@ function buildOption(
   if (chartType === "sankey") {
     const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
     const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
-    const valIdx = result.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+    const valIdx = result.columns.findIndex(
+      (_, i) => i !== srcIdx && i !== tgtIdx,
+    )
 
     const nodeNames = new Set<string>()
     const links: { source: string; target: string; value: number }[] = []
@@ -290,7 +292,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s1-a",
     title: "Story 1 · VietJet Spend Gap Among HDBank Travel Customers",
-    description: "Of all HDBank customers with measurable travel spend, how many have never transacted with VietJet. This untapped pool is the primary target for the co-brand card activation — proven travelers who just haven't flown VietJet yet.",
+    description:
+      "Of all HDBank customers with measurable travel spend, how many have never transacted with VietJet. This untapped pool is the primary target for the co-brand card activation — proven travelers who just haven't flown VietJet yet.",
     chartType: "pie",
     sql: "SELECT CASE WHEN has_vietjet_spend = 1 THEN 'Already flies VietJet' ELSE 'No VietJet spend yet' END AS spend_group, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 GROUP BY has_vietjet_spend",
     xCol: "spend_group",
@@ -299,7 +302,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s1-b",
     title: "Story 1 · Travel Affinity Score of Untapped Customers",
-    description: "Distribution of travel affinity scores for HDBank customers who have never spent with VietJet. High-affinity customers (0.6+) are proven travelers — the most likely to convert when offered a co-brand VietJet card with miles on existing spend.",
+    description:
+      "Distribution of travel affinity scores for HDBank customers who have never spent with VietJet. High-affinity customers (0.6+) are proven travelers — the most likely to convert when offered a co-brand VietJet card with miles on existing spend.",
     chartType: "bar",
     sql: "SELECT CASE WHEN travel_affinity_score >= 0.8 THEN '0.8–1.0 High' WHEN travel_affinity_score >= 0.6 THEN '0.6–0.8' WHEN travel_affinity_score >= 0.4 THEN '0.4–0.6' WHEN travel_affinity_score >= 0.2 THEN '0.2–0.4' ELSE '0.0–0.2 Low' END AS score_band, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 WHERE has_vietjet_spend = 0 GROUP BY score_band ORDER BY score_band DESC",
     xCol: "score_band",
@@ -308,7 +312,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s1-c",
     title: "Story 1 · VietJet Activation Candidates by Offer & Channel",
-    description: "HDBank's gold output: offer propositions assigned to VietJet activation candidates with their recommended outreach channels. The sankey shows which offers flow to which channels — thicker bands are higher-volume paths where campaign spend should concentrate first.",
+    description:
+      "HDBank's gold output: offer propositions assigned to VietJet activation candidates with their recommended outreach channels. The sankey shows which offers flow to which channels — thicker bands are higher-volume paths where campaign spend should concentrate first.",
     chartType: "sankey",
     sql: "SELECT offer_name AS source, recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 GROUP BY offer_name, recommended_channel",
     xCol: "source",
@@ -318,7 +323,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s2-a",
     title: "Story 2 · Shared VietJet Spenders by Credit Score Tier",
-    description: "HDBank customers who are already shared with VietJet AND have active VietJet card spend, grouped by credit score tier. Prime-tier customers (750+) are pre-qualified for a proactive limit upgrade — no application form needed, offer can be pushed in-app.",
+    description:
+      "HDBank customers who are already shared with VietJet AND have active VietJet card spend, grouped by credit score tier. Prime-tier customers (750+) are pre-qualified for a proactive limit upgrade — no application form needed, offer can be pushed in-app.",
     chartType: "bar",
     sql: "SELECT CASE WHEN c.credit_score >= 750 THEN 'Prime (750+)' WHEN c.credit_score >= 650 THEN 'Near-prime (650–749)' ELSE 'Sub-prime (<650)' END AS credit_tier, COUNT(*) AS customers, ROUND(AVG(t.total_card_spend), 0) AS avg_total_spend FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY credit_tier ORDER BY customers DESC",
     xCol: "credit_tier",
@@ -327,7 +333,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s2-b",
     title: "Story 2 · Preferred Outreach Channel for Shared Customers",
-    description: "How shared HDBank+VietJet customers prefer to be contacted. Channel alignment is critical — a limit upgrade offer pushed through the wrong channel sees lower open rates and burns campaign budget. Match the channel to the customer's stated preference.",
+    description:
+      "How shared HDBank+VietJet customers prefer to be contacted. Channel alignment is critical — a limit upgrade offer pushed through the wrong channel sees lower open rates and burns campaign budget. Match the channel to the customer's stated preference.",
     chartType: "bar",
     sql: "SELECT c.preferred_channel, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY c.preferred_channel ORDER BY customers DESC",
     xCol: "preferred_channel",
@@ -337,7 +344,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s3-a",
     title: "Story 3 · Non-Shared VietJet Flyers by Loyalty Tier",
-    description: "VietJet frequent flyers who have no existing HDBank relationship, grouped by frequent-flyer score band. High-tier non-shared flyers are HDBank's highest-value acquisition targets — strong travel behaviour signals credit-worthiness with zero existing relationship friction.",
+    description:
+      "VietJet frequent flyers who have no existing HDBank relationship, grouped by frequent-flyer score band. High-tier non-shared flyers are HDBank's highest-value acquisition targets — strong travel behaviour signals credit-worthiness with zero existing relationship friction.",
     chartType: "bar",
     sql: "SELECT CASE WHEN b.frequent_flyer_score >= 0.7 THEN 'High (0.7+)' WHEN b.frequent_flyer_score >= 0.4 THEN 'Mid (0.4–0.7)' ELSE 'Low (<0.4)' END AS flyer_tier, COUNT(*) AS flyers, ROUND(AVG(b.avg_booking_value), 0) AS avg_booking_value FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 c JOIN vietjetair.vietjetair_partnership_prod_silver.booking_features_v1 b ON c.customer_id = b.customer_id WHERE c.shared_customer = false GROUP BY flyer_tier ORDER BY flyers DESC",
     xCol: "flyer_tier",
@@ -346,7 +354,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s3-b",
     title: "Story 3 · HDBank Finance Candidates by Use Case",
-    description: "VietJet's gold output: which finance propositions were matched to non-shared frequent flyers. Installment plans appeal to high-value occasional bookers; co-brand card offers suit high-frequency travelers. The mix here drives the offer creative and approval workflow.",
+    description:
+      "VietJet's gold output: which finance propositions were matched to non-shared frequent flyers. Installment plans appeal to high-value occasional bookers; co-brand card offers suit high-frequency travelers. The mix here drives the offer creative and approval workflow.",
     chartType: "bar",
     sql: "SELECT use_case, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 GROUP BY use_case ORDER BY candidates DESC",
     xCol: "use_case",
@@ -356,7 +365,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s4-a",
     title: "Story 4 · Finance Candidates by Membership Tier",
-    description: "VietJet finance candidates grouped by membership tier. Silver and Gold members carry past loyalty signal — a financial incentive (0% instalment for 3 months) is far more likely to re-engage them than a flat discount, because the perceived value scales with booking size.",
+    description:
+      "VietJet finance candidates grouped by membership tier. Silver and Gold members carry past loyalty signal — a financial incentive (0% instalment for 3 months) is far more likely to re-engage them than a flat discount, because the perceived value scales with booking size.",
     chartType: "bar",
     sql: "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.membership_tier ORDER BY candidates DESC",
     xCol: "membership_tier",
@@ -365,7 +375,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "s4-b",
     title: "Story 4 · Email Reachability of Finance Targets",
-    description: "Email opt-in status among VietJet finance candidates. Email is the cheapest reactivation channel, but only works if consent exists. Customers without opt-in must be reached via in-app push or personal outreach — channels with higher cost but no consent gate.",
+    description:
+      "Email opt-in status among VietJet finance candidates. Email is the cheapest reactivation channel, but only works if consent exists. Customers without opt-in must be reached via in-app push or personal outreach — channels with higher cost but no consent gate.",
     chartType: "pie",
     sql: "SELECT CASE WHEN v.email_opt_in THEN 'Email reachable' ELSE 'No email consent' END AS reachability, COUNT(*) AS candidates FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.email_opt_in",
     xCol: "reachability",
@@ -375,7 +386,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "joint-a",
     title: "Joint Campaign · Co-brand Audience by Priority Band",
-    description: "Unified co-brand audience across both companies, tiered by activation priority. Band A customers have strong propensity signals from both HDBank and VietJet — they appear in both gold tables and receive the first outreach wave with the strongest co-brand offer.",
+    description:
+      "Unified co-brand audience across both companies, tiered by activation priority. Band A customers have strong propensity signals from both HDBank and VietJet — they appear in both gold tables and receive the first outreach wave with the strongest co-brand offer.",
     chartType: "pie",
     sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
     xCol: "priority_band",
@@ -384,7 +396,8 @@ const DEFAULT_PANELS: Panel[] = [
   {
     id: "joint-b",
     title: "Joint Campaign · HDBank → VietJet Activation Funnel",
-    description: "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (centre), which route to outreach channels (right). Thicker bands are higher-volume paths. Narrow bands reaching premium channels (e.g. personal banker) mark micro-segments worth dedicated campaign treatment.",
+    description:
+      "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (centre), which route to outreach channels (right). Thicker bands are higher-volume paths. Narrow bands reaching premium channels (e.g. personal banker) mark micro-segments worth dedicated campaign treatment.",
     chartType: "sankey",
     sql: "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id GROUP BY c.segment_name, a.use_case UNION ALL SELECT a.use_case AS source, a.recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a GROUP BY a.use_case, a.recommended_channel",
     xCol: "source",
@@ -394,9 +407,9 @@ const DEFAULT_PANELS: Panel[] = [
 
 const DEFAULT_LAYOUT: Layout = [
   // Story 1 — Travel Spender, Not Yet a VietJet Flyer
-  { i: "s1-a", x: 0, y: 0,  w: 1, h: 6 },
-  { i: "s1-b", x: 1, y: 0,  w: 1, h: 6 },
-  { i: "s1-c", x: 0, y: 6,  w: 2, h: 8 },
+  { i: "s1-a", x: 0, y: 0, w: 1, h: 6 },
+  { i: "s1-b", x: 1, y: 0, w: 1, h: 6 },
+  { i: "s1-c", x: 0, y: 6, w: 2, h: 8 },
   // Story 2 — Shared Customer Credit Limit Upgrade
   { i: "s2-a", x: 0, y: 14, w: 1, h: 6 },
   { i: "s2-b", x: 1, y: 14, w: 1, h: 6 },
@@ -1119,7 +1132,9 @@ function AiComposer({
       }
       if (e.key === "ArrowUp") {
         e.preventDefault()
-        setMentionIndex((idx) => (idx - 1 + mentionPanels.length) % mentionPanels.length)
+        setMentionIndex(
+          (idx) => (idx - 1 + mentionPanels.length) % mentionPanels.length,
+        )
         return
       }
       if (e.key === "Enter" || e.key === "Tab") {
@@ -1230,24 +1245,67 @@ function AiComposer({
         ) : null}
         <Popover open={!!activeMention}>
           <PopoverAnchor asChild>
-            <div className="min-w-0 w-full max-w-full overflow-x-hidden">
-              <Textarea
+            <InputGroup className="min-h-[132px] min-w-0 items-stretch overflow-x-hidden rounded-xl bg-background">
+              <InputGroupTextarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
                   setCaretPos(e.target.selectionStart ?? e.target.value.length)
                 }}
-                onClick={(e) => setCaretPos(e.currentTarget.selectionStart ?? 0)}
+                onClick={(e) =>
+                  setCaretPos(e.currentTarget.selectionStart ?? 0)
+                }
                 onKeyDown={handleKeyDown}
                 onSelect={(e) =>
                   setCaretPos(e.currentTarget.selectionStart ?? 0)
                 }
                 placeholder="Ask about revenue, trends, customers… Use @ to mention a panel."
                 rows={3}
-                className="min-h-[84px] w-full max-w-full overflow-x-hidden text-xs [field-sizing:fixed]"
+                className="min-h-[84px] w-full max-w-full overflow-x-hidden px-3 pt-3 text-xs [field-sizing:fixed]"
               />
-            </div>
+              <InputGroupAddon
+                align="block-end"
+                className="items-center justify-between gap-2 border-t px-3 py-2"
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex-1 w-full">
+                    <Select
+                      value={modelId}
+                      onValueChange={(v) => onModelChange(v as ModelId)}
+                    >
+                      <SelectTrigger className="h-7 w-full bg-transparent px-1 text-xs shadow-none">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MODELS.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-7 shrink-0 gap-1.5 text-xs"
+                    disabled={!input.trim() || isLoading}
+                    onClick={handleSend}
+                  >
+                    {isLoading ? (
+                      <HugeiconsIcon
+                        icon={Loading03Icon}
+                        size={12}
+                        className="animate-spin"
+                      />
+                    ) : (
+                      <HugeiconsIcon icon={ArrowUp01Icon} size={12} />
+                    )}
+                    Generate
+                  </Button>
+                </div>
+              </InputGroupAddon>
+            </InputGroup>
           </PopoverAnchor>
           <PopoverContent
             align="start"
@@ -1289,43 +1347,6 @@ function AiComposer({
             </div>
           </PopoverContent>
         </Popover>
-        <p className="text-[10px] text-muted-foreground">
-          Type `@` to mention a panel and scope your question.
-        </p>
-        <div className="flex items-center gap-2">
-          <Select
-            value={modelId}
-            onValueChange={(v) => onModelChange(v as ModelId)}
-          >
-            <SelectTrigger className="h-7 text-xs flex-1 shadow-none bg-transparent px-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MODELS.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            className="h-7 gap-1.5 text-xs shrink-0"
-            disabled={!input.trim() || isLoading}
-            onClick={handleSend}
-          >
-            {isLoading ? (
-              <HugeiconsIcon
-                icon={Loading03Icon}
-                size={12}
-                className="animate-spin"
-              />
-            ) : (
-              <HugeiconsIcon icon={ArrowUp01Icon} size={12} />
-            )}
-            Generate
-          </Button>
-        </div>
       </div>
     </div>
   )
@@ -1694,7 +1715,11 @@ export default function DashboardPage() {
 
   const configPanel = panels.find((p) => p.id === configPanelId) ?? null
   const configPanelData = configPanelId
-    ? (panelData[configPanelId] ?? { status: "idle", result: null, error: null })
+    ? (panelData[configPanelId] ?? {
+        status: "idle",
+        result: null,
+        error: null,
+      })
     : null
 
   return (
@@ -1757,7 +1782,9 @@ export default function DashboardPage() {
               panelData={panelData}
               selectedPanelIds={selectedIds}
               onRemoveSelectedPanel={(id) =>
-                setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id))
+                setSelectedIds((prev) =>
+                  prev.filter((selectedId) => selectedId !== id),
+                )
               }
               onClearSelectedPanels={() => setSelectedIds([])}
               onModelChange={setModelId}

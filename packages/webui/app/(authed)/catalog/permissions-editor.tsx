@@ -1,7 +1,6 @@
 "use client"
 
-import { Tick02Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { IconCheck } from "@tabler/icons-react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -407,11 +406,7 @@ export function PermissionsEditor({
                                 : "border-input bg-background text-transparent dark:bg-input/30",
                             )}
                           >
-                            <HugeiconsIcon
-                              icon={Tick02Icon}
-                              size={12}
-                              strokeWidth={2}
-                            />
+                            <IconCheck size={12} stroke={2} />
                           </span>
                           <span className="truncate" title={privilege}>
                             {privilege}

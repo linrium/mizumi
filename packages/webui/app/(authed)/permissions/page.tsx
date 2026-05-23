@@ -5,6 +5,14 @@ import {
   MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  IconCircleCheck,
+  IconClockHour4,
+  IconInfoCircle,
+  IconListDetails,
+  IconProgressCheck,
+  type TablerIcon,
+} from "@tabler/icons-react"
 import { formatDistanceToNowStrict } from "date-fns"
 import Link from "next/link"
 import { useDeferredValue, useEffect, useMemo, useState } from "react"
@@ -38,9 +46,9 @@ import {
 import { cn } from "@/lib/utils"
 import {
   type BlastRadiusPreview,
+  type LlmRiskStatus,
   listBlastRadius,
   listPermissionRequests,
-  type LlmRiskStatus,
   type PermissionRequest,
   type RequestStatus,
   type RiskLevel,
@@ -48,12 +56,16 @@ import {
 } from "@/services/permissions"
 
 const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "ready", label: "Grant-ready" },
-  { key: "needs-info", label: "Needs info" },
-  { key: "approved", label: "Approved" },
-] as const
+  { key: "all", label: "All", icon: IconListDetails },
+  { key: "pending", label: "Pending", icon: IconClockHour4 },
+  { key: "ready", label: "Grant-ready", icon: IconProgressCheck },
+  { key: "needs-info", label: "Needs info", icon: IconInfoCircle },
+  { key: "approved", label: "Approved", icon: IconCircleCheck },
+] as const satisfies ReadonlyArray<{
+  key: string
+  label: string
+  icon: TablerIcon
+}>
 
 function getStatusVariant(status: RequestStatus) {
   switch (status) {
@@ -344,6 +356,7 @@ export default function PermissionsPage() {
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
+                  <filter.icon size={12} />
                   {filter.label}
                   <span
                     className={cn(
@@ -598,7 +611,9 @@ export default function PermissionsPage() {
                                 setApproveTarget({
                                   request,
                                   stepId: currentSteps[0]?.id,
-                                  durationDays: String(Math.max(request.expires_in_days, 1)),
+                                  durationDays: String(
+                                    Math.max(request.expires_in_days, 1),
+                                  ),
                                 })
                               }
                             >
@@ -617,7 +632,9 @@ export default function PermissionsPage() {
                                   setApproveTarget({
                                     request,
                                     stepId: step.id,
-                                    durationDays: String(Math.max(request.expires_in_days, 1)),
+                                    durationDays: String(
+                                      Math.max(request.expires_in_days, 1),
+                                    ),
                                   })
                                 }
                               >
@@ -805,8 +822,7 @@ export default function PermissionsPage() {
               <p className="text-xs text-muted-foreground">
                 Access expires on{" "}
                 {new Date(
-                  Date.now() +
-                    Number(approveTarget.durationDays) * 86_400_000,
+                  Date.now() + Number(approveTarget.durationDays) * 86_400_000,
                 ).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",

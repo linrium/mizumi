@@ -1,11 +1,6 @@
 "use client"
 
-import {
-  DatabaseIcon,
-  Key01Icon,
-  SecurityIcon,
-} from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { IconDatabase, IconKey, IconShieldLock } from "@tabler/icons-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -37,18 +32,23 @@ export default function CatalogPage() {
         </p>
         <CatalogTabs
           tabs={[
-            { href: `/catalog/${catalog}`, label: "schemas", active: true },
+            {
+              href: `/catalog/${catalog}`,
+              label: "schemas",
+              active: true,
+              icon: IconDatabase,
+            },
             {
               href: `/catalog/${catalog}/permissions`,
               label: "permissions",
               active: false,
-              icon: SecurityIcon,
+              icon: IconShieldLock,
             },
             {
               href: `/catalog/${catalog}/request-permissions`,
               label: "request access",
               active: false,
-              icon: SecurityIcon,
+              icon: IconKey,
             },
           ]}
         />
@@ -87,8 +87,7 @@ export default function CatalogPage() {
                       href={`/catalog/${catalog}/${sch.name}`}
                       className="flex items-center gap-1.5 font-mono font-medium hover:underline underline-offset-2 w-fit"
                     >
-                      <HugeiconsIcon
-                        icon={DatabaseIcon}
+                      <IconDatabase
                         size={13}
                         className="shrink-0 text-muted-foreground"
                       />

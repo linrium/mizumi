@@ -1,7 +1,11 @@
 "use client"
 
-import { Key01Icon, SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  IconKey,
+  IconShieldLock,
+  IconTable,
+  IconTableOptions,
+} from "@tabler/icons-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -42,18 +46,19 @@ export default function SchemaPage() {
               href: `/catalog/${catalog}/${schema}`,
               label: "tables",
               active: true,
+              icon: IconTableOptions,
             },
             {
               href: `/catalog/${catalog}/${schema}/permissions`,
               label: "permissions",
               active: false,
-              icon: SecurityIcon,
+              icon: IconShieldLock,
             },
             {
               href: `/catalog/${catalog}/${schema}/request-permissions`,
               label: "request access",
               active: false,
-              icon: SecurityIcon,
+              icon: IconKey,
             },
           ]}
         />
@@ -92,8 +97,7 @@ export default function SchemaPage() {
                       href={`/catalog/${catalog}/${schema}/${tbl.name}`}
                       className="flex items-center gap-1.5 font-mono font-medium hover:underline underline-offset-2 w-fit"
                     >
-                      <HugeiconsIcon
-                        icon={TableIcon}
+                      <IconTable
                         size={13}
                         className="shrink-0 text-muted-foreground"
                       />

@@ -1,12 +1,18 @@
 "use client"
 
-import { Copy01Icon, SecurityIcon, TableIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  IconCopy,
+  IconEyeTable,
+  IconKey,
+  IconSchema,
+  IconShieldLock,
+  IconTable,
+} from "@tabler/icons-react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { getTableAction } from "../../../actions"
 import { cn } from "@/lib/utils"
+import { getTableAction } from "../../../actions"
 import { TableContext, type TableDetail } from "./table-context"
 
 type Tab = "schema" | "preview" | "permissions" | "request-permissions"
@@ -73,11 +79,7 @@ export default function TableLayout({
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-5 py-4 border-b shrink-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <HugeiconsIcon
-              icon={TableIcon}
-              size={15}
-              className="text-muted-foreground"
-            />
+            <IconTable size={15} className="text-muted-foreground" />
             <h2 className="text-sm font-semibold">{detail.name}</h2>
             <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
               {detail.table_type}
@@ -95,7 +97,7 @@ export default function TableLayout({
               }}
               className="opacity-0 group-hover/path:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
             >
-              <HugeiconsIcon icon={Copy01Icon} size={12} />
+              <IconCopy size={12} />
             </button>
           </div>
           {detail.comment && (
@@ -108,11 +110,23 @@ export default function TableLayout({
         <div className="flex items-center gap-0 px-5 border-b shrink-0">
           {(
             [
-              { key: "schema", label: "schema" },
-              { key: "preview", label: "preview" },
-              { key: "permissions", label: "permissions" },
-              { key: "request-permissions", label: "request access" },
-            ] satisfies { key: Tab; label: string }[]
+              { key: "schema", label: "schema", icon: IconSchema },
+              { key: "preview", label: "preview", icon: IconEyeTable },
+              {
+                key: "permissions",
+                label: "permissions",
+                icon: IconShieldLock,
+              },
+              {
+                key: "request-permissions",
+                label: "request access",
+                icon: IconKey,
+              },
+            ] satisfies {
+              key: Tab
+              label: string
+              icon: typeof IconTable
+            }[]
           ).map((tab) => (
             <button
               key={tab.key}
@@ -126,10 +140,7 @@ export default function TableLayout({
               )}
             >
               <span className="flex items-center gap-1.5">
-                {(tab.key === "permissions" ||
-                  tab.key === "request-permissions") && (
-                  <HugeiconsIcon icon={SecurityIcon} size={12} />
-                )}
+                <tab.icon size={12} />
                 {tab.label}
               </span>
             </button>

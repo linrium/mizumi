@@ -1,25 +1,26 @@
-"use client";
+"use client"
 
 import {
-  Airplane01Icon,
-  BankIcon,
-  Book03Icon,
-  ShoppingBag01Icon,
-  Chart01Icon,
-  CodeIcon,
-  Copy01Icon,
-  DashboardSquare01Icon,
-  Key01Icon,
-  LakeIcon,
-  Logout03Icon,
-  UserMultiple02Icon,
-  WorkflowCircle01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { startTransition } from "react";
-import { toast } from "sonner";
+  IconBook2,
+  IconBuildingBank,
+  IconChartBar,
+  IconCode,
+  IconCopy,
+  IconKey,
+  IconLayoutDashboard,
+  IconLogout2,
+  IconPlane,
+  IconRipple,
+  IconTopologyStar3,
+  IconUsersGroup,
+  IconPipeline,
+  type TablerIcon,
+  IconUsers,
+} from "@tabler/icons-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { startTransition } from "react"
+import { toast } from "sonner"
 import {
   Sidebar,
   SidebarContent,
@@ -31,52 +32,58 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
-import { signOut } from "@/lib/auth/actions";
-import type { AppSession } from "@/lib/auth/types";
+} from "@/components/ui/sidebar"
+import { signOut } from "@/lib/auth/actions"
+import type { AppSession } from "@/lib/auth/types"
 
 const navItems = [
-  { title: "Catalog", href: "/catalog", icon: Book03Icon },
-  { title: "Permissions", href: "/permissions", icon: Key01Icon },
-  { title: "Teams", href: "/teams", icon: UserMultiple02Icon },
-  { title: "SQL Editor", href: "/editor", icon: CodeIcon },
-  { title: "Pipelines", href: "/pipelines", icon: WorkflowCircle01Icon },
-  { title: "Analytics", href: "/analytics", icon: Chart01Icon },
-  { title: "Dashboard", href: "/dashboard", icon: DashboardSquare01Icon },
-];
+  { title: "Catalog", href: "/catalog", icon: IconBook2 },
+  { title: "Permissions", href: "/permissions", icon: IconKey },
+  { title: "Teams", href: "/teams", icon: IconUsers },
+  { title: "SQL Editor", href: "/editor", icon: IconCode },
+  { title: "Pipelines", href: "/pipelines", icon: IconPipeline },
+  { title: "Analytics", href: "/analytics", icon: IconChartBar },
+  { title: "Dashboard", href: "/dashboard", icon: IconLayoutDashboard },
+]
 
 const appItems = [
   {
     title: "VietJet Air Booking",
     href: "/apps/vietjetair-booking",
-    icon: Airplane01Icon,
+    icon: IconPlane,
   },
   {
     title: "HDBank Transfer",
     href: "/apps/hdbank",
-    icon: BankIcon,
+    icon: IconBuildingBank,
   },
-];
+]
+
+type NavItem = {
+  title: string
+  href: string
+  icon: TablerIcon
+}
 
 type AppSidebarProps = {
-  session: AppSession;
-};
+  session: AppSession
+}
 
 export function AppSidebar({ session }: AppSidebarProps) {
-  const pathname = usePathname();
-  const groupsLabel = session.groups?.join(", ");
+  const pathname = usePathname()
+  const groupsLabel = session.groups?.join(", ")
 
   async function copyDebugToken() {
     if (!session.idToken) {
-      toast.error("No ID token available");
-      return;
+      toast.error("No ID token available")
+      return
     }
 
     try {
-      await navigator.clipboard.writeText(session.idToken);
-      toast.success("Copied ID token");
+      await navigator.clipboard.writeText(session.idToken)
+      toast.success("Copied ID token")
     } catch {
-      toast.error("Failed to copy ID token");
+      toast.error("Failed to copy ID token")
     }
   }
 
@@ -84,7 +91,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-3">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={LakeIcon} size={18} className="shrink-0" />
+          <IconRipple size={18} className="shrink-0" />
           <span className="text-sm font-semibold font-mono tracking-tight truncate group-data-[collapsible=icon]:hidden">
             Mizumi
           </span>
@@ -96,7 +103,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {navItems.map((item: NavItem) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -104,7 +111,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
                     isActive={pathname.startsWith(item.href)}
                   >
                     <Link href={item.href}>
-                      <HugeiconsIcon icon={item.icon} size={16} />
+                      <item.icon size={16} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -117,7 +124,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
           <SidebarGroupLabel>Apps</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {appItems.map((item) => (
+              {appItems.map((item: NavItem) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -125,7 +132,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
                     isActive={pathname.startsWith(item.href)}
                   >
                     <Link href={item.href}>
-                      <HugeiconsIcon icon={item.icon} size={16} />
+                      <item.icon size={16} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -159,7 +166,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
               onClick={copyDebugToken}
               tooltip="Copy debug token"
             >
-              <HugeiconsIcon icon={Copy01Icon} size={16} />
+              <IconCopy size={16} />
               <span>Copy debug token</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -168,16 +175,16 @@ export function AppSidebar({ session }: AppSidebarProps) {
               tooltip="Log out"
               onClick={() => {
                 startTransition(() => {
-                  void signOut();
-                });
+                  void signOut()
+                })
               }}
             >
-              <HugeiconsIcon icon={Logout03Icon} size={16} />
+              <IconLogout2 size={16} />
               <span>Log out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  );
+  )
 }

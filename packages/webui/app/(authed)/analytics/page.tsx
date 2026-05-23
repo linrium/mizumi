@@ -19,6 +19,7 @@ import {
   SecurityIcon,
   Search01Icon,
   CatalogueIcon,
+  ArrowUp01Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import {
@@ -1237,17 +1238,15 @@ export default function AnalyticsPage() {
                 className="h-7 px-3 text-xs"
               >
                 {isLoading ? (
-                  <>
-                    <HugeiconsIcon
-                      icon={Loading03Icon}
-                      size={12}
-                      className="animate-spin mr-1.5"
-                    />
-                    Running
-                  </>
+                  <HugeiconsIcon
+                    icon={Loading03Icon}
+                    size={12}
+                    className="animate-spin"
+                  />
                 ) : (
-                  "Send"
+                  <HugeiconsIcon icon={ArrowUp01Icon} size={12} />
                 )}
+                Send
               </Button>
             </div>
           </div>

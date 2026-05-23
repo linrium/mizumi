@@ -1,18 +1,42 @@
 "use client"
 
+import {
+  IconChartBubble,
+  IconClockShield,
+  IconListDetails,
+  IconTemplate,
+  type TablerIcon,
+} from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const TABS = [
-  { label: "Request Queue", href: "/permissions" },
-  { label: "Policy Templates", href: "/permissions/policy-templates" },
+  {
+    label: "Request Queue",
+    href: "/permissions",
+    icon: IconListDetails,
+  },
+  {
+    label: "Policy Templates",
+    href: "/permissions/policy-templates",
+    icon: IconTemplate,
+  },
   {
     label: "Blast-Radius Preview",
     href: "/permissions/blast-radius-preview",
+    icon: IconChartBubble,
   },
-  { label: "Time-Bound Access", href: "/permissions/time-bound-access" },
-]
+  {
+    label: "Time-Bound Access",
+    href: "/permissions/time-bound-access",
+    icon: IconClockShield,
+  },
+] as const satisfies ReadonlyArray<{
+  label: string
+  href: string
+  icon: TablerIcon
+}>
 
 export default function PermissionsLayout({
   children,
@@ -44,12 +68,13 @@ export default function PermissionsLayout({
               key={tab.href}
               href={tab.href}
               className={cn(
-                "px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
+                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                 isActive
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
+              <tab.icon size={12} />
               {tab.label}
             </Link>
           )

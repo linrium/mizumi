@@ -1,7 +1,6 @@
 "use client"
 
-import { Book03Icon, DatabaseIcon, TableIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { IconBook2, IconDatabase, IconTable } from "@tabler/icons-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
@@ -189,8 +188,7 @@ export default function CatalogLayout({
                   )}
                 >
                   <Chevron open={catOpen} />
-                  <HugeiconsIcon
-                    icon={Book03Icon}
+                  <IconBook2
                     size={15}
                     className={cn(
                       "shrink-0 text-muted-foreground",
@@ -220,8 +218,7 @@ export default function CatalogLayout({
                           )}
                         >
                           <Chevron open={schOpen} />
-                          <HugeiconsIcon
-                            icon={DatabaseIcon}
+                          <IconDatabase
                             size={15}
                             className={cn(
                               "shrink-0 text-muted-foreground",
@@ -250,8 +247,7 @@ export default function CatalogLayout({
                                   tblActive && activeItemClass,
                                 )}
                               >
-                                <HugeiconsIcon
-                                  icon={TableIcon}
+                                <IconTable
                                   size={15}
                                   className={cn(
                                     "shrink-0 text-muted-foreground",

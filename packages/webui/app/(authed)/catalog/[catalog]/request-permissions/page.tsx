@@ -1,6 +1,6 @@
 "use client"
 
-import { SecurityIcon } from "@hugeicons/core-free-icons"
+import { IconDatabase, IconKey, IconShieldLock } from "@tabler/icons-react"
 import { useParams } from "next/navigation"
 import { CatalogTabs } from "../../catalog-tabs"
 import { RequestPermissionsPanel } from "../../request-permissions-panel"
@@ -17,18 +17,23 @@ export default function CatalogRequestPermissionsPage() {
         </p>
         <CatalogTabs
           tabs={[
-            { href: `/catalog/${catalog}`, label: "schemas", active: false },
+            {
+              href: `/catalog/${catalog}`,
+              label: "schemas",
+              active: false,
+              icon: IconDatabase,
+            },
             {
               href: `/catalog/${catalog}/permissions`,
               label: "permissions",
               active: false,
-              icon: SecurityIcon,
+              icon: IconShieldLock,
             },
             {
               href: `/catalog/${catalog}/request-permissions`,
               label: "request access",
               active: true,
-              icon: SecurityIcon,
+              icon: IconKey,
             },
           ]}
         />

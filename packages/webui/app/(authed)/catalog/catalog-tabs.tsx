@@ -1,7 +1,6 @@
 "use client"
 
-import type { SecurityIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import type { TablerIcon } from "@tabler/icons-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 
@@ -9,7 +8,7 @@ type Tab = {
   href: string
   label: string
   active: boolean
-  icon?: typeof SecurityIcon
+  icon?: TablerIcon
 }
 
 export function CatalogTabs({ tabs }: { tabs: Tab[] }) {
@@ -27,7 +26,7 @@ export function CatalogTabs({ tabs }: { tabs: Tab[] }) {
           )}
         >
           <span className="flex items-center gap-1.5">
-            {tab.icon && <HugeiconsIcon icon={tab.icon} size={12} />}
+            {tab.icon && <tab.icon size={12} />}
             {tab.label}
           </span>
         </Link>

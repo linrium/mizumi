@@ -1,6 +1,6 @@
 "use client"
 
-import { SecurityIcon } from "@hugeicons/core-free-icons"
+import { IconKey, IconShieldLock, IconTableOptions } from "@tabler/icons-react"
 import { useParams } from "next/navigation"
 import { CatalogTabs } from "../../../catalog-tabs"
 import { PermissionsEditor } from "../../../permissions-editor"
@@ -26,18 +26,19 @@ export default function SchemaPermissionsPage() {
               href: `/catalog/${catalog}/${schema}`,
               label: "tables",
               active: false,
+              icon: IconTableOptions,
             },
             {
               href: `/catalog/${catalog}/${schema}/permissions`,
               label: "permissions",
               active: true,
-              icon: SecurityIcon,
+              icon: IconShieldLock,
             },
             {
               href: `/catalog/${catalog}/${schema}/request-permissions`,
               label: "request access",
               active: false,
-              icon: SecurityIcon,
+              icon: IconKey,
             },
           ]}
         />

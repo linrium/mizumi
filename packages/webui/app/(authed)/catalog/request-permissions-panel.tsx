@@ -1,7 +1,6 @@
 "use client"
 
-import { Tick02Icon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
+import { IconCheck } from "@tabler/icons-react"
 import { useForm } from "@tanstack/react-form"
 import { formatDistanceToNowStrict } from "date-fns"
 import { useEffect, useState } from "react"
@@ -25,9 +24,9 @@ import {
   cancelPermissionRequestAction,
   getMyPrivilegesAction,
   listMyTeamsAction,
+  listPermissionRequestsAction,
   type MyTeamOption,
   type RequestSubmitAs,
-  listPermissionRequestsAction,
   type StoredPermissionRequest,
   submitPermissionRequestAction,
 } from "./actions"
@@ -359,11 +358,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                   : "border-input bg-background text-transparent dark:bg-input/30",
                               )}
                             >
-                              <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={12}
-                                strokeWidth={2}
-                              />
+                              <IconCheck size={12} stroke={2} />
                             </span>
                             <span className="truncate" title={priv}>
                               {priv}

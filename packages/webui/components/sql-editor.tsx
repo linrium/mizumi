@@ -1,9 +1,10 @@
 "use client"
 
-import { Copy01Icon, PlayIcon } from "@hugeicons/core-free-icons"
+import { Copy01Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import type { Monaco } from "@monaco-editor/react"
 import Editor from "@monaco-editor/react"
+import { IconPlayerPlay } from "@tabler/icons-react"
 import { useForm } from "@tanstack/react-form"
 import type { ColumnDef } from "@tanstack/react-table"
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
@@ -491,7 +492,7 @@ export function SqlEditor() {
               onClick={() => form.handleSubmit()}
               className="gap-1.5 h-7 px-3 text-xs"
             >
-              <HugeiconsIcon icon={PlayIcon} size={12} />
+              <IconPlayerPlay size={12} />
               {isSubmitting ? "Running…" : "Run"}
             </Button>
           )}
