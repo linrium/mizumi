@@ -1,13 +1,12 @@
 "use client"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import { CpuIcon } from "@hugeicons/core-free-icons"
+import { IconCpu } from "@tabler/icons-react"
 
 export function SessionSelector() {
   return (
     <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border text-xs text-muted-foreground">
       <span className="size-1.5 rounded-full bg-green-500" />
-      <HugeiconsIcon icon={CpuIcon} size={11} className="text-muted-foreground" />
+      <IconCpu size={14} />
       default
     </div>
   )

@@ -68,6 +68,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Textarea } from "@/components/ui/textarea"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { useSessionContext } from "@/hooks/use-session-context"
 import { apiFetch, getToken } from "@/lib/api-client"
@@ -1213,7 +1214,7 @@ function AiComposer({
       {/* Input */}
       <div className="shrink-0 min-w-0 overflow-x-hidden border-t p-2.5 flex flex-col gap-2">
         {selectedPanels.length > 0 ? (
-          <div className="flex min-w-0 items-stretch gap-2 rounded-md border bg-muted/20 p-1.5">
+          <div className="flex min-w-0 items-stretch gap-2">
             <button
               type="button"
               className="flex shrink-0 items-center justify-center self-stretch rounded-md border bg-background px-2 text-muted-foreground hover:text-foreground"

@@ -7,8 +7,8 @@ import {
   IconCode,
   IconCopy,
   IconKey,
-  IconLayoutSidebarLeftCollapse,
-  IconLayoutSidebarLeftExpand,
+  IconArrowBarLeft,
+  IconArrowBarRight,
   IconLogout2,
   IconPipeline,
   IconPlane,
@@ -78,8 +78,8 @@ export function AppSidebar({ session }: AppSidebarProps) {
   const groupsLabel = session.groups?.join(", ")
   const isCollapsed = state === "collapsed"
   const TriggerIcon = isCollapsed
-    ? IconLayoutSidebarLeftExpand
-    : IconLayoutSidebarLeftCollapse
+    ? IconArrowBarRight
+    : IconArrowBarLeft
 
   async function copyDebugToken() {
     if (!session.idToken) {
@@ -97,7 +97,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-3 py-3">
+      <SidebarHeader className="py-3">
         <div className="flex items-center">
           {isCollapsed ? (
             <SidebarTrigger
@@ -125,11 +125,6 @@ export function AppSidebar({ session }: AppSidebarProps) {
             </>
           )}
         </div>
-        {!isCollapsed ? (
-          <div className="px-1 pt-2">
-            <SessionSelector />
-          </div>
-        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
@@ -177,6 +172,11 @@ export function AppSidebar({ session }: AppSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        {!isCollapsed ? (
+          <div className="pt-2">
+            <SessionSelector />
+          </div>
+        ) : null}
         <div className="rounded-md border border-sidebar-border/70 bg-sidebar-accent/30 px-2 py-2 group-data-[collapsible=icon]:hidden">
           <div className="truncate text-xs font-medium">
             {session.name ?? session.email ?? session.preferredUsername}
