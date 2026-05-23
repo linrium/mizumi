@@ -1,0 +1,35 @@
+{
+  "seed": 42,
+  "generators": [
+    {
+      "type": "vietnamese-residents",
+      "count": 10000,
+      "output": "output/vietnamese_residents.csv"
+    },
+    {
+      "type": "banking-transactions",
+      "count": 50000,
+      "output": "output/banking_transactions.csv",
+      "residentsPath": "output/vietnamese_residents.csv"
+    },
+    {
+      "type": "brand-customers",
+      "count": 5000,
+      "output": "output",
+      "residentsPath": "output/vietnamese_residents.csv"
+    },
+    {
+      "type": "flight-tickets",
+      "count": 20000,
+      "output": "output/flight_tickets.csv",
+      "residentsPath": "output/vietnamese_residents.csv"
+    },
+    {
+      "type": "flight-incidents",
+      "count": 2000,
+      "output": "output/flight_incidents.csv",
+      "flightTicketsPath": "output/flight_tickets.csv",
+      "trainDataPath": "data/train"
+    }
+  ]
+}

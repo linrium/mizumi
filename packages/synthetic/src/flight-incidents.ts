@@ -1,3 +1,5 @@
+import { readdir } from "node:fs/promises"
+import { resolve } from "node:path"
 import { fakerVI as faker } from "@faker-js/faker"
 import { escapeCsv, readCsvRows, streamCsvRows } from "./csv"
 import {
@@ -229,7 +231,19 @@ function incidentToCsvRow(report: FlightIncidentReportInfo): string {
 	).join(",")}\n`
 }
 
-function buildIncidentReport(eligibleTicket: EligibleTicket): FlightIncidentReportInfo {
+function makeImageCycler(filenames: string[]): () => string {
+	let index = 0
+	return () => {
+		const filename = filenames[index % filenames.length] as string
+		index += 1
+		return `vietjetair/baggage_damaged_reports/${filename}`
+	}
+}
+
+function buildIncidentReport(
+	eligibleTicket: EligibleTicket,
+	nextImage: (() => string) | null,
+): FlightIncidentReportInfo {
 	const airport = issueAirport(eligibleTicket.ticket)
 	const type = incidentTypeForAirport(airport)
 	const severity = incidentSeverity(type)
@@ -254,6 +268,7 @@ function buildIncidentReport(eligibleTicket: EligibleTicket): FlightIncidentRepo
 		delayedMinutes: delayedMinutesForType(type),
 		currency: "VND",
 		city: eligibleTicket.ticket.city,
+		imagePath: type === "baggage_damaged" && nextImage ? nextImage() : "",
 	}
 }
 
@@ -288,9 +303,16 @@ export async function streamFlightIncidentsToCsv(
 		Math.min(options.count, eligibleTickets.length),
 	)
 
+	let nextImage: (() => string) | null = null
+	if (options.trainDataPath) {
+		const filenames = await readdir(resolve(options.trainDataPath))
+		const shuffled = faker.helpers.shuffle(filenames)
+		nextImage = makeImageCycler(shuffled)
+	}
+
 	function* rows() {
 		for (const ticket of selectedTickets) {
-			yield buildIncidentReport(ticket)
+			yield buildIncidentReport(ticket, nextImage)
 		}
 	}
 

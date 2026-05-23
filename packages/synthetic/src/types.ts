@@ -20,6 +20,7 @@ export interface FlightTicketGeneratorOptions extends GeneratorOptions {
 
 export interface FlightIncidentGeneratorOptions extends GeneratorOptions {
 	flightTicketsPath: string
+	trainDataPath?: string
 }
 
 export interface CliOptions {
@@ -145,6 +146,7 @@ export interface FlightIncidentReportInfo {
 	delayedMinutes: number
 	currency: "VND"
 	city: string
+	imagePath: string
 }
 
 export type CustomerCase =
@@ -264,6 +266,7 @@ export const FLIGHT_INCIDENT_CSV_HEADERS: Array<
 	"delayedMinutes",
 	"currency",
 	"city",
+	"imagePath",
 ]
 
 export const HDBANK_CUSTOMER_CSV_HEADERS: Array<keyof HdbankCustomerInfo> = [
