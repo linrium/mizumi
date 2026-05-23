@@ -455,10 +455,7 @@ impl PermissionService {
                 .map_err(AppError::QueryFailed)?;
         }
 
-        let team_name = request
-            .team
-            .as_deref()
-            .unwrap_or(&request.requester);
+        let team_name = request.team.as_deref().unwrap_or(&request.requester);
         let started_at = Utc::now();
         // Reviewer override takes precedence; fall back to the duration baked
         // into the request at creation time (already policy-capped).
@@ -466,7 +463,8 @@ impl PermissionService {
 
         // Renewal: extend the existing grant's expiry instead of inserting duplicates.
         if let Some(renewal_grant_id) = request.renewal_of {
-            match time_bound_grants::extend(&self.db, renewal_grant_id, effective_expires_at).await {
+            match time_bound_grants::extend(&self.db, renewal_grant_id, effective_expires_at).await
+            {
                 Ok(Some(_)) => tracing::info!(
                     request_id = %request.id,
                     grant_id = %renewal_grant_id,
@@ -630,7 +628,10 @@ impl PermissionService {
     /// The requested duration (from the caller) is capped by the matched
     /// template's `max_grant_duration_days`. When neither is provided the
     /// service falls back to `DEFAULT_DURATION_DAYS`.
-    fn effective_expires_at(requested_days: Option<i32>, template_max: Option<i32>) -> DateTime<Utc> {
+    fn effective_expires_at(
+        requested_days: Option<i32>,
+        template_max: Option<i32>,
+    ) -> DateTime<Utc> {
         const DEFAULT_DURATION_DAYS: i64 = 7;
         const MAX_DURATION_DAYS: i64 = 365;
 
@@ -1152,9 +1153,9 @@ impl PermissionService {
                 // If the reviewer supplied an explicit duration, compute a new
                 // expires_at from now. This overrides the value baked into the
                 // request at creation time (which is already policy-capped).
-                let expires_at_override = body.grant_duration_days.map(|days| {
-                    Utc::now() + chrono::Duration::days(days)
-                });
+                let expires_at_override = body
+                    .grant_duration_days
+                    .map(|days| Utc::now() + chrono::Duration::days(days));
                 if existing.approval_steps.is_empty() {
                     let reviewer_id = existing.reviewer_id;
                     let request = permission_requests::update_status_and_reviewer(
@@ -1333,9 +1334,7 @@ impl PermissionService {
         time_bound_grants::extend(&self.db, id, body.expires_at)
             .await?
             .ok_or_else(|| {
-                AppError::QueryFailed(
-                    "grant not found or already expired/revoked".into(),
-                )
+                AppError::QueryFailed("grant not found or already expired/revoked".into())
             })
     }
 

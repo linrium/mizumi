@@ -1,3 +1,4 @@
+pub mod chat_threads;
 pub mod dagster;
 pub mod k8s;
 pub mod lineage;
@@ -66,6 +67,16 @@ fn extract_bearer(headers: &HeaderMap) -> Option<String> {
 
 pub fn create_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
+        .route(
+            "/api/chat/threads",
+            get(chat_threads::list_threads).post(chat_threads::create_thread),
+        )
+        .route(
+            "/api/chat/threads/{id}",
+            get(chat_threads::get_thread)
+                .patch(chat_threads::update_thread)
+                .delete(chat_threads::delete_thread),
+        )
         .route(
             "/api/teams",
             get(teams::list_teams).post(teams::create_team),

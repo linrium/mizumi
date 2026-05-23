@@ -175,10 +175,7 @@ pub async fn mark_expiring_soon(db: &PgPool) -> Result<u64, sqlx::Error> {
 /// using `FOR UPDATE SKIP LOCKED` so concurrent workers don't double-process.
 /// Returns rows locked within this transaction — caller must hold the transaction
 /// open while processing.
-pub async fn list_overdue(
-    db: &PgPool,
-    limit: i64,
-) -> Result<Vec<TimeBoundGrant>, sqlx::Error> {
+pub async fn list_overdue(db: &PgPool, limit: i64) -> Result<Vec<TimeBoundGrant>, sqlx::Error> {
     sqlx::query_as::<_, TimeBoundGrant>(
         r#"
         SELECT * FROM time_bound_grants

@@ -12,11 +12,12 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use adapters::inbound::http::create_router;
 use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
-    dagster_service::DagsterService, expiry_worker::ExpiryWorker, k8s_service::K8sQueryService,
-    lineage_service::LineageService, llm_service::LlmService,
-    permission_service::PermissionService, streaming_service::StreamingJobService,
-    team_service::TeamService, test_event_service::TestEventService,
-    uc_service::UnityCatalogProxyService, user_service::UserService,
+    chat_thread_service::ChatThreadService, dagster_service::DagsterService,
+    expiry_worker::ExpiryWorker, k8s_service::K8sQueryService, lineage_service::LineageService,
+    llm_service::LlmService, permission_service::PermissionService,
+    streaming_service::StreamingJobService, team_service::TeamService,
+    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
+    user_service::UserService,
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
 
@@ -67,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::warn!("OpenAI API key not configured; LLM blast-radius analysis is disabled");
     }
     let state = Arc::new(AppState {
+        chat_thread_service: Arc::new(ChatThreadService::new(db.clone())),
         dagster_service: Arc::new(DagsterService),
         k8s_service: Arc::new(K8sQueryService::new(config.duckdb_server.base_url.clone())),
         lineage_service: Arc::new(LineageService::new(

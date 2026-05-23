@@ -1,4 +1,5 @@
 pub mod blast_radius;
+pub mod chat_threads;
 pub mod lineage;
 pub mod permission_requests;
 pub mod policy_templates;

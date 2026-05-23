@@ -1,3 +1,4 @@
+pub mod chat_thread_service;
 pub mod dagster_service;
 pub mod expiry_worker;
 pub mod k8s_service;

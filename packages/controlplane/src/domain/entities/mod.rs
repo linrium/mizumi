@@ -1,3 +1,4 @@
+pub mod chat_thread;
 pub mod lineage;
 pub mod permission;
 pub mod query;

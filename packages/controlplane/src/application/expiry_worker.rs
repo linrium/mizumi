@@ -25,8 +25,7 @@ impl ExpiryWorker {
     /// of the process and failures per-tick are logged but never propagate.
     pub fn start(self) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(Duration::from_secs(TICK_INTERVAL_SECS));
+            let mut interval = tokio::time::interval(Duration::from_secs(TICK_INTERVAL_SECS));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
@@ -39,10 +38,9 @@ impl ExpiryWorker {
     async fn tick(&self) {
         // Phase 1: promote healthy → expiring for grants expiring within 7 days.
         match time_bound_grants::mark_expiring_soon(&self.db).await {
-            Ok(count) if count > 0 => tracing::info!(
-                count,
-                "expiry-worker: promoted grants to 'expiring'"
-            ),
+            Ok(count) if count > 0 => {
+                tracing::info!(count, "expiry-worker: promoted grants to 'expiring'")
+            }
             Ok(_) => {}
             Err(e) => tracing::warn!(error = %e, "expiry-worker: mark_expiring_soon failed"),
         }
@@ -60,7 +58,10 @@ impl ExpiryWorker {
             return;
         }
 
-        tracing::info!(count = overdue.len(), "expiry-worker: processing overdue grants");
+        tracing::info!(
+            count = overdue.len(),
+            "expiry-worker: processing overdue grants"
+        );
 
         let mut expired_count = 0u32;
         let mut uc_error_count = 0u32;
