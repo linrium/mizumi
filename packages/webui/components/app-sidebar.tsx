@@ -16,6 +16,7 @@ import {
   IconSparkle2,
   IconUsers,
   type TablerIcon,
+  IconShield,
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -41,7 +42,7 @@ import type { AppSession } from "@/lib/auth/types"
 
 const navItems = [
   { title: "Catalog", href: "/catalog", icon: IconBook2 },
-  { title: "Permissions", href: "/permissions", icon: IconKey },
+  { title: "Governance", href: "/permissions", icon: IconShield },
   { title: "Teams", href: "/teams", icon: IconUsers },
   { title: "SQL Editor", href: "/editor", icon: IconCode },
   { title: "Pipelines", href: "/pipelines", icon: IconPipeline },

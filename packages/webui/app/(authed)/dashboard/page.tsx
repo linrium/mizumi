@@ -2,28 +2,29 @@
 
 import { useChat } from "@ai-sdk/react"
 import {
-  Add01Icon,
-  AlertCircleIcon,
-  ArrowDataTransferHorizontalIcon,
-  ArrowUp01Icon,
-  Cancel01Icon,
-  Chart01Icon,
-  ChartAreaIcon,
-  ChartColumnIcon,
-  ChartLineData01Icon,
-  ChartScatterIcon,
-  CheckmarkCircle01Icon,
-  Delete01Icon,
-  DragDropIcon,
-  Edit02Icon,
-  Loading03Icon,
-  MoreHorizontalIcon,
-  PieChart01Icon,
-  PlayIcon,
-  Refresh01Icon,
-  SparklesIcon,
-} from "@hugeicons/core-free-icons"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+  IconAlertCircle,
+  IconChartArea,
+  IconChartBar,
+  IconChartDots,
+  IconChartHistogram,
+  IconChartPie,
+  IconChartSankey,
+  IconChartScatter,
+  IconCheck,
+  IconDotsVertical,
+  IconGripVertical,
+  IconLoader2,
+  IconPencil,
+  IconPlayerPlay,
+  IconPlus,
+  IconRefresh,
+  IconSend2,
+  IconSparkles,
+  IconTrash,
+  IconX,
+  IconDots,
+  type TablerIcon,
+} from "@tabler/icons-react"
 import type { ColumnDef } from "@tanstack/react-table"
 import type { UIDataTypes, UIMessage, UIMessagePart, UITools } from "ai"
 import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
@@ -514,28 +515,19 @@ function PanelCard({
         )}
       >
         {editing && (
-          <HugeiconsIcon
-            icon={DragDropIcon}
-            size={12}
-            className="text-muted-foreground shrink-0"
-          />
+          <IconGripVertical size={12} className="text-muted-foreground shrink-0" />
         )}
         <span className="text-xs font-medium flex-1 truncate">
           {panel.title}
         </span>
         {data.status === "running" && (
-          <HugeiconsIcon
-            icon={Loading03Icon}
+          <IconLoader2
             size={12}
             className="text-muted-foreground animate-spin shrink-0"
           />
         )}
         {data.status === "error" && (
-          <HugeiconsIcon
-            icon={AlertCircleIcon}
-            size={12}
-            className="text-destructive shrink-0"
-          />
+          <IconAlertCircle size={12} className="text-destructive shrink-0" />
         )}
         {data.status === "ok" && (
           <span className="text-[10px] text-muted-foreground shrink-0">
@@ -549,7 +541,7 @@ function PanelCard({
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
               onClick={(e) => e.stopPropagation()}
             >
-              <HugeiconsIcon icon={MoreHorizontalIcon} size={13} />
+              <IconDotsVertical size={13} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="text-xs">
@@ -559,7 +551,7 @@ function PanelCard({
                 onConfigure()
               }}
             >
-              <HugeiconsIcon icon={Edit02Icon} size={12} className="mr-2" />
+              <IconPencil size={12} className="mr-2" />
               Configure
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -570,7 +562,7 @@ function PanelCard({
               }}
               className="text-destructive focus:text-destructive"
             >
-              <HugeiconsIcon icon={Delete01Icon} size={12} className="mr-2" />
+              <IconTrash size={12} className="mr-2" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -579,7 +571,7 @@ function PanelCard({
       <div className="flex-1 min-h-0 p-1">
         {data.status === "idle" && (
           <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
-            <HugeiconsIcon icon={ChartColumnIcon} size={22} />
+            <IconChartHistogram size={22} />
             <p className="text-[11px]">Use menu to configure</p>
           </div>
         )}
@@ -601,7 +593,7 @@ function PanelCard({
         )}
         {data.status === "ok" && !option && (
           <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
-            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={22} />
+            <IconCheck size={22} />
             <p className="text-[11px]">
               {data.result?.row_count} rows — configure X/Y columns
             </p>
@@ -621,14 +613,14 @@ function PanelCard({
 
 const CHART_TYPE_CONFIG: Record<
   ChartType,
-  { label: string; icon: IconSvgElement }
+  { label: string; icon: TablerIcon }
 > = {
-  bar: { label: "Bar", icon: ChartColumnIcon },
-  line: { label: "Line", icon: ChartLineData01Icon },
-  area: { label: "Area", icon: ChartAreaIcon },
-  pie: { label: "Pie / Donut", icon: PieChart01Icon },
-  scatter: { label: "Scatter", icon: ChartScatterIcon },
-  sankey: { label: "Sankey / Flow", icon: ArrowDataTransferHorizontalIcon },
+  bar: { label: "Bar", icon: IconChartHistogram },
+  line: { label: "Line", icon: IconChartBar },
+  area: { label: "Area", icon: IconChartArea },
+  pie: { label: "Pie / Donut", icon: IconChartPie },
+  scatter: { label: "Scatter", icon: IconChartScatter },
+  sankey: { label: "Sankey / Flow", icon: IconChartSankey },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
@@ -680,13 +672,9 @@ function PanelSidebar({
             onClick={() => onRun(panel)}
           >
             {isRunning ? (
-              <HugeiconsIcon
-                icon={Loading03Icon}
-                size={11}
-                className="animate-spin"
-              />
+              <IconLoader2 size={11} className="animate-spin" />
             ) : (
-              <HugeiconsIcon icon={PlayIcon} size={11} />
+              <IconPlayerPlay size={11} />
             )}
             Run
           </Button>
@@ -738,22 +726,21 @@ function PanelSidebar({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(CHART_TYPE_CONFIG) as ChartType[]).map((type) => (
-                <SelectItem
-                  key={type}
-                  value={type}
-                  textValue={CHART_TYPE_CONFIG[type].label}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <HugeiconsIcon
-                      icon={CHART_TYPE_CONFIG[type].icon}
-                      size={12}
-                      className="shrink-0"
-                    />
-                    {CHART_TYPE_CONFIG[type].label}
-                  </div>
-                </SelectItem>
-              ))}
+              {(Object.keys(CHART_TYPE_CONFIG) as ChartType[]).map((type) => {
+                const ChartTypeIcon = CHART_TYPE_CONFIG[type].icon
+                return (
+                  <SelectItem
+                    key={type}
+                    value={type}
+                    textValue={CHART_TYPE_CONFIG[type].label}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <ChartTypeIcon size={12} className="shrink-0" />
+                      {CHART_TYPE_CONFIG[type].label}
+                    </div>
+                  </SelectItem>
+                )
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -1198,11 +1185,7 @@ function AiComposer({
             ))}
             {isLoading && messages.at(-1)?.role === "user" && (
               <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                <HugeiconsIcon
-                  icon={Loading03Icon}
-                  size={12}
-                  className="animate-spin"
-                />
+                <IconLoader2 size={12} className="animate-spin" />
                 Generating panels…
               </div>
             )}
@@ -1222,7 +1205,7 @@ function AiComposer({
               title="Clear selected panels"
               aria-label="Clear selected panels"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+              <IconX size={12} />
             </button>
             <div className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto whitespace-nowrap">
               {selectedPanels.map((panel) => (
@@ -1234,11 +1217,7 @@ function AiComposer({
                   title={panel.title}
                 >
                   <span>{panel.title}</span>
-                  <HugeiconsIcon
-                    icon={Cancel01Icon}
-                    size={10}
-                    className="shrink-0 text-muted-foreground"
-                  />
+                  <IconX size={10} className="shrink-0 text-muted-foreground" />
                 </button>
               ))}
             </div>
@@ -1294,13 +1273,9 @@ function AiComposer({
                     onClick={handleSend}
                   >
                     {isLoading ? (
-                      <HugeiconsIcon
-                        icon={Loading03Icon}
-                        size={12}
-                        className="animate-spin"
-                      />
+                      <IconLoader2 size={12} className="animate-spin" />
                     ) : (
-                      <HugeiconsIcon icon={ArrowUp01Icon} size={12} />
+                      <IconSend2 size={12} />
                     )}
                     Generate
                   </Button>
@@ -1415,11 +1390,7 @@ function ComposerMessagePart({
         const inp = part.input as { title?: string } | undefined
         return (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <HugeiconsIcon
-              icon={Loading03Icon}
-              size={11}
-              className="animate-spin shrink-0"
-            />
+            <IconLoader2 size={11} className="animate-spin shrink-0" />
             {inp?.title ? `Creating: ${inp.title}` : "Creating panel…"}
           </div>
         )
@@ -1434,11 +1405,7 @@ function ComposerMessagePart({
           )
         return (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <HugeiconsIcon
-              icon={Chart01Icon}
-              size={11}
-              className="text-primary shrink-0"
-            />
+            <IconChartDots size={11} className="text-primary shrink-0" />
             <span>
               Added <strong className="text-foreground">{out.title}</strong>
             </span>
@@ -1456,11 +1423,7 @@ function ComposerMessagePart({
         const inp = part.input as { title?: string } | undefined
         return (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <HugeiconsIcon
-              icon={Loading03Icon}
-              size={11}
-              className="animate-spin shrink-0"
-            />
+            <IconLoader2 size={11} className="animate-spin shrink-0" />
             {inp?.title ? `Editing: ${inp.title}` : "Editing panel…"}
           </div>
         )
@@ -1475,11 +1438,7 @@ function ComposerMessagePart({
           )
         return (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <HugeiconsIcon
-              icon={Edit02Icon}
-              size={11}
-              className="text-primary shrink-0"
-            />
+            <IconPencil size={11} className="text-primary shrink-0" />
             <span>
               Updated <strong className="text-foreground">{out.title}</strong>
             </span>
@@ -1736,7 +1695,7 @@ export default function DashboardPage() {
             onClick={refreshAll}
             title="Re-run all panels"
           >
-            <HugeiconsIcon icon={Refresh01Icon} size={13} />
+            <IconRefresh size={13} />
           </Button>
           <Button
             variant="ghost"
@@ -1744,7 +1703,7 @@ export default function DashboardPage() {
             className="h-7 gap-1.5 text-xs"
             onClick={handleAddPanel}
           >
-            <HugeiconsIcon icon={Add01Icon} size={13} />
+            <IconPlus size={13} />
             Add Panel
           </Button>
           <Button
@@ -1758,12 +1717,12 @@ export default function DashboardPage() {
           >
             {editing ? (
               <>
-                <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                <IconX size={13} />
                 Done
               </>
             ) : (
               <>
-                <HugeiconsIcon icon={Chart01Icon} size={13} />
+                <IconChartDots size={13} />
                 Edit Layout
               </>
             )}
@@ -1816,11 +1775,7 @@ export default function DashboardPage() {
         >
           {panels.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
-              <HugeiconsIcon
-                icon={SparklesIcon}
-                size={36}
-                className="opacity-20"
-              />
+              <IconSparkles size={36} className="opacity-20" />
               <p className="text-sm">
                 Ask the AI composer to generate panels, or click{" "}
                 <strong>Add Panel</strong>.
@@ -1890,7 +1845,7 @@ export default function DashboardPage() {
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => setConfigPanelId(null)}
                 >
-                  <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                  <IconX size={13} />
                 </button>
               </div>
               <PanelSidebar
