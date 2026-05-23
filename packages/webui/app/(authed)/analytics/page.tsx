@@ -8,19 +8,18 @@ import { Streamdown } from "streamdown"
 import { formatDistanceToNowStrict } from "date-fns"
 import ReactECharts from "echarts-for-react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Chart01Icon,
-  Loading03Icon,
-  ArrowDown01Icon,
-  DatabaseIcon,
-  Shield01Icon,
-  Tick02Icon,
-  SecurityIcon,
-  Search01Icon,
-  CatalogueIcon,
-  ArrowUp01Icon,
-} from "@hugeicons/core-free-icons"
+  IconArrowUp,
+  IconBook2,
+  IconChartBar,
+  IconCheck,
+  IconChevronDown,
+  IconDatabase,
+  IconLoader2,
+  IconSearch,
+  IconShieldLock,
+  IconShieldCheck,
+} from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -197,15 +196,14 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
         onClick={() => setSqlOpen((v) => !v)}
         className="flex w-full items-center gap-1.5 px-3 py-1.5 text-muted-foreground hover:bg-accent/40 transition-colors border-b"
       >
-        <HugeiconsIcon
-          icon={ArrowDown01Icon}
+        <IconChevronDown
           size={11}
           className={cn(
             "shrink-0 transition-transform",
             sqlOpen && "rotate-180",
           )}
         />
-        <HugeiconsIcon icon={DatabaseIcon} size={11} className="shrink-0" />
+        <IconDatabase size={11} className="shrink-0" />
         <span className="font-mono truncate flex-1 text-left">
           {output.sql.slice(0, 72)}
           {output.sql.length > 72 ? "…" : ""}
@@ -330,11 +328,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <HugeiconsIcon
-          icon={Chart01Icon}
-          size={12}
-          className="text-muted-foreground shrink-0"
-        />
+        <IconChartBar size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1 truncate">{output.title}</span>
         <button
           type="button"
@@ -342,8 +336,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
           className="text-muted-foreground hover:text-foreground transition-colors"
           title="Toggle SQL"
         >
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
+          <IconChevronDown
             size={11}
             className={cn("transition-transform", sqlOpen && "rotate-180")}
           />
@@ -378,10 +371,11 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                     : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >
-                <HugeiconsIcon
-                  icon={t === "chart" ? Chart01Icon : DatabaseIcon}
-                  size={11}
-                />
+                {t === "chart" ? (
+                  <IconChartBar size={11} />
+                ) : (
+                  <IconDatabase size={11} />
+                )}
                 {t}
               </button>
             ))}
@@ -463,7 +457,7 @@ function AccessRequestCard({
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <HugeiconsIcon icon={Shield01Icon} size={12} className="text-muted-foreground shrink-0" />
+        <IconShieldLock size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1">Request Data Access</span>
         <span className="text-muted-foreground capitalize">{output.scope}</span>
       </div>
@@ -490,7 +484,7 @@ function AccessRequestCard({
 
         {submitted ? (
           <div className="flex items-center gap-2 py-1 text-emerald-600">
-            <HugeiconsIcon icon={Tick02Icon} size={13} className="shrink-0" />
+            <IconCheck size={13} className="shrink-0" />
             <span>
               Request submitted — <span className="font-mono font-semibold">{submitted.code}</span>
             </span>
@@ -515,7 +509,7 @@ function AccessRequestCard({
             >
               {submitting ? (
                 <>
-                  <HugeiconsIcon icon={Loading03Icon} size={11} className="animate-spin mr-1.5" />
+                  <IconLoader2 size={11} className="animate-spin mr-1.5" />
                   Submitting…
                 </>
               ) : (
@@ -553,7 +547,7 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <HugeiconsIcon icon={SecurityIcon} size={12} className="text-muted-foreground shrink-0" />
+        <IconShieldCheck size={12} className="text-muted-foreground shrink-0" />
         <span className="font-mono font-semibold flex-1">{output.code}</span>
         <span className={cn("px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize", colorClass)}>
           {output.status}
@@ -643,7 +637,7 @@ function AccessRequestsListCard({
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <HugeiconsIcon icon={SecurityIcon} size={12} className="text-muted-foreground shrink-0" />
+        <IconShieldCheck size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1">My Access Requests</span>
         <span className="text-muted-foreground">{output.requests.length}</span>
       </div>
@@ -779,7 +773,7 @@ function CatalogTableList({
                       }
                       className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
                     >
-                      <HugeiconsIcon icon={DatabaseIcon} size={10} />
+                      <IconDatabase size={10} />
                       Query
                     </button>
                   )}
@@ -793,7 +787,7 @@ function CatalogTableList({
                         }
                         className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors"
                       >
-                        <HugeiconsIcon icon={SecurityIcon} size={10} />
+                        <IconShieldCheck size={10} />
                         {existingRequest.code}
                       </button>
                     ) : (
@@ -804,7 +798,7 @@ function CatalogTableList({
                         }}
                         className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
                       >
-                        <HugeiconsIcon icon={Shield01Icon} size={10} />
+                        <IconShieldLock size={10} />
                         Request Access
                       </button>
                     )
@@ -846,7 +840,7 @@ function ExploreCatalogCard({
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <HugeiconsIcon icon={CatalogueIcon} size={12} className="text-muted-foreground shrink-0" />
+        <IconBook2 size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1">Catalog Explorer</span>
         {output.search && (
           <span className="text-muted-foreground text-[11px] font-mono">
@@ -884,7 +878,7 @@ function ExploreCatalogCard({
       {hasInaccessible && (
         <>
           <div className="px-3 py-1.5 flex items-center gap-2 bg-muted/5 border-t border-b">
-            <HugeiconsIcon icon={Shield01Icon} size={11} className="text-muted-foreground shrink-0" />
+            <IconShieldLock size={11} className="text-muted-foreground shrink-0" />
             <span className="text-[11px] text-muted-foreground font-medium">
               Additional results — access required
             </span>
@@ -923,8 +917,7 @@ function ToolPart({
       const input = part.input as { explanation?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon
-            icon={Loading03Icon}
+          <IconLoader2
             size={12}
             className="animate-spin shrink-0"
           />
@@ -943,8 +936,8 @@ function ToolPart({
       const input = part.input as { search?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
-          <HugeiconsIcon icon={Search01Icon} size={11} className="shrink-0" />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
+          <IconSearch size={11} className="shrink-0" />
           {input?.search ? `Searching catalog for "${input.search}"…` : "Exploring catalog…"}
         </div>
       )
@@ -963,7 +956,7 @@ function ToolPart({
     if (part.state === "input-streaming" || part.state === "input-available") {
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
           Loading your access requests…
         </div>
       )
@@ -984,7 +977,7 @@ function ToolPart({
       const input = part.input as { resource?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
           {input?.resource ? `Preparing access request for ${input.resource}…` : "Preparing access request…"}
         </div>
       )
@@ -999,7 +992,7 @@ function ToolPart({
     if (part.state === "input-streaming" || part.state === "input-available") {
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin shrink-0" />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
           Checking request status…
         </div>
       )
@@ -1015,8 +1008,7 @@ function ToolPart({
       const input = part.input as { title?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <HugeiconsIcon
-            icon={Loading03Icon}
+          <IconLoader2
             size={12}
             className="animate-spin shrink-0"
           />
@@ -1152,8 +1144,7 @@ export default function AnalyticsPage() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground px-6">
-            <HugeiconsIcon
-              icon={Chart01Icon}
+            <IconChartBar
               size={40}
               className="opacity-15"
             />
@@ -1187,8 +1178,7 @@ export default function AnalyticsPage() {
 
             {isLoading && messages.at(-1)?.role === "user" && (
               <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-muted-foreground">
-                <HugeiconsIcon
-                  icon={Loading03Icon}
+                <IconLoader2
                   size={14}
                   className="animate-spin"
                 />
@@ -1238,13 +1228,12 @@ export default function AnalyticsPage() {
                 className="h-7 px-3 text-xs"
               >
                 {isLoading ? (
-                  <HugeiconsIcon
-                    icon={Loading03Icon}
+                  <IconLoader2
                     size={12}
                     className="animate-spin"
                   />
                 ) : (
-                  <HugeiconsIcon icon={ArrowUp01Icon} size={12} />
+                  <IconArrowUp size={12} />
                 )}
                 Send
               </Button>
