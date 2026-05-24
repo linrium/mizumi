@@ -187,6 +187,9 @@ rustfs-train-upload bucket=rustfs_train_bucket prefix=rustfs_train_prefix:
         mc mirror --overwrite /upload rustfs/{{ bucket }}/{{ prefix }}'
     echo "Upload complete"
 
+rustfs-baggage-download:
+    bash packages/synthetic/scripts/download-dataset.sh
+
 rustfs-baggage-upload:
     #!/usr/bin/env bash
     set -euo pipefail

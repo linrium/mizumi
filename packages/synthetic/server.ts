@@ -103,9 +103,29 @@ const pools = await loadPoolsFromCsv(SYNTHETIC_DATA_DIR)
 const paginationQuery = t.Object({
 	limit: t.Optional(t.Numeric({ default: 10, minimum: 1, maximum: 100 })),
 	offset: t.Optional(t.Numeric({ default: 0, minimum: 0 })),
+	random: t.Optional(t.BooleanString({ default: false })),
 })
 
-function paginate<T>(pool: T[], limit: number, offset: number) {
+function randomSample<T>(pool: T[], size: number): T[] {
+	const copy = pool.slice()
+	for (let i = copy.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1))
+		;[copy[i], copy[j]] = [copy[j] as T, copy[i] as T]
+	}
+	return copy.slice(0, size)
+}
+
+function paginate<T>(pool: T[], limit: number, offset: number, random: boolean) {
+	if (random) {
+		const sample = randomSample(pool, Math.min(limit, pool.length))
+		return {
+			data: sample,
+			total: pool.length,
+			limit,
+			offset: 0,
+			hasMore: false,
+		}
+	}
 	const slice = pool.slice(offset, offset + limit)
 	return {
 		data: slice,
@@ -134,7 +154,7 @@ new Elysia()
 		({ query }) => {
 			const limit = query.limit ?? 10
 			const offset = query.offset ?? 0
-			return paginate(pools.hdbankCustomers, limit, offset)
+			return paginate(pools.hdbankCustomers, limit, offset, query.random ?? false)
 		},
 		{ query: paginationQuery },
 	)
@@ -143,7 +163,7 @@ new Elysia()
 		({ query }) => {
 			const limit = query.limit ?? 10
 			const offset = query.offset ?? 0
-			return paginate(pools.vietjetairCustomers, limit, offset)
+			return paginate(pools.vietjetairCustomers, limit, offset, query.random ?? false)
 		},
 		{ query: paginationQuery },
 	)
@@ -152,7 +172,7 @@ new Elysia()
 		({ query }) => {
 			const limit = query.limit ?? 10
 			const offset = query.offset ?? 0
-			return paginate(pools.bankingTransactions, limit, offset)
+			return paginate(pools.bankingTransactions, limit, offset, query.random ?? false)
 		},
 		{ query: paginationQuery },
 	)
@@ -161,7 +181,7 @@ new Elysia()
 		({ query }) => {
 			const limit = query.limit ?? 10
 			const offset = query.offset ?? 0
-			return paginate(pools.flightTickets, limit, offset)
+			return paginate(pools.flightTickets, limit, offset, query.random ?? false)
 		},
 		{ query: paginationQuery },
 	)
@@ -170,7 +190,7 @@ new Elysia()
 		({ query }) => {
 			const limit = query.limit ?? 10
 			const offset = query.offset ?? 0
-			return paginate(pools.flightIncidents, limit, offset)
+			return paginate(pools.flightIncidents, limit, offset, query.random ?? false)
 		},
 		{ query: paginationQuery },
 	)

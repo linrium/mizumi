@@ -2,20 +2,19 @@ import dagster as dg
 from dagster_k8s import PipesK8sClient
 
 from .assets.cross_sell_pipeline import (
+    build_hdbank_silver,
+    build_vietjetair_silver,
     cross_sell_daily_schedule,
     hdbank_bronze_customers,
     hdbank_gold_vietjet_activation_candidates,
-    partnership_gold_co_brand_offer_audience,
     partnership_gold_campaign_summary,
+    partnership_gold_co_brand_offer_audience,
     partnership_silver_customer_360,
-    build_hdbank_silver,
-    build_vietjetair_silver,
     vietjetair_bronze_customers,
     vietjetair_gold_baggage_damage_classifications,
     vietjetair_gold_hdbank_finance_candidates,
-    vietjetair_baggage_damage_model,
+    # vietjetair_baggage_damage_model,
 )
-
 
 defs = dg.Definitions(
     assets=[
@@ -27,7 +26,7 @@ defs = dg.Definitions(
         hdbank_gold_vietjet_activation_candidates,
         vietjetair_gold_hdbank_finance_candidates,
         vietjetair_gold_baggage_damage_classifications,
-        vietjetair_baggage_damage_model,
+        # vietjetair_baggage_damage_model,
         partnership_gold_co_brand_offer_audience,
         partnership_gold_campaign_summary,
     ],
