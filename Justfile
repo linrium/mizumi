@@ -90,9 +90,57 @@ doctor:
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
     docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy controlplane-deploy webui-deploy lancedb-deploy lancedb-embed-schema
+deploy: \
+  doctor \
+  rustfs-deploy \
+  rustfs-s3-proxy-deploy \
+  rustfs-s3-proxy-dns-enable \
+  rustfs-baggage-download \
+  rustfs-baggage-upload \
+  redpanda-deploy \
+  shared-postgres-deploy \
+  keycloak-deploy \
+  dagster-deploy \
+  unitycatalog-deploy \
+  spark-deploy \
+  daft-image-build \
+  daft-baggage-classifier-image-build \
+  rustfs-unitycatalog-anon-read-enable \
+  duckdb-image-build \
+  duckdb-server-image-build \
+  duckdb-server-deploy \
+  controlplane-deploy \
+  webui-deploy \
+  lancedb-deploy \
+  lancedb-embed-schema \
+  synthetic-server-deploy \
+  synthetic-bootstrap
+
 
 destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
+
+openai-secrets-apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ lancedb_namespace }} 2>/dev/null || true
+    for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
+      secret_name="${namespace}-secret"
+      kubectl create secret generic "$secret_name" \
+        -n "$namespace" \
+        --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
+        --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    done
+    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    fi
+    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
+      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
+      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
+    fi
 
 forward:
     #!/usr/bin/env bash
@@ -108,8 +156,8 @@ forward:
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:8080 &
-    # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
-    # kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
+    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
     kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -507,29 +555,6 @@ unitycatalog-auth-secret-apply:
     if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
       kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
       kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
-
-openai-secrets-apply:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
-    kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
-    kubectl create namespace {{ lancedb_namespace }} 2>/dev/null || true
-    for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
-      secret_name="${namespace}-secret"
-      kubectl create secret generic "$secret_name" \
-        -n "$namespace" \
-        --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
-        --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
-        --dry-run=client -o yaml | kubectl apply -f -
-    done
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
-    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
-      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
     fi
 
 unitycatalog-bootstrap:
