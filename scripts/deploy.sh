@@ -208,6 +208,34 @@ baggage_upload() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# ENV CHECKS
+#═══════════════════════════════════════════════════════════════════════════════
+
+_DEFAULT_OPENAI_BASE_URL="https://api.openai.com/v1"
+
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  printf "${YLW}⚠${NC}  OPENAI_API_KEY is not set.\n"
+  printf "   Enter your OpenAI API key: "
+  read -r OPENAI_API_KEY
+  if [[ -z "$OPENAI_API_KEY" ]]; then
+    err "OPENAI_API_KEY cannot be empty. Aborting."
+    exit 1
+  fi
+  export OPENAI_API_KEY
+fi
+
+if [[ -z "${OPENAI_BASE_URL:-}" ]]; then
+  printf "${YLW}⚠${NC}  OPENAI_BASE_URL is not set.\n"
+  printf "   Enter base URL [${_DEFAULT_OPENAI_BASE_URL}]: "
+  read -r OPENAI_BASE_URL
+  OPENAI_BASE_URL="${OPENAI_BASE_URL:-${_DEFAULT_OPENAI_BASE_URL}}"
+  export OPENAI_BASE_URL
+fi
+
+ok "OPENAI_API_KEY     set"
+ok "OPENAI_BASE_URL    ${OPENAI_BASE_URL}"
+
+#═══════════════════════════════════════════════════════════════════════════════
 # DEPLOY
 #═══════════════════════════════════════════════════════════════════════════════
 
