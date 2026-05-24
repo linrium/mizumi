@@ -496,6 +496,7 @@ openai-secrets-apply:
     set -euo pipefail
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ lancedb_namespace }} 2>/dev/null || true
     for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
       secret_name="${namespace}-secret"
       kubectl create secret generic "$secret_name" \
@@ -660,7 +661,7 @@ lancedb-image-build:
       kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s; \
     fi
 
-lancedb-deploy: lancedb-image-build
+lancedb-deploy: openai-secrets-apply lancedb-image-build
     kubectl apply -f {{ lancedb_manifests }}/server.yaml
     kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s
     kubectl get pods,svc -n {{ lancedb_namespace }}
@@ -674,7 +675,7 @@ lancedb-bootstrap:
 lancedb-forward:
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080
 
-lancedb-embed-schema: lancedb-image-build
+lancedb-embed-schema: openai-secrets-apply lancedb-image-build
     kubectl delete job lancedb-embed-schema -n {{ lancedb_namespace }} --ignore-not-found
     kubectl apply -f {{ lancedb_manifests }}/embed-schema-job.yaml
     kubectl wait --for=condition=complete job/lancedb-embed-schema -n {{ lancedb_namespace }} --timeout=300s

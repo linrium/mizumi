@@ -1,35 +1,11 @@
 "use client"
 
-import { IconBook2, IconCarFan, IconDatabase, IconFolder, IconTable } from "@tabler/icons-react"
+import { IconBook2, IconCarFan, IconChevronRight, IconDatabase, IconFolder, IconTable } from "@tabler/icons-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { Catalog, RegisteredModelSummary, Schema, TableSummary, VolumeSummary } from "@/services/catalog-types"
 import { getCatalogsAction, getModelsAction, getSchemasAction, getTablesAction, getVolumesAction } from "./actions"
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="10"
-      height="10"
-      viewBox="0 0 10 10"
-      fill="none"
-      className={cn(
-        "shrink-0 transition-transform text-muted-foreground",
-        open && "rotate-90",
-      )}
-    >
-      <path
-        d="M3 2l4 3-4 3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 export default function CatalogLayout({
   children,
@@ -215,7 +191,14 @@ export default function CatalogLayout({
                     catActive && activeItemClass,
                   )}
                 >
-                  <Chevron open={catOpen} />
+                  <IconChevronRight
+                    aria-hidden="true"
+                    size={14}
+                    className={cn(
+                      "shrink-0 text-muted-foreground transition-transform",
+                      catOpen && "rotate-90",
+                    )}
+                  />
                   <IconBook2
                     size={15}
                     className={cn(
@@ -247,7 +230,14 @@ export default function CatalogLayout({
                             schActive && activeItemClass,
                           )}
                         >
-                          <Chevron open={schOpen} />
+                          <IconChevronRight
+                            aria-hidden="true"
+                            size={14}
+                            className={cn(
+                              "shrink-0 text-muted-foreground transition-transform",
+                              schOpen && "rotate-90",
+                            )}
+                          />
                           <IconDatabase
                             size={15}
                             className={cn(
