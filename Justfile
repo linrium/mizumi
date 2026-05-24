@@ -113,9 +113,8 @@ deploy: \
   webui-deploy \
   lancedb-deploy \
   lancedb-embed-schema \
-  synthetic-server-deploy \
-  synthetic-bootstrap
-
+  synthetic-bootstrap \
+  synthetic-server-deploy
 
 destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
 
@@ -619,7 +618,6 @@ controlplane-deploy: controlplane-image-build
     just shared-postgres-deploy
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
-    just openai-secrets-apply
     just shared-postgres-bootstrap
     kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
     kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
@@ -645,7 +643,6 @@ webui-image-build:
     fi
 
 webui-deploy: webui-image-build
-    just openai-secrets-apply
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
     kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
     kubectl get pods,svc -n {{ webui_namespace }}
@@ -730,12 +727,9 @@ lancedb-destroy:
 
 synthetic-server-image-build:
     docker build -t {{ synthetic_image }} packages/synthetic
-    if kubectl get deployment/synthetic-server -n {{ synthetic_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/synthetic-server -n {{ synthetic_namespace }}; \
-      kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s; \
-    fi
 
-synthetic-bootstrap: synthetic-server-image-build
+synthetic-bootstrap:
+    docker build -t {{ synthetic_image }} packages/synthetic
     kubectl create namespace {{ synthetic_namespace }} 2>/dev/null || true
     kubectl delete job synthetic-bootstrap -n {{ synthetic_namespace }} --ignore-not-found
     kubectl delete configmap synthetic-bootstrap-config -n {{ synthetic_namespace }} --ignore-not-found
