@@ -30,20 +30,37 @@ def main() -> None:
 
     hdbank_customers = (
         source_df
-        .withColumnRenamed("userId", "unified_customer_id")
+        .withColumnRenamed("userId", "customer_id")
         .withColumnRenamed("fullName", "customer_name")
         .withColumnRenamed("customerTier", "customer_tier")
+        .withColumnRenamed("customerCase", "customer_case")
         .withColumnRenamed("creditScoreBand", "credit_score_band")
         .withColumnRenamed("averageMonthlyBalance", "average_monthly_balance")
         .withColumnRenamed("hdbankAffinityScore", "hdbank_affinity_score")
         .withColumnRenamed("hdbankSince", "hdbank_since")
         .withColumnRenamed("hasVietjetCoBrandCard", "has_vietjet_cobrand_card")
-        .withColumn("customer_id", F.col("unified_customer_id"))
-        .withColumn("shared_customer", F.col("customerCase") == F.lit("both_hdbank_and_vietjetair"))
+        .withColumn("shared_customer", F.col("customer_case") == F.lit("both_hdbank_and_vietjetair"))
         .withColumn("age", F.col("age").cast("int"))
         .withColumn("average_monthly_balance", F.col("average_monthly_balance").cast("double"))
         .withColumn("hdbank_affinity_score", F.col("hdbank_affinity_score").cast("double"))
+        .withColumn("hdbank_since", F.col("hdbank_since").cast("date"))
+        .withColumn("has_vietjet_cobrand_card", F.col("has_vietjet_cobrand_card").cast("boolean"))
         .withColumn("seed_timestamp", F.current_timestamp())
+        .select(
+            "customer_id",
+            "customer_name",
+            "city",
+            "age",
+            "customer_case",
+            "customer_tier",
+            "hdbank_affinity_score",
+            "average_monthly_balance",
+            "credit_score_band",
+            "hdbank_since",
+            "has_vietjet_cobrand_card",
+            "shared_customer",
+            "seed_timestamp",
+        )
     )
 
     write_delta(hdbank_customers, HDBANK_BRONZE_CUSTOMERS_PATH)

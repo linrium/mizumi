@@ -48,6 +48,8 @@ spec:
               value: xohzlCDjF8FoDU+SFb1Dcw9BCkYFGs7NaipxrZE6rwk=
             - name: API_BASE_URL
               value: http://controlplane-svc.controlplane.svc.cluster.local:4000
+            - name: SYNTHETIC_BASE_URL
+              value: http://synthetic-server-svc.synthetic.svc.cluster.local:8092
             - name: UC_BASE_URL
               value: http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/api/2.1/unity-catalog
             - name: RUSTFS_S3_URL

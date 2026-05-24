@@ -1,76 +1,171 @@
 "use client"
 
-import { type EventOption, EventPublisher } from "@/components/event-publisher"
 import { useEffect, useState } from "react"
+import { type EventOption, EventPublisher } from "@/components/event-publisher"
 
-function uuid() {
-  return crypto.randomUUID()
-}
-
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-function randFloat(min: number, max: number, decimals = 0): number {
-  return parseFloat((Math.random() * (max - min) + min).toFixed(decimals))
-}
-
-function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min
-}
-
-function recentTimestamp(maxDaysAgo = 30): string {
-  const ms = Date.now() - randInt(0, maxDaysAgo * 24 * 60 * 60 * 1000)
-  return new Date(ms).toISOString()
-}
-
-function pnrCode(): string {
-  return Array.from(
-    { length: 6 },
-    () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[randInt(0, 31)],
-  ).join("")
+type PaginatedResponse<T> = {
+  data: T[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
 }
 
 type VietjetairCustomer = {
-  vietjetair_customer_id: string
+  userId: string
+  fullName: string
+  city: string
+  age: number
+  customerCase: string
+  skybossTier: string
+  vietjetAirAffinityScore: string
+  annualFlights: number
+  ancillarySpendScore: string
+  vietjetAirSince: string
+  hasHdbankCoBrandCard: string
 }
 
-const FALLBACK_CUSTOMERS: VietjetairCustomer[] = [
-  { vietjetair_customer_id: "VJ-FALLBACK-0001" },
-  { vietjetair_customer_id: "VJ-FALLBACK-0002" },
-  { vietjetair_customer_id: "VJ-FALLBACK-0003" },
-  { vietjetair_customer_id: "VJ-FALLBACK-0004" },
-  { vietjetair_customer_id: "VJ-FALLBACK-0005" },
-]
+type FlightTicket = {
+  ticketId: string
+  userId: string
+  bookingReference: string
+  airline: string
+  flightNumber: string
+  tripType: string
+  originAirport: string
+  destinationAirport: string
+  bookingAt: string
+  departureAt: string
+  returnDepartureAt: string
+  cabinClass: string
+  passengerCount: number
+  distanceKm: number
+  flightDurationMinutes: number
+  baseFare: string
+  taxes: string
+  totalPrice: string
+  currency: string
+  baggageKg: number
+  status: string
+  city: string
+}
 
-const ROUTES = [
-  { route_code: "SGN-HAN", base_price_vnd: 1_200_000 },
-  { route_code: "HAN-SGN", base_price_vnd: 1_200_000 },
-  { route_code: "SGN-DAD", base_price_vnd: 750_000 },
-  { route_code: "DAD-SGN", base_price_vnd: 750_000 },
-  { route_code: "SGN-PQC", base_price_vnd: 650_000 },
-  { route_code: "SGN-BKK", base_price_vnd: 2_800_000 },
-  { route_code: "HAN-ICN", base_price_vnd: 6_500_000 },
-  { route_code: "SGN-SIN", base_price_vnd: 3_200_000 },
-]
+type FlightIncident = {
+  reportId: string
+  vietjetCustomerId: string
+  ticketId: string
+  bookingReference: string
+  airline: string
+  reportChannel: string
+  incidentType: string
+  severity: string
+  issueAirport: string
+  originAirport: string
+  destinationAirport: string
+  flightNumber: string
+  departureDate: string
+  reportedAt: string
+  status: string
+  baggageTag: string
+  delayedMinutes: number
+  currency: string
+  city: string
+  imagePath: string
+}
 
-function generateBookingEvent(customers: VietjetairCustomer[]) {
-  const customer = pick(customers)
-  const route = pick(ROUTES)
-  const passengers = randInt(1, 4)
+function toInt(value: number | string): number {
+  return typeof value === "number" ? value : Number.parseInt(value, 10)
+}
 
+function normalizeVietjetairCustomer(
+  customer: VietjetairCustomer,
+): Record<string, unknown> {
   return {
-    booking_id: uuid(),
-    customer_id: customer.vietjetair_customer_id,
-    pnr_code: pnrCode(),
-    payment_reference: `PAYREF-${uuid().replace(/-/g, "").slice(0, 10).toUpperCase()}`,
-    route_code: route.route_code,
-    ticket_amount: Math.round(
-      route.base_price_vnd * passengers * randFloat(0.85, 1.4),
-    ),
-    currency: "VND",
-    booking_timestamp: recentTimestamp(7),
+    ...customer,
+    age: toInt(customer.age),
+    annualFlights: toInt(customer.annualFlights),
   }
+}
+
+function normalizeFlightTicket(ticket: FlightTicket): Record<string, unknown> {
+  return {
+    ...ticket,
+    passengerCount: toInt(ticket.passengerCount),
+    distanceKm: toInt(ticket.distanceKm),
+    flightDurationMinutes: toInt(ticket.flightDurationMinutes),
+    baggageKg: toInt(ticket.baggageKg),
+    returnDepartureAt: ticket.returnDepartureAt || null,
+  }
+}
+
+function normalizeFlightIncident(
+  incident: FlightIncident,
+): Record<string, unknown> {
+  return {
+    ...incident,
+    delayedMinutes: toInt(incident.delayedMinutes),
+  }
+}
+
+async function fetchSyntheticDataset<T>(
+  dataset: string,
+  limit: number,
+  offset = 0,
+): Promise<T[]> {
+  const response = await fetch(
+    `/api/synthetic/${dataset}?limit=${limit}&offset=${offset}`,
+    {
+      cache: "no-store",
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to load ${dataset}`)
+  }
+
+  const payload = (await response.json()) as PaginatedResponse<T>
+  return payload.data
+}
+
+async function fetchSyntheticDatasetPage<T>(
+  dataset: string,
+  targetCount: number,
+): Promise<T[]> {
+  const pageSize = Math.min(100, targetCount)
+  const results: T[] = []
+  let offset = 0
+
+  while (results.length < targetCount) {
+    const page = await fetchSyntheticDataset<T>(dataset, pageSize, offset)
+    if (page.length === 0) {
+      break
+    }
+
+    results.push(...page)
+
+    if (page.length < pageSize) {
+      break
+    }
+
+    offset += page.length
+  }
+
+  return results.slice(0, targetCount)
+}
+
+function sampleBatch<T>(items: T[], batchSize: number): T[] {
+  if (items.length <= batchSize) {
+    return items.slice(0, batchSize)
+  }
+
+  const pool = [...items]
+
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    ;[pool[index], pool[swapIndex]] = [pool[swapIndex] as T, pool[index] as T]
+  }
+
+  return pool.slice(0, batchSize)
 }
 
 export default function VietjetairBookingPage() {
@@ -80,11 +175,10 @@ export default function VietjetairBookingPage() {
   useEffect(() => {
     let mounted = true
 
-    fetch("/api/demo/customers?company=vietjetair")
-      .then((response) => response.json())
-      .then((payload: { customers: VietjetairCustomer[] }) => {
+    fetchSyntheticDatasetPage<VietjetairCustomer>("vietjetair-customers", 500)
+      .then((data) => {
         if (mounted) {
-          setCustomers(payload.customers)
+          setCustomers(data)
           setLoaded(true)
         }
       })
@@ -103,20 +197,48 @@ export default function VietjetairBookingPage() {
   if (!loaded) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Loading VietJet customer master…
+        Loading VietJet synthetic datasets…
       </div>
     )
   }
 
-  const activeCustomers =
-    customers.length > 0 ? customers : FALLBACK_CUSTOMERS
+  const firstCustomer = customers[0]
 
   const vietjetairOptions: EventOption[] = [
+    ...(firstCustomer
+      ? [
+          {
+            id: "customer-profile",
+            label: "Customer Profile Events",
+            endpoint: "/api/tests/vietjetair/customers/batch",
+            createSample: () => normalizeVietjetairCustomer(firstCustomer),
+            createBatch: async (batchSize) =>
+              sampleBatch(customers, batchSize).map(
+                normalizeVietjetairCustomer,
+              ),
+          } satisfies EventOption,
+        ]
+      : []),
     {
-      id: "booking",
-      label: "Booking Event",
-      endpoint: "/api/tests/vietjetair/booking-events",
-      createSample: () => generateBookingEvent(activeCustomers),
+      id: "flight-ticket",
+      label: "Flight Ticket Events",
+      endpoint: "/api/tests/vietjetair/flight-tickets/batch",
+      createBatch: async (batchSize) =>
+        (
+          await fetchSyntheticDataset<FlightTicket>("flight-tickets", batchSize)
+        ).map(normalizeFlightTicket),
+    },
+    {
+      id: "flight-incident",
+      label: "Flight Incident Events",
+      endpoint: "/api/tests/vietjetair/flight-incidents/batch",
+      createBatch: async (batchSize) =>
+        (
+          await fetchSyntheticDataset<FlightIncident>(
+            "flight-incidents",
+            batchSize,
+          )
+        ).map(normalizeFlightIncident),
     },
   ]
 
@@ -124,16 +246,16 @@ export default function VietjetairBookingPage() {
     <div className="flex h-full flex-col overflow-hidden">
       {customers.length === 0 && (
         <div className="border-b bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Shared customer master returned no VietJet rows. Using fallback demo
-          customer IDs so you can still send booking events.
+          VietJet customer profiles were unavailable from the synthetic server.
+          Flight ticket and incident batches are still available.
         </div>
       )}
       <EventPublisher
-        title="VietJet Air Booking"
+        title="VietJet Air Events"
         subtitle={
           customers.length > 0
-            ? "Customer profiles come from the shared CSV master. Send 100 VietJet booking events for HDBank travel financing."
-            : "Shared CSV customers were unavailable, so this page is using fallback VietJet demo customer IDs. Send 100 booking events."
+            ? "Customer profiles, flight tickets, and flight incidents are loaded from the synthetic server and sent to the new batch APIs."
+            : "Flight tickets and flight incidents are loaded from the synthetic server and sent to the new batch APIs."
         }
         options={vietjetairOptions}
       />

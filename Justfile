@@ -106,6 +106,7 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
+    kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:8080 &
     # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     # kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
@@ -693,9 +694,11 @@ synthetic-server-image-build:
 synthetic-bootstrap:
     kubectl create namespace {{ synthetic_namespace }} 2>/dev/null || true
     kubectl delete job synthetic-bootstrap -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl delete configmap synthetic-bootstrap-config -n {{ synthetic_namespace }} --ignore-not-found
     kubectl apply -f {{ synthetic_manifests }}/bootstrap-job.yaml
     kubectl wait --for=condition=complete job/synthetic-bootstrap -n {{ synthetic_namespace }} --timeout=120s
-    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }}
+    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }} -c generator
+    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }} -c bootstrap
 
 synthetic-server-deploy: synthetic-server-image-build
     just synthetic-bootstrap
@@ -708,12 +711,6 @@ synthetic-server-forward:
 
 synthetic-brand-customers-upload: synthetic-server-image-build
     just synthetic-bootstrap
-    kubectl delete job synthetic-brand-customers-upload -n {{ synthetic_namespace }} --ignore-not-found
-    kubectl delete configmap synthetic-brand-customers-upload-config -n {{ synthetic_namespace }} --ignore-not-found
-    kubectl apply -f {{ synthetic_manifests }}/brand-customers-upload-job.yaml
-    kubectl wait --for=condition=complete job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} --timeout=300s
-    kubectl logs job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} -c generator
-    kubectl logs job/synthetic-brand-customers-upload -n {{ synthetic_namespace }} -c uploader
     kubectl apply -f {{ synthetic_manifests }}/server.yaml
     kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=180s
     kubectl logs deployment/synthetic-server -n {{ synthetic_namespace }} --tail=50

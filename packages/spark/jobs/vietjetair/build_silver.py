@@ -30,7 +30,6 @@ def main() -> None:
     customers_df = (
         bronze_customers.select(
             "customer_id",
-            "unified_customer_id",
             "customer_name",
             "city",
             "age",
@@ -42,12 +41,12 @@ def main() -> None:
                 | (F.col("annual_flights") >= F.lit(10))
             ).alias("email_opt_in"),
             F.col("shared_customer"),
-            F.col("customerCase").alias("customer_case"),
+            F.col("customer_case"),
             F.upper("skyboss_tier").alias("skyboss_tier"),
             F.col("annual_flights"),
             F.col("ancillary_spend_score"),
             F.col("vietjetair_affinity_score"),
-            F.col("vietjetair_since"),
+            F.col("vietjetair_since").cast("date").alias("vietjetair_since"),
             F.col("has_hdbank_cobrand_card"),
             F.current_timestamp().alias("updated_at"),
         )

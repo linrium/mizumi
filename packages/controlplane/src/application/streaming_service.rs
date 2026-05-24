@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::{
     adapters::outbound::{kubernetes::spark, postgres::streaming_jobs},
     domain::{
-        entities::streaming::{CreateStreamingJobRequest, StreamingJobResponse},
+        entities::streaming::{CreateStreamingJobRequest, StreamingJob, StreamingJobResponse},
         error::AppError,
     },
 };
@@ -16,6 +16,10 @@ const DEFAULT_NAMESPACE: &str = "spark";
 const DEFAULT_SPARK_VERSION: &str = "4.1.3";
 const DEFAULT_DRIVER_MEMORY: &str = "512m";
 const DEFAULT_EXECUTOR_MEMORY: &str = "512m";
+const LEGACY_VIETJETAIR_PARTNER_EVENTS_SCRIPT: &str =
+    "local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py";
+const VIETJETAIR_FLIGHT_TICKETS_SCRIPT: &str =
+    "local:///opt/spark/jobs/vietjetair/stream_flight_tickets_to_bronze.py";
 
 #[derive(Clone)]
 pub struct StreamingJobService {
@@ -27,12 +31,27 @@ impl StreamingJobService {
         Self { db }
     }
 
+    fn normalize_main_application_file(path: &str) -> &str {
+        if path == LEGACY_VIETJETAIR_PARTNER_EVENTS_SCRIPT {
+            VIETJETAIR_FLIGHT_TICKETS_SCRIPT
+        } else {
+            path
+        }
+    }
+
+    fn normalize_job(mut job: StreamingJob) -> StreamingJob {
+        job.main_application_file =
+            Self::normalize_main_application_file(&job.main_application_file).to_string();
+        job
+    }
+
     pub async fn list_jobs(&self) -> Result<Vec<StreamingJobResponse>, AppError> {
         let jobs = streaming_jobs::list(&self.db).await?;
         let client = spark::client().await.ok();
         let mut responses = Vec::with_capacity(jobs.len());
 
         for job in jobs {
+            let job = Self::normalize_job(job);
             let k8s_status = match &client {
                 Some(c) => spark::get_k8s_status(c, &job.name, &job.namespace).await,
                 None => None,
@@ -52,7 +71,7 @@ impl StreamingJobService {
             &req.name,
             req.namespace.as_deref().unwrap_or(DEFAULT_NAMESPACE),
             &req.image,
-            &req.main_application_file,
+            Self::normalize_main_application_file(&req.main_application_file),
             req.spark_version
                 .as_deref()
                 .unwrap_or(DEFAULT_SPARK_VERSION),
@@ -103,15 +122,17 @@ impl StreamingJobService {
 
         tracing::info!(name = %job.name, namespace = %job.namespace, "streaming job created");
         Ok(StreamingJobResponse {
-            job,
+            job: Self::normalize_job(job),
             k8s_status: None,
         })
     }
 
     pub async fn get_job(&self, id: Uuid) -> Result<StreamingJobResponse, AppError> {
-        let job = streaming_jobs::get(&self.db, id)
+        let job = Self::normalize_job(
+            streaming_jobs::get(&self.db, id)
             .await?
-            .ok_or(AppError::NotFound)?;
+            .ok_or(AppError::NotFound)?,
+        );
         let k8s_status = match spark::client().await {
             Ok(c) => spark::get_k8s_status(&c, &job.name, &job.namespace).await,
             Err(_) => None,
@@ -121,9 +142,11 @@ impl StreamingJobService {
     }
 
     pub async fn delete_job(&self, id: Uuid) -> Result<(), AppError> {
-        let job = streaming_jobs::get(&self.db, id)
+        let job = Self::normalize_job(
+            streaming_jobs::get(&self.db, id)
             .await?
-            .ok_or(AppError::NotFound)?;
+            .ok_or(AppError::NotFound)?,
+        );
 
         if let Ok(client) = spark::client().await {
             let _ = spark::delete_spark_application(&client, &job.namespace, &job.name).await;
@@ -136,9 +159,11 @@ impl StreamingJobService {
     }
 
     pub async fn get_job_logs(&self, id: Uuid) -> Result<serde_json::Value, AppError> {
-        let job = streaming_jobs::get(&self.db, id)
+        let job = Self::normalize_job(
+            streaming_jobs::get(&self.db, id)
             .await?
-            .ok_or(AppError::NotFound)?;
+            .ok_or(AppError::NotFound)?,
+        );
 
         let client = spark::client().await?;
         let status = spark::get_k8s_status(&client, &job.name, &job.namespace)
@@ -154,9 +179,11 @@ impl StreamingJobService {
     }
 
     pub async fn restart_job(&self, id: Uuid) -> Result<serde_json::Value, AppError> {
-        let job = streaming_jobs::get(&self.db, id)
+        let job = Self::normalize_job(
+            streaming_jobs::get(&self.db, id)
             .await?
-            .ok_or(AppError::NotFound)?;
+            .ok_or(AppError::NotFound)?,
+        );
 
         let client = spark::client().await?;
         let _ = spark::delete_spark_application(&client, &job.namespace, &job.name).await;

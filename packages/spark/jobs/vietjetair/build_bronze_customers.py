@@ -30,21 +30,38 @@ def main() -> None:
 
     customers = (
         source_df
-        .withColumnRenamed("userId", "unified_customer_id")
+        .withColumnRenamed("userId", "customer_id")
         .withColumnRenamed("fullName", "customer_name")
+        .withColumnRenamed("customerCase", "customer_case")
         .withColumnRenamed("skybossTier", "skyboss_tier")
         .withColumnRenamed("vietjetAirAffinityScore", "vietjetair_affinity_score")
         .withColumnRenamed("annualFlights", "annual_flights")
         .withColumnRenamed("ancillarySpendScore", "ancillary_spend_score")
         .withColumnRenamed("vietjetAirSince", "vietjetair_since")
         .withColumnRenamed("hasHdbankCoBrandCard", "has_hdbank_cobrand_card")
-        .withColumn("customer_id", F.col("unified_customer_id"))
-        .withColumn("shared_customer", F.col("customerCase") == F.lit("both_hdbank_and_vietjetair"))
+        .withColumn("shared_customer", F.col("customer_case") == F.lit("both_hdbank_and_vietjetair"))
         .withColumn("age", F.col("age").cast("int"))
         .withColumn("annual_flights", F.col("annual_flights").cast("int"))
         .withColumn("ancillary_spend_score", F.col("ancillary_spend_score").cast("double"))
         .withColumn("vietjetair_affinity_score", F.col("vietjetair_affinity_score").cast("double"))
+        .withColumn("vietjetair_since", F.col("vietjetair_since").cast("date"))
+        .withColumn("has_hdbank_cobrand_card", F.col("has_hdbank_cobrand_card").cast("boolean"))
         .withColumn("seed_timestamp", F.current_timestamp())
+        .select(
+            "customer_id",
+            "customer_name",
+            "city",
+            "age",
+            "customer_case",
+            "skyboss_tier",
+            "vietjetair_affinity_score",
+            "annual_flights",
+            "ancillary_spend_score",
+            "vietjetair_since",
+            "has_hdbank_cobrand_card",
+            "shared_customer",
+            "seed_timestamp",
+        )
     )
 
     write_delta(customers, VIETJETAIR_BRONZE_CUSTOMERS_PATH)

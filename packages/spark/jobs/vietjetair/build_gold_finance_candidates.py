@@ -28,7 +28,7 @@ def main() -> None:
     candidates = (
         customers.alias("c")
         .join(bookings.alias("b"), "customer_id")
-        .join(hdbank_customers.alias("h"), "unified_customer_id", "left")
+        .join(hdbank_customers.alias("h"), "customer_id", "left")
         .where(
             F.col("h.customer_id").isNull()
             | (~F.coalesce(F.col("c.has_hdbank_cobrand_card"), F.lit(False)))
@@ -65,7 +65,6 @@ def main() -> None:
         )
         .select(
             F.col("c.customer_id").alias("customer_id"),
-            F.col("c.unified_customer_id"),
             F.col("c.customer_name").alias("customer_name"),
             "offer_name",
             "use_case",

@@ -9,6 +9,45 @@ import { type QueryResponse, runSessionSqlQuery } from "@/services/sql"
 
 type Row = Record<string, unknown>
 
+const previewResultCache = new Map<string, QueryResponse>()
+const previewRequestCache = new Map<string, Promise<QueryResponse>>()
+
+function getPreviewQueryKey(catalog: string, schema: string, table: string) {
+  return `${catalog}.${schema}.${table}`
+}
+
+function loadPreviewQuery(
+  catalog: string,
+  schema: string,
+  table: string,
+): Promise<QueryResponse> {
+  const queryKey = getPreviewQueryKey(catalog, schema, table)
+  const cachedResult = previewResultCache.get(queryKey)
+  if (cachedResult) {
+    return Promise.resolve(cachedResult)
+  }
+
+  const existingRequest = previewRequestCache.get(queryKey)
+  if (existingRequest) {
+    return existingRequest
+  }
+
+  const request = runSessionSqlQuery(
+    "default",
+    `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
+  )
+    .then((result) => {
+      previewResultCache.set(queryKey, result)
+      return result
+    })
+    .finally(() => {
+      previewRequestCache.delete(queryKey)
+    })
+
+  previewRequestCache.set(queryKey, request)
+  return request
+}
+
 function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(400)
@@ -74,15 +113,20 @@ export default function TablePreviewPage() {
 
   useEffect(() => {
     let cancelled = false
+    const queryKey = getPreviewQueryKey(catalog, schema, table)
     async function load() {
-      setLoading(true)
       setError(null)
+      const cachedResult = previewResultCache.get(queryKey)
+      if (cachedResult) {
+        setQueryResult(cachedResult)
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
       setQueryResult(null)
       try {
-        const result = await runSessionSqlQuery(
-          "default",
-          `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
-        )
+        const result = await loadPreviewQuery(catalog, schema, table)
         if (!cancelled) setQueryResult(result)
       } catch (e) {
         if (!cancelled) setError((e as Error).message)

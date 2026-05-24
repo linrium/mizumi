@@ -27,7 +27,6 @@ def main() -> None:
     customers_df = (
         bronze_customers.select(
             "customer_id",
-            "unified_customer_id",
             "customer_name",
             "city",
             "age",
@@ -46,12 +45,12 @@ def main() -> None:
                 | F.upper(F.col("customer_tier")).isin("GOLD", "PLATINUM", "DIAMOND")
             ).alias("has_credit_card"),
             F.col("shared_customer"),
-            F.col("customerCase").alias("customer_case"),
+            F.col("customer_case"),
             F.upper("customer_tier").alias("customer_tier"),
             F.col("average_monthly_balance"),
             F.upper("credit_score_band").alias("credit_score_band"),
             F.col("hdbank_affinity_score"),
-            F.col("hdbank_since"),
+            F.col("hdbank_since").cast("date").alias("hdbank_since"),
             F.col("has_vietjet_cobrand_card"),
             F.when(F.col("credit_score_band") == "A", F.lit("VERIFIED"))
             .when(F.col("credit_score_band") == "B", F.lit("SIMPLIFIED_DUE_DILIGENCE"))

@@ -30,7 +30,7 @@ def main() -> None:
     candidates = (
         customers.alias("c")
         .join(travel.alias("t"), "customer_id")
-        .join(vietjet_customers.alias("v"), "unified_customer_id", "left")
+        .join(vietjet_customers.alias("v"), "customer_id", "left")
         .join(vietjet_bookings.alias("b"), F.col("v.customer_id") == F.col("b.customer_id"), "left")
         .where(F.col("c.customer_id").isNotNull())
         .where(
@@ -69,7 +69,6 @@ def main() -> None:
         )
         .select(
             F.col("c.customer_id").alias("customer_id"),
-            F.col("c.unified_customer_id"),
             F.col("c.customer_name").alias("customer_name"),
             "offer_name",
             "use_case",

@@ -31,10 +31,9 @@ def main() -> None:
     customer_360 = (
         hdbank_customers.alias("h")
         .join(hdbank_travel.alias("ht"), "customer_id", "left")
-        .join(vietjet_customers.alias("v"), F.col("h.unified_customer_id") == F.col("v.unified_customer_id"), "full_outer")
+        .join(vietjet_customers.alias("v"), F.col("h.customer_id") == F.col("v.customer_id"), "full_outer")
         .join(vietjet_bookings.alias("vb"), F.col("v.customer_id") == F.col("vb.customer_id"), "left")
         .select(
-            F.coalesce(F.col("h.unified_customer_id"), F.col("v.unified_customer_id")).alias("unified_customer_id"),
             F.coalesce(F.col("h.customer_id"), F.col("v.customer_id")).alias("customer_id"),
             F.coalesce(F.col("h.customer_name"), F.col("v.customer_name")).alias("customer_name"),
             F.coalesce(F.col("h.city"), F.col("v.city")).alias("city"),

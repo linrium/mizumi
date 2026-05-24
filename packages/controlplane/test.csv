@@ -1,0 +1,2 @@
+customer_id,customer_name,city,age,segment_name,kyc_status,preferred_channel,monthly_income,credit_score,has_credit_card,shared_customer,customer_case,customer_tier,average_monthly_balance,credit_score_band,hdbank_affinity_score,hdbank_since,has_vietjet_cobrand_card,updated_at
+VARCHAR,VARCHAR,VARCHAR,INTEGER,VARCHAR,VARCHAR,VARCHAR,DOUBLE,INTEGER,BOOLEAN,BOOLEAN,VARCHAR,VARCHAR,DOUBLE,VARCHAR,DOUBLE,DATE,BOOLEAN,TIMESTAMP WITH TIME ZONE
