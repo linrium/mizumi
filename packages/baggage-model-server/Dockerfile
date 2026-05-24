@@ -4,9 +4,9 @@ ENV PYTHONUNBUFFERED=1
 ENV HF_HOME=/opt/hf-cache
 
 RUN pip install --no-cache-dir \
-    "boto3>=1.43.6,<2" \
     "fastapi[standard]>=0.115,<1" \
     "joblib>=1.4,<2" \
+    "mlflow>=2.17,<4" \
     "numpy>=1.26,<3" \
     "pillow>=11,<12" \
     "python-multipart>=0.0.20,<1" \

@@ -6,62 +6,67 @@ import os
 from functools import lru_cache
 from typing import Any
 
-import boto3
 import joblib
+import mlflow
 import torch
-from botocore.config import Config
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile, status
 from PIL import Image, UnidentifiedImageError
 from transformers import CLIPModel, CLIPProcessor
 
-MODEL_URI = os.getenv(
-    "MODEL_URI",
-    "s3://models/vietjetair/baggage-damage-classifier/20260524T112308Z",
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    "http://mlflow-svc.mlflow.svc.cluster.local:5000",
 )
-RUSTFS_ENDPOINT_URL = os.getenv(
-    "RUSTFS_ENDPOINT_URL",
-    "http://rustfs-svc.rustfs.svc.cluster.local:9000",
+MLFLOW_EXPERIMENT_NAME = os.getenv(
+    "MLFLOW_EXPERIMENT_NAME",
+    "vietjetair-baggage-damage",
 )
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-RUSTFS_USE_SSL = os.getenv("RUSTFS_USE_SSL", "false").lower() == "true"
+# Explicit MLflow artifact URI (e.g. "runs:/<run_id>/model" or "models:/<name>/<version>").
+# When unset the server picks the latest successful run in MLFLOW_EXPERIMENT_NAME.
+MODEL_URI = os.getenv("MODEL_URI", "")
 
 app = FastAPI(title="VietJet Air baggage damage model")
 
 
-def parse_s3_uri(uri: str) -> tuple[str, str]:
-    if not uri.startswith("s3://"):
-        raise ValueError(f"MODEL_URI must be an s3:// URI, got {uri!r}")
-    without_scheme = uri.removeprefix("s3://")
-    bucket, _, key = without_scheme.partition("/")
-    if not bucket or not key:
-        raise ValueError(f"MODEL_URI must include bucket and key prefix, got {uri!r}")
-    return bucket, key.rstrip("/")
+def _resolve_artifact_uri() -> tuple[str, str]:
+    """Return (artifact_uri, run_id) for the model artifacts."""
+    client = mlflow.MlflowClient()
 
+    if MODEL_URI:
+        # User supplied an explicit URI — parse the run_id from it for display.
+        run_id = ""
+        if MODEL_URI.startswith("runs:/"):
+            run_id = MODEL_URI.split("/")[1]
+        return MODEL_URI, run_id
 
-def build_s3_client():
-    return boto3.client(
-        "s3",
-        endpoint_url=RUSTFS_ENDPOINT_URL,
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_REGION,
-        use_ssl=RUSTFS_USE_SSL,
-        config=Config(signature_version="s3v4"),
+    experiment = client.get_experiment_by_name(MLFLOW_EXPERIMENT_NAME)
+    if experiment is None:
+        raise RuntimeError(
+            f"MLflow experiment {MLFLOW_EXPERIMENT_NAME!r} not found at {MLFLOW_TRACKING_URI}"
+        )
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string="status = 'FINISHED'",
+        order_by=["start_time DESC"],
+        max_results=1,
     )
-
-
-def read_s3_bytes(bucket: str, key: str) -> bytes:
-    response = build_s3_client().get_object(Bucket=bucket, Key=key)
-    return response["Body"].read()
+    if not runs:
+        raise RuntimeError(
+            f"No finished runs found in experiment {MLFLOW_EXPERIMENT_NAME!r}"
+        )
+    run = runs[0]
+    return f"runs:/{run.info.run_id}/model", run.info.run_id
 
 
 @lru_cache(maxsize=1)
 def load_runtime() -> dict[str, Any]:
-    bucket, prefix = parse_s3_uri(MODEL_URI)
-    artifact = joblib.load(io.BytesIO(read_s3_bytes(bucket, f"{prefix}/model.joblib")))
-    metadata = json.loads(read_s3_bytes(bucket, f"{prefix}/metadata.json").decode())
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    artifact_uri, run_id = _resolve_artifact_uri()
+
+    local_dir = mlflow.artifacts.download_artifacts(artifact_uri=artifact_uri)
+    artifact = joblib.load(os.path.join(local_dir, "model.joblib"))
+    with open(os.path.join(local_dir, "metadata.json"), encoding="utf-8") as fh:
+        metadata = json.load(fh)
 
     clip_model_id = metadata.get("clip_model_id") or "openai/clip-vit-base-patch32"
     processor = CLIPProcessor.from_pretrained(clip_model_id, use_fast=False)
@@ -77,6 +82,8 @@ def load_runtime() -> dict[str, Any]:
         "processor": processor,
         "clip_model": clip_model,
         "device": device,
+        "artifact_uri": artifact_uri,
+        "run_id": run_id,
     }
 
 
@@ -98,10 +105,16 @@ def readyz(response: Response) -> dict[str, Any]:
         runtime = load_runtime()
     except Exception as exc:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "unavailable", "model_uri": MODEL_URI, "error": str(exc)}
+        return {
+            "status": "unavailable",
+            "mlflow_tracking_uri": MLFLOW_TRACKING_URI,
+            "experiment": MLFLOW_EXPERIMENT_NAME,
+            "error": str(exc),
+        }
     return {
         "status": "ready",
-        "model_uri": MODEL_URI,
+        "artifact_uri": runtime["artifact_uri"],
+        "run_id": runtime["run_id"],
         "metadata": runtime["metadata"],
     }
 
@@ -141,6 +154,7 @@ async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
         "label": top["label"],
         "score": top["score"],
         "rankings": rankings,
-        "model_uri": MODEL_URI,
+        "artifact_uri": runtime["artifact_uri"],
+        "run_id": runtime["run_id"],
         "metadata": runtime["metadata"],
     }

@@ -130,14 +130,14 @@ spec:
               cpu: "2"
               memory: 4Gi
           env:
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow-svc.mlflow.svc.cluster.local:5000
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: vietjetair-baggage-damage
+            # Optional: pin to a specific run, e.g. "runs:/<run_id>/model".
+            # When unset the server picks the latest finished run automatically.
             - name: MODEL_URI
-              value: s3://models/vietjetair/baggage-damage-classifier/20260524T112308Z
-            - name: RUSTFS_ENDPOINT_URL
-              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
-            - name: AWS_ACCESS_KEY_ID
-              value: rustfsadmin
-            - name: AWS_SECRET_ACCESS_KEY
-              value: rustfsadmin
+              value: ""
           readinessProbe:
             httpGet:
               path: /readyz
