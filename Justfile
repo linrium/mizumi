@@ -7,6 +7,7 @@ controlplane_image := "mizumi-controlplane:0.1.0"
 webui_namespace := "webui"
 webui_manifests := "infra/k8s/webui"
 webui_image := "mizumi-webui:0.1.0"
+baggage_model_server_image := "mizumi-baggage-model-server:0.1.0"
 
 unitycatalog_namespace := "unitycatalog"
 unitycatalog_image := "mizumi-uc:0.1.0"
@@ -626,10 +627,17 @@ controlplane-destroy:
 webui-image-build:
     docker build -t {{ webui_image }} packages/webui
 
-webui-deploy: webui-image-build
+baggage-model-server-image-build:
+    docker build -t {{ baggage_model_server_image }} packages/baggage-model-server
+
+webui-deploy: webui-image-build baggage-model-server-image-build
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
     kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
+    kubectl rollout status deployment/baggage-model-server -n {{ webui_namespace }} --timeout=300s
     kubectl get pods,svc -n {{ webui_namespace }}
+
+baggage-model-server-forward:
+    kubectl port-forward -n {{ webui_namespace }} svc/baggage-model-server-svc 8093:8080
 
 webui-destroy:
     kubectl delete -f {{ webui_manifests }}/ --ignore-not-found || true

@@ -1,22 +1,22 @@
 "use client"
 
 import {
+  IconArrowBarLeft,
+  IconArrowBarRight,
   IconBook2,
   IconBuildingBank,
   IconChartBar,
   IconCode,
   IconCopy,
-  IconKey,
-  IconArrowBarLeft,
-  IconArrowBarRight,
   IconLogout2,
+  IconLuggage,
   IconPipeline,
   IconPlane,
   IconRipple,
+  IconShield,
   IconSparkle2,
   IconUsers,
   type TablerIcon,
-  IconShield,
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -57,6 +57,11 @@ const appItems = [
     icon: IconPlane,
   },
   {
+    title: "Baggage Model",
+    href: "/apps/vietjetair-baggage-model",
+    icon: IconLuggage,
+  },
+  {
     title: "HDBank Transfer",
     href: "/apps/hdbank",
     icon: IconBuildingBank,
@@ -78,9 +83,7 @@ export function AppSidebar({ session }: AppSidebarProps) {
   const { state } = useSidebar()
   const groupsLabel = session.groups?.join(", ")
   const isCollapsed = state === "collapsed"
-  const TriggerIcon = isCollapsed
-    ? IconArrowBarRight
-    : IconArrowBarLeft
+  const TriggerIcon = isCollapsed ? IconArrowBarRight : IconArrowBarLeft
 
   async function copyDebugToken() {
     if (!session.idToken) {

@@ -78,7 +78,7 @@ def load_training_rows() -> list[dict]:
         )
     )
     return (
-        daft.read_delta_lake(GOLD_TABLE_PATH, io_config=io_config)
+        daft.read_deltalake(GOLD_TABLE_PATH, io_config=io_config)
         .where(
             (daft.col("classification_status") == "classified")
             & (daft.col("damage_score") >= MIN_CONFIDENCE)
