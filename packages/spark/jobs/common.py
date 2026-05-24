@@ -4,6 +4,7 @@ from typing import Sequence
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.utils import AnalysisException
 
 HDBANK_BRONZE_CUSTOMERS_CSV_PATH = (
     "s3a://unitycatalog/hdbank/hdbank_partnership_prod_bronze/hdbank_customers.csv"
@@ -93,8 +94,22 @@ def read_first_existing_csv(spark: SparkSession, paths: Sequence[str]) -> tuple[
     raise FileNotFoundError(f"No readable CSV found in any configured path: {formatted_paths}")
 
 
+def _delete_path(spark: SparkSession, path: str) -> None:
+    jvm = spark._jvm
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    fs = jvm.org.apache.hadoop.fs.FileSystem.get(jvm.java.net.URI(path), hadoop_conf)
+    fs.delete(jvm.org.apache.hadoop.fs.Path(path), True)
+
+
 def write_delta(df: DataFrame, path: str) -> None:
-    df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(path)
+    try:
+        df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(path)
+    except AnalysisException as e:
+        if "truncatedTransactionLog" in str(e):
+            _delete_path(df.sparkSession, path)
+            df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(path)
+        else:
+            raise
 
 
 def with_home_airport(city_col: str) -> F.Column:
