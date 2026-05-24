@@ -376,9 +376,9 @@ daft-baggage-classify-local: daft-baggage-classifier-image-build
       -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
       -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
       -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
-      -e SOURCE_BUCKET={{ rustfs_train_bucket }} \
-      -e SOURCE_PREFIX={{ rustfs_train_prefix }} \
-      -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1 \
+      -e SOURCE_BUCKET=unitycatalog \
+      -e SOURCE_PREFIX=vietjetair/baggage_damaged_reports/ \
+      -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
       {{ daft_baggage_classifier_image }}
 
 spark-destroy:
@@ -692,7 +692,7 @@ synthetic-server-image-build:
       kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s; \
     fi
 
-synthetic-bootstrap:
+synthetic-bootstrap: synthetic-server-image-build
     kubectl create namespace {{ synthetic_namespace }} 2>/dev/null || true
     kubectl delete job synthetic-bootstrap -n {{ synthetic_namespace }} --ignore-not-found
     kubectl delete configmap synthetic-bootstrap-config -n {{ synthetic_namespace }} --ignore-not-found

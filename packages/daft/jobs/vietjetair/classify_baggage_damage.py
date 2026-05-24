@@ -19,11 +19,11 @@ from dagster_pipes import open_dagster_pipes
 from PIL import Image, UnidentifiedImageError
 from transformers import pipeline
 
-SOURCE_BUCKET = os.getenv("SOURCE_BUCKET", "datasets")
-SOURCE_PREFIX = os.getenv("SOURCE_PREFIX", "train/")
+SOURCE_BUCKET = os.getenv("SOURCE_BUCKET", "unitycatalog")
+SOURCE_PREFIX = os.getenv("SOURCE_PREFIX", "vietjetair/baggage_damaged_reports/")
 TARGET_PATH = os.getenv(
     "TARGET_PATH",
-    "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1",
+    "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1",
 )
 MODEL_ID = os.getenv("MODEL_ID", "openai/clip-vit-base-patch32")
 WRITE_MODE = os.getenv("WRITE_MODE", "overwrite")
@@ -238,7 +238,7 @@ def main() -> None:
     with maybe_open_dagster_pipes() as pipes:
         if pipes is not None:
             pipes.report_asset_materialization(
-                asset_key="vietjetair_silver_baggage_damage_classifications",
+                asset_key="vietjetair_gold_baggage_damage_classifications",
                 metadata={
                     "source": f"s3://{SOURCE_BUCKET}/{normalized_source_prefix()}",
                     "target": TARGET_PATH,

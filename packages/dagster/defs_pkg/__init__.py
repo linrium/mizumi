@@ -11,6 +11,7 @@ from .assets.cross_sell_pipeline import (
     build_hdbank_silver,
     build_vietjetair_silver,
     vietjetair_bronze_customers,
+    vietjetair_gold_baggage_damage_classifications,
     vietjetair_gold_hdbank_finance_candidates,
 )
 
@@ -24,6 +25,7 @@ defs = dg.Definitions(
         partnership_silver_customer_360,
         hdbank_gold_vietjet_activation_candidates,
         vietjetair_gold_hdbank_finance_candidates,
+        vietjetair_gold_baggage_damage_classifications,
         partnership_gold_co_brand_offer_audience,
         partnership_gold_campaign_summary,
     ],

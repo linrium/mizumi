@@ -31,7 +31,15 @@ spec:
               mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
               mkdir -p /data/current
               if mc stat rustfs/datasets/synthetic/current >/dev/null 2>&1; then
-                mc mirror --overwrite rustfs/datasets/synthetic/current/ /data/current/
+                for file in \
+                  vietnamese_residents.csv \
+                  hdbank_customers.csv \
+                  vietjetair_customers.csv \
+                  banking_transactions.csv \
+                  flight_tickets.csv \
+                  flight_incidents.csv; do
+                  mc cp "rustfs/datasets/synthetic/current/${file}" "/data/current/${file}"
+                done
               else
                 echo "synthetic dataset prefix not found yet; starting with empty local data dir"
               fi

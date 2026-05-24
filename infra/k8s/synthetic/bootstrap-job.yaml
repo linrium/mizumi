@@ -35,7 +35,8 @@ data:
           "type": "flight-incidents",
           "count": 2000,
           "output": "/workspace/output/flight_incidents.csv",
-          "flightTicketsPath": "/workspace/output/flight_tickets.csv"
+          "flightTicketsPath": "/workspace/output/flight_tickets.csv",
+          "trainDataPath": "/app/data/train"
         }
       ]
     }
@@ -86,6 +87,7 @@ spec:
               mc mb --ignore-existing rustfs/unitycatalog/partnership
               mc rm --recursive --force rustfs/datasets/synthetic/current || true
               mc mirror --overwrite /workspace/output rustfs/datasets/synthetic/current
+              mc mirror --overwrite /workspace/output/baggage_damaged_reports rustfs/unitycatalog/vietjetair/baggage_damaged_reports
               mc cp /workspace/output/hdbank_customers.csv rustfs/unitycatalog/hdbank/hdbank_partnership_prod_bronze/
               mc cp /workspace/output/vietjetair_customers.csv rustfs/unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/
               mc ls rustfs/datasets/synthetic/current/

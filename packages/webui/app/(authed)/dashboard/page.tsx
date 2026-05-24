@@ -81,7 +81,15 @@ import "react-grid-layout/css/styles.css"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ChartType = "bar" | "line" | "pie" | "scatter" | "area" | "sankey"
+type ChartType =
+  | "bar"
+  | "line"
+  | "pie"
+  | "scatter"
+  | "area"
+  | "sankey"
+  | "funnel"
+  | "heatmap"
 
 type QueryResult = {
   columns: string[]
@@ -146,14 +154,19 @@ function buildOption(
 ) {
   const xi = result.columns.indexOf(xCol)
   const yi = result.columns.indexOf(yCol)
+  const rowValue = (row: unknown, index: number) => (row as unknown[])[index]
+  const numericValue = (value: unknown) => {
+    const parsed = parseFloat(String(value ?? ""))
+    return Number.isFinite(parsed) ? parsed : null
+  }
   const keys =
     xi >= 0
-      ? result.rows.map((r) => String((r as unknown[])[xi] ?? ""))
+      ? result.rows.map((r) => String(rowValue(r, xi) ?? ""))
       : result.rows.map((_, i) => String(i))
   const values =
     yi >= 0
       ? result.rows
-          .map((r) => parseFloat(String((r as unknown[])[yi] ?? "0")))
+          .map((r) => parseFloat(String(rowValue(r, yi) ?? "0")))
           .filter(Number.isFinite)
       : []
 
@@ -208,6 +221,97 @@ function buildOption(
     }
   }
 
+  if (chartType === "funnel") {
+    return {
+      ...base,
+      tooltip: { trigger: "item", formatter: "{b}: {c}" },
+      series: [
+        {
+          type: "funnel",
+          left: "8%",
+          top: 10,
+          bottom: 10,
+          width: "84%",
+          minSize: "18%",
+          maxSize: "100%",
+          sort: "none",
+          gap: 4,
+          label: { position: "inside", fontSize: 11, color: "#ffffff" },
+          labelLine: { show: false },
+          itemStyle: { borderColor: "#ffffff", borderWidth: 1 },
+          data: keys.map((k, i) => ({ name: k, value: values[i] ?? 0 })),
+        },
+      ],
+    }
+  }
+
+  if (chartType === "heatmap") {
+    const valueIdx = result.columns.findIndex((_, i) => {
+      if (i === xi || i === yi) return false
+      return result.rows.some((row) => numericValue(rowValue(row, i)) !== null)
+    })
+    const xLabels = [...new Set(keys)]
+    const yLabels =
+      yi >= 0
+        ? [...new Set(result.rows.map((r) => String(rowValue(r, yi) ?? "")))]
+        : []
+    const heatValues = result.rows
+      .map((row) => {
+        const x = xLabels.indexOf(String(rowValue(row, xi) ?? ""))
+        const y = yLabels.indexOf(String(rowValue(row, yi) ?? ""))
+        const value = numericValue(rowValue(row, valueIdx))
+        return x >= 0 && y >= 0 && value !== null ? [x, y, value] : null
+      })
+      .filter((row): row is number[] => row !== null)
+    const maxValue = Math.max(...heatValues.map((row) => row[2] ?? 0), 1)
+
+    return {
+      ...base,
+      tooltip: {
+        position: "top",
+        formatter: (params: { value?: [number, number, number] }) => {
+          const [x, y, value] = params.value ?? [0, 0, 0]
+          return `${xLabels[x] ?? ""}<br/>${yLabels[y] ?? ""}: ${value}`
+        },
+      },
+      grid: { left: 88, right: 24, top: 16, bottom: 56 },
+      xAxis: {
+        type: "category",
+        data: xLabels,
+        splitArea: { show: true },
+        axisLabel: { fontSize: 10, color: textColor, rotate: 30 },
+      },
+      yAxis: {
+        type: "category",
+        data: yLabels,
+        splitArea: { show: true },
+        axisLabel: { fontSize: 10, color: textColor },
+      },
+      visualMap: {
+        min: 0,
+        max: maxValue,
+        calculable: true,
+        orient: "horizontal",
+        left: "center",
+        bottom: 0,
+        textStyle: { fontSize: 10, color: textColor },
+      },
+      series: [
+        {
+          type: "heatmap",
+          data: heatValues,
+          label: { show: true, fontSize: 10, color: "#18181b" },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 8,
+              shadowColor: "rgba(0, 0, 0, 0.18)",
+            },
+          },
+        },
+      ],
+    }
+  }
+
   if (chartType === "pie") {
     return {
       ...base,
@@ -229,6 +333,63 @@ function buildOption(
     }
   }
   if (chartType === "scatter") {
+    const numericPairs = result.rows
+      .map((row) => {
+        const x = numericValue(rowValue(row, xi))
+        const y = numericValue(rowValue(row, yi))
+        return x !== null && y !== null ? { x, y, row } : null
+      })
+      .filter((point): point is { x: number; y: number; row: unknown } => !!point)
+    const sizeIdx = result.columns.findIndex((_, i) => {
+      if (i === xi || i === yi) return false
+      return result.rows.some((row) => numericValue(rowValue(row, i)) !== null)
+    })
+
+    if (numericPairs.length > 0) {
+      const sizes = numericPairs.map(({ row }) => numericValue(rowValue(row, sizeIdx)) ?? 1)
+      const maxSize = Math.max(...sizes, 1)
+      return {
+        ...base,
+        tooltip: {
+          trigger: "item",
+          formatter: (params: { value?: number[] }) => {
+            const [x, y, size] = params.value ?? []
+            return `${xCol}: ${x}<br/>${yCol}: ${y}${sizeIdx >= 0 ? `<br/>${result.columns[sizeIdx]}: ${size}` : ""}`
+          },
+        },
+        grid: { left: 48, right: 18, top: 16, bottom: 42 },
+        xAxis: {
+          type: "value",
+          name: xCol,
+          nameLocation: "middle",
+          nameGap: 28,
+          axisLabel: { fontSize: 10, color: textColor },
+          splitLine: { lineStyle: { color: gridColor } },
+        },
+        yAxis: {
+          type: "value",
+          name: yCol,
+          nameLocation: "middle",
+          nameGap: 36,
+          axisLabel: { fontSize: 10, color: textColor },
+          splitLine: { lineStyle: { color: gridColor } },
+        },
+        series: [
+          {
+            type: "scatter",
+            data: numericPairs.map(({ x, y, row }) => [
+              x,
+              y,
+              numericValue(rowValue(row, sizeIdx)) ?? 1,
+            ]),
+            symbolSize: (value: number[]) =>
+              8 + Math.sqrt(Math.max(0, value[2] ?? 1) / maxSize) * 28,
+            itemStyle: { opacity: 0.72 },
+          },
+        ],
+      }
+    }
+
     return {
       ...base,
       grid: { left: 40, right: 16, top: 12, bottom: 36, containLabel: false },
@@ -621,6 +782,8 @@ const CHART_TYPE_CONFIG: Record<
   pie: { label: "Pie / Donut", icon: IconChartPie },
   scatter: { label: "Scatter", icon: IconChartScatter },
   sankey: { label: "Sankey / Flow", icon: IconChartSankey },
+  funnel: { label: "Funnel", icon: IconChartDots },
+  heatmap: { label: "Heatmap", icon: IconChartDots },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────

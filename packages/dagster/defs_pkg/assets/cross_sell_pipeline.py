@@ -1,7 +1,15 @@
 import dagster as dg
 from dagster_k8s import PipesK8sClient
 
-from ..config import DAFT_IMAGE, S3A_CONF, SPARK_IMAGE
+from ..config import (
+    DAFT_BAGGAGE_CLASSIFIER_IMAGE,
+    DAFT_IMAGE,
+    S3A_ACCESS_KEY,
+    S3A_CONF,
+    S3A_ENDPOINT,
+    S3A_SECRET_KEY,
+    SPARK_IMAGE,
+)
 
 
 def _run_spark_job(
@@ -201,6 +209,38 @@ def partnership_gold_campaign_summary(
             ]
         },
         command=["python", "/opt/daft/jobs/co_brand_campaign_summary.py"],
+    ).get_materialize_result()
+
+
+@dg.asset(
+    group_name="vietjetair_gold",
+    kinds={"daft", "k8s"},
+)
+def vietjetair_gold_baggage_damage_classifications(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image=DAFT_BAGGAGE_CLASSIFIER_IMAGE,
+        base_pod_spec={
+            "containers": [
+                {
+                    "name": "dagster-pipes-execution",
+                    "imagePullPolicy": "Always",
+                    "resources": {
+                        "requests": {"cpu": "1", "memory": "2Gi"},
+                        "limits": {"cpu": "2", "memory": "3Gi"},
+                    },
+                    "env": [
+                        {"name": "RUSTFS_ENDPOINT_URL", "value": S3A_ENDPOINT},
+                        {"name": "AWS_ACCESS_KEY_ID", "value": S3A_ACCESS_KEY},
+                        {"name": "AWS_SECRET_ACCESS_KEY", "value": S3A_SECRET_KEY},
+                    ],
+                }
+            ]
+        },
+        command=["python", "/opt/daft/jobs/vietjetair/classify_baggage_damage.py"],
     ).get_materialize_result()
 
 

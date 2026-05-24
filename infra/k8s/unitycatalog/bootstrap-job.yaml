@@ -521,6 +521,22 @@ data:
             "frequent_flyer_score": "Derived score estimating frequency and value of flying behavior.",
             "service_recovery_score": "Derived score estimating need for service-recovery outreach.",
         },
+        "VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1": {
+            "image_uri": "S3 URI of the baggage image that was classified.",
+            "bucket": "Source S3 bucket containing the image.",
+            "object_key": "S3 object key for the image file.",
+            "file_name": "File name of the baggage image.",
+            "etag": "S3 ETag of the image object.",
+            "size_bytes": "Image file size in bytes.",
+            "last_modified": "Timestamp when the image was last modified in S3.",
+            "damage_label": "Top predicted damage category for the image.",
+            "damage_score": "Confidence score of the top damage prediction.",
+            "label_rankings_json": "JSON array of all label predictions ranked by score.",
+            "model_id": "Identifier of the classification model used.",
+            "classification_status": "Outcome status of the classification attempt.",
+            "error_message": "Error detail when classification failed.",
+            "classified_at": "Timestamp when the classification was executed.",
+        },
         "VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1": {
             "customer_id": "VietJet Air customer selected for HDBank finance outreach.",
             "customer_name": "Customer name for campaign operations and review.",
@@ -777,6 +793,26 @@ data:
         ]
     )
 
+    VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1 = build_cols(
+        "VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1",
+        [
+            ("image_uri", "STRING", "string", "string"),
+            ("bucket", "STRING", "string", "string"),
+            ("object_key", "STRING", "string", "string"),
+            ("file_name", "STRING", "string", "string"),
+            ("etag", "STRING", "string", "string"),
+            ("size_bytes", "INT", "int", "integer"),
+            ("last_modified", "TIMESTAMP", "timestamp", "timestamp"),
+            ("damage_label", "STRING", "string", "string"),
+            ("damage_score", "DOUBLE", "double", "double"),
+            ("label_rankings_json", "STRING", "string", "string"),
+            ("model_id", "STRING", "string", "string"),
+            ("classification_status", "STRING", "string", "string"),
+            ("error_message", "STRING", "string", "string"),
+            ("classified_at", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
     VIETJETAIR_CUSTOMERS_V1 = build_cols(
         "VIETJETAIR_CUSTOMERS_V1",
         [
@@ -1018,7 +1054,13 @@ data:
                             "comment": "VietJet flyers most likely to take HDBank financing or a co-brand card.",
                             "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/hdbank_finance_candidates_v1",
                             "columns": VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1,
-                        }
+                        },
+                        {
+                            "name": "baggage_damage_classifications_v1",
+                            "comment": "AI-classified baggage damage labels from inspection photos.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1",
+                            "columns": VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1,
+                        },
                     ],
                 },
             },
@@ -1144,6 +1186,7 @@ data:
         "vietjetair.vietjetair_partnership_prod_silver.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_gold.baggage_damage_classifications_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "partnership.co_brand_silver.customer_360_v1": {linh: ["OWNER", "SELECT"]},
         "partnership.co_brand_gold.co_brand_offer_audience_v1": {linh: ["OWNER", "SELECT"]},
     }

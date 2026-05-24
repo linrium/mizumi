@@ -1,5 +1,5 @@
-import { readdir } from "node:fs/promises"
-import { resolve } from "node:path"
+import { copyFile, mkdir, readdir } from "node:fs/promises"
+import { dirname, resolve } from "node:path"
 import { fakerVI as faker } from "@faker-js/faker"
 import { escapeCsv, readCsvRows, streamCsvRows } from "./csv"
 import {
@@ -162,14 +162,13 @@ function reportedAtAfterDeparture(departureDate: string): string {
 	return reportDate.toISOString()
 }
 
-function ticketIncidentScore(
-	ticket: FlightTicketInfo,
-): number {
+function ticketIncidentScore(ticket: FlightTicketInfo): number {
 	const airportBias =
 		(airportIncidentBias(ticket.originAirport) +
 			airportIncidentBias(ticket.destinationAirport)) /
 		2
-	const baggageFactor = ticket.baggageKg >= 30 ? 1.08 : ticket.baggageKg >= 20 ? 1 : 0.92
+	const baggageFactor =
+		ticket.baggageKg >= 30 ? 1.08 : ticket.baggageKg >= 20 ? 1 : 0.92
 	const passengerFactor = 0.95 + ticket.passengerCount * 0.08
 	const distanceFactor = clamp(ticket.distanceKm / 1800, 0.4, 3.6)
 	const classFactor =
@@ -179,9 +178,14 @@ function ticketIncidentScore(
 				? 1.08
 				: 1
 	const tripFactor = ticket.tripType === "round_trip" ? 1.1 : 1
-	const priceFactor = clamp(Number.parseFloat(ticket.totalPrice) / 2_800_000, 0.65, 2.5)
+	const priceFactor = clamp(
+		Number.parseFloat(ticket.totalPrice) / 2_800_000,
+		0.65,
+		2.5,
+	)
 	const wave =
-		0.92 + 0.14 * Math.sin(Number.parseInt(ticket.ticketId.slice(0, 8), 16) / 4000)
+		0.92 +
+		0.14 * Math.sin(Number.parseInt(ticket.ticketId.slice(0, 8), 16) / 4000)
 
 	return clamp(
 		(0.75 + distanceFactor * 0.24 + priceFactor * 0.18) *
@@ -204,7 +208,10 @@ function selectTicketsWithoutReplacement(
 	const selected: EligibleTicket[] = []
 
 	while (pool.length > 0 && selected.length < count) {
-		const totalScore = pool.reduce((sum, ticket) => sum + ticket.incidentScore, 0)
+		const totalScore = pool.reduce(
+			(sum, ticket) => sum + ticket.incidentScore,
+			0,
+		)
 		let threshold = faker.number.float({ min: 0, max: totalScore })
 		let selectedIndex = 0
 
@@ -297,7 +304,9 @@ export function generateFlightIncidents(
 		Math.min(count, eligibleTickets.length),
 	)
 
-	return selectedTickets.map((eligibleTicket) => buildIncidentReport(eligibleTicket, null))
+	return selectedTickets.map((eligibleTicket) =>
+		buildIncidentReport(eligibleTicket, null),
+	)
 }
 
 export async function streamFlightIncidentsToCsv(
@@ -310,7 +319,9 @@ export async function streamFlightIncidentsToCsv(
 	const tickets = await readCsvRows<FlightTicketInfo>(options.flightTicketsPath)
 
 	if (tickets.length === 0) {
-		throw new Error(`No flight tickets loaded from ${options.flightTicketsPath}.`)
+		throw new Error(
+			`No flight tickets loaded from ${options.flightTicketsPath}.`,
+		)
 	}
 
 	const eligibleTickets = tickets
@@ -333,7 +344,28 @@ export async function streamFlightIncidentsToCsv(
 
 	let nextImage: (() => string) | null = null
 	if (options.trainDataPath) {
-		const filenames = await readdir(resolve(options.trainDataPath))
+		const trainDataPath = resolve(options.trainDataPath)
+		const filenames = (await readdir(trainDataPath)).filter((filename) =>
+			/\.(?:jpg|jpeg|png|webp)$/i.test(filename),
+		)
+		if (filenames.length === 0) {
+			throw new Error(
+				`No baggage damage images found in ${options.trainDataPath}.`,
+			)
+		}
+		const outputImageDir = resolve(
+			dirname(options.outputPath),
+			"baggage_damaged_reports",
+		)
+		await mkdir(outputImageDir, { recursive: true })
+		await Promise.all(
+			filenames.map((filename) =>
+				copyFile(
+					resolve(trainDataPath, filename),
+					resolve(outputImageDir, filename),
+				),
+			),
+		)
 		const shuffled = faker.helpers.shuffle(filenames)
 		nextImage = makeImageCycler(shuffled)
 	}
