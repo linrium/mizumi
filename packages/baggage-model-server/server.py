@@ -10,7 +10,7 @@ import boto3
 import joblib
 import torch
 from botocore.config import Config
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile, status
 from PIL import Image, UnidentifiedImageError
 from transformers import CLIPModel, CLIPProcessor
 
@@ -64,8 +64,8 @@ def load_runtime() -> dict[str, Any]:
     metadata = json.loads(read_s3_bytes(bucket, f"{prefix}/metadata.json").decode())
 
     clip_model_id = metadata.get("clip_model_id") or "openai/clip-vit-base-patch32"
-    processor = CLIPProcessor.from_pretrained(clip_model_id)
-    clip_model = CLIPModel.from_pretrained(clip_model_id)
+    processor = CLIPProcessor.from_pretrained(clip_model_id, use_fast=False)
+    clip_model = CLIPModel.from_pretrained(clip_model_id, low_cpu_mem_usage=False)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     clip_model.to(device)
     clip_model.eval()
@@ -93,8 +93,12 @@ def livez() -> dict[str, str]:
 
 
 @app.get("/readyz")
-def readyz() -> dict[str, Any]:
-    runtime = load_runtime()
+def readyz(response: Response) -> dict[str, Any]:
+    try:
+        runtime = load_runtime()
+    except Exception as exc:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unavailable", "model_uri": MODEL_URI, "error": str(exc)}
     return {
         "status": "ready",
         "model_uri": MODEL_URI,

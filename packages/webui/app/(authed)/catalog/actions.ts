@@ -4,7 +4,9 @@ import { getServerSession } from "@/lib/auth"
 import {
   getCatalogs,
   getEffectivePrivileges,
+  getModel,
   getModels,
+  getModelVersions,
   getPermissions,
   getSchemas,
   getTable,
@@ -13,13 +15,13 @@ import {
   getVolumes,
   patchPermissions,
 } from "@/services/catalog"
-import { listS3Objects } from "@/services/rustfs"
 import type {
   PermissionApprovalStep,
   RequestScope,
   RequestStatus,
   RiskLevel,
 } from "@/services/permissions"
+import { listS3Objects } from "@/services/rustfs"
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:4000"
 const DEFAULT_REVIEWER_ID = "10000000-0000-0000-0000-000000000004"
@@ -81,6 +83,22 @@ export async function listVolumeFilesAction(
 
 export async function getModelsAction(catalog: string, schema: string) {
   return getModels(catalog, schema)
+}
+
+export async function getModelAction(
+  catalog: string,
+  schema: string,
+  model: string,
+) {
+  return getModel(catalog, schema, model)
+}
+
+export async function getModelVersionsAction(
+  catalog: string,
+  schema: string,
+  model: string,
+) {
+  return getModelVersions(catalog, schema, model)
 }
 
 export async function getTableAction(

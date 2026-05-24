@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  IconBrain,
   IconKey,
   IconShieldLock,
   IconTable,
@@ -9,24 +10,38 @@ import {
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import type { TableSummary } from "@/services/catalog-types"
-import { getTablesAction } from "../../actions"
+import type {
+  RegisteredModelSummary,
+  TableSummary,
+} from "@/services/catalog-types"
+import { getModelsAction, getTablesAction } from "../../actions"
 import { CatalogTabs } from "../../catalog-tabs"
 
 export default function SchemaPage() {
   const { catalog, schema } = useParams<{ catalog: string; schema: string }>()
   const [tables, setTables] = useState<TableSummary[]>([])
+  const [models, setModels] = useState<RegisteredModelSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
-    getTablesAction(catalog, schema)
-      .then((data) => data.tables ?? [])
-      .then(setTables)
+    setError(null)
+    Promise.all([
+      getTablesAction(catalog, schema),
+      getModelsAction(catalog, schema).catch(() => ({
+        registered_models: [] as RegisteredModelSummary[],
+      })),
+    ])
+      .then(([tablesData, modelsData]) => {
+        setTables(tablesData.tables ?? [])
+        setModels(modelsData.registered_models ?? [])
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [catalog, schema])
+
+  const objectCount = tables.length + models.length
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -38,13 +53,14 @@ export default function SchemaPage() {
           </span>
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {tables.length} table{tables.length !== 1 ? "s" : ""}
+          {tables.length} table{tables.length !== 1 ? "s" : ""} ·{" "}
+          {models.length} model{models.length !== 1 ? "s" : ""}
         </p>
         <CatalogTabs
           tabs={[
             {
               href: `/catalog/${catalog}/${schema}`,
-              label: "tables",
+              label: "objects",
               active: true,
               icon: IconTableOptions,
             },
@@ -109,13 +125,33 @@ export default function SchemaPage() {
                   </td>
                 </tr>
               ))}
-              {tables.length === 0 && (
+              {models.map((model) => (
+                <tr
+                  key={`model:${model.name}`}
+                  className="border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors"
+                >
+                  <td className="px-5 py-2">
+                    <Link
+                      href={`/catalog/${catalog}/${schema}/models/${model.name}`}
+                      className="flex items-center gap-1.5 font-mono font-medium hover:underline underline-offset-2 w-fit"
+                    >
+                      <IconBrain
+                        size={13}
+                        className="shrink-0 text-muted-foreground"
+                      />
+                      {model.name}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-2 text-muted-foreground">MODEL</td>
+                </tr>
+              ))}
+              {objectCount === 0 && (
                 <tr>
                   <td
                     colSpan={2}
                     className="px-5 py-8 text-center text-muted-foreground"
                   >
-                    No tables found
+                    No objects found
                   </td>
                 </tr>
               )}

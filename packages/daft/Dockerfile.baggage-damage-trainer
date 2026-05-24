@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir \
     "daft[deltalake]==0.7.10" \
     "dagster-pipes>=1.13.4,<2" \
     "joblib>=1.4,<2" \
+    "mlflow>=2.17,<4" \
     "numpy>=1.26,<3" \
     "pillow>=11,<12" \
     "safetensors>=0.5,<1" \

@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Iterator
@@ -26,12 +27,19 @@ GOLD_TABLE_PATH = os.getenv(
     "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1",
 )
 SOURCE_BUCKET = os.getenv("SOURCE_BUCKET", "unitycatalog")
-MODEL_BUCKET = os.getenv("MODEL_BUCKET", "models")
-MODEL_KEY_PREFIX = os.getenv("MODEL_KEY_PREFIX", "vietjetair/baggage-damage-classifier")
+MODEL_BUCKET = os.getenv("MODEL_BUCKET", "unitycatalog")
+MODEL_KEY_PREFIX = os.getenv(
+    "MODEL_KEY_PREFIX", "vietjetair/models/baggage_damage_detector"
+)
 CLIP_MODEL_ID = os.getenv("CLIP_MODEL_ID", "openai/clip-vit-base-patch32")
 MIN_CONFIDENCE = float(os.getenv("MIN_CONFIDENCE", "0.25"))
 MAX_ITER = int(os.getenv("MAX_ITER", "1000"))
 BATCH_SIZE = max(int(os.getenv("BATCH_SIZE", "16")), 1)
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
+MLFLOW_EXPERIMENT_NAME = os.getenv(
+    "MLFLOW_EXPERIMENT_NAME", "vietjetair-baggage-damage"
+)
+MLFLOW_RUN_NAME = os.getenv("MLFLOW_RUN_NAME", "")
 
 RUSTFS_ENDPOINT_URL = os.getenv("RUSTFS_ENDPOINT_URL", "http://127.0.0.1:9000")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "rustfsadmin")
@@ -47,6 +55,21 @@ def maybe_open_dagster_pipes() -> Iterator[Any]:
             yield pipes
         return
     yield None
+
+
+@contextmanager
+def maybe_start_mlflow_run(run_ts: str) -> Iterator[Any]:
+    if not MLFLOW_TRACKING_URI:
+        yield None
+        return
+
+    import mlflow
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    run_name = MLFLOW_RUN_NAME or f"baggage-damage-{run_ts}"
+    with mlflow.start_run(run_name=run_name):
+        yield mlflow
 
 
 def build_s3_client():
@@ -180,35 +203,78 @@ def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     s3_client = build_s3_client()
 
-    rows = load_training_rows()
-    if not rows:
-        raise RuntimeError(
-            f"No training rows found in {GOLD_TABLE_PATH} "
-            f"(min_confidence={MIN_CONFIDENCE})"
-        )
+    with maybe_start_mlflow_run(run_ts) as mlflow_run:
+        if mlflow_run is not None:
+            mlflow_run.log_params(
+                {
+                    "clip_model_id": CLIP_MODEL_ID,
+                    "gold_table_path": GOLD_TABLE_PATH,
+                    "source_bucket": SOURCE_BUCKET,
+                    "model_bucket": MODEL_BUCKET,
+                    "model_key_prefix": MODEL_KEY_PREFIX,
+                    "min_confidence": MIN_CONFIDENCE,
+                    "max_iter": MAX_ITER,
+                    "batch_size": BATCH_SIZE,
+                    "classifier": "LogisticRegression",
+                }
+            )
 
-    processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID)
-    clip_model = CLIPModel.from_pretrained(CLIP_MODEL_ID)
-    clip_model.eval()
+        rows = load_training_rows()
+        if mlflow_run is not None:
+            mlflow_run.log_metric("candidate_rows", len(rows))
+        if not rows:
+            raise RuntimeError(
+                f"No training rows found in {GOLD_TABLE_PATH} "
+                f"(min_confidence={MIN_CONFIDENCE})"
+            )
 
-    X, y = extract_embeddings(rows, s3_client, processor, clip_model)
-    clf, le, y_enc = train_classifier(X, y)
+        processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID, use_fast=False)
+        clip_model = CLIPModel.from_pretrained(CLIP_MODEL_ID, low_cpu_mem_usage=False)
+        clip_model.eval()
 
-    train_acc = float((clf.predict(X) == y_enc).mean())
-    classes = le.classes_.tolist()
+        X, y = extract_embeddings(rows, s3_client, processor, clip_model)
+        clf, le, y_enc = train_classifier(X, y)
 
-    metadata = {
-        "run_ts": run_ts,
-        "clip_model_id": CLIP_MODEL_ID,
-        "gold_table_path": GOLD_TABLE_PATH,
-        "training_samples": len(y),
-        "classes": classes,
-        "train_accuracy": round(train_acc, 4),
-        "min_confidence_filter": MIN_CONFIDENCE,
-        "sklearn_classifier": type(clf).__name__,
-    }
+        train_acc = float((clf.predict(X) == y_enc).mean())
+        classes = le.classes_.tolist()
 
-    model_uri = upload_artifacts(s3_client, run_ts, clf, le, metadata)
+        metadata = {
+            "run_ts": run_ts,
+            "clip_model_id": CLIP_MODEL_ID,
+            "gold_table_path": GOLD_TABLE_PATH,
+            "training_samples": len(y),
+            "classes": classes,
+            "train_accuracy": round(train_acc, 4),
+            "min_confidence_filter": MIN_CONFIDENCE,
+            "sklearn_classifier": type(clf).__name__,
+        }
+
+        model_uri = upload_artifacts(s3_client, run_ts, clf, le, metadata)
+
+        if mlflow_run is not None:
+            mlflow_run.log_metrics(
+                {
+                    "training_samples": len(y),
+                    "class_count": len(classes),
+                    "train_accuracy": train_acc,
+                }
+            )
+            mlflow_run.log_dict(metadata, "metadata.json")
+            mlflow_run.set_tags(
+                {
+                    "model_uri": model_uri,
+                    "run_ts": run_ts,
+                    "engine": "daft",
+                    "domain": "vietjetair",
+                }
+            )
+            with tempfile.TemporaryDirectory() as tmpdir:
+                model_path = os.path.join(tmpdir, "model.joblib")
+                metadata_path = os.path.join(tmpdir, "metadata.json")
+                joblib.dump({"classifier": clf, "label_encoder": le}, model_path)
+                with open(metadata_path, "w", encoding="utf-8") as fh:
+                    json.dump(metadata, fh, indent=2)
+                mlflow_run.log_artifacts(tmpdir, artifact_path="model")
 
     with maybe_open_dagster_pipes() as pipes:
         if pipes is not None:

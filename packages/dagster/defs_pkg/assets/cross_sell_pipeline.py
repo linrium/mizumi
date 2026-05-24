@@ -5,6 +5,8 @@ from ..config import (
     DAFT_BAGGAGE_CLASSIFIER_IMAGE,
     DAFT_BAGGAGE_DAMAGE_TRAINER_IMAGE,
     DAFT_IMAGE,
+    MLFLOW_EXPERIMENT_NAME,
+    MLFLOW_TRACKING_URI,
     S3A_ACCESS_KEY,
     S3A_CONF,
     S3A_ENDPOINT,
@@ -270,6 +272,13 @@ def vietjetair_baggage_damage_model(
                         {"name": "RUSTFS_ENDPOINT_URL", "value": S3A_ENDPOINT},
                         {"name": "AWS_ACCESS_KEY_ID", "value": S3A_ACCESS_KEY},
                         {"name": "AWS_SECRET_ACCESS_KEY", "value": S3A_SECRET_KEY},
+                        {"name": "MLFLOW_TRACKING_URI", "value": MLFLOW_TRACKING_URI},
+                        {
+                            "name": "MLFLOW_EXPERIMENT_NAME",
+                            "value": MLFLOW_EXPERIMENT_NAME,
+                        },
+                        {"name": "MLFLOW_S3_ENDPOINT_URL", "value": S3A_ENDPOINT},
+                        {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
                     ],
                 }
             ]

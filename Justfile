@@ -19,6 +19,9 @@ dagster_chart := "dagster/dagster"
 dagster_chart_version := "1.13.4"
 dagster_values := "infra/k8s/dagster/helm/values.yaml"
 dagster_image := "mizumi-dagster:1.13.4"
+mlflow_namespace := "mlflow"
+mlflow_manifests := "infra/k8s/mlflow"
+mlflow_image := "mizumi-mlflow:0.1.0"
 shared_postgres_namespace := "shared-postgres"
 shared_postgres_manifests := "infra/k8s/shared-postgres"
 
@@ -100,12 +103,14 @@ deploy: \
   rustfs-baggage-upload \
   redpanda-deploy \
   shared-postgres-deploy \
+  mlflow-deploy \
   keycloak-deploy \
   dagster-deploy \
   unitycatalog-deploy \
   spark-deploy \
   daft-image-build \
   daft-baggage-classifier-image-build \
+  daft-baggage-damage-trainer-image-build \
   rustfs-unitycatalog-anon-read-enable \
   duckdb-image-build \
   duckdb-server-image-build \
@@ -117,7 +122,7 @@ deploy: \
   synthetic-bootstrap \
   synthetic-server-deploy
 
-destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
+destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy mlflow-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
 
 openai-secrets-apply:
     #!/usr/bin/env bash
@@ -152,6 +157,7 @@ forward:
     trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
     kubectl port-forward -n {{ rustfs_namespace }} svc/rustfs-svc 9000:9000 9001:9001 &
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:80 &
+    kubectl port-forward -n {{ mlflow_namespace }} svc/mlflow-svc 5000:5000 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8083:8080 &
@@ -171,6 +177,7 @@ forward:
     echo "Redpanda UI:      http://127.0.0.1:8081"
     echo "Keycloak:         http://127.0.0.1:8080"
     echo "Dagster UI:       http://127.0.0.1:8088"
+    echo "MLflow UI:        http://127.0.0.1:5000"
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "DuckDB Server:    http://127.0.0.1:8090"
@@ -325,6 +332,32 @@ shared-postgres-destroy:
     kubectl delete -f {{ shared_postgres_manifests }}/ --ignore-not-found || true
     kubectl delete namespace {{ shared_postgres_namespace }} --ignore-not-found --wait=false
 
+mlflow-image-build:
+    docker build -t {{ mlflow_image }} packages/mlflow
+
+mlflow-artifact-bucket-create:
+    kubectl create namespace {{ rustfs_namespace }} 2>/dev/null || true
+    kubectl delete job mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --ignore-not-found
+    kubectl create job mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc mb --ignore-existing rustfs/mlflow'
+    kubectl wait --for=condition=complete job/mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --timeout=120s
+    kubectl logs job/mlflow-artifact-bucket-create -n {{ rustfs_namespace }}
+
+mlflow-deploy: mlflow-image-build
+    just rustfs-deploy
+    just shared-postgres-deploy
+    just shared-postgres-bootstrap
+    just mlflow-artifact-bucket-create
+    kubectl apply -f {{ mlflow_manifests }}/deployment.yaml
+    kubectl rollout status deployment/mlflow -n {{ mlflow_namespace }} --timeout=300s
+    kubectl get pods,svc,secret -n {{ mlflow_namespace }}
+
+mlflow-forward:
+    kubectl port-forward -n {{ mlflow_namespace }} svc/mlflow-svc 5000:5000
+
+mlflow-destroy:
+    kubectl delete -f {{ mlflow_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ mlflow_namespace }} --ignore-not-found --wait=false
+
 keycloak-image-build:
     docker build -t {{ keycloak_image }} packages/keycloak
 
@@ -446,9 +479,14 @@ daft-baggage-damage-train-local: daft-baggage-damage-trainer-image-build
       -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
       -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
       -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
+      -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 \
+      -e MLFLOW_EXPERIMENT_NAME=vietjetair-baggage-damage \
+      -e MLFLOW_S3_ENDPOINT_URL={{ rustfs_endpoint }} \
+      -e AWS_DEFAULT_REGION=us-east-1 \
       -e SOURCE_BUCKET=unitycatalog \
       -e GOLD_TABLE_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
-      -e MODEL_BUCKET=models \
+      -e MODEL_BUCKET=unitycatalog \
+      -e MODEL_KEY_PREFIX=vietjetair/models/baggage_damage_detector \
       {{ daft_baggage_damage_trainer_image }}
 
 spark-destroy:

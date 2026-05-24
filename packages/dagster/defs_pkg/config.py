@@ -1,6 +1,8 @@
 S3A_ENDPOINT = "http://rustfs-svc.rustfs.svc.cluster.local:9000"
 S3A_ACCESS_KEY = "rustfsadmin"
 S3A_SECRET_KEY = "rustfsadmin"
+MLFLOW_TRACKING_URI = "http://mlflow-svc.mlflow.svc.cluster.local:5000"
+MLFLOW_EXPERIMENT_NAME = "vietjetair-baggage-damage"
 
 SPARK_IMAGE = "mizumi-spark-rustfs:4.1.3"
 DAFT_IMAGE = "mizumi-daft:0.7.10"
