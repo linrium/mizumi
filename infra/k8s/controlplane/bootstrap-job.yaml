@@ -76,5 +76,6 @@ spec:
                 return 1
               }
 
-              submit_job "hdbank-stream-partner-events-to-bronze" "local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"
-              submit_job "vietjetair-stream-partner-events-to-bronze" "local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py"
+              submit_job "hdbank-stream-banking-transactions-to-bronze" "local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"
+              submit_job "vietjetair-stream-flight-tickets-to-bronze" "local:///opt/spark/jobs/vietjetair/stream_flight_tickets_to_bronze.py"
+              submit_job "vietjetair-stream-flight-incidents-to-bronze" "local:///opt/spark/jobs/vietjetair/stream_flight_incidents_to_bronze.py"

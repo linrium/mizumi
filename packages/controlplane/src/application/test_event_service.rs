@@ -9,9 +9,9 @@ use tracing::info;
 
 use crate::domain::{
     entities::test_event::{
-        PublishEventResponse, PublishHdbankCustomerEventRequest, PublishHdbankPaymentEventRequest,
-        PublishVietjetairBookingEventRequest, PublishVietjetairCustomerEventRequest,
-        PublishVietjetairFlightEventRequest,
+        PublishBankingTransactionEventRequest, PublishEventResponse,
+        PublishFlightIncidentEventRequest, PublishFlightTicketEventRequest,
+        PublishHdbankCustomerEventRequest, PublishVietjetairCustomerEventRequest,
     },
     error::AppError,
 };
@@ -53,115 +53,205 @@ impl TestEventService {
         })
     }
 
-    pub async fn publish_hdbank_payment_event(
-        &self,
-        req: PublishHdbankPaymentEventRequest,
-    ) -> Result<PublishEventResponse, AppError> {
-        let timestamp = req.payment_timestamp.unwrap_or_else(Utc::now);
-        let key = req.payment_event_id.clone();
-        let value = serde_json::json!({
-            "event_type": "card_transaction_posted",
-            "payment_event_id": req.payment_event_id,
-            "customer_id": req.customer_id,
-            "account_id": req.account_id,
-            "transaction_reference": req.transaction_reference,
-            "merchant_name": req.merchant_name,
-            "merchant_category": req.merchant_category,
-            "amount": req.amount,
-            "currency": req.currency,
-            "payment_timestamp": timestamp,
-            "note": req.note,
-        })
-        .to_string();
-
-        self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
-            .await
+    fn parse_f64(field: &'static str, value: &str) -> Result<f64, AppError> {
+        value
+            .parse::<f64>()
+            .map_err(|e| AppError::Parse(format!("invalid {} '{}': {}", field, value, e)))
     }
 
-    pub async fn publish_hdbank_customer_event(
+    pub async fn publish_hdbank_customer_events(
         &self,
-        req: PublishHdbankCustomerEventRequest,
-    ) -> Result<PublishEventResponse, AppError> {
-        let timestamp = req.updated_at.unwrap_or_else(Utc::now);
-        let key = req.customer_id.clone();
-        let value = serde_json::json!({
-            "event_type": "customer_profile_updated",
-            "customer_id": req.customer_id,
-            "customer_name": req.customer_name,
-            "segment_name": req.segment_name,
-            "kyc_status": req.kyc_status,
-            "preferred_channel": req.preferred_channel,
-            "updated_at": timestamp,
-        })
-        .to_string();
+        reqs: Vec<PublishHdbankCustomerEventRequest>,
+    ) -> Result<Vec<PublishEventResponse>, AppError> {
+        let mut responses = Vec::with_capacity(reqs.len());
 
-        self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
-            .await
+        for req in reqs {
+            let timestamp = Utc::now();
+            let key = req.user_id.clone();
+            let value = serde_json::json!({
+                "event_type": "customer_profile_updated",
+                "customer_id": req.user_id,
+                "customer_name": req.full_name,
+                "city": req.city,
+                "age": req.age,
+                "customer_case": req.customer_case,
+                "customer_tier": req.customer_tier,
+                "hdbank_affinity_score": req.hdbank_affinity_score,
+                "average_monthly_balance": req.average_monthly_balance,
+                "credit_score_band": req.credit_score_band,
+                "hdbank_since": req.hdbank_since,
+                "has_vietjet_co_brand_card": req.has_vietjet_co_brand_card,
+                "updated_at": timestamp,
+            })
+            .to_string();
+
+            responses.push(
+                self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
+                    .await?,
+            );
+        }
+
+        Ok(responses)
     }
 
-    pub async fn publish_vietjetair_customer_event(
+    pub async fn publish_hdbank_banking_transaction_events(
         &self,
-        req: PublishVietjetairCustomerEventRequest,
-    ) -> Result<PublishEventResponse, AppError> {
-        let timestamp = req.updated_at.unwrap_or_else(Utc::now);
-        let key = req.customer_id.clone();
-        let value = serde_json::json!({
-            "event_type": "customer_profile_updated",
-            "customer_id": req.customer_id,
-            "customer_name": req.customer_name,
-            "membership_tier": req.membership_tier,
-            "home_airport": req.home_airport,
-            "email_opt_in": req.email_opt_in,
-            "updated_at": timestamp,
-        })
-        .to_string();
+        reqs: Vec<PublishBankingTransactionEventRequest>,
+    ) -> Result<Vec<PublishEventResponse>, AppError> {
+        let mut responses = Vec::with_capacity(reqs.len());
 
-        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
-            .await
+        for req in reqs {
+            let timestamp = req.posted_at;
+            let key = req.transaction_id.clone();
+            let value = serde_json::json!({
+                "event_type": "banking_transaction_recorded",
+                "transaction_id": req.transaction_id,
+                "customer_id": req.user_id,
+                "accountId": req.account_id,
+                "posted_at": timestamp,
+                "transaction_type": req.transaction_type,
+                "channel": req.channel,
+                "merchant_category": req.merchant_category,
+                "amount": Self::parse_f64("amount", &req.amount)?,
+                "currency": req.currency,
+                "source_bank": req.source_bank,
+                "destination_bank": req.destination_bank,
+                "merchant_name": req.merchant_name,
+                "balance_before": Self::parse_f64("balanceBefore", &req.balance_before)?,
+                "balance_after": Self::parse_f64("balanceAfter", &req.balance_after)?,
+                "city": req.city,
+            })
+            .to_string();
+
+            responses.push(
+                self.publish_raw_event(HDBANK_PARTNER_EVENTS_TOPIC, key, timestamp, value)
+                    .await?,
+            );
+        }
+
+        Ok(responses)
     }
 
-    pub async fn publish_vietjetair_flight_event(
+    pub async fn publish_vietjetair_customer_events(
         &self,
-        req: PublishVietjetairFlightEventRequest,
-    ) -> Result<PublishEventResponse, AppError> {
-        let timestamp = req.scheduled_departure_time;
-        let key = req.flight_id.clone();
-        let value = serde_json::json!({
-            "event_type": "flight_schedule_updated",
-            "flight_id": req.flight_id,
-            "flight_number": req.flight_number,
-            "route_code": req.route_code,
-            "departure_airport": req.departure_airport,
-            "arrival_airport": req.arrival_airport,
-            "scheduled_departure_time": req.scheduled_departure_time,
-            "aircraft_type": req.aircraft_type,
-        })
-        .to_string();
+        reqs: Vec<PublishVietjetairCustomerEventRequest>,
+    ) -> Result<Vec<PublishEventResponse>, AppError> {
+        let mut responses = Vec::with_capacity(reqs.len());
 
-        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
-            .await
+        for req in reqs {
+            let timestamp = Utc::now();
+            let key = req.user_id.clone();
+            let value = serde_json::json!({
+                "event_type": "customer_profile_updated",
+                "customer_id": req.user_id,
+                "customer_name": req.full_name,
+                "city": req.city,
+                "age": req.age,
+                "customer_case": req.customer_case,
+                "skyboss_tier": req.skyboss_tier,
+                "vietjet_air_affinity_score": req.vietjet_air_affinity_score,
+                "annual_flights": req.annual_flights,
+                "ancillary_spend_score": req.ancillary_spend_score,
+                "vietjet_air_since": req.vietjet_air_since,
+                "has_hdbank_co_brand_card": req.has_hdbank_co_brand_card,
+                "updated_at": timestamp,
+            })
+            .to_string();
+
+            responses.push(
+                self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
+                    .await?,
+            );
+        }
+
+        Ok(responses)
     }
 
-    pub async fn publish_vietjetair_booking_event(
+    pub async fn publish_vietjetair_flight_ticket_events(
         &self,
-        req: PublishVietjetairBookingEventRequest,
-    ) -> Result<PublishEventResponse, AppError> {
-        let timestamp = req.booking_timestamp.unwrap_or_else(Utc::now);
-        let key = req.booking_id.clone();
-        let value = serde_json::json!({
-            "event_type": "booking_confirmed",
-            "booking_id": req.booking_id,
-            "customer_id": req.customer_id,
-            "pnr_code": req.pnr_code,
-            "payment_reference": req.payment_reference,
-            "route_code": req.route_code,
-            "ticket_amount": req.ticket_amount,
-            "currency": req.currency,
-            "booking_timestamp": timestamp,
-        })
-        .to_string();
+        reqs: Vec<PublishFlightTicketEventRequest>,
+    ) -> Result<Vec<PublishEventResponse>, AppError> {
+        let mut responses = Vec::with_capacity(reqs.len());
 
-        self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
-            .await
+        for req in reqs {
+            let timestamp = req.booking_at;
+            let key = req.ticket_id.clone();
+            let value = serde_json::json!({
+                "event_type": "flight_ticket_issued",
+                "ticket_id": req.ticket_id,
+                "customer_id": req.user_id,
+                "booking_reference": req.booking_reference,
+                "airline": req.airline,
+                "flight_number": req.flight_number,
+                "trip_type": req.trip_type,
+                "origin_airport": req.origin_airport,
+                "destination_airport": req.destination_airport,
+                "booking_at": req.booking_at,
+                "departure_at": req.departure_at,
+                "return_departure_at": req.return_departure_at,
+                "cabin_class": req.cabin_class,
+                "passenger_count": req.passenger_count,
+                "distance_km": req.distance_km,
+                "flight_duration_minutes": req.flight_duration_minutes,
+                "base_fare": Self::parse_f64("baseFare", &req.base_fare)?,
+                "taxes": Self::parse_f64("taxes", &req.taxes)?,
+                "total_price": Self::parse_f64("totalPrice", &req.total_price)?,
+                "currency": req.currency,
+                "baggage_kg": req.baggage_kg,
+                "status": req.status,
+                "city": req.city,
+            })
+            .to_string();
+
+            responses.push(
+                self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
+                    .await?,
+            );
+        }
+
+        Ok(responses)
+    }
+
+    pub async fn publish_vietjetair_flight_incident_events(
+        &self,
+        reqs: Vec<PublishFlightIncidentEventRequest>,
+    ) -> Result<Vec<PublishEventResponse>, AppError> {
+        let mut responses = Vec::with_capacity(reqs.len());
+
+        for req in reqs {
+            let timestamp = req.reported_at;
+            let key = req.report_id.clone();
+            let value = serde_json::json!({
+                "event_type": "flight_incident_reported",
+                "report_id": req.report_id,
+                "customer_id": req.vietjet_customer_id,
+                "ticket_id": req.ticket_id,
+                "booking_reference": req.booking_reference,
+                "airline": req.airline,
+                "report_channel": req.report_channel,
+                "incident_type": req.incident_type,
+                "severity": req.severity,
+                "issue_airport": req.issue_airport,
+                "origin_airport": req.origin_airport,
+                "destination_airport": req.destination_airport,
+                "flight_number": req.flight_number,
+                "departure_date": req.departure_date,
+                "reported_at": req.reported_at,
+                "status": req.status,
+                "baggage_tag": req.baggage_tag,
+                "delayed_minutes": req.delayed_minutes,
+                "currency": req.currency,
+                "city": req.city,
+                "image_path": req.image_path,
+            })
+            .to_string();
+
+            responses.push(
+                self.publish_raw_event(VIETJETAIR_PARTNER_EVENTS_TOPIC, key, timestamp, value)
+                    .await?,
+            );
+        }
+
+        Ok(responses)
     }
 }

@@ -18,6 +18,34 @@ spec:
       labels:
         app: synthetic-server
     spec:
+      volumes:
+        - name: synthetic-data
+          emptyDir: {}
+      initContainers:
+        - name: rustfs-sync
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
+              mkdir -p /data/current
+              if mc stat rustfs/datasets/synthetic/current >/dev/null 2>&1; then
+                for file in \
+                  vietnamese_residents.csv \
+                  hdbank_customers.csv \
+                  vietjetair_customers.csv \
+                  banking_transactions.csv \
+                  flight_tickets.csv \
+                  flight_incidents.csv; do
+                  mc cp "rustfs/datasets/synthetic/current/${file}" "/data/current/${file}"
+                done
+              else
+                echo "synthetic dataset prefix not found yet; starting with empty local data dir"
+              fi
+          volumeMounts:
+            - name: synthetic-data
+              mountPath: /data
       containers:
         - name: synthetic-server
           image: mizumi-synthetic-server:0.1.0
@@ -28,6 +56,8 @@ spec:
           env:
             - name: PORT
               value: "8092"
+            - name: SYNTHETIC_DATA_DIR
+              value: "/data/current"
             - name: SEED
               value: "42"
             - name: POOL_RESIDENTS
@@ -38,6 +68,9 @@ spec:
               value: "8092"
             - name: POOL_FLIGHT_INCIDENTS
               value: "1000"
+          volumeMounts:
+            - name: synthetic-data
+              mountPath: /data
           readinessProbe:
             httpGet:
               path: /health
@@ -53,10 +86,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service

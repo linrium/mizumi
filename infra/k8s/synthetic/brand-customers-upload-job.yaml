@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: synthetic-brand-customers-upload-config
+  namespace: synthetic
+data:
+  generate.config.json: |
+    {
+      "seed": 42,
+      "generators": [
+        {
+          "type": "vietnamese-residents",
+          "count": 10000,
+          "output": "/workspace/output/vietnamese_residents.csv"
+        },
+        {
+          "type": "banking-transactions",
+          "count": 50000,
+          "output": "/workspace/output/banking_transactions.csv",
+          "residentsPath": "/workspace/output/vietnamese_residents.csv"
+        },
+        {
+          "type": "brand-customers",
+          "count": 5000,
+          "output": "/workspace/output",
+          "residentsPath": "/workspace/output/vietnamese_residents.csv"
+        },
+        {
+          "type": "flight-tickets",
+          "count": 20000,
+          "output": "/workspace/output/flight_tickets.csv",
+          "residentsPath": "/workspace/output/vietnamese_residents.csv"
+        },
+        {
+          "type": "flight-incidents",
+          "count": 2000,
+          "output": "/workspace/output/flight_incidents.csv",
+          "flightTicketsPath": "/workspace/output/flight_tickets.csv",
+          "trainDataPath": "/app/data/train"
+        }
+      ]
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: synthetic-brand-customers-upload
+  namespace: synthetic
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: generate-config
+          configMap:
+            name: synthetic-brand-customers-upload-config
+      initContainers:
+        - name: generator
+          image: mizumi-synthetic-server:0.1.0
+          imagePullPolicy: Always
+          workingDir: /app
+          command:
+            - bun
+            - run
+            - generate.ts
+            - /config/generate.config.json
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: generate-config
+              mountPath: /config
+      containers:
+        - name: uploader
+          image: minio/mc:latest
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin
+              mc mb --ignore-existing rustfs/datasets
+              mc mb --ignore-existing rustfs/unitycatalog
+              mc rm --recursive --force rustfs/datasets/synthetic/current || true
+              mc mirror --overwrite /workspace/output rustfs/datasets/synthetic/current
+              mc mirror --overwrite /workspace/output/baggage_damaged_reports rustfs/unitycatalog/vietjetair/baggage_damaged_reports
+              mc cp /workspace/output/vietjetair_customers.csv rustfs/unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/
+              mc cp /workspace/output/hdbank_customers.csv rustfs/unitycatalog/hdbank/hdbank_partnership_prod_bronze/
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace

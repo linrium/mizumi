@@ -1,35 +1,30 @@
 "use client"
 
-import { IconBook2, IconCarFan, IconDatabase, IconFolder, IconTable } from "@tabler/icons-react"
+import {
+  IconBook2,
+  IconBrain,
+  IconChevronRight,
+  IconDatabase,
+  IconFolder,
+  IconTable,
+} from "@tabler/icons-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import type { Catalog, RegisteredModelSummary, Schema, TableSummary, VolumeSummary } from "@/services/catalog-types"
-import { getCatalogsAction, getModelsAction, getSchemasAction, getTablesAction, getVolumesAction } from "./actions"
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="10"
-      height="10"
-      viewBox="0 0 10 10"
-      fill="none"
-      className={cn(
-        "shrink-0 transition-transform text-muted-foreground",
-        open && "rotate-90",
-      )}
-    >
-      <path
-        d="M3 2l4 3-4 3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
+import type {
+  Catalog,
+  RegisteredModelSummary,
+  Schema,
+  TableSummary,
+  VolumeSummary,
+} from "@/services/catalog-types"
+import {
+  getCatalogsAction,
+  getModelsAction,
+  getSchemasAction,
+  getTablesAction,
+  getVolumesAction,
+} from "./actions"
 
 export default function CatalogLayout({
   children,
@@ -44,7 +39,9 @@ export default function CatalogLayout({
   const [schemas, setSchemas] = useState<Record<string, Schema[]>>({})
   const [tables, setTables] = useState<Record<string, TableSummary[]>>({})
   const [volumes, setVolumes] = useState<Record<string, VolumeSummary[]>>({})
-  const [models, setModels] = useState<Record<string, RegisteredModelSummary[]>>({})
+  const [models, setModels] = useState<
+    Record<string, RegisteredModelSummary[]>
+  >({})
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(360)
@@ -67,9 +64,13 @@ export default function CatalogLayout({
       ? resourceParts[1]
       : undefined
   const activeVol =
-    resourceParts[1] === "volumes" && resourceParts[2] ? resourceParts[2] : undefined
+    resourceParts[1] === "volumes" && resourceParts[2]
+      ? resourceParts[2]
+      : undefined
   const activeMod =
-    resourceParts[1] === "models" && resourceParts[2] ? resourceParts[2] : undefined
+    resourceParts[1] === "models" && resourceParts[2]
+      ? resourceParts[2]
+      : undefined
   const activeItemClass =
     "bg-primary/12 text-foreground font-medium ring-1 ring-primary/20"
   const activeIconClass = "text-primary"
@@ -105,12 +106,19 @@ export default function CatalogLayout({
 
     void Promise.all([
       getTablesAction(activeCat, activeSch),
-      getVolumesAction(activeCat, activeSch).catch(() => ({ volumes: [] as VolumeSummary[] })),
-      getModelsAction(activeCat, activeSch).catch(() => ({ registered_models: [] as RegisteredModelSummary[] })),
+      getVolumesAction(activeCat, activeSch).catch(() => ({
+        volumes: [] as VolumeSummary[],
+      })),
+      getModelsAction(activeCat, activeSch).catch(() => ({
+        registered_models: [] as RegisteredModelSummary[],
+      })),
     ]).then(([tablesData, volumesData, modelsData]) => {
       setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
       setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
-      setModels((prev) => ({ ...prev, [key]: modelsData.registered_models ?? [] }))
+      setModels((prev) => ({
+        ...prev,
+        [key]: modelsData.registered_models ?? [],
+      }))
     })
   }, [activeCat, activeSch, tables])
 
@@ -138,12 +146,19 @@ export default function CatalogLayout({
     if (!tables[key]) {
       const [tablesData, volumesData, modelsData] = await Promise.all([
         getTablesAction(cat, sch),
-        getVolumesAction(cat, sch).catch(() => ({ volumes: [] as VolumeSummary[] })),
-        getModelsAction(cat, sch).catch(() => ({ registered_models: [] as RegisteredModelSummary[] })),
+        getVolumesAction(cat, sch).catch(() => ({
+          volumes: [] as VolumeSummary[],
+        })),
+        getModelsAction(cat, sch).catch(() => ({
+          registered_models: [] as RegisteredModelSummary[],
+        })),
       ])
       setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
       setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
-      setModels((prev) => ({ ...prev, [key]: modelsData.registered_models ?? [] }))
+      setModels((prev) => ({
+        ...prev,
+        [key]: modelsData.registered_models ?? [],
+      }))
     }
   }
 
@@ -215,7 +230,14 @@ export default function CatalogLayout({
                     catActive && activeItemClass,
                   )}
                 >
-                  <Chevron open={catOpen} />
+                  <IconChevronRight
+                    aria-hidden="true"
+                    size={14}
+                    className={cn(
+                      "shrink-0 text-muted-foreground transition-transform",
+                      catOpen && "rotate-90",
+                    )}
+                  />
                   <IconBook2
                     size={15}
                     className={cn(
@@ -247,7 +269,14 @@ export default function CatalogLayout({
                             schActive && activeItemClass,
                           )}
                         >
-                          <Chevron open={schOpen} />
+                          <IconChevronRight
+                            aria-hidden="true"
+                            size={14}
+                            className={cn(
+                              "shrink-0 text-muted-foreground transition-transform",
+                              schOpen && "rotate-90",
+                            )}
+                          />
                           <IconDatabase
                             size={15}
                             className={cn(
@@ -338,7 +367,7 @@ export default function CatalogLayout({
                                     modActive && activeItemClass,
                                   )}
                                 >
-                                  <IconCarFan
+                                  <IconBrain
                                     size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",

@@ -22,13 +22,29 @@ import {
   IconSparkles,
   IconTrash,
   IconX,
-  IconDots,
   type TablerIcon,
 } from "@tabler/icons-react"
 import type { ColumnDef } from "@tanstack/react-table"
 import type { UIDataTypes, UIMessage, UIMessagePart, UITools } from "ai"
 import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
-import ReactECharts from "echarts-for-react"
+import useMeasure from "react-use-measure"
+import { BarChart } from "@/components/charts/bar-chart"
+import { Bar } from "@/components/charts/bar"
+import { BarXAxis } from "@/components/charts/bar-x-axis"
+import { BarYAxis } from "@/components/charts/bar-y-axis"
+import { AreaChart, Area } from "@/components/charts/area-chart"
+import { PieChart } from "@/components/charts/pie-chart"
+import { PieSlice } from "@/components/charts/pie-slice"
+import { FunnelChart } from "@/components/charts/funnel-chart"
+import { SankeyChart } from "@/components/charts/sankey/sankey-chart"
+import { SankeyNode } from "@/components/charts/sankey/sankey-node"
+import { SankeyLink } from "@/components/charts/sankey/sankey-link"
+import { SankeyTooltip } from "@/components/charts/sankey/sankey-tooltip"
+import type { SankeyData } from "@/components/charts/sankey/sankey-chart"
+import type { PieData } from "@/components/charts/pie-context"
+import type { FunnelStage } from "@/components/charts/funnel-chart"
+import { Grid } from "@/components/charts/grid"
+import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip"
 import {
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -81,7 +97,15 @@ import "react-grid-layout/css/styles.css"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ChartType = "bar" | "line" | "pie" | "scatter" | "area" | "sankey"
+type ChartType =
+  | "bar"
+  | "line"
+  | "pie"
+  | "scatter"
+  | "area"
+  | "sankey"
+  | "funnel"
+  | "heatmap"
 
 type QueryResult = {
   columns: string[]
@@ -103,6 +127,7 @@ type Panel = {
   sql: string
   xCol: string
   yCol: string
+  yCols?: string[]
 }
 
 // Tool output shape coming back from createPanel
@@ -136,294 +161,508 @@ type EditPanelOutput = {
   error?: string
 }
 
-// ── ECharts option builder ────────────────────────────────────────────────────
+// ── Bklit data helpers ────────────────────────────────────────────────────────
 
-function buildOption(
-  chartType: ChartType,
-  result: QueryResult,
-  xCol: string,
-  yCol: string,
-) {
+function toBarChartData(result: QueryResult, xCol: string, yCol: string) {
   const xi = result.columns.indexOf(xCol)
   const yi = result.columns.indexOf(yCol)
-  const keys =
-    xi >= 0
-      ? result.rows.map((r) => String((r as unknown[])[xi] ?? ""))
-      : result.rows.map((_, i) => String(i))
-  const values =
-    yi >= 0
-      ? result.rows
-          .map((r) => parseFloat(String((r as unknown[])[yi] ?? "0")))
-          .filter(Number.isFinite)
-      : []
-
-  const textColor = "#71717a"
-  const gridColor = "#e4e4e7"
-  const base = {
-    backgroundColor: "transparent",
-    textStyle: { color: textColor, fontFamily: "inherit" },
-    tooltip: {
-      trigger: chartType === "pie" ? "item" : "axis",
-      textStyle: { fontSize: 11 },
-    },
-  }
-
-  if (chartType === "sankey") {
-    const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
-    const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
-    const valIdx = result.columns.findIndex(
-      (_, i) => i !== srcIdx && i !== tgtIdx,
-    )
-
-    const nodeNames = new Set<string>()
-    const links: { source: string; target: string; value: number }[] = []
-
-    for (const row of result.rows) {
-      const r = row as unknown[]
-      const src = String(r[srcIdx] ?? "")
-      const tgt = String(r[tgtIdx] ?? "")
-      const val = parseFloat(String(r[Math.max(0, valIdx)] ?? "0"))
-      if (src && tgt && Number.isFinite(val) && val > 0) {
-        nodeNames.add(src)
-        nodeNames.add(tgt)
-        links.push({ source: src, target: tgt, value: val })
-      }
-    }
-
+  return result.rows.map((row) => {
+    const r = row as unknown[]
     return {
-      ...base,
-      series: [
-        {
-          type: "sankey",
-          emphasis: { focus: "adjacency" },
-          data: [...nodeNames].map((name) => ({ name })),
-          links,
-          lineStyle: { color: "gradient", opacity: 0.45 },
-          label: { fontSize: 11, color: textColor },
-          nodeWidth: 14,
-          nodeGap: 10,
-          right: "10%",
-        },
-      ],
+      [xCol]: String(r[xi] ?? ""),
+      [yCol]: parseFloat(String(r[yi] ?? "0")) || 0,
+    }
+  })
+}
+
+function toPieData(result: QueryResult, xCol: string, yCol: string): PieData[] {
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+  return result.rows.map((row) => {
+    const r = row as unknown[]
+    return {
+      label: String(r[xi] ?? ""),
+      value: parseFloat(String(r[yi] ?? "0")) || 0,
+    }
+  })
+}
+
+function toFunnelData(result: QueryResult, xCol: string, yCol: string): FunnelStage[] {
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+  return result.rows.map((row) => {
+    const r = row as unknown[]
+    return {
+      label: String(r[xi] ?? ""),
+      value: parseFloat(String(r[yi] ?? "0")) || 0,
+    }
+  })
+}
+
+function toStackedBarData(result: QueryResult, xCol: string, yCols: string[]) {
+  const xi = result.columns.indexOf(xCol)
+  return result.rows.map((row) => {
+    const r = row as unknown[]
+    const obj: Record<string, unknown> = { [xCol]: String(r[xi] ?? "") }
+    for (const col of yCols) {
+      const ci = result.columns.indexOf(col)
+      obj[col] = ci >= 0 ? parseFloat(String(r[ci] ?? "0")) || 0 : 0
+    }
+    return obj
+  })
+}
+
+function toSankeyData(result: QueryResult, xCol: string, yCol: string): SankeyData {
+  const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
+  const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
+  const valIdx = result.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+  const rowValue = (row: unknown, index: number) => (row as unknown[])[index]
+
+  const nodeNames = new Set<string>()
+  const rawLinks: { source: string; target: string; value: number }[] = []
+
+  for (const row of result.rows) {
+    const src = String(rowValue(row, srcIdx) ?? "")
+    const tgt = String(rowValue(row, tgtIdx) ?? "")
+    const val = parseFloat(String(rowValue(row, Math.max(0, valIdx)) ?? "0"))
+    if (src && tgt && Number.isFinite(val) && val > 0) {
+      nodeNames.add(src)
+      nodeNames.add(tgt)
+      rawLinks.push({ source: src, target: tgt, value: val })
     }
   }
 
-  if (chartType === "pie") {
-    return {
-      ...base,
-      legend: {
-        orient: "vertical",
-        left: "left",
-        textStyle: { fontSize: 11, color: textColor },
-      },
-      series: [
-        {
-          type: "pie",
-          radius: ["32%", "62%"],
-          center: ["60%", "50%"],
-          data: keys.map((k, i) => ({ name: k, value: values[i] ?? 0 })),
-          label: { fontSize: 10, color: textColor },
-          itemStyle: { borderRadius: 4 },
-        },
-      ],
-    }
-  }
-  if (chartType === "scatter") {
-    return {
-      ...base,
-      grid: { left: 40, right: 16, top: 12, bottom: 36, containLabel: false },
-      xAxis: {
-        type: "category",
-        data: keys,
-        axisLabel: { fontSize: 10, color: textColor },
-        axisLine: { lineStyle: { color: gridColor } },
-        splitLine: { lineStyle: { color: gridColor } },
-      },
-      yAxis: {
-        type: "value",
-        axisLabel: { fontSize: 10, color: textColor },
-        splitLine: { lineStyle: { color: gridColor } },
-      },
-      series: [{ type: "scatter", data: values, symbolSize: 10 }],
-    }
-  }
+  const nodeArray = [...nodeNames]
   return {
-    ...base,
-    grid: { left: 44, right: 16, top: 12, bottom: 36, containLabel: false },
-    xAxis: {
-      type: "category",
-      data: keys,
-      axisLabel: {
-        fontSize: 10,
-        color: textColor,
-        rotate: keys.length > 6 ? 30 : 0,
-      },
-      axisLine: { lineStyle: { color: gridColor } },
-      splitLine: { show: false },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: { fontSize: 10, color: textColor },
-      splitLine: { lineStyle: { color: gridColor } },
-    },
-    series: [
-      {
-        type: chartType === "area" ? "line" : chartType,
-        data: values,
-        smooth: chartType === "line" || chartType === "area",
-        areaStyle: chartType === "area" ? { opacity: 0.18 } : undefined,
-        itemStyle: {
-          borderRadius: chartType === "bar" ? [3, 3, 0, 0] : undefined,
-        },
-      },
-    ],
+    nodes: nodeArray.map((name) => ({ name })),
+    links: rawLinks.map((l) => ({
+      source: nodeArray.indexOf(l.source),
+      target: nodeArray.indexOf(l.target),
+      value: l.value,
+    })),
   }
 }
 
+// ── ScatterPlot ───────────────────────────────────────────────────────────────
+
+function ScatterPlot({ result, xCol, yCol }: { result: QueryResult; xCol: string; yCol: string }) {
+  const [ref, { width, height }] = useMeasure({ debounce: 10 })
+  const m = { top: 16, right: 18, bottom: 40, left: 48 }
+  const textColor = "#71717a"
+  const gridColor = "#e4e4e7"
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+
+  const points = useMemo(() => {
+    return result.rows.flatMap((row) => {
+      const r = row as unknown[]
+      const x = parseFloat(String(r[xi] ?? ""))
+      const y = parseFloat(String(r[yi] ?? ""))
+      return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : []
+    })
+  }, [result, xi, yi])
+
+  const iw = Math.max(0, width - m.left - m.right)
+  const ih = Math.max(0, height - m.top - m.bottom)
+
+  const { xScale, yScale, xTicks, yTicks } = useMemo(() => {
+    if (!points.length || !iw || !ih)
+      return { xScale: (_: number) => 0, yScale: (_: number) => ih, xTicks: [] as number[], yTicks: [] as number[] }
+    const xs = points.map((p) => p.x)
+    const ys = points.map((p) => p.y)
+    const xMin = Math.min(...xs), xMax = Math.max(...xs)
+    const yMin = Math.min(...ys), yMax = Math.max(...ys)
+    const xPad = (xMax - xMin) * 0.06 || 1
+    const yPad = (yMax - yMin) * 0.1 || 1
+    const xD = [xMin - xPad, xMax + xPad]
+    const yD = [yMin - yPad, yMax + yPad]
+    const xR = xD[1] - xD[0], yR = yD[1] - yD[0]
+    const xScale = (v: number) => ((v - xD[0]) / xR) * iw
+    const yScale = (v: number) => ih - ((v - yD[0]) / yR) * ih
+    const n = 4
+    const xTicks = Array.from({ length: n + 1 }, (_, i) => xD[0] + (i / n) * xR)
+    const yTicks = Array.from({ length: n + 1 }, (_, i) => yD[0] + (i / n) * yR)
+    return { xScale, yScale, xTicks, yTicks }
+  }, [points, iw, ih])
+
+  const fmt = (n: number) =>
+    Math.abs(n) >= 1e6 ? `${(n / 1e6).toFixed(1)}M`
+    : Math.abs(n) >= 1e3 ? `${(n / 1e3).toFixed(1)}k`
+    : Number.isInteger(n) ? String(n) : n.toFixed(1)
+
+  return (
+    <div ref={ref} className="h-full w-full">
+      {width > 0 && height > 0 && (
+        <svg width={width} height={height}>
+          <g transform={`translate(${m.left},${m.top})`}>
+            {yTicks.map((t) => (
+              <line key={t} x1={0} x2={iw} y1={yScale(t)} y2={yScale(t)} stroke={gridColor} strokeWidth={1} />
+            ))}
+            {yTicks.map((t) => (
+              <text key={t} x={-6} y={yScale(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill={textColor}>
+                {fmt(t)}
+              </text>
+            ))}
+            {xTicks.map((t) => (
+              <text key={t} x={xScale(t)} y={ih + 14} textAnchor="middle" fontSize={10} fill={textColor}>
+                {fmt(t)}
+              </text>
+            ))}
+            <text x={iw / 2} y={ih + 30} textAnchor="middle" fontSize={10} fill={textColor}>{xCol}</text>
+            {points.map((p, i) => (
+              <circle key={i} cx={xScale(p.x)} cy={yScale(p.y)} r={5} fill="var(--chart-1)" opacity={0.72} />
+            ))}
+          </g>
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// ── HeatmapChart ──────────────────────────────────────────────────────────────
+
+function HeatmapChart({ result, xCol, yCol }: { result: QueryResult; xCol: string; yCol: string }) {
+  const [ref, { width, height }] = useMeasure({ debounce: 10 })
+  const m = { top: 16, right: 24, bottom: 56, left: 88 }
+  const textColor = "#71717a"
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+  const valIdx = result.columns.findIndex((_, i) => {
+    if (i === xi || i === yi) return false
+    return result.rows.some((row) => Number.isFinite(parseFloat(String((row as unknown[])[i] ?? ""))))
+  })
+
+  const { xLabels, yLabels, cells, maxVal } = useMemo(() => {
+    const rv = (row: unknown, i: number) => (row as unknown[])[i]
+    const xSet = [...new Set(result.rows.map((r) => String(rv(r, xi) ?? "")))]
+    const ySet = yi >= 0 ? [...new Set(result.rows.map((r) => String(rv(r, yi) ?? "")))] : []
+    const safeValIdx = Math.max(0, valIdx)
+    const cells = result.rows.flatMap((row) => {
+      const x = xSet.indexOf(String(rv(row, xi) ?? ""))
+      const y = ySet.indexOf(String(rv(row, yi) ?? ""))
+      const v = parseFloat(String(rv(row, safeValIdx) ?? ""))
+      return x >= 0 && y >= 0 && Number.isFinite(v) && v > 0 ? [{ x, y, v }] : []
+    })
+    const maxVal = Math.max(...cells.map((c) => c.v), 1)
+    return { xLabels: xSet, yLabels: ySet, cells, maxVal }
+  }, [result, xi, yi, valIdx])
+
+  const iw = Math.max(0, width - m.left - m.right)
+  const ih = Math.max(0, height - m.top - m.bottom)
+  const cw = xLabels.length ? iw / xLabels.length : 0
+  const ch = yLabels.length ? ih / yLabels.length : 0
+
+  const cellColor = (v: number) => {
+    const t = Math.min(1, v / maxVal)
+    return `hsl(221 83% ${Math.round(96 - t * 52)}%)`
+  }
+
+  return (
+    <div ref={ref} className="h-full w-full">
+      {width > 0 && height > 0 && (
+        <svg width={width} height={height}>
+          <g transform={`translate(${m.left},${m.top})`}>
+            {cells.map((cell, i) => {
+              const cx = cell.x * cw + cw / 2
+              const cy = cell.y * ch + ch / 2
+              return (
+                <g key={i}>
+                  <rect x={cell.x * cw} y={cell.y * ch} width={Math.max(0, cw - 2)} height={Math.max(0, ch - 2)} fill={cellColor(cell.v)} rx={2} />
+                  {cw > 30 && ch > 16 && (
+                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#18181b">
+                      {cell.v.toLocaleString()}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+            {xLabels.map((label, i) => (
+              <text
+                key={label}
+                x={i * cw + cw / 2}
+                y={ih + 12}
+                fontSize={10}
+                fill={textColor}
+                textAnchor="end"
+                transform={`rotate(-30, ${i * cw + cw / 2}, ${ih + 12})`}
+              >
+                {label.length > 12 ? `${label.slice(0, 11)}…` : label}
+              </text>
+            ))}
+            {yLabels.map((label, i) => (
+              <text key={label} x={-6} y={i * ch + ch / 2} textAnchor="end" dominantBaseline="middle" fontSize={10} fill={textColor}>
+                {label.length > 12 ? `${label.slice(0, 11)}…` : label}
+              </text>
+            ))}
+          </g>
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// ── PanelChart ────────────────────────────────────────────────────────────────
+
+const STACK_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
+
+function PanelChart({
+  chartType,
+  result,
+  xCol,
+  yCol,
+  yCols,
+}: {
+  chartType: ChartType
+  result: QueryResult
+  xCol: string
+  yCol: string
+  yCols?: string[]
+}) {
+  const smallMargin = { top: 16, right: 16, bottom: 36, left: 44 }
+
+  if (chartType === "bar") {
+    const isMultiSeries = yCols && yCols.length > 1
+    if (isMultiSeries) {
+      const data = toStackedBarData(result, xCol, yCols)
+      return (
+        <BarChart
+          data={data}
+          xDataKey={xCol}
+          className="h-full"
+          aspectRatio="auto"
+          margin={{ top: 16, right: 24, bottom: 16, left: 100 }}
+          animationDuration={600}
+          orientation="horizontal"
+          stacked
+        >
+          <Grid horizontal={false} vertical />
+          {yCols.map((col, i) => (
+            <Bar key={col} dataKey={col} fill={STACK_COLORS[i % STACK_COLORS.length]} />
+          ))}
+          <ChartTooltip showDatePill={false} />
+          <BarYAxis />
+        </BarChart>
+      )
+    }
+    const data = toBarChartData(result, xCol, yCol)
+    return (
+      <BarChart
+        data={data}
+        xDataKey={xCol}
+        className="h-full"
+        aspectRatio="auto"
+        margin={smallMargin}
+        animationDuration={600}
+      >
+        <Grid />
+        <Bar dataKey={yCol} />
+        <ChartTooltip showDatePill={false} />
+        <BarXAxis />
+      </BarChart>
+    )
+  }
+
+  if (chartType === "line" || chartType === "area") {
+    const data = toBarChartData(result, xCol, yCol).map((d) => ({
+      ...d,
+      [xCol]: (() => {
+        const parsed = new Date(d[xCol] as string)
+        return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed
+      })(),
+    }))
+    return (
+      <AreaChart
+        data={data}
+        xDataKey={xCol}
+        className="h-full"
+        aspectRatio="auto"
+        margin={smallMargin}
+        animationDuration={600}
+      >
+        <Grid />
+        <Area dataKey={yCol} fillOpacity={chartType === "line" ? 0 : 0.4} />
+        <ChartTooltip />
+      </AreaChart>
+    )
+  }
+
+  if (chartType === "pie") {
+    const data = toPieData(result, xCol, yCol)
+    const total = data.reduce((sum, d) => sum + d.value, 0)
+    return (
+      <div className="h-full flex items-center gap-6 px-2">
+        <div className="h-full aspect-square shrink-0">
+          <PieChart
+            data={data}
+            innerRadius={60}
+            padAngle={0.02}
+            cornerRadius={4}
+          >
+            {data.map((_, i) => (
+              <PieSlice key={i} index={i} />
+            ))}
+          </PieChart>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
+          {data.map((item, i) => {
+            const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0.0"
+            return (
+              <div key={item.label} className="flex items-center gap-2 text-[11px]">
+                <span
+                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{ background: STACK_COLORS[i % STACK_COLORS.length] }}
+                />
+                <span className="truncate text-foreground/75">{item.label}</span>
+                <span className="ml-auto shrink-0 tabular-nums text-muted-foreground pl-3">
+                  {pct}%
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  if (chartType === "funnel") {
+    const data = toFunnelData(result, xCol, yCol)
+    return (
+      <FunnelChart
+        data={data}
+        className="h-full"
+        orientation="horizontal"
+        showPercentage
+      />
+    )
+  }
+
+  if (chartType === "sankey") {
+    const data = toSankeyData(result, xCol, yCol)
+    return (
+      <SankeyChart
+        data={data}
+        className="h-full"
+        aspectRatio="auto"
+        animationDuration={600}
+        margin={{ top: 24, right: 160, bottom: 24, left: 160 }}
+      >
+        <SankeyNode />
+        <SankeyLink />
+        <SankeyTooltip />
+      </SankeyChart>
+    )
+  }
+
+  if (chartType === "heatmap") {
+    return <HeatmapChart result={result} xCol={xCol} yCol={yCol} />
+  }
+
+  // scatter
+  return <ScatterPlot result={result} xCol={xCol} yCol={yCol} />
+}
+
 // ── Default panels ────────────────────────────────────────────────────────────
-// Panels are organised as four user stories followed by a joint campaign view.
-//
-// Story 1 (HDBank → VietJet): Travel Spender, Not Yet a VietJet Flyer
-// Story 2 (HDBank):           Shared Customer Ready for Credit Limit Upgrade
-// Story 3 (VietJet → HDBank): Frequent Flyer with No HDBank Relationship
-// Story 4 (VietJet):          Lapsing Flyer Reactivated via Financial Incentive
-// Joint:                      Co-brand campaign audience and activation funnel
+// Panels are organized around the cross-brand journey:
+// discover whitespace, prioritize audiences, and route offers to channels.
 
 const DEFAULT_PANELS: Panel[] = [
-  // ── Story 1: Travel Spender, Not Yet a VietJet Flyer ──────────────────────
   {
-    id: "s1-a",
-    title: "Story 1 · VietJet Spend Gap Among HDBank Travel Customers",
+    id: "journey-funnel",
+    title: "Journey Funnel - HDBank Travel Customers to VietJet Activation",
     description:
-      "Of all HDBank customers with measurable travel spend, how many have never transacted with VietJet. This untapped pool is the primary target for the co-brand card activation — proven travelers who just haven't flown VietJet yet.",
+      "Shows how the bank audience narrows from all HDBank customers into proven travel spenders, airline/OTA buyers, customers with no VietJet spend yet, and final activation candidates.",
+    chartType: "funnel",
+    sql: "SELECT step_order, journey_step, customers FROM (SELECT 1 AS step_order, 'All HDBank customers' AS journey_step, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.customers_v1 UNION ALL SELECT 2 AS step_order, 'Travel spenders' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND travel_spend > 0 UNION ALL SELECT 3 AS step_order, 'Airline or OTA spenders' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND (airline_ticket_spend > 0 OR ota_travel_spend > 0) UNION ALL SELECT 4 AS step_order, 'No VietJet spend yet' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND travel_spend > 0 AND has_vietjet_spend = 0 UNION ALL SELECT 5 AS step_order, 'Activation candidates' AS journey_step, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1) funnel ORDER BY step_order",
+    xCol: "journey_step",
+    yCol: "customers",
+  },
+  {
+    id: "relationship-split",
+    title: "Relationship Split - HDBank Only, VietJet Only, Shared",
+    description:
+      "A simple market map of who belongs to one partner versus both. The largest single-brand pools are the cleanest cross-sell whitespace.",
     chartType: "pie",
-    sql: "SELECT CASE WHEN has_vietjet_spend = 1 THEN 'Already flies VietJet' ELSE 'No VietJet spend yet' END AS spend_group, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 GROUP BY has_vietjet_spend",
-    xCol: "spend_group",
+    sql: "SELECT CASE WHEN has_hdbank_relationship = true AND has_vietjetair_relationship = true THEN 'Shared customer' WHEN has_hdbank_relationship = true THEN 'HDBank only' WHEN has_vietjetair_relationship = true THEN 'VietJet only' ELSE 'Unknown' END AS relationship_group, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 GROUP BY relationship_group ORDER BY customers DESC",
+    xCol: "relationship_group",
     yCol: "customers",
   },
   {
-    id: "s1-b",
-    title: "Story 1 · Travel Affinity Score of Untapped Customers",
+    id: "opportunity-matrix",
+    title: "Activation Segments - Co-brand Audience by Priority Tier",
     description:
-      "Distribution of travel affinity scores for HDBank customers who have never spent with VietJet. High-affinity customers (0.6+) are proven travelers — the most likely to convert when offered a co-brand VietJet card with miles on existing spend.",
+      "Collapses the readiness × flyer matrix into four actionable tiers. Prime Targets (both scores ≥ 0.6) are the first-wave campaign audience; HDBank-led and VietJet-led segments follow; Nurture is the long-cycle pool.",
     chartType: "bar",
-    sql: "SELECT CASE WHEN travel_affinity_score >= 0.8 THEN '0.8–1.0 High' WHEN travel_affinity_score >= 0.6 THEN '0.6–0.8' WHEN travel_affinity_score >= 0.4 THEN '0.4–0.6' WHEN travel_affinity_score >= 0.2 THEN '0.2–0.4' ELSE '0.0–0.2 Low' END AS score_band, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 WHERE has_vietjet_spend = 0 GROUP BY score_band ORDER BY score_band DESC",
-    xCol: "score_band",
+    sql: "SELECT CASE WHEN cross_sell_readiness_score >= 0.6 AND frequent_flyer_score >= 0.6 THEN 'Prime Targets' WHEN cross_sell_readiness_score >= 0.6 THEN 'HDBank-led' WHEN frequent_flyer_score >= 0.6 THEN 'VietJet-led' ELSE 'Nurture' END AS segment, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true OR has_vietjetair_relationship = true GROUP BY segment ORDER BY customers DESC",
+    xCol: "segment",
     yCol: "customers",
   },
   {
-    id: "s1-c",
-    title: "Story 1 · VietJet Activation Candidates by Offer & Channel",
+    id: "cobrand-card-journey",
+    title: "Co-brand Card Journey - Travel Spender to Active Cardholder",
     description:
-      "HDBank's gold output: offer propositions assigned to VietJet activation candidates with their recommended outreach channels. The sankey shows which offers flow to which channels — thicker bands are higher-volume paths where campaign spend should concentrate first.",
-    chartType: "sankey",
-    sql: "SELECT offer_name AS source, recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 GROUP BY offer_name, recommended_channel",
-    xCol: "source",
-    yCol: "target",
-  },
-  // ── Story 2: Shared Customer Ready for Credit Limit Upgrade ───────────────
-  {
-    id: "s2-a",
-    title: "Story 2 · Shared VietJet Spenders by Credit Score Tier",
-    description:
-      "HDBank customers who are already shared with VietJet AND have active VietJet card spend, grouped by credit score tier. Prime-tier customers (750+) are pre-qualified for a proactive limit upgrade — no application form needed, offer can be pushed in-app.",
-    chartType: "bar",
-    sql: "SELECT CASE WHEN c.credit_score >= 750 THEN 'Prime (750+)' WHEN c.credit_score >= 650 THEN 'Near-prime (650–749)' ELSE 'Sub-prime (<650)' END AS credit_tier, COUNT(*) AS customers, ROUND(AVG(t.total_card_spend), 0) AS avg_total_spend FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY credit_tier ORDER BY customers DESC",
-    xCol: "credit_tier",
+      "End-to-end funnel from VietJet travelers with an HDBank relationship through high-affinity targeting, offer receipt, card application, activation, and first co-brand booking. Reveals where the biggest drop-offs occur in the card acquisition journey.",
+    chartType: "funnel",
+    sql: "SELECT step_order, journey_step, customers FROM (SELECT 1 AS step_order, 'Shared customers' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND has_vietjetair_relationship = true UNION ALL SELECT 2 AS step_order, 'Travel affinity >= 0.5' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND has_vietjetair_relationship = true AND travel_affinity_score >= 0.5 UNION ALL SELECT 3 AS step_order, 'Cross-sell ready' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND has_vietjetair_relationship = true AND travel_affinity_score >= 0.5 AND cross_sell_readiness_score >= 0.6 UNION ALL SELECT 4 AS step_order, 'Prime targets' AS journey_step, COUNT(*) AS customers FROM partnership.co_brand_silver.customer_360_v1 WHERE has_hdbank_relationship = true AND has_vietjetair_relationship = true AND cross_sell_readiness_score >= 0.6 AND frequent_flyer_score >= 0.6 UNION ALL SELECT 5 AS step_order, 'Activation candidates' AS journey_step, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1) funnel ORDER BY step_order",
+    xCol: "journey_step",
     yCol: "customers",
   },
   {
-    id: "s2-b",
-    title: "Story 2 · Preferred Outreach Channel for Shared Customers",
+    id: "vietjet-finance-value",
+    title: "VietJet to HDBank - Finance Value by Membership Tier",
     description:
-      "How shared HDBank+VietJet customers prefer to be contacted. Channel alignment is critical — a limit upgrade offer pushed through the wrong channel sees lower open rates and burns campaign budget. Match the channel to the customer's stated preference.",
+      "Shows where HDBank financing and co-brand card offers have the largest booking value base among VietJet customers.",
     chartType: "bar",
-    sql: "SELECT c.preferred_channel, COUNT(*) AS customers FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1 t ON c.customer_id = t.customer_id WHERE c.shared_customer = true AND t.has_vietjet_spend = 1 GROUP BY c.preferred_channel ORDER BY customers DESC",
-    xCol: "preferred_channel",
-    yCol: "customers",
-  },
-  // ── Story 3: Frequent Flyer with No HDBank Relationship ───────────────────
-  {
-    id: "s3-a",
-    title: "Story 3 · Non-Shared VietJet Flyers by Loyalty Tier",
-    description:
-      "VietJet frequent flyers who have no existing HDBank relationship, grouped by frequent-flyer score band. High-tier non-shared flyers are HDBank's highest-value acquisition targets — strong travel behaviour signals credit-worthiness with zero existing relationship friction.",
-    chartType: "bar",
-    sql: "SELECT CASE WHEN b.frequent_flyer_score >= 0.7 THEN 'High (0.7+)' WHEN b.frequent_flyer_score >= 0.4 THEN 'Mid (0.4–0.7)' ELSE 'Low (<0.4)' END AS flyer_tier, COUNT(*) AS flyers, ROUND(AVG(b.avg_booking_value), 0) AS avg_booking_value FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 c JOIN vietjetair.vietjetair_partnership_prod_silver.booking_features_v1 b ON c.customer_id = b.customer_id WHERE c.shared_customer = false GROUP BY flyer_tier ORDER BY flyers DESC",
-    xCol: "flyer_tier",
-    yCol: "flyers",
-  },
-  {
-    id: "s3-b",
-    title: "Story 3 · HDBank Finance Candidates by Use Case",
-    description:
-      "VietJet's gold output: which finance propositions were matched to non-shared frequent flyers. Installment plans appeal to high-value occasional bookers; co-brand card offers suit high-frequency travelers. The mix here drives the offer creative and approval workflow.",
-    chartType: "bar",
-    sql: "SELECT use_case, COUNT(*) AS candidates, ROUND(AVG(propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 GROUP BY use_case ORDER BY candidates DESC",
-    xCol: "use_case",
-    yCol: "candidates",
-  },
-  // ── Story 4: Lapsing Flyer Reactivated via Financial Incentive ────────────
-  {
-    id: "s4-a",
-    title: "Story 4 · Finance Candidates by Membership Tier",
-    description:
-      "VietJet finance candidates grouped by membership tier. Silver and Gold members carry past loyalty signal — a financial incentive (0% instalment for 3 months) is far more likely to re-engage them than a flat discount, because the perceived value scales with booking size.",
-    chartType: "bar",
-    sql: "SELECT v.membership_tier, COUNT(DISTINCT h.customer_id) AS candidates, ROUND(AVG(h.propensity_score), 3) AS avg_propensity FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.membership_tier ORDER BY candidates DESC",
+    sql: "SELECT membership_tier, COUNT(*) AS customers, ROUND(AVG(gross_booking_value), 0) AS avg_booking_value, ROUND(SUM(gross_booking_value), 0) AS total_booking_value FROM partnership.co_brand_silver.customer_360_v1 WHERE has_vietjetair_relationship = true GROUP BY membership_tier ORDER BY total_booking_value DESC",
     xCol: "membership_tier",
-    yCol: "candidates",
+    yCol: "total_booking_value",
   },
   {
-    id: "s4-b",
-    title: "Story 4 · Email Reachability of Finance Targets",
+    id: "competitor-recovery",
+    title: "VietJet Recovery - Competitor Booking Pressure by City",
     description:
-      "Email opt-in status among VietJet finance candidates. Email is the cheapest reactivation channel, but only works if consent exists. Customers without opt-in must be reached via in-app push or personal outreach — channels with higher cost but no consent gate.",
-    chartType: "pie",
-    sql: "SELECT CASE WHEN v.email_opt_in THEN 'Email reachable' ELSE 'No email consent' END AS reachability, COUNT(*) AS candidates FROM vietjetair.vietjetair_partnership_prod_silver.customers_v1 v JOIN vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1 h ON v.customer_id = h.customer_id GROUP BY v.email_opt_in",
-    xCol: "reachability",
-    yCol: "candidates",
-  },
-  // ── Joint Campaign View ────────────────────────────────────────────────────
-  {
-    id: "joint-a",
-    title: "Joint Campaign · Co-brand Audience by Priority Band",
-    description:
-      "Unified co-brand audience across both companies, tiered by activation priority. Band A customers have strong propensity signals from both HDBank and VietJet — they appear in both gold tables and receive the first outreach wave with the strongest co-brand offer.",
-    chartType: "pie",
-    sql: "SELECT priority_band, COUNT(*) AS audience_count FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY priority_band ORDER BY audience_count DESC",
-    xCol: "priority_band",
-    yCol: "audience_count",
+      "Cities where VietJet flyers are also booking competitors. These are strong targets for co-brand rewards, installment perks, or route-specific win-back offers.",
+    chartType: "bar",
+    sql: "SELECT city, SUM(vietjet_booking_count) AS vietjet_bookings, SUM(competitor_booking_count) AS competitor_bookings FROM partnership.co_brand_silver.customer_360_v1 WHERE has_vietjetair_relationship = true GROUP BY city ORDER BY competitor_bookings DESC",
+    xCol: "city",
+    yCol: "competitor_bookings",
   },
   {
-    id: "joint-b",
-    title: "Joint Campaign · HDBank → VietJet Activation Funnel",
+    id: "offer-routing",
+    title: "Offer Routing - Source to Use Case to Channel",
     description:
-      "End-to-end activation flow: HDBank customer segments (left) map into cross-sell use cases (centre), which route to outreach channels (right). Thicker bands are higher-volume paths. Narrow bands reaching premium channels (e.g. personal banker) mark micro-segments worth dedicated campaign treatment.",
+      "Unified campaign flow from partner source to use case to recommended channel. This makes campaign operations visible: who originates demand, what the offer is for, and where outreach should happen.",
     chartType: "sankey",
-    sql: "SELECT c.segment_name AS source, a.use_case AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_silver.customers_v1 c JOIN hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a ON c.customer_id = a.customer_id GROUP BY c.segment_name, a.use_case UNION ALL SELECT a.use_case AS source, a.recommended_channel AS target, COUNT(*) AS value FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1 a GROUP BY a.use_case, a.recommended_channel",
+    sql: "SELECT source_company AS source, use_case AS target, COUNT(*) AS value FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY source_company, use_case UNION ALL SELECT use_case AS source, recommended_channel AS target, COUNT(*) AS value FROM partnership.co_brand_gold.co_brand_offer_audience_v1 GROUP BY use_case, recommended_channel",
     xCol: "source",
     yCol: "target",
+  },
+  {
+    id: "service-recovery",
+    title: "Service Recovery - Incident Customers by Priority Band",
+    description:
+      "High-incident, high-value flyers can be turned into loyalty moments. Use this to separate operational recovery from regular marketing sends.",
+    chartType: "bar",
+    sql: "SELECT vietjet_priority_band, COUNT(*) AS customers, ROUND(AVG(service_recovery_score), 3) AS avg_recovery_score FROM partnership.co_brand_silver.customer_360_v1 WHERE incident_count > 0 GROUP BY vietjet_priority_band ORDER BY customers DESC",
+    xCol: "vietjet_priority_band",
+    yCol: "customers",
   },
 ]
 
 const DEFAULT_LAYOUT: Layout = [
-  // Story 1 — Travel Spender, Not Yet a VietJet Flyer
-  { i: "s1-a", x: 0, y: 0, w: 1, h: 6 },
-  { i: "s1-b", x: 1, y: 0, w: 1, h: 6 },
-  { i: "s1-c", x: 0, y: 6, w: 2, h: 8 },
-  // Story 2 — Shared Customer Credit Limit Upgrade
-  { i: "s2-a", x: 0, y: 14, w: 1, h: 6 },
-  { i: "s2-b", x: 1, y: 14, w: 1, h: 6 },
-  // Story 3 — Frequent Flyer with No HDBank Relationship
-  { i: "s3-a", x: 0, y: 20, w: 1, h: 6 },
-  { i: "s3-b", x: 1, y: 20, w: 1, h: 6 },
-  // Story 4 — Lapsing Flyer Reactivation
-  { i: "s4-a", x: 0, y: 26, w: 1, h: 6 },
-  { i: "s4-b", x: 1, y: 26, w: 1, h: 6 },
-  // Joint Campaign
-  { i: "joint-a", x: 0, y: 32, w: 2, h: 6 },
-  { i: "joint-b", x: 0, y: 38, w: 2, h: 8 },
+  { i: "journey-funnel", x: 0, y: 0, w: 2, h: 7 },
+  { i: "relationship-split", x: 0, y: 7, w: 2, h: 8 },
+  { i: "opportunity-matrix", x: 0, y: 15, w: 2, h: 8 },
+  { i: "cobrand-card-journey", x: 0, y: 23, w: 2, h: 7 },
+  { i: "vietjet-finance-value", x: 0, y: 30, w: 1, h: 6 },
+  { i: "competitor-recovery", x: 1, y: 30, w: 1, h: 6 },
+  { i: "offer-routing", x: 0, y: 36, w: 2, h: 8 },
+  { i: "service-recovery", x: 0, y: 44, w: 2, h: 6 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
@@ -493,11 +732,7 @@ function PanelCard({
   onConfigure: () => void
   onDelete: () => void
 }) {
-  const option = useMemo(() => {
-    if (data.status === "ok" && data.result && panel.xCol && panel.yCol)
-      return buildOption(panel.chartType, data.result, panel.xCol, panel.yCol)
-    return null
-  }, [data, panel.chartType, panel.xCol, panel.yCol])
+  const canRenderChart = data.status === "ok" && !!data.result && !!panel.xCol && !!panel.yCol
 
   return (
     <div
@@ -515,7 +750,10 @@ function PanelCard({
         )}
       >
         {editing && (
-          <IconGripVertical size={12} className="text-muted-foreground shrink-0" />
+          <IconGripVertical
+            size={12}
+            className="text-muted-foreground shrink-0"
+          />
         )}
         <span className="text-xs font-medium flex-1 truncate">
           {panel.title}
@@ -583,15 +821,16 @@ function PanelCard({
             </p>
           </div>
         )}
-        {data.status === "ok" && option && (
-          <ReactECharts
-            option={option}
-            style={{ height: "100%", width: "100%" }}
-            opts={{ renderer: "svg" }}
-            notMerge
+        {data.status === "ok" && canRenderChart && (
+          <PanelChart
+            chartType={panel.chartType}
+            result={data.result!}
+            xCol={panel.xCol}
+            yCol={panel.yCol}
+            yCols={panel.yCols}
           />
         )}
-        {data.status === "ok" && !option && (
+        {data.status === "ok" && !canRenderChart && (
           <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
             <IconCheck size={22} />
             <p className="text-[11px]">
@@ -621,6 +860,8 @@ const CHART_TYPE_CONFIG: Record<
   pie: { label: "Pie / Donut", icon: IconChartPie },
   scatter: { label: "Scatter", icon: IconChartScatter },
   sankey: { label: "Sankey / Flow", icon: IconChartSankey },
+  funnel: { label: "Funnel", icon: IconChartDots },
+  heatmap: { label: "Heatmap", icon: IconChartDots },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
@@ -831,12 +1072,12 @@ function PanelSidebar({
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "HDBank customers by preferred channel",
-  "VietJet membership tiers by average booking value",
-  "Travel affinity score distribution across HDBank customers",
-  "HDBank finance candidates from VietJet by propensity",
-  "Shared customers between HDBank and VietJet",
-  "Co-brand signal value by source company",
+  "Cross-sell readiness vs. frequent flyer score by segment",
+  "Top cities for prime target activation candidates",
+  "Service recovery score distribution among high-incident flyers",
+  "VietJet membership tiers by HDBank credit score band",
+  "Competitor booking pressure in prime target cities",
+  "Offer channel mix for co-brand vs. finance use cases",
 ]
 
 const PANEL_MENTION_RE = /@\[(.*?)\]\(panel:([^)]+)\)/g

@@ -7,6 +7,7 @@ controlplane_image := "mizumi-controlplane:0.1.0"
 webui_namespace := "webui"
 webui_manifests := "infra/k8s/webui"
 webui_image := "mizumi-webui:0.1.0"
+baggage_model_server_image := "mizumi-baggage-model-server:0.1.0"
 
 unitycatalog_namespace := "unitycatalog"
 unitycatalog_image := "mizumi-uc:0.1.0"
@@ -18,6 +19,9 @@ dagster_chart := "dagster/dagster"
 dagster_chart_version := "1.13.4"
 dagster_values := "infra/k8s/dagster/helm/values.yaml"
 dagster_image := "mizumi-dagster:1.13.4"
+mlflow_namespace := "mlflow"
+mlflow_manifests := "infra/k8s/mlflow"
+mlflow_image := "mizumi-mlflow:0.1.0"
 shared_postgres_namespace := "shared-postgres"
 shared_postgres_manifests := "infra/k8s/shared-postgres"
 
@@ -49,6 +53,7 @@ duckdb_image := "mizumi-duckdb:1.1.6"
 duckdb_server_image := "mizumi-duckdb-server:0.1.0"
 daft_image := "mizumi-daft:0.7.10"
 daft_baggage_classifier_image := "mizumi-daft-baggage-classifier:0.1.0"
+daft_baggage_damage_trainer_image := "mizumi-daft-baggage-damage-trainer:0.1.0"
 
 daft_namespace := "daft"
 daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
@@ -89,9 +94,62 @@ doctor:
     docker pull docker.redpanda.com/redpandadata/console:v2.8.3
     docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 
-deploy: doctor rustfs-deploy rustfs-s3-proxy-deploy rustfs-s3-proxy-dns-enable redpanda-deploy shared-postgres-deploy keycloak-deploy dagster-deploy unitycatalog-deploy spark-deploy daft-image-build rustfs-unitycatalog-anon-read-enable duckdb-image-build duckdb-server-image-build duckdb-server-deploy controlplane-deploy webui-deploy lancedb-deploy lancedb-embed-schema
+deploy: \
+  doctor \
+  rustfs-deploy \
+  rustfs-s3-proxy-deploy \
+  rustfs-s3-proxy-dns-enable \
+  rustfs-baggage-download \
+  rustfs-baggage-upload \
+  redpanda-deploy \
+  shared-postgres-deploy \
+  mlflow-deploy \
+  keycloak-deploy \
+  dagster-deploy \
+  unitycatalog-deploy \
+  spark-deploy \
+  daft-image-build \
+  daft-baggage-classifier-image-build \
+  daft-baggage-damage-trainer-image-build \
+  rustfs-unitycatalog-anon-read-enable \
+  duckdb-image-build \
+  duckdb-server-image-build \
+  duckdb-server-deploy \
+  controlplane-deploy \
+  webui-deploy \
+  lancedb-deploy \
+  lancedb-embed-schema \
+  synthetic-bootstrap \
+  synthetic-server-deploy
 
-destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
+destroy: webui-destroy controlplane-destroy lancedb-destroy duckdb-server-destroy spark-destroy dagster-destroy mlflow-destroy unitycatalog-destroy keycloak-destroy shared-postgres-destroy redpanda-destroy rustfs-destroy
+
+openai-secrets-apply:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
+    kubectl create namespace {{ lancedb_namespace }} 2>/dev/null || true
+    for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
+      secret_name="${namespace}-secret"
+      kubectl create secret generic "$secret_name" \
+        -n "$namespace" \
+        --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
+        --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    done
+    # if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+    #   kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
+    #   kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/lancedb -n {{ lancedb_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/lancedb -n {{ lancedb_namespace }}; \
+    #   kubectl rollout status deployment/lancedb -n {{ lancedb_namespace }} --timeout=120s; \
+    # fi
 
 forward:
     #!/usr/bin/env bash
@@ -99,6 +157,7 @@ forward:
     trap 'kill $(jobs -p) 2>/dev/null; wait' EXIT INT TERM
     kubectl port-forward -n {{ rustfs_namespace }} svc/rustfs-svc 9000:9000 9001:9001 &
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:80 &
+    kubectl port-forward -n {{ mlflow_namespace }} svc/mlflow-svc 5000:5000 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-svc 19092:19092 9644:9644 &
     kubectl port-forward -n {{ redpanda_namespace }} svc/redpanda-console-svc 8081:8080 &
     kubectl port-forward -n {{ keycloak_namespace }} svc/keycloak-svc 8083:8080 &
@@ -106,8 +165,9 @@ forward:
     kubectl port-forward -n {{ unitycatalog_namespace }} svc/unitycatalog-svc 8082:8080 &
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
+    kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:8080 &
     # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
-    # kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
+    kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
     kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092 &
     echo "RustFS console:   http://127.0.0.1:9001"
@@ -117,6 +177,7 @@ forward:
     echo "Redpanda UI:      http://127.0.0.1:8081"
     echo "Keycloak:         http://127.0.0.1:8080"
     echo "Dagster UI:       http://127.0.0.1:8088"
+    echo "MLflow UI:        http://127.0.0.1:5000"
     echo "Dagster GraphQL:  http://127.0.0.1:8088/graphql"
     echo "UC API:           http://127.0.0.1:8082"
     echo "DuckDB Server:    http://127.0.0.1:8090"
@@ -185,6 +246,9 @@ rustfs-train-upload bucket=rustfs_train_bucket prefix=rustfs_train_prefix:
         mc mirror --overwrite /upload rustfs/{{ bucket }}/{{ prefix }}'
     echo "Upload complete"
 
+rustfs-baggage-download:
+    bash packages/synthetic/scripts/download-dataset.sh
+
 rustfs-baggage-upload:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -244,7 +308,7 @@ rustfs-s3-proxy-dns-disable:
 
 rustfs-unitycatalog-anon-read-enable:
     kubectl delete job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --ignore-not-found
-    kubectl create job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc anonymous set download rustfs/unitycatalog'
+    kubectl create job rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc mb --ignore-existing rustfs/unitycatalog && mc anonymous set download rustfs/unitycatalog'
     kubectl wait --for=condition=complete job/rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }} --timeout=120s
     kubectl logs job/rustfs-unitycatalog-anon-read -n {{ rustfs_namespace }}
 
@@ -267,6 +331,32 @@ shared-postgres-deploy:
 shared-postgres-destroy:
     kubectl delete -f {{ shared_postgres_manifests }}/ --ignore-not-found || true
     kubectl delete namespace {{ shared_postgres_namespace }} --ignore-not-found --wait=false
+
+mlflow-image-build:
+    docker build -t {{ mlflow_image }} packages/mlflow
+
+mlflow-artifact-bucket-create:
+    kubectl create namespace {{ rustfs_namespace }} 2>/dev/null || true
+    kubectl delete job mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --ignore-not-found
+    kubectl create job mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --image=minio/mc:latest -- /bin/sh -ec 'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc mb --ignore-existing rustfs/mlflow'
+    kubectl wait --for=condition=complete job/mlflow-artifact-bucket-create -n {{ rustfs_namespace }} --timeout=120s
+    kubectl logs job/mlflow-artifact-bucket-create -n {{ rustfs_namespace }}
+
+mlflow-deploy: mlflow-image-build
+    just rustfs-deploy
+    just shared-postgres-deploy
+    just shared-postgres-bootstrap
+    just mlflow-artifact-bucket-create
+    kubectl apply -f {{ mlflow_manifests }}/deployment.yaml
+    kubectl rollout status deployment/mlflow -n {{ mlflow_namespace }} --timeout=300s
+    kubectl get pods,svc,secret -n {{ mlflow_namespace }}
+
+mlflow-forward:
+    kubectl port-forward -n {{ mlflow_namespace }} svc/mlflow-svc 5000:5000
+
+mlflow-destroy:
+    kubectl delete -f {{ mlflow_manifests }}/ --ignore-not-found || true
+    kubectl delete namespace {{ mlflow_namespace }} --ignore-not-found --wait=false
 
 keycloak-image-build:
     docker build -t {{ keycloak_image }} packages/keycloak
@@ -375,10 +465,29 @@ daft-baggage-classify-local: daft-baggage-classifier-image-build
       -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
       -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
       -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
-      -e SOURCE_BUCKET={{ rustfs_train_bucket }} \
-      -e SOURCE_PREFIX={{ rustfs_train_prefix }} \
-      -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1 \
+      -e SOURCE_BUCKET=unitycatalog \
+      -e SOURCE_PREFIX=vietjetair/baggage_damaged_reports/ \
+      -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
       {{ daft_baggage_classifier_image }}
+
+daft-baggage-damage-trainer-image-build:
+    docker build -t {{ daft_baggage_damage_trainer_image }} -f packages/daft/Dockerfile.baggage-damage-trainer .
+
+daft-baggage-damage-train-local: daft-baggage-damage-trainer-image-build
+    docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
+      -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
+      -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
+      -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 \
+      -e MLFLOW_EXPERIMENT_NAME=vietjetair-baggage-damage \
+      -e MLFLOW_S3_ENDPOINT_URL={{ rustfs_endpoint }} \
+      -e AWS_DEFAULT_REGION=us-east-1 \
+      -e SOURCE_BUCKET=unitycatalog \
+      -e GOLD_TABLE_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
+      -e MODEL_BUCKET=unitycatalog \
+      -e MODEL_KEY_PREFIX=vietjetair/models/baggage_damage_detector \
+      {{ daft_baggage_damage_trainer_image }}
 
 spark-destroy:
     helm uninstall {{ spark_operator_release }} --namespace {{ spark_operator_namespace }} || true
@@ -391,10 +500,6 @@ dagster-helm-repo:
 
 dagster-image-build:
     docker build -t {{ dagster_image }} -f packages/dagster/Dockerfile .
-    if kubectl get deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }}; \
-      kubectl rollout status deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }} --timeout=120s; \
-    fi
 
 dagster-deploy: dagster-helm-repo dagster-image-build
     just shared-postgres-deploy
@@ -424,10 +529,6 @@ dagster-destroy:
 
 unitycatalog-image-build:
     docker build -t {{ unitycatalog_image }} packages/uc
-    if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
 
 unitycatalog-ui-image-build:
     #!/usr/bin/env bash
@@ -442,10 +543,6 @@ unitycatalog-ui-image-build:
       --build-arg PROXY_HOST=unitycatalog-svc \
       -t {{ unitycatalog_ui_image }} \
       "$tmpdir/ui"
-    if kubectl get deployment/unitycatalog-ui -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog-ui -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog-ui -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     just shared-postgres-deploy
@@ -481,36 +578,14 @@ unitycatalog-auth-secret-apply:
       -n {{ controlplane_namespace }} \
       --from-file=UC_INTERNAL_SERVICE_TOKEN=packages/uc/config/token.txt \
       --dry-run=client -o yaml | kubectl apply -f -
-    if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
-
-openai-secrets-apply:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
-    kubectl create namespace {{ webui_namespace }} 2>/dev/null || true
-    for namespace in {{ controlplane_namespace }} {{ webui_namespace }} {{ lancedb_namespace }}; do
-      secret_name="${namespace}-secret"
-      kubectl create secret generic "$secret_name" \
-        -n "$namespace" \
-        --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
-        --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
-        --dry-run=client -o yaml | kubectl apply -f -
-    done
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
-    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
-      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
-    fi
+    # if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
+    #   kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+    #   kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    # fi
 
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
@@ -526,20 +601,25 @@ jobs-submit-hdbank token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"hdbank-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_partner_events_to_bronze.py"}' \
+      -d '{"name":"hdbank-stream-banking-transactions-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"}' \
       | jq
 
 jobs-submit-vietjetair token='test':
     curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer {{ token }}" \
-      -d '{"name":"vietjetair-stream-partner-events-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_partner_events_to_bronze.py"}' \
+      -d '{"name":"vietjetair-stream-flight-tickets-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_flight_tickets_to_bronze.py"}' \
+      | jq
+    curl -fsSL -X POST http://127.0.0.1:4000/api/streaming/jobs \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer {{ token }}" \
+      -d '{"name":"vietjetair-stream-flight-incidents-to-bronze","image":"{{ spark_image }}","main_application_file":"local:///opt/spark/jobs/vietjetair/stream_flight_incidents_to_bronze.py"}' \
       | jq
 
 jobs-delete-hdbank token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in hdbank-stream-partner-events-to-bronze; do
+    for name in hdbank-stream-banking-transactions-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
@@ -550,7 +630,7 @@ jobs-delete-hdbank token='test':
 jobs-delete-vietjetair token='test':
     #!/usr/bin/env bash
     set -euo pipefail
-    for name in vietjetair-stream-partner-events-to-bronze; do
+    for name in vietjetair-stream-flight-tickets-to-bronze vietjetair-stream-flight-incidents-to-bronze; do
       id=$(curl -fsSL http://127.0.0.1:4000/api/streaming/jobs \
         -H "Authorization: Bearer {{ token }}" \
         | jq -r --arg n "$name" '.jobs[] | select(.job.name == $n) | .job.id')
@@ -560,16 +640,11 @@ jobs-delete-vietjetair token='test':
 
 controlplane-image-build:
     docker build -f packages/controlplane/Dockerfile -t {{ controlplane_image }} .
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
 
 controlplane-deploy: controlplane-image-build
     just shared-postgres-deploy
     kubectl create namespace {{ controlplane_namespace }} 2>/dev/null || true
     just unitycatalog-auth-secret-apply
-    just openai-secrets-apply
     just shared-postgres-bootstrap
     kubectl apply -f {{ controlplane_manifests }}/postgres.yaml
     kubectl apply -f {{ controlplane_manifests }}/deployment.yaml
@@ -589,16 +664,18 @@ controlplane-destroy:
 
 webui-image-build:
     docker build -t {{ webui_image }} packages/webui
-    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
-      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
-    fi
 
-webui-deploy: webui-image-build
-    just openai-secrets-apply
+baggage-model-server-image-build:
+    docker build -t {{ baggage_model_server_image }} packages/baggage-model-server
+
+webui-deploy: webui-image-build baggage-model-server-image-build
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
     kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
+    kubectl rollout status deployment/baggage-model-server -n {{ webui_namespace }} --timeout=300s
     kubectl get pods,svc -n {{ webui_namespace }}
+
+baggage-model-server-forward:
+    kubectl port-forward -n {{ webui_namespace }} svc/baggage-model-server-svc 8093:8080
 
 webui-destroy:
     kubectl delete -f {{ webui_manifests }}/ --ignore-not-found || true
@@ -649,10 +726,6 @@ daft-destroy: daft-distributed-destroy daft-simple-destroy
 
 lancedb-image-build:
     docker build -t {{ lancedb_image }} packages/lancedb-server
-    if kubectl get deployment/lancedb-server -n {{ lancedb_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/lancedb-server -n {{ lancedb_namespace }}; \
-      kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s; \
-    fi
 
 lancedb-deploy: lancedb-image-build
     kubectl apply -f {{ lancedb_manifests }}/server.yaml
@@ -680,18 +753,31 @@ lancedb-destroy:
 
 synthetic-server-image-build:
     docker build -t {{ synthetic_image }} packages/synthetic
-    if kubectl get deployment/synthetic-server -n {{ synthetic_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/synthetic-server -n {{ synthetic_namespace }}; \
-      kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s; \
-    fi
+
+synthetic-bootstrap:
+    docker build -t {{ synthetic_image }} packages/synthetic
+    kubectl create namespace {{ synthetic_namespace }} 2>/dev/null || true
+    kubectl delete job synthetic-bootstrap -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl delete configmap synthetic-bootstrap-config -n {{ synthetic_namespace }} --ignore-not-found
+    kubectl apply -f {{ synthetic_manifests }}/bootstrap-job.yaml
+    kubectl wait --for=condition=complete job/synthetic-bootstrap -n {{ synthetic_namespace }} --timeout=120s
+    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }} -c generator
+    kubectl logs job/synthetic-bootstrap -n {{ synthetic_namespace }} -c bootstrap
 
 synthetic-server-deploy: synthetic-server-image-build
+    just synthetic-bootstrap
     kubectl apply -f {{ synthetic_manifests }}/server.yaml
     kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=120s
     kubectl get pods,svc -n {{ synthetic_namespace }}
 
 synthetic-server-forward:
     kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092
+
+synthetic-brand-customers-upload: synthetic-server-image-build
+    just synthetic-bootstrap
+    kubectl apply -f {{ synthetic_manifests }}/server.yaml
+    kubectl rollout status deployment/synthetic-server -n {{ synthetic_namespace }} --timeout=180s
+    kubectl logs deployment/synthetic-server -n {{ synthetic_namespace }} --tail=50
 
 synthetic-server-destroy:
     kubectl delete -f {{ synthetic_manifests }}/ --ignore-not-found || true

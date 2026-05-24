@@ -101,24 +101,24 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/sessions/{id}", delete(k8s::delete_session))
         .route("/api/sessions/{id}/query", post(k8s::session_query))
         .route(
-            "/api/tests/hdbank/payment-events",
-            post(tests::publish_hdbank_payment_event),
+            "/api/tests/hdbank/customers/batch",
+            post(tests::publish_hdbank_customer_events),
         )
         .route(
-            "/api/tests/hdbank/customer-events",
-            post(tests::publish_hdbank_customer_event),
+            "/api/tests/hdbank/banking-transactions/batch",
+            post(tests::publish_hdbank_banking_transaction_events),
         )
         .route(
-            "/api/tests/vietjetair/customer-events",
-            post(tests::publish_vietjetair_customer_event),
+            "/api/tests/vietjetair/customers/batch",
+            post(tests::publish_vietjetair_customer_events),
         )
         .route(
-            "/api/tests/vietjetair/flight-events",
-            post(tests::publish_vietjetair_flight_event),
+            "/api/tests/vietjetair/flight-tickets/batch",
+            post(tests::publish_vietjetair_flight_ticket_events),
         )
         .route(
-            "/api/tests/vietjetair/booking-events",
-            post(tests::publish_vietjetair_booking_event),
+            "/api/tests/vietjetair/flight-incidents/batch",
+            post(tests::publish_vietjetair_flight_incident_events),
         )
         .route(
             "/api/streaming/jobs",

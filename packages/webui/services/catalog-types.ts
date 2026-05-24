@@ -81,6 +81,34 @@ export type RegisteredModelSummary = {
   name: string
   catalog_name: string
   schema_name: string
+  storage_location?: string
+  full_name?: string
+  comment?: string
+  owner?: string
+  created_at?: number
+  created_by?: string
+  updated_at?: number
+  updated_by?: string
+  id?: string
+}
+
+export type RegisteredModelDetail = RegisteredModelSummary
+
+export type ModelVersionSummary = {
+  model_name?: string
+  catalog_name?: string
+  schema_name?: string
+  version?: number
+  source?: string
+  run_id?: string
+  status?: string
+  storage_location?: string
+  comment?: string
+  created_at?: number
+  created_by?: string
+  updated_at?: number
+  updated_by?: string
+  id?: string
 }
 
 export type ResourceType = "catalog" | "schema" | "table"

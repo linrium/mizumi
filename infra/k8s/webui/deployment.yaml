@@ -48,6 +48,8 @@ spec:
               value: xohzlCDjF8FoDU+SFb1Dcw9BCkYFGs7NaipxrZE6rwk=
             - name: API_BASE_URL
               value: http://controlplane-svc.controlplane.svc.cluster.local:4000
+            - name: SYNTHETIC_BASE_URL
+              value: http://synthetic-server-svc.synthetic.svc.cluster.local:8092
             - name: UC_BASE_URL
               value: http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/api/2.1/unity-catalog
             - name: RUSTFS_S3_URL
@@ -58,6 +60,8 @@ spec:
               value: rustfsadmin
             - name: LANCEDB_BASE_URL
               value: http://lancedb-svc.lancedb.svc.cluster.local:8080
+            - name: BAGGAGE_MODEL_SERVER_BASE_URL
+              value: http://baggage-model-server-svc.webui.svc.cluster.local:8080
             - name: EMBEDDING_MODEL
               value: text-embedding-3-small
             - name: OPENAI_BASE_URL
@@ -96,3 +100,66 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: baggage-model-server
+  namespace: webui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: baggage-model-server
+  template:
+    metadata:
+      labels:
+        app: baggage-model-server
+    spec:
+      containers:
+        - name: baggage-model-server
+          image: mizumi-baggage-model-server:0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow-svc.mlflow.svc.cluster.local:5000
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: vietjetair-baggage-damage
+            # Optional: pin to a specific run, e.g. "runs:/<run_id>/model".
+            # When unset the server picks the latest finished run automatically.
+            - name: MODEL_URI
+              value: ""
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: baggage-model-server-svc
+  namespace: webui
+spec:
+  selector:
+    app: baggage-model-server
+  ports:
+    - port: 8080
+      targetPort: 8080

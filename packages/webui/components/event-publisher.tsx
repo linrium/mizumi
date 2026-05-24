@@ -5,9 +5,8 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Editor from "@monaco-editor/react"
 import Image, { type StaticImageData } from "next/image"
 import { useState } from "react"
-
-import { apiFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
+import { apiFetch } from "@/lib/api-client"
 
 type SendResult =
   | {
@@ -26,7 +25,10 @@ export type EventOption = {
   id: string
   label: string
   endpoint: string
-  createSample: () => Record<string, unknown>
+  createSample?: () => Record<string, unknown>
+  createBatch?: (
+    batchSize: number,
+  ) => Promise<Record<string, unknown>[]> | Record<string, unknown>[]
 }
 
 type EventPublisherProps = {
@@ -38,7 +40,7 @@ type EventPublisherProps = {
   batchSize?: number
 }
 
-function prettyJson(value: Record<string, unknown>) {
+function prettyJson(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
@@ -52,71 +54,57 @@ export function EventPublisher({
 }: EventPublisherProps) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      options.map((option) => [option.id, prettyJson(option.createSample())]),
+      options.map((option) => [
+        option.id,
+        option.createSample ? prettyJson(option.createSample()) : "[]",
+      ]),
     ),
   )
   const [sending, setSending] = useState<Record<string, boolean>>({})
   const [results, setResults] = useState<Record<string, SendResult | null>>({})
 
   const handleSend = async (option: EventOption) => {
-    const sample = option.createSample()
-    const value = prettyJson(sample)
+    const batch = option.createBatch
+      ? await option.createBatch(batchSize)
+      : Array.from({ length: batchSize }, () => option.createSample?.() ?? {})
+    const value = prettyJson(batch)
     setValues((current) => ({ ...current, [option.id]: value }))
 
     setSending((current) => ({ ...current, [option.id]: true }))
     setResults((current) => ({ ...current, [option.id]: null }))
 
     try {
-      const responses = await Promise.all(
-        Array.from({ length: batchSize }, () =>
-          apiFetch(option.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(option.createSample()),
-          }).then(async (res) => ({
-            ok: res.ok,
-            status: res.status,
-            body: await res.json().catch(() => null),
-          })),
-        ),
-      )
+      const response = await apiFetch(option.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batch),
+      })
+      const body = await response.json().catch(() => null)
 
-      const accepted = responses.filter((response) => response.ok).length
-      const failed = responses.length - accepted
-
-      if (accepted > 0) {
+      if (response.ok) {
+        const accepted = Array.isArray(body) ? body.length : batch.length
+        const failed = Math.max(0, batch.length - accepted)
         setResults((current) => ({
           ...current,
           [option.id]: {
             ok: true,
-            status: failed === 0 ? 202 : 207,
+            status: response.status,
             data: {
-              sent: responses.length,
+              sent: batch.length,
               accepted,
               failed,
-              sample: responses.slice(0, 5).map((response) =>
-                response.ok
-                  ? response.body
-                  : {
-                      status: response.status,
-                      error:
-                        (response.body as { error?: string } | null)?.error ??
-                        "Request failed",
-                    },
-              ),
+              sample: Array.isArray(body) ? body.slice(0, 5) : [body],
             },
           },
         }))
       } else {
-        const firstFailure = responses[0]
         setResults((current) => ({
           ...current,
           [option.id]: {
             ok: false,
-            status: firstFailure?.status,
+            status: response.status,
             error:
-              (firstFailure?.body as { error?: string } | null)?.error ??
-              `All ${responses.length} requests failed`,
+              (body as { error?: string } | null)?.error ?? "Request failed",
           },
         }))
       }
@@ -191,7 +179,9 @@ export function EventPublisher({
                       className="h-7 gap-1.5 px-2.5 text-[11px]"
                     >
                       <HugeiconsIcon icon={MailSend02Icon} size={11} />
-                      {isSending ? `Sending ${batchSize}…` : `Send ${batchSize}`}
+                      {isSending
+                        ? `Sending ${batchSize}…`
+                        : `Send ${batchSize}`}
                     </Button>
                   </div>
                 </div>
@@ -253,7 +243,8 @@ export function EventPublisher({
                   <div className="h-[calc(100%-32px)] overflow-auto px-4 py-2">
                     {!result && (
                       <span className="text-xs text-muted-foreground">
-                        Send {batchSize} generated events to see the batch response.
+                        Send {batchSize} generated events to see the batch
+                        response.
                       </span>
                     )}
                     {result && (

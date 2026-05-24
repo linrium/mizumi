@@ -71,6 +71,30 @@ def init_duckdb() -> duckdb.DuckDBPyConnection:
     return c
 
 
+def reset_duckdb_connection() -> None:
+    global con, catalogs_attached
+
+    try:
+        if con is not None:
+            con.close()
+    except Exception:
+        pass
+
+    con = init_duckdb()
+    catalogs_attached = False
+
+    if current_uc_token:
+        create_uc_secret(current_uc_token)
+
+
+def is_fatal_duckdb_error(message: str) -> bool:
+    fatal_markers = [
+        "database has been invalidated because of a previous fatal error",
+        "ExpressionExecutor::Execute called with a result vector of type VARCHAR",
+    ]
+    return any(marker in message for marker in fatal_markers)
+
+
 def attach_catalogs() -> None:
     for name in CATALOGS:
         con.execute(f"""
@@ -157,6 +181,50 @@ def query(req: QueryRequest):
                 "row_count": len(data["data"]),
             }
         except Exception as e:
+            message = str(e)
+
+            if is_fatal_duckdb_error(message):
+                try:
+                    reset_duckdb_connection()
+                except Exception as reset_error:
+                    return JSONResponse(
+                        status_code=500,
+                        content={
+                            "error": message,
+                            "recovery_error": str(reset_error),
+                        },
+                    )
+
+                if "database has been invalidated because of a previous fatal error" in message:
+                    try:
+                        if not catalogs_attached:
+                            attach_catalogs()
+                            catalogs_attached = True
+
+                        result = con.execute(req.sql).fetchdf()
+                        data = _json.loads(result.to_json(orient="split", date_format="iso"))
+                        return {
+                            "columns": data["columns"],
+                            "rows": data["data"],
+                            "row_count": len(data["data"]),
+                        }
+                    except Exception as retry_error:
+                        return JSONResponse(
+                            status_code=400,
+                            content={
+                                "error": str(retry_error),
+                                "recovered_after_reset": True,
+                            },
+                        )
+
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": message,
+                        "connection_reset": True,
+                    },
+                )
+
             return JSONResponse(status_code=400, content={"error": str(e)})
 
 

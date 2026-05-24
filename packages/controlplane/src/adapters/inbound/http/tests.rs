@@ -5,85 +5,85 @@ use axum::{Json, extract::State, http::StatusCode};
 use crate::{
     domain::{
         entities::test_event::{
-            PublishEventResponse, PublishHdbankCustomerEventRequest,
-            PublishHdbankPaymentEventRequest, PublishVietjetairBookingEventRequest,
-            PublishVietjetairCustomerEventRequest, PublishVietjetairFlightEventRequest,
+            PublishBankingTransactionEventRequest, PublishEventResponse,
+            PublishFlightIncidentEventRequest, PublishFlightTicketEventRequest,
+            PublishHdbankCustomerEventRequest, PublishVietjetairCustomerEventRequest,
         },
         error::AppError,
     },
     infrastructure::server::AppState,
 };
 
-pub async fn publish_hdbank_payment_event(
+pub async fn publish_hdbank_customer_events(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<PublishHdbankPaymentEventRequest>,
-) -> Result<(StatusCode, Json<PublishEventResponse>), AppError> {
+    Json(reqs): Json<Vec<PublishHdbankCustomerEventRequest>>,
+) -> Result<(StatusCode, Json<Vec<PublishEventResponse>>), AppError> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             state
                 .test_event_service
-                .publish_hdbank_payment_event(req)
+                .publish_hdbank_customer_events(reqs)
                 .await?,
         ),
     ))
 }
 
-pub async fn publish_hdbank_customer_event(
+pub async fn publish_hdbank_banking_transaction_events(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<PublishHdbankCustomerEventRequest>,
-) -> Result<(StatusCode, Json<PublishEventResponse>), AppError> {
+    Json(reqs): Json<Vec<PublishBankingTransactionEventRequest>>,
+) -> Result<(StatusCode, Json<Vec<PublishEventResponse>>), AppError> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             state
                 .test_event_service
-                .publish_hdbank_customer_event(req)
+                .publish_hdbank_banking_transaction_events(reqs)
                 .await?,
         ),
     ))
 }
 
-pub async fn publish_vietjetair_customer_event(
+pub async fn publish_vietjetair_customer_events(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<PublishVietjetairCustomerEventRequest>,
-) -> Result<(StatusCode, Json<PublishEventResponse>), AppError> {
+    Json(reqs): Json<Vec<PublishVietjetairCustomerEventRequest>>,
+) -> Result<(StatusCode, Json<Vec<PublishEventResponse>>), AppError> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             state
                 .test_event_service
-                .publish_vietjetair_customer_event(req)
+                .publish_vietjetair_customer_events(reqs)
                 .await?,
         ),
     ))
 }
 
-pub async fn publish_vietjetair_flight_event(
+pub async fn publish_vietjetair_flight_ticket_events(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<PublishVietjetairFlightEventRequest>,
-) -> Result<(StatusCode, Json<PublishEventResponse>), AppError> {
+    Json(reqs): Json<Vec<PublishFlightTicketEventRequest>>,
+) -> Result<(StatusCode, Json<Vec<PublishEventResponse>>), AppError> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             state
                 .test_event_service
-                .publish_vietjetair_flight_event(req)
+                .publish_vietjetair_flight_ticket_events(reqs)
                 .await?,
         ),
     ))
 }
 
-pub async fn publish_vietjetair_booking_event(
+pub async fn publish_vietjetair_flight_incident_events(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<PublishVietjetairBookingEventRequest>,
-) -> Result<(StatusCode, Json<PublishEventResponse>), AppError> {
+    Json(reqs): Json<Vec<PublishFlightIncidentEventRequest>>,
+) -> Result<(StatusCode, Json<Vec<PublishEventResponse>>), AppError> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             state
                 .test_event_service
-                .publish_vietjetair_booking_event(req)
+                .publish_vietjetair_flight_incident_events(reqs)
                 .await?,
         ),
     ))

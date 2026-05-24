@@ -451,7 +451,7 @@ export function SqlEditor() {
 
   const form = useForm({
     defaultValues: {
-      sql: "select * from hdbank.hdbank_partnership_prod_bronze.partner_events_v1 limit 100",
+      sql: "select * from hdbank.hdbank_partnership_prod_bronze.customers_v1 limit 100",
     },
     validators: { onSubmit: sqlSchema },
     onSubmit: async ({ value }) => {

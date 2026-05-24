@@ -2,7 +2,9 @@ import { getServerSession } from "@/lib/auth"
 import {
   type Catalog,
   CatalogApiError,
+  type ModelVersionSummary,
   type PermissionsResponse,
+  type RegisteredModelDetail,
   type RegisteredModelSummary,
   type ResourceType,
   type Schema,
@@ -99,6 +101,20 @@ export async function getVolume(
 export async function getModels(catalog: string, schema: string) {
   return ucFetch<{ registered_models: RegisteredModelSummary[] }>(
     `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+  )
+}
+
+export async function getModel(catalog: string, schema: string, model: string) {
+  return ucFetch<RegisteredModelDetail>(`/models/${catalog}.${schema}.${model}`)
+}
+
+export async function getModelVersions(
+  catalog: string,
+  schema: string,
+  model: string,
+) {
+  return ucFetch<{ model_versions?: ModelVersionSummary[] }>(
+    `/models/${catalog}.${schema}.${model}/versions?max_results=200`,
   )
 }
 

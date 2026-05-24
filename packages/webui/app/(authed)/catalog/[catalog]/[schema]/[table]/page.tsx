@@ -44,6 +44,9 @@ export default function TableSchemaPage() {
             <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">
               Nullable
             </th>
+            <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">
+              Comment
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -61,6 +64,9 @@ export default function TableSchemaPage() {
               </td>
               <td className="px-4 py-2 text-muted-foreground">
                 {col.nullable ? "yes" : "no"}
+              </td>
+              <td className="px-4 py-2 text-muted-foreground">
+                {col.comment?.trim() || "—"}
               </td>
             </tr>
           ))}

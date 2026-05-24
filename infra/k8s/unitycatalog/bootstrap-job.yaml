@@ -28,6 +28,7 @@ data:
     python3 <<'PY'
     import json
     import os
+    import re
     import sys
     import urllib.error
     import urllib.parse
@@ -265,7 +266,61 @@ data:
         existing_models.add(model_name)
 
 
-    def col(name: str, type_name: str, type_text: str, json_type: str, pos: int) -> dict:
+    TOKEN_LABELS = {
+        "api": "API",
+        "app": "app",
+        "at": "at",
+        "avg": "average",
+        "cobrand": "co-brand",
+        "cross": "cross",
+        "csv": "CSV",
+        "delayed": "delayed",
+        "email": "email",
+        "flights": "flights",
+        "gbv": "GBV",
+        "gross": "gross",
+        "has": "has",
+        "hdbank": "HDBank",
+        "id": "ID",
+        "incident": "incident",
+        "incidents": "incidents",
+        "jet": "Jet",
+        "json": "JSON",
+        "kg": "kg",
+        "km": "km",
+        "kyc": "KYC",
+        "ota": "OTA",
+        "payment": "payment",
+        "pnr": "PNR",
+        "score": "score",
+        "sms": "SMS",
+        "spend": "spend",
+        "timestamp": "timestamp",
+        "uc": "UC",
+        "url": "URL",
+        "utc": "UTC",
+        "v1": "v1",
+        "vietjet": "VietJet",
+        "vietjetair": "VietJet Air",
+    }
+
+
+    def default_column_comment(name: str) -> str:
+        normalized = re.sub(r"([a-z0-9])([A-Z])", r"\\1_\\2", name)
+        words = [part for part in normalized.split("_") if part]
+        if not words:
+            return ""
+
+        rendered: list[str] = []
+        for word in words:
+            token = TOKEN_LABELS.get(word.lower())
+            rendered.append(token if token is not None else word.lower())
+
+        comment = " ".join(rendered)
+        return comment[:1].upper() + comment[1:]
+
+
+    def col(name: str, type_name: str, type_text: str, json_type: str, pos: int, comment: str | None = None) -> dict:
         return {
             "name": name,
             "type_text": type_text,
@@ -278,28 +333,336 @@ data:
             "type_scale": 0,
             "type_interval_type": "",
             "position": pos,
-            "comment": "",
+            "comment": default_column_comment(name) if comment is None else comment,
             "nullable": True,
             "partition_index": -1,
         }
 
 
-    def build_cols(specs: list[tuple[str, str, str, str]]) -> list[dict]:
-        return [col(name, type_name, type_text, json_type, pos) for pos, (name, type_name, type_text, json_type) in enumerate(specs)]
+    TABLE_COLUMN_COMMENTS = {
+        "HDBANK_BRONZE_CUSTOMERS_V1": {
+            "customer_id": "Unique HDBank customer identifier.",
+            "customer_name": "Customer full name from the source file.",
+            "city": "Primary city associated with the customer.",
+            "age": "Customer age in whole years.",
+            "customer_case": "Synthetic overlap segment describing whether the customer is shared with VietJet Air.",
+            "customer_tier": "Original HDBank relationship tier from the source data.",
+            "hdbank_affinity_score": "Synthetic score estimating affinity for HDBank travel-card offers.",
+            "average_monthly_balance": "Average monthly account balance in VND.",
+            "credit_score_band": "Source credit-quality band used to derive downstream risk fields.",
+            "hdbank_since": "Date the customer relationship with HDBank began.",
+            "has_vietjet_cobrand_card": "Whether the customer already holds the HDBank x VietJet co-brand card.",
+            "shared_customer": "True when the synthetic customer appears in both partner datasets.",
+            "seed_timestamp": "Timestamp when the bronze row was generated.",
+        },
+        "HDBANK_BANKING_TRANSACTIONS_V1": {
+            "transaction_id": "Unique banking or card transaction identifier.",
+            "customer_id": "Customer identifier linked to the transaction.",
+            "accountId": "Account identifier reported by the event payload.",
+            "posted_at": "Timestamp when the transaction posted to the account.",
+            "transaction_type": "Normalized transaction type such as salary, transfer, or card payment.",
+            "channel": "Origin channel used to initiate the transaction.",
+            "merchant_category": "Merchant category used for downstream travel-spend grouping.",
+            "amount": "Transaction amount in VND.",
+            "currency": "Currency code reported for the transaction.",
+            "source_bank": "Originating bank on the transfer or payment.",
+            "destination_bank": "Receiving bank on the transfer or payment.",
+            "merchant_name": "Merchant or counterparty display name.",
+            "balance_before": "Account balance before the transaction posted.",
+            "balance_after": "Account balance after the transaction posted.",
+            "city": "City associated with the transaction event.",
+            "touches_hdbank": "True when either side of the movement involves HDBank.",
+            "seed_timestamp": "Timestamp when the bronze transaction row was written.",
+        },
+        "HDBANK_CUSTOMERS_V1": {
+            "customer_id": "Unique HDBank customer identifier.",
+            "customer_name": "Customer full name used for analyst review.",
+            "city": "Primary customer city carried into silver.",
+            "age": "Customer age in whole years.",
+            "segment_name": "Uppercased marketing segment derived from the HDBank customer tier.",
+            "preferred_channel": "Recommended outbound channel derived from age band.",
+            "monthly_income": "Estimated monthly income derived from average balance.",
+            "credit_score": "Synthetic numeric credit score derived from the source band.",
+            "has_credit_card": "True when the customer already has a card or qualifies by tier.",
+            "shared_customer": "True when the customer appears in both partner datasets.",
+            "customer_case": "Synthetic overlap segment describing partner relationship coverage.",
+            "customer_tier": "Normalized HDBank tier retained for downstream scoring.",
+            "average_monthly_balance": "Average monthly balance in VND.",
+            "credit_score_band": "Normalized source credit-score band.",
+            "hdbank_affinity_score": "Synthetic affinity score for HDBank travel engagement.",
+            "hdbank_since": "Date the HDBank relationship started.",
+            "has_vietjet_cobrand_card": "Whether the customer already holds the co-brand card.",
+            "kyc_status": "Derived KYC processing status based on credit score band.",
+            "updated_at": "Timestamp when the silver customer profile was last rebuilt.",
+        },
+        "HDBANK_TRAVEL_SPEND_FEATURES_V1": {
+            "customer_id": "Customer identifier used to join travel-spend aggregates.",
+            "transaction_count": "Number of qualifying banking transactions observed for the customer.",
+            "total_card_spend": "Total non-salary outgoing spend in VND.",
+            "travel_spend": "Total spend in travel-related merchant categories in VND.",
+            "has_vietjet_spend": "Indicator showing whether any merchant matched VietJet.",
+            "last_payment_at": "Most recent transaction timestamp seen for the customer.",
+            "salary_inflow": "Total salary inflow recognized in the transaction history.",
+            "airline_ticket_spend": "Total spend specifically tagged as airline tickets.",
+            "ota_travel_spend": "Total spend at online travel agencies.",
+            "avg_spend_amount": "Average amount of non-salary outgoing transactions.",
+            "travel_affinity_score": "Derived score estimating propensity for travel purchases.",
+            "cross_sell_readiness_score": "Derived score estimating readiness for VietJet cross-sell outreach.",
+        },
+        "HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1": {
+            "customer_id": "HDBank customer selected for VietJet activation outreach.",
+            "customer_name": "Customer name for campaign operations and review.",
+            "offer_name": "Recommended VietJet offer variant for the customer.",
+            "use_case": "Reason the customer qualified for this outbound use case.",
+            "propensity_score": "Model-style score estimating likelihood of VietJet activation.",
+            "recommended_channel": "Best outreach channel chosen for the activation offer.",
+            "signal_value": "Primary supporting signal value, based on travel spend.",
+        },
+        "VIETJETAIR_BRONZE_CUSTOMERS_V1": {
+            "customer_id": "Unique VietJet Air customer identifier.",
+            "customer_name": "Customer full name from the source file.",
+            "city": "Primary city associated with the flyer.",
+            "age": "Customer age in whole years.",
+            "customer_case": "Synthetic overlap segment describing whether the flyer is shared with HDBank.",
+            "skyboss_tier": "Original SkyBoss loyalty tier from the source data.",
+            "vietjetair_affinity_score": "Synthetic score estimating affinity for VietJet Air offers.",
+            "annual_flights": "Approximate annual flight count from the source data.",
+            "ancillary_spend_score": "Synthetic score representing ancillaries purchase behavior.",
+            "vietjetair_since": "Date the customer relationship with VietJet Air began.",
+            "has_hdbank_cobrand_card": "Whether the flyer already has the HDBank x VietJet co-brand card.",
+            "shared_customer": "True when the synthetic customer appears in both partner datasets.",
+            "seed_timestamp": "Timestamp when the bronze row was generated.",
+        },
+        "VIETJETAIR_FLIGHT_TICKETS_V1": {
+            "ticket_id": "Unique ticket or booking identifier for the itinerary.",
+            "customer_id": "Customer identifier associated with the booking.",
+            "booking_reference": "PNR or booking reference code.",
+            "airline": "Operating or booked airline name.",
+            "flight_number": "Flight designator for the booked segment.",
+            "trip_type": "Trip shape such as one-way or round-trip.",
+            "origin_airport": "Departure airport code for the itinerary.",
+            "destination_airport": "Arrival airport code for the itinerary.",
+            "booking_at": "Timestamp when the booking was created.",
+            "departure_at": "Scheduled departure timestamp for the outbound leg.",
+            "return_departure_at": "Scheduled departure timestamp for the return leg, if present.",
+            "cabin_class": "Cabin class booked for the itinerary.",
+            "passenger_count": "Number of passengers included in the booking.",
+            "distance_km": "Approximate route distance in kilometers.",
+            "flight_duration_minutes": "Scheduled flight duration in minutes.",
+            "base_fare": "Base fare before taxes and extras, in VND.",
+            "taxes": "Taxes and fees applied to the booking, in VND.",
+            "total_price": "Total booking price paid, in VND.",
+            "currency": "Currency code reported for the booking.",
+            "baggage_kg": "Checked baggage allowance or purchased baggage weight in kilograms.",
+            "status": "Ticketing or booking status.",
+            "city": "Customer home city associated with the booking.",
+            "is_vietjet_air": "True when the booking is on VietJet Air rather than a competitor.",
+            "seed_timestamp": "Timestamp when the bronze ticket row was written.",
+        },
+        "VIETJETAIR_FLIGHT_INCIDENTS_V1": {
+            "report_id": "Unique incident report identifier.",
+            "customer_id": "Customer identifier tied to the incident.",
+            "ticket_id": "Ticket identifier associated with the incident.",
+            "booking_reference": "Booking reference linked to the affected itinerary.",
+            "airline": "Airline associated with the reported incident.",
+            "report_channel": "Channel used to submit the incident report.",
+            "incident_type": "Normalized incident category such as baggage damage or delay.",
+            "severity": "Reported severity level of the incident.",
+            "issue_airport": "Airport where the issue was reported or observed.",
+            "origin_airport": "Origin airport of the affected trip.",
+            "destination_airport": "Destination airport of the affected trip.",
+            "flight_number": "Flight number linked to the incident.",
+            "departure_date": "Scheduled departure timestamp for the affected flight.",
+            "reported_at": "Timestamp when the incident was reported.",
+            "status": "Current case status for the incident.",
+            "baggage_tag": "Baggage tag reference when the issue involves checked luggage.",
+            "delayed_minutes": "Reported delay duration in minutes.",
+            "currency": "Currency code associated with any claim value.",
+            "city": "Customer city recorded on the incident.",
+            "image_path": "Object path for supporting incident imagery, when available.",
+            "has_image": "True when a supporting incident image is attached.",
+            "seed_timestamp": "Timestamp when the bronze incident row was written.",
+        },
+        "VIETJETAIR_CUSTOMERS_V1": {
+            "customer_id": "Unique VietJet Air customer identifier.",
+            "customer_name": "Customer full name used for analyst review.",
+            "city": "Primary customer city carried into silver.",
+            "age": "Customer age in whole years.",
+            "membership_tier": "Normalized loyalty tier used for downstream segmentation.",
+            "home_airport": "Derived home airport based on the customer's city.",
+            "email_opt_in": "Derived indicator showing whether email is a viable outreach channel.",
+            "shared_customer": "True when the flyer appears in both partner datasets.",
+            "customer_case": "Synthetic overlap segment describing partner relationship coverage.",
+            "skyboss_tier": "Original loyalty tier retained for traceability.",
+            "annual_flights": "Approximate annual flight count retained for targeting.",
+            "ancillary_spend_score": "Synthetic score summarizing ancillary purchase behavior.",
+            "vietjetair_affinity_score": "Synthetic affinity score for VietJet engagement.",
+            "vietjetair_since": "Date the VietJet Air relationship started.",
+            "has_hdbank_cobrand_card": "Whether the flyer already holds the co-brand card.",
+            "updated_at": "Timestamp when the silver customer profile was last rebuilt.",
+        },
+        "VIETJETAIR_BOOKING_FEATURES_V1": {
+            "customer_id": "Customer identifier used to join booking aggregates.",
+            "booking_count": "Number of bookings observed for the customer.",
+            "gross_booking_value": "Total booking spend across all observed itineraries, in VND.",
+            "avg_booking_value": "Average booking value per itinerary, in VND.",
+            "last_booking_at": "Most recent booking timestamp seen for the customer.",
+            "vietjet_booking_count": "Count of bookings flown on VietJet Air.",
+            "competitor_booking_count": "Count of bookings flown on non-VietJet carriers.",
+            "vietjet_booking_value": "Total spend on VietJet-operated bookings, in VND.",
+            "avg_baggage_kg": "Average baggage weight attached to bookings.",
+            "avg_distance_km": "Average route distance across bookings.",
+            "incident_count": "Number of incident reports linked to the customer.",
+            "baggage_damage_count": "Number of baggage-damage incidents reported.",
+            "baggage_incident_count": "Number of baggage-related incidents reported.",
+            "avg_delay_minutes": "Average delay duration across linked incidents.",
+            "last_incident_at": "Most recent incident report timestamp seen for the customer.",
+            "has_baggage_image": "Indicator showing whether any baggage incident has image evidence.",
+            "frequent_flyer_score": "Derived score estimating frequency and value of flying behavior.",
+            "service_recovery_score": "Derived score estimating need for service-recovery outreach.",
+        },
+        "VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1": {
+            "image_uri": "S3 URI of the baggage image that was classified.",
+            "bucket": "Source S3 bucket containing the image.",
+            "object_key": "S3 object key for the image file.",
+            "file_name": "File name of the baggage image.",
+            "etag": "S3 ETag of the image object.",
+            "size_bytes": "Image file size in bytes.",
+            "last_modified": "Timestamp when the image was last modified in S3.",
+            "damage_label": "Top predicted damage category for the image.",
+            "damage_score": "Confidence score of the top damage prediction.",
+            "label_rankings_json": "JSON array of all label predictions ranked by score.",
+            "model_id": "Identifier of the classification model used.",
+            "classification_status": "Outcome status of the classification attempt.",
+            "error_message": "Error detail when classification failed.",
+            "classified_at": "Timestamp when the classification was executed.",
+        },
+        "VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1": {
+            "customer_id": "VietJet Air customer selected for HDBank finance outreach.",
+            "customer_name": "Customer name for campaign operations and review.",
+            "offer_name": "Recommended HDBank offer variant for the flyer.",
+            "use_case": "Reason the customer qualified for this outbound use case.",
+            "propensity_score": "Model-style score estimating likelihood of HDBank conversion.",
+            "recommended_channel": "Best outreach channel chosen for the finance offer.",
+            "signal_value": "Primary supporting signal value, based on booking value.",
+        },
+        "PARTNERSHIP_CO_BRAND_AUDIENCE_V1": {
+            "customer_id": "Customer identifier in the shared outbound audience.",
+            "customer_name": "Customer name for campaign activation workflows.",
+            "offer_name": "Offer selected for the outbound audience member.",
+            "use_case": "Cross-sell scenario that produced the audience row.",
+            "propensity_score": "Unified score estimating likelihood of response.",
+            "recommended_channel": "Best outreach channel for the selected offer.",
+            "signal_value": "Primary business signal carried forward from the source candidate table.",
+            "source_company": "Partner company originating the recommendation.",
+            "target_company": "Partner company receiving the candidate for activation.",
+            "priority_band": "Priority bucket derived from the propensity score.",
+        },
+        "PARTNERSHIP_CUSTOMER_360_V1": {
+            "customer_id": "Unified customer identifier across HDBank and VietJet Air views.",
+            "customer_name": "Best available customer name across both partners.",
+            "city": "Best available customer city across both partners.",
+            "age": "Best available customer age across both partners.",
+            "has_hdbank_relationship": "True when the customer exists in HDBank silver data.",
+            "has_vietjetair_relationship": "True when the customer exists in VietJet Air silver data.",
+            "shared_customer": "True when the customer is present in both partner datasets.",
+            "segment_name": "HDBank-derived marketing segment for the customer.",
+            "preferred_channel": "HDBank-derived preferred outreach channel.",
+            "monthly_income": "Estimated monthly income from HDBank balance behavior.",
+            "credit_score": "Synthetic HDBank-derived numeric credit score.",
+            "has_credit_card": "Whether the HDBank profile indicates card ownership or eligibility.",
+            "average_monthly_balance": "Average HDBank monthly balance in VND.",
+            "transaction_count": "Number of HDBank transactions summarized for the customer.",
+            "total_card_spend": "Total HDBank outgoing spend summarized in silver.",
+            "travel_spend": "Total HDBank travel-category spend in VND.",
+            "airline_ticket_spend": "Total HDBank spend on airline tickets in VND.",
+            "ota_travel_spend": "Total HDBank spend at online travel agencies in VND.",
+            "has_vietjet_spend": "Indicator showing whether HDBank transactions include VietJet spend.",
+            "travel_affinity_score": "HDBank-derived score for travel purchase propensity.",
+            "cross_sell_readiness_score": "HDBank-derived score for VietJet cross-sell readiness.",
+            "membership_tier": "VietJet Air loyalty tier for the customer.",
+            "home_airport": "Derived VietJet Air home airport for the customer.",
+            "email_opt_in": "Derived indicator that email is a viable VietJet outreach channel.",
+            "annual_flights": "Approximate annual flight count from VietJet profile data.",
+            "ancillary_spend_score": "Synthetic score representing ancillary purchase behavior.",
+            "has_hdbank_cobrand_card": "Whether the VietJet profile indicates co-brand card ownership.",
+            "booking_count": "Total observed bookings from VietJet booking features.",
+            "vietjet_booking_count": "Count of bookings made on VietJet Air.",
+            "competitor_booking_count": "Count of bookings made on competitor airlines.",
+            "gross_booking_value": "Total booking spend summarized from VietJet data, in VND.",
+            "avg_booking_value": "Average booking value summarized from VietJet data, in VND.",
+            "incident_count": "Total number of linked service incidents.",
+            "baggage_damage_count": "Number of linked baggage-damage incidents.",
+            "baggage_incident_count": "Number of linked baggage-related incidents.",
+            "avg_delay_minutes": "Average reported delay duration across incidents.",
+            "has_baggage_image": "Indicator showing whether baggage evidence images exist.",
+            "frequent_flyer_score": "Derived VietJet score for flight frequency and value.",
+            "service_recovery_score": "Derived VietJet score for service-recovery need.",
+            "hdbank_priority_band": "Priority bucket derived from HDBank cross-sell readiness.",
+            "vietjet_priority_band": "Priority bucket derived from VietJet frequent-flyer score.",
+            "updated_at": "Timestamp when the customer 360 profile was last rebuilt.",
+        },
+    }
 
 
-    PARTNER_EVENTS_V1 = build_cols(
+    def build_cols(table_key: str, specs: list[tuple[str, str, str, str] | tuple[str, str, str, str, str]]) -> list[dict]:
+        built: list[dict] = []
+        comments = TABLE_COLUMN_COMMENTS.get(table_key, {})
+        for pos, spec in enumerate(specs):
+            if len(spec) == 4:
+                name, type_name, type_text, json_type = spec
+                built.append(col(name, type_name, type_text, json_type, pos, comments.get(name)))
+            else:
+                name, type_name, type_text, json_type, comment = spec
+                built.append(col(name, type_name, type_text, json_type, pos, comment))
+        return built
+
+
+    HDBANK_BRONZE_CUSTOMERS_V1 = build_cols(
+        "HDBANK_BRONZE_CUSTOMERS_V1",
         [
-            ("timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-            ("key", "STRING", "string", "string"),
-            ("event_type", "STRING", "string", "string"),
-            ("value", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("customer_case", "STRING", "string", "string"),
+            ("customer_tier", "STRING", "string", "string"),
+            ("hdbank_affinity_score", "DOUBLE", "double", "double"),
+            ("average_monthly_balance", "DOUBLE", "double", "double"),
+            ("credit_score_band", "STRING", "string", "string"),
+            ("hdbank_since", "DATE", "date", "string"),
+            ("has_vietjet_cobrand_card", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
-    HDBANK_BRONZE_CUSTOMERS_V1 = build_cols(
+    HDBANK_BANKING_TRANSACTIONS_V1 = build_cols(
+        "HDBANK_BANKING_TRANSACTIONS_V1",
         [
-            ("unified_customer_id", "STRING", "string", "string"),
+            ("transaction_id", "STRING", "string", "string"),
+            ("customer_id", "STRING", "string", "string"),
+            ("accountId", "STRING", "string", "string"),
+            ("posted_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("transaction_type", "STRING", "string", "string"),
+            ("channel", "STRING", "string", "string"),
+            ("merchant_category", "STRING", "string", "string"),
+            ("amount", "DOUBLE", "double", "double"),
+            ("currency", "STRING", "string", "string"),
+            ("source_bank", "STRING", "string", "string"),
+            ("destination_bank", "STRING", "string", "string"),
+            ("merchant_name", "STRING", "string", "string"),
+            ("balance_before", "DOUBLE", "double", "double"),
+            ("balance_after", "DOUBLE", "double", "double"),
+            ("city", "STRING", "string", "string"),
+            ("touches_hdbank", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    HDBANK_CUSTOMERS_V1 = build_cols(
+        "HDBANK_CUSTOMERS_V1",
+        [
             ("customer_id", "STRING", "string", "string"),
             ("customer_name", "STRING", "string", "string"),
             ("city", "STRING", "string", "string"),
@@ -310,26 +673,20 @@ data:
             ("credit_score", "INT", "int", "integer"),
             ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
             ("shared_customer", "BOOLEAN", "boolean", "boolean"),
-            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
-        ]
-    )
-
-    HDBANK_CUSTOMERS_V1 = build_cols(
-        [
-            ("customer_id", "STRING", "string", "string"),
-            ("customer_name", "STRING", "string", "string"),
-            ("segment_name", "STRING", "string", "string"),
+            ("customer_case", "STRING", "string", "string"),
+            ("customer_tier", "STRING", "string", "string"),
+            ("average_monthly_balance", "DOUBLE", "double", "double"),
+            ("credit_score_band", "STRING", "string", "string"),
+            ("hdbank_affinity_score", "DOUBLE", "double", "double"),
+            ("hdbank_since", "DATE", "date", "string"),
+            ("has_vietjet_cobrand_card", "BOOLEAN", "boolean", "boolean"),
             ("kyc_status", "STRING", "string", "string"),
-            ("preferred_channel", "STRING", "string", "string"),
-            ("monthly_income", "DOUBLE", "double", "double"),
-            ("credit_score", "INT", "int", "integer"),
-            ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
-            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
             ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
     HDBANK_TRAVEL_SPEND_FEATURES_V1 = build_cols(
+        "HDBANK_TRAVEL_SPEND_FEATURES_V1",
         [
             ("customer_id", "STRING", "string", "string"),
             ("transaction_count", "INT", "int", "integer"),
@@ -337,11 +694,17 @@ data:
             ("travel_spend", "DOUBLE", "double", "double"),
             ("has_vietjet_spend", "INT", "int", "integer"),
             ("last_payment_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("salary_inflow", "DOUBLE", "double", "double"),
+            ("airline_ticket_spend", "DOUBLE", "double", "double"),
+            ("ota_travel_spend", "DOUBLE", "double", "double"),
+            ("avg_spend_amount", "DOUBLE", "double", "double"),
             ("travel_affinity_score", "DOUBLE", "double", "double"),
+            ("cross_sell_readiness_score", "DOUBLE", "double", "double"),
         ]
     )
 
     HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1 = build_cols(
+        "HDBANK_VIETJET_ACTIVATION_CANDIDATES_V1",
         [
             ("customer_id", "STRING", "string", "string"),
             ("customer_name", "STRING", "string", "string"),
@@ -354,44 +717,84 @@ data:
     )
 
     VIETJETAIR_BRONZE_CUSTOMERS_V1 = build_cols(
+        "VIETJETAIR_BRONZE_CUSTOMERS_V1",
         [
-            ("unified_customer_id", "STRING", "string", "string"),
             ("customer_id", "STRING", "string", "string"),
             ("customer_name", "STRING", "string", "string"),
             ("city", "STRING", "string", "string"),
             ("age", "INT", "int", "integer"),
-            ("membership_tier", "STRING", "string", "string"),
-            ("home_airport", "STRING", "string", "string"),
-            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("customer_case", "STRING", "string", "string"),
+            ("skyboss_tier", "STRING", "string", "string"),
+            ("vietjetair_affinity_score", "DOUBLE", "double", "double"),
+            ("annual_flights", "INT", "int", "integer"),
+            ("ancillary_spend_score", "DOUBLE", "double", "double"),
+            ("vietjetair_since", "DATE", "date", "string"),
+            ("has_hdbank_cobrand_card", "BOOLEAN", "boolean", "boolean"),
             ("shared_customer", "BOOLEAN", "boolean", "boolean"),
             ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
-    VIETJETAIR_CUSTOMERS_V1 = build_cols(
+    VIETJETAIR_FLIGHT_TICKETS_V1 = build_cols(
+        "VIETJETAIR_FLIGHT_TICKETS_V1",
         [
+            ("ticket_id", "STRING", "string", "string"),
             ("customer_id", "STRING", "string", "string"),
-            ("customer_name", "STRING", "string", "string"),
-            ("membership_tier", "STRING", "string", "string"),
-            ("home_airport", "STRING", "string", "string"),
-            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
-            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
-            ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("booking_reference", "STRING", "string", "string"),
+            ("airline", "STRING", "string", "string"),
+            ("flight_number", "STRING", "string", "string"),
+            ("trip_type", "STRING", "string", "string"),
+            ("origin_airport", "STRING", "string", "string"),
+            ("destination_airport", "STRING", "string", "string"),
+            ("booking_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("departure_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("return_departure_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("cabin_class", "STRING", "string", "string"),
+            ("passenger_count", "INT", "int", "integer"),
+            ("distance_km", "INT", "int", "integer"),
+            ("flight_duration_minutes", "INT", "int", "integer"),
+            ("base_fare", "DOUBLE", "double", "double"),
+            ("taxes", "DOUBLE", "double", "double"),
+            ("total_price", "DOUBLE", "double", "double"),
+            ("currency", "STRING", "string", "string"),
+            ("baggage_kg", "INT", "int", "integer"),
+            ("status", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("is_vietjet_air", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
-    VIETJETAIR_BOOKING_FEATURES_V1 = build_cols(
+    VIETJETAIR_FLIGHT_INCIDENTS_V1 = build_cols(
+        "VIETJETAIR_FLIGHT_INCIDENTS_V1",
         [
+            ("report_id", "STRING", "string", "string"),
             ("customer_id", "STRING", "string", "string"),
-            ("booking_count", "INT", "int", "integer"),
-            ("gross_booking_value", "DOUBLE", "double", "double"),
-            ("avg_booking_value", "DOUBLE", "double", "double"),
-            ("last_booking_at", "TIMESTAMP", "timestamp", "timestamp"),
-            ("frequent_flyer_score", "DOUBLE", "double", "double"),
+            ("ticket_id", "STRING", "string", "string"),
+            ("booking_reference", "STRING", "string", "string"),
+            ("airline", "STRING", "string", "string"),
+            ("report_channel", "STRING", "string", "string"),
+            ("incident_type", "STRING", "string", "string"),
+            ("severity", "STRING", "string", "string"),
+            ("issue_airport", "STRING", "string", "string"),
+            ("origin_airport", "STRING", "string", "string"),
+            ("destination_airport", "STRING", "string", "string"),
+            ("flight_number", "STRING", "string", "string"),
+            ("departure_date", "TIMESTAMP", "timestamp", "timestamp"),
+            ("reported_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("status", "STRING", "string", "string"),
+            ("baggage_tag", "STRING", "string", "string"),
+            ("delayed_minutes", "INT", "int", "integer"),
+            ("currency", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("image_path", "STRING", "string", "string"),
+            ("has_image", "BOOLEAN", "boolean", "boolean"),
+            ("seed_timestamp", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
     VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1 = build_cols(
+        "VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1",
         [
             ("image_uri", "STRING", "string", "string"),
             ("bucket", "STRING", "string", "string"),
@@ -410,7 +813,54 @@ data:
         ]
     )
 
+    VIETJETAIR_CUSTOMERS_V1 = build_cols(
+        "VIETJETAIR_CUSTOMERS_V1",
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("membership_tier", "STRING", "string", "string"),
+            ("home_airport", "STRING", "string", "string"),
+            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("customer_case", "STRING", "string", "string"),
+            ("skyboss_tier", "STRING", "string", "string"),
+            ("annual_flights", "INT", "int", "integer"),
+            ("ancillary_spend_score", "DOUBLE", "double", "double"),
+            ("vietjetair_affinity_score", "DOUBLE", "double", "double"),
+            ("vietjetair_since", "DATE", "date", "string"),
+            ("has_hdbank_cobrand_card", "BOOLEAN", "boolean", "boolean"),
+            ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
+        ]
+    )
+
+    VIETJETAIR_BOOKING_FEATURES_V1 = build_cols(
+        "VIETJETAIR_BOOKING_FEATURES_V1",
+        [
+            ("customer_id", "STRING", "string", "string"),
+            ("booking_count", "INT", "int", "integer"),
+            ("gross_booking_value", "DOUBLE", "double", "double"),
+            ("avg_booking_value", "DOUBLE", "double", "double"),
+            ("last_booking_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("vietjet_booking_count", "INT", "int", "integer"),
+            ("competitor_booking_count", "INT", "int", "integer"),
+            ("vietjet_booking_value", "DOUBLE", "double", "double"),
+            ("avg_baggage_kg", "DOUBLE", "double", "double"),
+            ("avg_distance_km", "DOUBLE", "double", "double"),
+            ("incident_count", "INT", "int", "integer"),
+            ("baggage_damage_count", "INT", "int", "integer"),
+            ("baggage_incident_count", "INT", "int", "integer"),
+            ("avg_delay_minutes", "DOUBLE", "double", "double"),
+            ("last_incident_at", "TIMESTAMP", "timestamp", "timestamp"),
+            ("has_baggage_image", "INT", "int", "integer"),
+            ("frequent_flyer_score", "DOUBLE", "double", "double"),
+            ("service_recovery_score", "DOUBLE", "double", "double"),
+        ]
+    )
+
     VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1 = build_cols(
+        "VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1",
         [
             ("customer_id", "STRING", "string", "string"),
             ("customer_name", "STRING", "string", "string"),
@@ -423,6 +873,7 @@ data:
     )
 
     PARTNERSHIP_CO_BRAND_AUDIENCE_V1 = build_cols(
+        "PARTNERSHIP_CO_BRAND_AUDIENCE_V1",
         [
             ("customer_id", "STRING", "string", "string"),
             ("customer_name", "STRING", "string", "string"),
@@ -437,15 +888,51 @@ data:
         ]
     )
 
-    PARTNERSHIP_CAMPAIGN_SUMMARY_V1 = build_cols(
+    PARTNERSHIP_CUSTOMER_360_V1 = build_cols(
+        "PARTNERSHIP_CUSTOMER_360_V1",
         [
-            ("campaign_name", "STRING", "string", "string"),
-            ("source_company", "STRING", "string", "string"),
-            ("target_company", "STRING", "string", "string"),
-            ("offer_name", "STRING", "string", "string"),
-            ("customer_count", "INT", "int", "integer"),
-            ("avg_propensity_score", "DOUBLE", "double", "double"),
-            ("total_signal_value", "DOUBLE", "double", "double"),
+            ("customer_id", "STRING", "string", "string"),
+            ("customer_name", "STRING", "string", "string"),
+            ("city", "STRING", "string", "string"),
+            ("age", "INT", "int", "integer"),
+            ("has_hdbank_relationship", "BOOLEAN", "boolean", "boolean"),
+            ("has_vietjetair_relationship", "BOOLEAN", "boolean", "boolean"),
+            ("shared_customer", "BOOLEAN", "boolean", "boolean"),
+            ("segment_name", "STRING", "string", "string"),
+            ("preferred_channel", "STRING", "string", "string"),
+            ("monthly_income", "DOUBLE", "double", "double"),
+            ("credit_score", "INT", "int", "integer"),
+            ("has_credit_card", "BOOLEAN", "boolean", "boolean"),
+            ("average_monthly_balance", "DOUBLE", "double", "double"),
+            ("transaction_count", "INT", "int", "integer"),
+            ("total_card_spend", "DOUBLE", "double", "double"),
+            ("travel_spend", "DOUBLE", "double", "double"),
+            ("airline_ticket_spend", "DOUBLE", "double", "double"),
+            ("ota_travel_spend", "DOUBLE", "double", "double"),
+            ("has_vietjet_spend", "INT", "int", "integer"),
+            ("travel_affinity_score", "DOUBLE", "double", "double"),
+            ("cross_sell_readiness_score", "DOUBLE", "double", "double"),
+            ("membership_tier", "STRING", "string", "string"),
+            ("home_airport", "STRING", "string", "string"),
+            ("email_opt_in", "BOOLEAN", "boolean", "boolean"),
+            ("annual_flights", "INT", "int", "integer"),
+            ("ancillary_spend_score", "DOUBLE", "double", "double"),
+            ("has_hdbank_cobrand_card", "BOOLEAN", "boolean", "boolean"),
+            ("booking_count", "INT", "int", "integer"),
+            ("vietjet_booking_count", "INT", "int", "integer"),
+            ("competitor_booking_count", "INT", "int", "integer"),
+            ("gross_booking_value", "DOUBLE", "double", "double"),
+            ("avg_booking_value", "DOUBLE", "double", "double"),
+            ("incident_count", "INT", "int", "integer"),
+            ("baggage_damage_count", "INT", "int", "integer"),
+            ("baggage_incident_count", "INT", "int", "integer"),
+            ("avg_delay_minutes", "DOUBLE", "double", "double"),
+            ("has_baggage_image", "INT", "int", "integer"),
+            ("frequent_flyer_score", "DOUBLE", "double", "double"),
+            ("service_recovery_score", "DOUBLE", "double", "double"),
+            ("hdbank_priority_band", "STRING", "string", "string"),
+            ("vietjet_priority_band", "STRING", "string", "string"),
+            ("updated_at", "TIMESTAMP", "timestamp", "timestamp"),
         ]
     )
 
@@ -470,19 +957,19 @@ data:
             "comment": "HDBank demo catalog for co-branded travel card and ticket financing.",
             "schemas": {
                 "hdbank_partnership_prod_bronze": {
-                    "comment": "Raw HDBank partner events from the single company topic.",
+                    "comment": "Raw HDBank customer and banking data for the cross-sell demo.",
                     "tables": [
-                        {
-                            "name": "partner_events_v1",
-                            "comment": "Mixed HDBank customer and card transaction events.",
-                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/partner_events_v1",
-                            "columns": PARTNER_EVENTS_V1,
-                        },
                         {
                             "name": "customers_v1",
                             "comment": "Seeded HDBank customer master rows for the partnership demo.",
                             "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/customers_v1",
                             "columns": HDBANK_BRONZE_CUSTOMERS_V1,
+                        },
+                        {
+                            "name": "banking_transactions_v1",
+                            "comment": "Synthetic banking transactions keyed to the HDBank customer universe.",
+                            "storage_location": "s3://unitycatalog/hdbank/hdbank_partnership_prod_bronze/banking_transactions_v1",
+                            "columns": HDBANK_BANKING_TRANSACTIONS_V1,
                         }
                     ],
                 },
@@ -520,19 +1007,25 @@ data:
             "comment": "VietJet Air demo catalog for HDBank travel financing cross-sell.",
             "schemas": {
                 "vietjetair_partnership_prod_bronze": {
-                    "comment": "Raw VietJet partner events from the single company topic.",
+                    "comment": "Raw VietJet customer, ticket, and incident data for the cross-sell demo.",
                     "tables": [
-                        {
-                            "name": "partner_events_v1",
-                            "comment": "Mixed VietJet customer and booking events.",
-                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/partner_events_v1",
-                            "columns": PARTNER_EVENTS_V1,
-                        },
                         {
                             "name": "customers_v1",
                             "comment": "Seeded VietJet customer master rows for the partnership demo.",
                             "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/customers_v1",
                             "columns": VIETJETAIR_BRONZE_CUSTOMERS_V1,
+                        },
+                        {
+                            "name": "flight_tickets_v1",
+                            "comment": "Synthetic flight ticket activity for the VietJet customer universe.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/flight_tickets_v1",
+                            "columns": VIETJETAIR_FLIGHT_TICKETS_V1,
+                        },
+                        {
+                            "name": "flight_incidents_v1",
+                            "comment": "Synthetic VietJet incident reports including baggage damage image references.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_bronze/flight_incidents_v1",
+                            "columns": VIETJETAIR_FLIGHT_INCIDENTS_V1,
                         }
                     ],
                 },
@@ -551,12 +1044,6 @@ data:
                             "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/booking_features_v1",
                             "columns": VIETJETAIR_BOOKING_FEATURES_V1,
                         },
-                        {
-                            "name": "baggage_damage_classifications_v1",
-                            "comment": "Local Daft image classifications for damaged baggage photos uploaded to datasets/train/.",
-                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_silver/baggage_damage_classifications_v1",
-                            "columns": VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1,
-                        },
                     ],
                 },
                 "vietjetair_partnership_prod_gold": {
@@ -567,7 +1054,13 @@ data:
                             "comment": "VietJet flyers most likely to take HDBank financing or a co-brand card.",
                             "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/hdbank_finance_candidates_v1",
                             "columns": VIETJETAIR_HDBANK_FINANCE_CANDIDATES_V1,
-                        }
+                        },
+                        {
+                            "name": "baggage_damage_classifications_v1",
+                            "comment": "AI-classified baggage damage labels from inspection photos.",
+                            "storage_location": "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1",
+                            "columns": VIETJETAIR_BAGGAGE_DAMAGE_CLASSIFICATIONS_V1,
+                        },
                     ],
                 },
             },
@@ -575,6 +1068,17 @@ data:
         "partnership": {
             "comment": "Shared partnership outputs for co-brand campaign planning.",
             "schemas": {
+                "co_brand_silver": {
+                    "comment": "Unified customer 360 features for cross-sell scoring.",
+                    "tables": [
+                        {
+                            "name": "customer_360_v1",
+                            "comment": "Customer-level cross-brand profile with spend, booking, and service signals.",
+                            "storage_location": "s3://unitycatalog/partnership/co_brand_silver/customer_360_v1",
+                            "columns": PARTNERSHIP_CUSTOMER_360_V1,
+                        },
+                    ],
+                },
                 "co_brand_gold": {
                     "comment": "Joint campaign audience and summary outputs.",
                     "tables": [
@@ -583,12 +1087,6 @@ data:
                             "comment": "Unified outbound audience for the co-brand travel use case.",
                             "storage_location": "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1",
                             "columns": PARTNERSHIP_CO_BRAND_AUDIENCE_V1,
-                        },
-                        {
-                            "name": "campaign_summary_v1",
-                            "comment": "Compact campaign summary for activation planning.",
-                            "storage_location": "s3://unitycatalog/partnership/co_brand_gold/campaign_summary_v1",
-                            "columns": PARTNERSHIP_CAMPAIGN_SUMMARY_V1,
                         },
                     ],
                 }
@@ -677,19 +1175,20 @@ data:
     # Table-level grants
     # linh: owner+select on all; khaosoi: select on hdbank; khaopad: select on vietjetair
     table_grants = {
-        "hdbank.hdbank_partnership_prod_bronze.partner_events_v1":             {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
         "hdbank.hdbank_partnership_prod_bronze.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
+        "hdbank.hdbank_partnership_prod_bronze.banking_transactions_v1":       {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
         "hdbank.hdbank_partnership_prod_silver.customers_v1":                  {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
         "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1":      {linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
         "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1":{linh: ["OWNER", "SELECT"], "khaosoi@gmail.com": ["SELECT"]},
-        "vietjetair.vietjetair_partnership_prod_bronze.partner_events_v1":     {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_bronze.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.flight_tickets_v1":     {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_bronze.flight_incidents_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_silver.customers_v1":          {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":   {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
-        "vietjetair.vietjetair_partnership_prod_silver.baggage_damage_classifications_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
         "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "vietjetair.vietjetair_partnership_prod_gold.baggage_damage_classifications_v1": {linh: ["OWNER", "SELECT"], "khaopad@gmail.com": ["SELECT"]},
+        "partnership.co_brand_silver.customer_360_v1": {linh: ["OWNER", "SELECT"]},
         "partnership.co_brand_gold.co_brand_offer_audience_v1": {linh: ["OWNER", "SELECT"]},
-        "partnership.co_brand_gold.campaign_summary_v1":        {linh: ["OWNER", "SELECT"]},
     }
     for table_name, grants in table_grants.items():
         changes = [{"principal": principal, "add": privs, "remove": []} for principal, privs in grants.items()]

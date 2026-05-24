@@ -1,7 +1,18 @@
 import dagster as dg
 from dagster_k8s import PipesK8sClient
 
-from ..config import DAFT_IMAGE, S3A_CONF, SPARK_IMAGE
+from ..config import (
+    DAFT_BAGGAGE_CLASSIFIER_IMAGE,
+    DAFT_BAGGAGE_DAMAGE_TRAINER_IMAGE,
+    DAFT_IMAGE,
+    MLFLOW_EXPERIMENT_NAME,
+    MLFLOW_TRACKING_URI,
+    S3A_ACCESS_KEY,
+    S3A_CONF,
+    S3A_ENDPOINT,
+    S3A_SECRET_KEY,
+    SPARK_IMAGE,
+)
 
 
 def _run_spark_job(
@@ -24,29 +35,27 @@ def _run_spark_job(
     )
 
 
-@dg.multi_asset(
-    specs=[
-        dg.AssetSpec(
-            "hdbank_bronze_customers",
-            group_name="hdbank_bronze",
-            kinds={"spark", "k8s"},
-        ),
-        dg.AssetSpec(
-            "vietjetair_bronze_customers",
-            group_name="vietjetair_bronze",
-            kinds={"spark", "k8s"},
-        ),
-    ],
-    can_subset=False,
-)
-def seed_partner_bronze_events(
+@dg.asset(group_name="hdbank_bronze", kinds={"spark", "k8s"})
+def hdbank_bronze_customers(
     context: dg.AssetExecutionContext,
     pipes_k8s_client: PipesK8sClient,
 ):
     yield from _run_spark_job(
         context,
         pipes_k8s_client,
-        "/opt/spark/jobs/seed_co_brand_demo_bronze.py",
+        "/opt/spark/jobs/hdbank/build_bronze_customers.py",
+    ).get_results()
+
+
+@dg.asset(group_name="vietjetair_bronze", kinds={"spark", "k8s"})
+def vietjetair_bronze_customers(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+):
+    yield from _run_spark_job(
+        context,
+        pipes_k8s_client,
+        "/opt/spark/jobs/vietjetair/build_bronze_customers.py",
     ).get_results()
 
 
@@ -104,49 +113,84 @@ def build_vietjetair_silver(
     ).get_results()
 
 
-@dg.multi_asset(
-    specs=[
-        dg.AssetSpec(
-            "hdbank_gold_vietjet_activation_candidates",
-            group_name="hdbank_gold",
-            deps=[
-                "hdbank_silver_customers",
-                "hdbank_silver_travel_spend_features",
-                "vietjetair_silver_customers",
-            ],
-            kinds={"spark", "k8s"},
-        ),
-        dg.AssetSpec(
-            "vietjetair_gold_hdbank_finance_candidates",
-            group_name="vietjetair_gold",
-            deps=[
-                "vietjetair_silver_customers",
-                "vietjetair_silver_booking_features",
-                "hdbank_silver_customers",
-            ],
-            kinds={"spark", "k8s"},
-        ),
-        dg.AssetSpec(
-            "partnership_gold_co_brand_offer_audience",
-            group_name="partnership_gold",
-            deps=[
-                "hdbank_silver_customers",
-                "hdbank_silver_travel_spend_features",
-                "vietjetair_silver_customers",
-                "vietjetair_silver_booking_features",
-            ],
-            kinds={"spark", "k8s"},
-        ),
+@dg.asset(
+    group_name="partnership_silver",
+    deps=[
+        "hdbank_silver_customers",
+        "hdbank_silver_travel_spend_features",
+        "vietjetair_silver_customers",
+        "vietjetair_silver_booking_features",
     ],
+    kinds={"spark", "k8s"},
 )
-def build_gold_cross_sell(
+def partnership_silver_customer_360(
     context: dg.AssetExecutionContext,
     pipes_k8s_client: PipesK8sClient,
 ):
     yield from _run_spark_job(
         context,
         pipes_k8s_client,
-        "/opt/spark/jobs/build_gold_cross_sell.py",
+        "/opt/spark/jobs/partnership/build_customer_360.py",
+    ).get_results()
+
+
+@dg.asset(
+    group_name="hdbank_gold",
+    deps=[
+        "hdbank_silver_customers",
+        "hdbank_silver_travel_spend_features",
+        "vietjetair_silver_customers",
+        "vietjetair_silver_booking_features",
+    ],
+    kinds={"spark", "k8s"},
+)
+def hdbank_gold_vietjet_activation_candidates(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+):
+    yield from _run_spark_job(
+        context,
+        pipes_k8s_client,
+        "/opt/spark/jobs/hdbank/build_gold_activation_candidates.py",
+    ).get_results()
+
+
+@dg.asset(
+    group_name="vietjetair_gold",
+    deps=[
+        "hdbank_silver_customers",
+        "vietjetair_silver_customers",
+        "vietjetair_silver_booking_features",
+    ],
+    kinds={"spark", "k8s"},
+)
+def vietjetair_gold_hdbank_finance_candidates(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+):
+    yield from _run_spark_job(
+        context,
+        pipes_k8s_client,
+        "/opt/spark/jobs/vietjetair/build_gold_finance_candidates.py",
+    ).get_results()
+
+
+@dg.asset(
+    group_name="partnership_gold",
+    deps=[
+        "hdbank_gold_vietjet_activation_candidates",
+        "vietjetair_gold_hdbank_finance_candidates",
+    ],
+    kinds={"spark", "k8s"},
+)
+def partnership_gold_co_brand_offer_audience(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+):
+    yield from _run_spark_job(
+        context,
+        pipes_k8s_client,
+        "/opt/spark/jobs/partnership/build_gold_audience.py",
     ).get_results()
 
 
@@ -171,6 +215,78 @@ def partnership_gold_campaign_summary(
     ).get_materialize_result()
 
 
+@dg.asset(
+    group_name="vietjetair_gold",
+    kinds={"daft", "k8s"},
+)
+def vietjetair_gold_baggage_damage_classifications(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image=DAFT_BAGGAGE_CLASSIFIER_IMAGE,
+        base_pod_spec={
+            "containers": [
+                {
+                    "name": "dagster-pipes-execution",
+                    "imagePullPolicy": "Always",
+                    "resources": {
+                        "requests": {"cpu": "1", "memory": "2Gi"},
+                        "limits": {"cpu": "2", "memory": "3Gi"},
+                    },
+                    "env": [
+                        {"name": "RUSTFS_ENDPOINT_URL", "value": S3A_ENDPOINT},
+                        {"name": "AWS_ACCESS_KEY_ID", "value": S3A_ACCESS_KEY},
+                        {"name": "AWS_SECRET_ACCESS_KEY", "value": S3A_SECRET_KEY},
+                    ],
+                }
+            ]
+        },
+        command=["python", "/opt/daft/jobs/vietjetair/classify_baggage_damage.py"],
+    ).get_materialize_result()
+
+
+@dg.asset(
+    group_name="vietjetair_models",
+    deps=["vietjetair_gold_baggage_damage_classifications"],
+    kinds={"daft", "k8s", "sklearn"},
+)
+def vietjetair_baggage_damage_model(
+    context: dg.AssetExecutionContext,
+    pipes_k8s_client: PipesK8sClient,
+) -> dg.MaterializeResult:
+    return pipes_k8s_client.run(
+        context=context,
+        image=DAFT_BAGGAGE_DAMAGE_TRAINER_IMAGE,
+        base_pod_spec={
+            "containers": [
+                {
+                    "name": "dagster-pipes-execution",
+                    "imagePullPolicy": "Always",
+                    "resources": {
+                        "requests": {"cpu": "2", "memory": "4Gi"},
+                        "limits": {"cpu": "4", "memory": "6Gi"},
+                    },
+                    "env": [
+                        {"name": "RUSTFS_ENDPOINT_URL", "value": S3A_ENDPOINT},
+                        {"name": "AWS_ACCESS_KEY_ID", "value": S3A_ACCESS_KEY},
+                        {"name": "AWS_SECRET_ACCESS_KEY", "value": S3A_SECRET_KEY},
+                        {"name": "MLFLOW_TRACKING_URI", "value": MLFLOW_TRACKING_URI},
+                        {
+                            "name": "MLFLOW_EXPERIMENT_NAME",
+                            "value": MLFLOW_EXPERIMENT_NAME,
+                        },
+                        {"name": "MLFLOW_S3_ENDPOINT_URL", "value": S3A_ENDPOINT},
+                        {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+                    ],
+                }
+            ]
+        },
+        command=["python", "/opt/daft/jobs/vietjetair/train_baggage_damage_model.py"],
+    ).get_materialize_result()
+
+
 cross_sell_daily_job = dg.define_asset_job(
     name="cross_sell_daily_job",
     selection=dg.AssetSelection.assets(
@@ -180,6 +296,7 @@ cross_sell_daily_job = dg.define_asset_job(
         "hdbank_silver_travel_spend_features",
         "vietjetair_silver_customers",
         "vietjetair_silver_booking_features",
+        "partnership_silver_customer_360",
         "hdbank_gold_vietjet_activation_candidates",
         "vietjetair_gold_hdbank_finance_candidates",
         "partnership_gold_co_brand_offer_audience",
