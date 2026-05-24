@@ -13,6 +13,7 @@ from .assets.cross_sell_pipeline import (
     vietjetair_bronze_customers,
     vietjetair_gold_baggage_damage_classifications,
     vietjetair_gold_hdbank_finance_candidates,
+    vietjetair_baggage_damage_model,
 )
 
 
@@ -26,6 +27,7 @@ defs = dg.Definitions(
         hdbank_gold_vietjet_activation_candidates,
         vietjetair_gold_hdbank_finance_candidates,
         vietjetair_gold_baggage_damage_classifications,
+        vietjetair_baggage_damage_model,
         partnership_gold_co_brand_offer_audience,
         partnership_gold_campaign_summary,
     ],

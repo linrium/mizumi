@@ -5,6 +5,7 @@ S3A_SECRET_KEY = "rustfsadmin"
 SPARK_IMAGE = "mizumi-spark-rustfs:4.1.3"
 DAFT_IMAGE = "mizumi-daft:0.7.10"
 DAFT_BAGGAGE_CLASSIFIER_IMAGE = "mizumi-daft-baggage-classifier:0.1.0"
+DAFT_BAGGAGE_DAMAGE_TRAINER_IMAGE = "mizumi-daft-baggage-damage-trainer:0.1.0"
 
 S3A_CONF = [
     "--conf",

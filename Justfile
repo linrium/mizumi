@@ -49,6 +49,7 @@ duckdb_image := "mizumi-duckdb:1.1.6"
 duckdb_server_image := "mizumi-duckdb-server:0.1.0"
 daft_image := "mizumi-daft:0.7.10"
 daft_baggage_classifier_image := "mizumi-daft-baggage-classifier:0.1.0"
+daft_baggage_damage_trainer_image := "mizumi-daft-baggage-damage-trainer:0.1.0"
 
 daft_namespace := "daft"
 daft_chart := "oci://ghcr.io/eventual-inc/daft/quickstart"
@@ -380,6 +381,20 @@ daft-baggage-classify-local: daft-baggage-classifier-image-build
       -e SOURCE_PREFIX=vietjetair/baggage_damaged_reports/ \
       -e TARGET_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
       {{ daft_baggage_classifier_image }}
+
+daft-baggage-damage-trainer-image-build:
+    docker build -t {{ daft_baggage_damage_trainer_image }} -f packages/daft/Dockerfile.baggage-damage-trainer .
+
+daft-baggage-damage-train-local: daft-baggage-damage-trainer-image-build
+    docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \
+      -e AWS_ACCESS_KEY_ID={{ rustfs_access_key }} \
+      -e AWS_SECRET_ACCESS_KEY={{ rustfs_secret_key }} \
+      -e SOURCE_BUCKET=unitycatalog \
+      -e GOLD_TABLE_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
+      -e MODEL_BUCKET=models \
+      {{ daft_baggage_damage_trainer_image }}
 
 spark-destroy:
     helm uninstall {{ spark_operator_release }} --namespace {{ spark_operator_namespace }} || true

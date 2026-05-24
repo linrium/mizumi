@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/opt/hf-cache
+
+RUN pip install --no-cache-dir \
+    "boto3>=1.43.6,<2" \
+    "daft[deltalake]==0.7.10" \
+    "dagster-pipes>=1.13.4,<2" \
+    "joblib>=1.4,<2" \
+    "numpy>=1.26,<3" \
+    "pillow>=11,<12" \
+    "safetensors>=0.5,<1" \
+    "scikit-learn>=1.5,<2" \
+    "torch>=2.4,<3" \
+    "transformers>=4.52,<5"
+
+RUN mkdir -p /opt/daft/jobs/vietjetair "$HF_HOME"
+COPY packages/daft/jobs/vietjetair/train_baggage_damage_model.py /opt/daft/jobs/vietjetair/train_baggage_damage_model.py
+
+WORKDIR /opt/daft
+
+CMD ["python", "/opt/daft/jobs/vietjetair/train_baggage_damage_model.py"]

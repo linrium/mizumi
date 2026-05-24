@@ -4,8 +4,8 @@ import type { LanguageModel } from "ai"
 import { convertToModelMessages, stepCountIs, streamText, tool } from "ai"
 import type { NextRequest } from "next/server"
 import { z } from "zod"
-import { MODELS, type ModelId } from "@/services/ai-models"
 import { getServerSession } from "@/lib/auth"
+import type { ModelId } from "@/services/ai-models"
 import { fetchSchema } from "@/services/unity-catalog"
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
@@ -68,7 +68,16 @@ function resolveModel(modelId: ModelId): LanguageModel {
   return deepseek("deepseek-chat")
 }
 
-const chartTypeEnum = z.enum(["bar", "line", "area", "pie", "scatter"])
+const chartTypeEnum = z.enum([
+  "bar",
+  "line",
+  "area",
+  "pie",
+  "scatter",
+  "sankey",
+  "funnel",
+  "heatmap",
+])
 
 export type PanelSummary = {
   id: string
@@ -115,24 +124,21 @@ export async function handleDashboardGenerate(req: NextRequest) {
   const panelList =
     (panels ?? []).length > 0
       ? (panels ?? [])
-          .map(
-            (panel) =>
-              [
-                `  id=${panel.id} title="${panel.title}" chartType=${panel.chartType} xCol=${panel.xCol} yCol=${panel.yCol}`,
-                panel.description
-                  ? `  description="${panel.description}"`
-                  : null,
-                `  sql=${JSON.stringify(panel.sql)}`,
-                panel.resultPreview
-                  ? [
-                      `  top_rows_columns=${JSON.stringify(panel.resultPreview.columns)}`,
-                      `  top_rows=${JSON.stringify(panel.resultPreview.rows)}`,
-                      `  row_count=${panel.resultPreview.rowCount}`,
-                    ].join("\n")
-                  : "  top_rows=(unavailable)",
-              ]
-                .filter(Boolean)
-                .join("\n"),
+          .map((panel) =>
+            [
+              `  id=${panel.id} title="${panel.title}" chartType=${panel.chartType} xCol=${panel.xCol} yCol=${panel.yCol}`,
+              panel.description ? `  description="${panel.description}"` : null,
+              `  sql=${JSON.stringify(panel.sql)}`,
+              panel.resultPreview
+                ? [
+                    `  top_rows_columns=${JSON.stringify(panel.resultPreview.columns)}`,
+                    `  top_rows=${JSON.stringify(panel.resultPreview.rows)}`,
+                    `  row_count=${panel.resultPreview.rowCount}`,
+                  ].join("\n")
+                : "  top_rows=(unavailable)",
+            ]
+              .filter(Boolean)
+              .join("\n"),
           )
           .join("\n")
       : "  (none)"
@@ -164,7 +170,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
             "SQL query. Always use fully qualified names: <catalog>.<schema>.<table>",
           ),
         chartType: chartTypeEnum.describe(
-          "bar → categories, line/area → time-series, pie → proportions ≤8 slices, scatter → correlation",
+          "bar -> categories, line/area -> time-series, pie -> proportions <=8 slices, scatter -> correlation/bubble matrix, sankey -> flows, funnel -> journey steps, heatmap -> two-dimensional intensity",
         ),
         xCol: z
           .string()
@@ -324,7 +330,13 @@ ${contextHints ? `## Context:\n${contextHints}` : ""}
 - For time-series: ORDER BY the date/time column ascending
 
 ## Chart types:
-- bar: categories/comparisons  · line/area: time-series trends  · pie: proportions ≤8 slices  · scatter: correlation
+- bar: categories/comparisons
+- line/area: time-series trends
+- pie: proportions <=8 slices
+- scatter: correlation or bubble matrix
+- sankey: source-target-value flows
+- funnel: ordered journey steps
+- heatmap: x category, y category, numeric intensity
 
 ## Available tables:
 ${schema}
