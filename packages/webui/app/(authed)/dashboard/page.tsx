@@ -27,7 +27,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table"
 import type { UIDataTypes, UIMessage, UIMessagePart, UITools } from "ai"
 import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
-import ReactECharts from "echarts-for-react"
+import useMeasure from "react-use-measure"
 import { BarChart } from "@/components/charts/bar-chart"
 import { Bar } from "@/components/charts/bar"
 import { BarXAxis } from "@/components/charts/bar-x-axis"
@@ -161,177 +161,6 @@ type EditPanelOutput = {
   error?: string
 }
 
-// ── ECharts option builder (scatter & heatmap only) ──────────────────────────
-
-function buildEChartsOption(
-  chartType: "scatter" | "heatmap",
-  result: QueryResult,
-  xCol: string,
-  yCol: string,
-) {
-  const xi = result.columns.indexOf(xCol)
-  const yi = result.columns.indexOf(yCol)
-  const rowValue = (row: unknown, index: number) => (row as unknown[])[index]
-  const numericValue = (value: unknown) => {
-    const parsed = parseFloat(String(value ?? ""))
-    return Number.isFinite(parsed) ? parsed : null
-  }
-
-  const textColor = "#71717a"
-  const gridColor = "#e4e4e7"
-  const base = {
-    backgroundColor: "transparent",
-    textStyle: { color: textColor, fontFamily: "inherit" },
-    tooltip: { trigger: "axis" as const, textStyle: { fontSize: 11 } },
-  }
-
-  if (chartType === "heatmap") {
-    const valueIdx = result.columns.findIndex((_, i) => {
-      if (i === xi || i === yi) return false
-      return result.rows.some((row) => numericValue(rowValue(row, i)) !== null)
-    })
-    const xLabels = [...new Set(result.rows.map((r) => String(rowValue(r, xi) ?? "")))]
-    const yLabels =
-      yi >= 0
-        ? [...new Set(result.rows.map((r) => String(rowValue(r, yi) ?? "")))]
-        : []
-    const heatValues = result.rows
-      .map((row) => {
-        const x = xLabels.indexOf(String(rowValue(row, xi) ?? ""))
-        const y = yLabels.indexOf(String(rowValue(row, yi) ?? ""))
-        const value = numericValue(rowValue(row, valueIdx))
-        return x >= 0 && y >= 0 && value !== null ? [x, y, value] : null
-      })
-      .filter((row): row is number[] => row !== null)
-    const maxValue = Math.max(...heatValues.map((row) => row[2] ?? 0), 1)
-
-    return {
-      ...base,
-      tooltip: {
-        position: "top",
-        formatter: (params: { value?: [number, number, number] }) => {
-          const [x, y, value] = params.value ?? [0, 0, 0]
-          return `${xLabels[x] ?? ""}<br/>${yLabels[y] ?? ""}: ${value}`
-        },
-      },
-      grid: { left: 88, right: 24, top: 16, bottom: 56 },
-      xAxis: {
-        type: "category",
-        data: xLabels,
-        splitArea: { show: true },
-        axisLabel: { fontSize: 10, color: textColor, rotate: 30 },
-      },
-      yAxis: {
-        type: "category",
-        data: yLabels,
-        splitArea: { show: true },
-        axisLabel: { fontSize: 10, color: textColor },
-      },
-      visualMap: {
-        min: 0,
-        max: maxValue,
-        calculable: true,
-        orient: "horizontal",
-        left: "center",
-        bottom: 0,
-        textStyle: { fontSize: 10, color: textColor },
-      },
-      series: [
-        {
-          type: "heatmap",
-          data: heatValues,
-          label: { show: true, fontSize: 10, color: "#18181b" },
-          emphasis: {
-            itemStyle: { shadowBlur: 8, shadowColor: "rgba(0, 0, 0, 0.18)" },
-          },
-        },
-      ],
-    }
-  }
-
-  // scatter
-  const numericPairs = result.rows
-    .map((row) => {
-      const x = numericValue(rowValue(row, xi))
-      const y = numericValue(rowValue(row, yi))
-      return x !== null && y !== null ? { x, y, row: row as unknown[] } : null
-    })
-    .filter((p): p is { x: number; y: number; row: unknown[] } => !!p)
-  const sizeIdx = result.columns.findIndex((_, i) => {
-    if (i === xi || i === yi) return false
-    return result.rows.some((row) => numericValue(rowValue(row, i)) !== null)
-  })
-
-  if (numericPairs.length > 0) {
-    const sizes = numericPairs.map(({ row }) => numericValue(rowValue(row, sizeIdx)) ?? 1)
-    const maxSize = Math.max(...sizes, 1)
-    return {
-      ...base,
-      tooltip: {
-        trigger: "item" as const,
-        formatter: (params: { value?: number[] }) => {
-          const [x, y, size] = params.value ?? []
-          return `${xCol}: ${x}<br/>${yCol}: ${y}${sizeIdx >= 0 ? `<br/>${result.columns[sizeIdx]}: ${size}` : ""}`
-        },
-      },
-      grid: { left: 48, right: 18, top: 16, bottom: 42 },
-      xAxis: {
-        type: "value",
-        name: xCol,
-        nameLocation: "middle",
-        nameGap: 28,
-        axisLabel: { fontSize: 10, color: textColor },
-        splitLine: { lineStyle: { color: gridColor } },
-      },
-      yAxis: {
-        type: "value",
-        name: yCol,
-        nameLocation: "middle",
-        nameGap: 36,
-        axisLabel: { fontSize: 10, color: textColor },
-        splitLine: { lineStyle: { color: gridColor } },
-      },
-      series: [
-        {
-          type: "scatter",
-          data: numericPairs.map(({ x, y, row }) => [
-            x,
-            y,
-            numericValue(rowValue(row, sizeIdx)) ?? 1,
-          ]),
-          symbolSize: (value: number[]) =>
-            8 + Math.sqrt(Math.max(0, value[2] ?? 1) / maxSize) * 28,
-          itemStyle: { opacity: 0.72 },
-        },
-      ],
-    }
-  }
-
-  const keys = xi >= 0
-    ? result.rows.map((r) => String(rowValue(r, xi) ?? ""))
-    : result.rows.map((_, i) => String(i))
-  const values = result.rows
-    .map((r) => parseFloat(String(rowValue(r, yi) ?? "0")))
-    .filter(Number.isFinite)
-  return {
-    ...base,
-    grid: { left: 40, right: 16, top: 12, bottom: 36, containLabel: false },
-    xAxis: {
-      type: "category",
-      data: keys,
-      axisLabel: { fontSize: 10, color: textColor },
-      axisLine: { lineStyle: { color: gridColor } },
-      splitLine: { lineStyle: { color: gridColor } },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: { fontSize: 10, color: textColor },
-      splitLine: { lineStyle: { color: gridColor } },
-    },
-    series: [{ type: "scatter", data: values, symbolSize: 10 }],
-  }
-}
-
 // ── Bklit data helpers ────────────────────────────────────────────────────────
 
 function toBarChartData(result: QueryResult, xCol: string, yCol: string) {
@@ -412,6 +241,164 @@ function toSankeyData(result: QueryResult, xCol: string, yCol: string): SankeyDa
       value: l.value,
     })),
   }
+}
+
+// ── ScatterPlot ───────────────────────────────────────────────────────────────
+
+function ScatterPlot({ result, xCol, yCol }: { result: QueryResult; xCol: string; yCol: string }) {
+  const [ref, { width, height }] = useMeasure({ debounce: 10 })
+  const m = { top: 16, right: 18, bottom: 40, left: 48 }
+  const textColor = "#71717a"
+  const gridColor = "#e4e4e7"
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+
+  const points = useMemo(() => {
+    return result.rows.flatMap((row) => {
+      const r = row as unknown[]
+      const x = parseFloat(String(r[xi] ?? ""))
+      const y = parseFloat(String(r[yi] ?? ""))
+      return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : []
+    })
+  }, [result, xi, yi])
+
+  const iw = Math.max(0, width - m.left - m.right)
+  const ih = Math.max(0, height - m.top - m.bottom)
+
+  const { xScale, yScale, xTicks, yTicks } = useMemo(() => {
+    if (!points.length || !iw || !ih)
+      return { xScale: (_: number) => 0, yScale: (_: number) => ih, xTicks: [] as number[], yTicks: [] as number[] }
+    const xs = points.map((p) => p.x)
+    const ys = points.map((p) => p.y)
+    const xMin = Math.min(...xs), xMax = Math.max(...xs)
+    const yMin = Math.min(...ys), yMax = Math.max(...ys)
+    const xPad = (xMax - xMin) * 0.06 || 1
+    const yPad = (yMax - yMin) * 0.1 || 1
+    const xD = [xMin - xPad, xMax + xPad]
+    const yD = [yMin - yPad, yMax + yPad]
+    const xR = xD[1] - xD[0], yR = yD[1] - yD[0]
+    const xScale = (v: number) => ((v - xD[0]) / xR) * iw
+    const yScale = (v: number) => ih - ((v - yD[0]) / yR) * ih
+    const n = 4
+    const xTicks = Array.from({ length: n + 1 }, (_, i) => xD[0] + (i / n) * xR)
+    const yTicks = Array.from({ length: n + 1 }, (_, i) => yD[0] + (i / n) * yR)
+    return { xScale, yScale, xTicks, yTicks }
+  }, [points, iw, ih])
+
+  const fmt = (n: number) =>
+    Math.abs(n) >= 1e6 ? `${(n / 1e6).toFixed(1)}M`
+    : Math.abs(n) >= 1e3 ? `${(n / 1e3).toFixed(1)}k`
+    : Number.isInteger(n) ? String(n) : n.toFixed(1)
+
+  return (
+    <div ref={ref} className="h-full w-full">
+      {width > 0 && height > 0 && (
+        <svg width={width} height={height}>
+          <g transform={`translate(${m.left},${m.top})`}>
+            {yTicks.map((t) => (
+              <line key={t} x1={0} x2={iw} y1={yScale(t)} y2={yScale(t)} stroke={gridColor} strokeWidth={1} />
+            ))}
+            {yTicks.map((t) => (
+              <text key={t} x={-6} y={yScale(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill={textColor}>
+                {fmt(t)}
+              </text>
+            ))}
+            {xTicks.map((t) => (
+              <text key={t} x={xScale(t)} y={ih + 14} textAnchor="middle" fontSize={10} fill={textColor}>
+                {fmt(t)}
+              </text>
+            ))}
+            <text x={iw / 2} y={ih + 30} textAnchor="middle" fontSize={10} fill={textColor}>{xCol}</text>
+            {points.map((p, i) => (
+              <circle key={i} cx={xScale(p.x)} cy={yScale(p.y)} r={5} fill="var(--chart-1)" opacity={0.72} />
+            ))}
+          </g>
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// ── HeatmapChart ──────────────────────────────────────────────────────────────
+
+function HeatmapChart({ result, xCol, yCol }: { result: QueryResult; xCol: string; yCol: string }) {
+  const [ref, { width, height }] = useMeasure({ debounce: 10 })
+  const m = { top: 16, right: 24, bottom: 56, left: 88 }
+  const textColor = "#71717a"
+  const xi = result.columns.indexOf(xCol)
+  const yi = result.columns.indexOf(yCol)
+  const valIdx = result.columns.findIndex((_, i) => {
+    if (i === xi || i === yi) return false
+    return result.rows.some((row) => Number.isFinite(parseFloat(String((row as unknown[])[i] ?? ""))))
+  })
+
+  const { xLabels, yLabels, cells, maxVal } = useMemo(() => {
+    const rv = (row: unknown, i: number) => (row as unknown[])[i]
+    const xSet = [...new Set(result.rows.map((r) => String(rv(r, xi) ?? "")))]
+    const ySet = yi >= 0 ? [...new Set(result.rows.map((r) => String(rv(r, yi) ?? "")))] : []
+    const safeValIdx = Math.max(0, valIdx)
+    const cells = result.rows.flatMap((row) => {
+      const x = xSet.indexOf(String(rv(row, xi) ?? ""))
+      const y = ySet.indexOf(String(rv(row, yi) ?? ""))
+      const v = parseFloat(String(rv(row, safeValIdx) ?? ""))
+      return x >= 0 && y >= 0 && Number.isFinite(v) && v > 0 ? [{ x, y, v }] : []
+    })
+    const maxVal = Math.max(...cells.map((c) => c.v), 1)
+    return { xLabels: xSet, yLabels: ySet, cells, maxVal }
+  }, [result, xi, yi, valIdx])
+
+  const iw = Math.max(0, width - m.left - m.right)
+  const ih = Math.max(0, height - m.top - m.bottom)
+  const cw = xLabels.length ? iw / xLabels.length : 0
+  const ch = yLabels.length ? ih / yLabels.length : 0
+
+  const cellColor = (v: number) => {
+    const t = Math.min(1, v / maxVal)
+    return `hsl(221 83% ${Math.round(96 - t * 52)}%)`
+  }
+
+  return (
+    <div ref={ref} className="h-full w-full">
+      {width > 0 && height > 0 && (
+        <svg width={width} height={height}>
+          <g transform={`translate(${m.left},${m.top})`}>
+            {cells.map((cell, i) => {
+              const cx = cell.x * cw + cw / 2
+              const cy = cell.y * ch + ch / 2
+              return (
+                <g key={i}>
+                  <rect x={cell.x * cw} y={cell.y * ch} width={Math.max(0, cw - 2)} height={Math.max(0, ch - 2)} fill={cellColor(cell.v)} rx={2} />
+                  {cw > 30 && ch > 16 && (
+                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#18181b">
+                      {cell.v.toLocaleString()}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+            {xLabels.map((label, i) => (
+              <text
+                key={label}
+                x={i * cw + cw / 2}
+                y={ih + 12}
+                fontSize={10}
+                fill={textColor}
+                textAnchor="end"
+                transform={`rotate(-30, ${i * cw + cw / 2}, ${ih + 12})`}
+              >
+                {label.length > 12 ? `${label.slice(0, 11)}…` : label}
+              </text>
+            ))}
+            {yLabels.map((label, i) => (
+              <text key={label} x={-6} y={i * ch + ch / 2} textAnchor="end" dominantBaseline="middle" fontSize={10} fill={textColor}>
+                {label.length > 12 ? `${label.slice(0, 11)}…` : label}
+              </text>
+            ))}
+          </g>
+        </svg>
+      )}
+    </div>
+  )
 }
 
 // ── PanelChart ────────────────────────────────────────────────────────────────
@@ -572,21 +559,12 @@ function PanelChart({
     )
   }
 
-  // scatter & heatmap: keep ECharts
-  const option = buildEChartsOption(
-    chartType as "scatter" | "heatmap",
-    result,
-    xCol,
-    yCol,
-  )
-  return (
-    <ReactECharts
-      option={option}
-      style={{ height: "100%", width: "100%" }}
-      opts={{ renderer: "svg" }}
-      notMerge
-    />
-  )
+  if (chartType === "heatmap") {
+    return <HeatmapChart result={result} xCol={xCol} yCol={yCol} />
+  }
+
+  // scatter
+  return <ScatterPlot result={result} xCol={xCol} yCol={yCol} />
 }
 
 // ── Default panels ────────────────────────────────────────────────────────────

@@ -132,14 +132,18 @@ openai-secrets-apply:
         --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
         --dry-run=client -o yaml | kubectl apply -f -
     done
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
-    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
-      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
-    fi
+    # if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+    #   kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
+    #   kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/lancedb -n {{ lancedb_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/lancedb -n {{ lancedb_namespace }}; \
+    #   kubectl rollout status deployment/lancedb -n {{ lancedb_namespace }} --timeout=120s; \
+    # fi
 
 forward:
     #!/usr/bin/env bash
@@ -155,7 +159,7 @@ forward:
     kubectl port-forward -n {{ shared_postgres_namespace }} svc/shared-postgres-svc 5433:5432 &
     kubectl port-forward -n {{ spark_namespace }} svc/duckdb-server-svc 8090:8080 &
     kubectl port-forward -n {{ dagster_namespace }} svc/dagster-dagster-webserver 8088:8080 &
-    kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
+    # kubectl port-forward -n {{ webui_namespace }} svc/webui-svc 3000:3000 &
     kubectl port-forward -n {{ controlplane_namespace }} svc/controlplane-svc 4000:4000 &
     kubectl port-forward -n {{ lancedb_namespace }} svc/lancedb-svc 8091:8080 &
     kubectl port-forward -n {{ synthetic_namespace }} svc/synthetic-server-svc 8092:8092 &
@@ -457,10 +461,6 @@ dagster-helm-repo:
 
 dagster-image-build:
     docker build -t {{ dagster_image }} -f packages/dagster/Dockerfile .
-    if kubectl get deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }}; \
-      kubectl rollout status deployment/{{ dagster_release }}-dagster-user-deployments-mizumi -n {{ dagster_namespace }} --timeout=120s; \
-    fi
 
 dagster-deploy: dagster-helm-repo dagster-image-build
     just shared-postgres-deploy
@@ -490,10 +490,6 @@ dagster-destroy:
 
 unitycatalog-image-build:
     docker build -t {{ unitycatalog_image }} packages/uc
-    if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
 
 unitycatalog-ui-image-build:
     #!/usr/bin/env bash
@@ -508,10 +504,6 @@ unitycatalog-ui-image-build:
       --build-arg PROXY_HOST=unitycatalog-svc \
       -t {{ unitycatalog_ui_image }} \
       "$tmpdir/ui"
-    if kubectl get deployment/unitycatalog-ui -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog-ui -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog-ui -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
 
 unitycatalog-deploy: unitycatalog-image-build unitycatalog-ui-image-build
     just shared-postgres-deploy
@@ -547,14 +539,14 @@ unitycatalog-auth-secret-apply:
       -n {{ controlplane_namespace }} \
       --from-file=UC_INTERNAL_SERVICE_TOKEN=packages/uc/config/token.txt \
       --dry-run=client -o yaml | kubectl apply -f -
-    if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
-      kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
-    fi
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
+    # if kubectl get deployment/unitycatalog -n {{ unitycatalog_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/unitycatalog -n {{ unitycatalog_namespace }}; \
+    #   kubectl rollout status deployment/unitycatalog -n {{ unitycatalog_namespace }} --timeout=120s; \
+    # fi
+    # if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
+    #   kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
+    #   kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
+    # fi
 
 unitycatalog-bootstrap:
     kubectl delete job unitycatalog-bootstrap -n {{ unitycatalog_namespace }} --ignore-not-found
@@ -609,10 +601,6 @@ jobs-delete-vietjetair token='test':
 
 controlplane-image-build:
     docker build -f packages/controlplane/Dockerfile -t {{ controlplane_image }} .
-    if kubectl get deployment/controlplane -n {{ controlplane_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/controlplane -n {{ controlplane_namespace }}; \
-      kubectl rollout status deployment/controlplane -n {{ controlplane_namespace }} --timeout=120s; \
-    fi
 
 controlplane-deploy: controlplane-image-build
     just shared-postgres-deploy
@@ -637,10 +625,6 @@ controlplane-destroy:
 
 webui-image-build:
     docker build -t {{ webui_image }} packages/webui
-    if kubectl get deployment/webui -n {{ webui_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/webui -n {{ webui_namespace }}; \
-      kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=120s; \
-    fi
 
 webui-deploy: webui-image-build
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
@@ -696,10 +680,6 @@ daft-destroy: daft-distributed-destroy daft-simple-destroy
 
 lancedb-image-build:
     docker build -t {{ lancedb_image }} packages/lancedb-server
-    if kubectl get deployment/lancedb-server -n {{ lancedb_namespace }} &>/dev/null; then \
-      kubectl rollout restart deployment/lancedb-server -n {{ lancedb_namespace }}; \
-      kubectl rollout status deployment/lancedb-server -n {{ lancedb_namespace }} --timeout=120s; \
-    fi
 
 lancedb-deploy: lancedb-image-build
     kubectl apply -f {{ lancedb_manifests }}/server.yaml

@@ -6,8 +6,21 @@ import { DefaultChatTransport, isToolUIPart, getToolName } from "ai"
 import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai"
 import { Streamdown } from "streamdown"
 import { formatDistanceToNowStrict } from "date-fns"
-import ReactECharts from "echarts-for-react"
 import type { ColumnDef } from "@tanstack/react-table"
+import { BarChart } from "@/components/charts/bar-chart"
+import { Bar } from "@/components/charts/bar"
+import { BarXAxis } from "@/components/charts/bar-x-axis"
+import { AreaChart, Area } from "@/components/charts/area-chart"
+import { PieChart } from "@/components/charts/pie-chart"
+import { PieSlice } from "@/components/charts/pie-slice"
+import { Grid } from "@/components/charts/grid"
+import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip"
+import type { PieData } from "@/components/charts/pie-context"
+import { SankeyChart } from "@/components/charts/sankey/sankey-chart"
+import { SankeyNode } from "@/components/charts/sankey/sankey-node"
+import { SankeyLink } from "@/components/charts/sankey/sankey-link"
+import { SankeyTooltip } from "@/components/charts/sankey/sankey-tooltip"
+import type { SankeyData } from "@/components/charts/sankey/sankey-chart"
 import {
   IconArrowUp,
   IconBook2,
@@ -49,7 +62,7 @@ type RunQueryOutput = {
 type VisualizeChartOutput = {
   sql: string
   title: string
-  chartType: "bar" | "line" | "area" | "pie" | "scatter"
+  chartType: "bar" | "line" | "area" | "pie" | "scatter" | "sankey"
   x: string
   y: string
   explanation: string
@@ -236,59 +249,7 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 
 // ── VisualizationCard ─────────────────────────────────────────────────────────
 
-function buildEChartsOption(
-  chartType: "bar" | "line" | "area" | "pie" | "scatter",
-  keys: string[],
-  values: number[],
-  title: string,
-) {
-  if (chartType === "pie") {
-    return {
-      tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
-      legend: { orient: "vertical", left: "left", textStyle: { fontSize: 11 } },
-      series: [
-        {
-          name: title,
-          type: "pie",
-          radius: ["35%", "65%"],
-          data: keys.map((k, i) => ({ name: k, value: values[i] })),
-          label: { fontSize: 11 },
-        },
-      ],
-    }
-  }
-  if (chartType === "scatter") {
-    return {
-      tooltip: { trigger: "axis" },
-      grid: { left: 48, right: 16, top: 16, bottom: 40, containLabel: false },
-      xAxis: {
-        type: "category",
-        data: keys,
-        axisLabel: { fontSize: 11, rotate: keys.length > 6 ? 30 : 0 },
-      },
-      yAxis: { type: "value", axisLabel: { fontSize: 11 } },
-      series: [{ data: values, type: "scatter", symbolSize: 10 }],
-    }
-  }
-  return {
-    tooltip: { trigger: "axis" },
-    grid: { left: 48, right: 16, top: 16, bottom: 40, containLabel: false },
-    xAxis: {
-      type: "category",
-      data: keys,
-      axisLabel: { fontSize: 11, rotate: keys.length > 6 ? 30 : 0 },
-    },
-    yAxis: { type: "value", axisLabel: { fontSize: 11 } },
-    series: [
-      {
-        data: values,
-        type: chartType === "area" ? "line" : chartType,
-        smooth: chartType === "line" || chartType === "area",
-        areaStyle: chartType === "area" ? { opacity: 0.18 } : undefined,
-      },
-    ],
-  }
-}
+const VIZ_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 
 function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
@@ -308,10 +269,57 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
     return { keys: pairs.map((d) => d.k), values: pairs.map((d) => d.v) }
   }, [output])
 
-  const option = useMemo(
-    () => buildEChartsOption(output.chartType, keys, values, output.title),
-    [output.chartType, output.title, keys, values],
+  const barData = useMemo(
+    () => keys.map((k, i) => ({ [output.x]: k, [output.y]: values[i] ?? 0 })),
+    [keys, values, output.x, output.y],
   )
+
+  const areaData = useMemo(
+    () =>
+      keys.map((k, i) => {
+        const parsed = new Date(k)
+        return {
+          [output.x]: Number.isNaN(parsed.getTime()) ? new Date(i * 86400000) : parsed,
+          [output.y]: values[i] ?? 0,
+        }
+      }),
+    [keys, values, output.x, output.y],
+  )
+
+  const pieData = useMemo<PieData[]>(
+    () => keys.map((k, i) => ({ label: k, value: values[i] ?? 0 })),
+    [keys, values],
+  )
+  const pieTotal = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData])
+
+  const sankeyData = useMemo<SankeyData>(() => {
+    if (!output.columns || !output.rows) return { nodes: [], links: [] }
+    const srcIdx = output.columns.indexOf(output.x)
+    const tgtIdx = output.columns.indexOf(output.y)
+    const valIdx = output.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+    const rv = (row: unknown, i: number) => (row as unknown[])[i]
+    const nodeNames = new Set<string>()
+    const rawLinks: { source: string; target: string; value: number }[] = []
+    for (const row of output.rows) {
+      const src = String(rv(row, srcIdx) ?? "")
+      const tgt = String(rv(row, tgtIdx) ?? "")
+      const val = parseFloat(String(rv(row, Math.max(0, valIdx)) ?? "0"))
+      if (src && tgt && Number.isFinite(val) && val > 0) {
+        nodeNames.add(src)
+        nodeNames.add(tgt)
+        rawLinks.push({ source: src, target: tgt, value: val })
+      }
+    }
+    const nodeArray = [...nodeNames]
+    return {
+      nodes: nodeArray.map((name) => ({ name })),
+      links: rawLinks.map((l) => ({
+        source: nodeArray.indexOf(l.source),
+        target: nodeArray.indexOf(l.target),
+        value: l.value,
+      })),
+    }
+  }, [output])
 
   const queryResult: QueryResponse | null = useMemo(
     () =>
@@ -397,12 +405,78 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                 Cannot map &quot;{output.x}&quot; / &quot;{output.y}&quot; to
                 chart axes
               </div>
+            ) : output.chartType === "pie" ? (
+              <div style={{ height: 260 }} className="flex items-center gap-6 px-4">
+                <div className="h-full aspect-square shrink-0">
+                  <PieChart data={pieData} innerRadius={55} padAngle={0.02} cornerRadius={3}>
+                    {pieData.map((_, i) => (
+                      <PieSlice key={i} index={i} />
+                    ))}
+                  </PieChart>
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-2 overflow-y-auto max-h-full">
+                  {pieData.map((item, i) => {
+                    const pct = pieTotal > 0 ? ((item.value / pieTotal) * 100).toFixed(1) : "0.0"
+                    return (
+                      <div key={item.label} className="flex items-center gap-2 text-[11px]">
+                        <span
+                          className="w-2 h-2 rounded-sm shrink-0"
+                          style={{ background: VIZ_COLORS[i % VIZ_COLORS.length] }}
+                        />
+                        <span className="truncate text-foreground/75">{item.label}</span>
+                        <span className="ml-auto shrink-0 tabular-nums text-muted-foreground pl-2">
+                          {pct}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : output.chartType === "sankey" ? (
+              <div style={{ height: 260 }}>
+                <SankeyChart
+                  data={sankeyData}
+                  className="h-full"
+                  aspectRatio="auto"
+                  animationDuration={600}
+                  margin={{ top: 16, right: 120, bottom: 16, left: 120 }}
+                >
+                  <SankeyNode />
+                  <SankeyLink />
+                  <SankeyTooltip />
+                </SankeyChart>
+              </div>
+            ) : output.chartType === "line" || output.chartType === "area" ? (
+              <div style={{ height: 260 }}>
+                <AreaChart
+                  data={areaData}
+                  xDataKey={output.x}
+                  className="h-full"
+                  aspectRatio="auto"
+                  margin={{ top: 16, right: 16, bottom: 40, left: 48 }}
+                  animationDuration={600}
+                >
+                  <Grid />
+                  <Area dataKey={output.y} fillOpacity={output.chartType === "line" ? 0 : 0.4} />
+                  <ChartTooltip />
+                </AreaChart>
+              </div>
             ) : (
-              <ReactECharts
-                option={option}
-                style={{ height: 260 }}
-                opts={{ renderer: "svg" }}
-              />
+              <div style={{ height: 260 }}>
+                <BarChart
+                  data={barData}
+                  xDataKey={output.x}
+                  className="h-full"
+                  aspectRatio="auto"
+                  margin={{ top: 16, right: 16, bottom: 40, left: 48 }}
+                  animationDuration={600}
+                >
+                  <Grid />
+                  <Bar dataKey={output.y} />
+                  <ChartTooltip showDatePill={false} />
+                  <BarXAxis />
+                </BarChart>
+              </div>
             ))}
 
           {tab === "data" && queryResult && (
