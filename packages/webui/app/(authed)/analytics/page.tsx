@@ -19,6 +19,7 @@ import {
   IconSearch,
   IconShieldLock,
   IconShieldCheck,
+  IconSparkles,
 } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -1084,12 +1085,12 @@ function MessageBubble({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "HDBank customer count by segment",
-  "Top VietJet activation candidates by propensity score",
-  "Travel spend vs credit score across HDBank customers",
-  "Co-brand campaign audience by priority band",
-  "Campaign summary: customer count and avg propensity by offer",
-  "VietJet customers by membership tier and booking value",
+  "HDBank customers by segment and credit score band",
+  "Top VietJet activation candidates ranked by propensity score",
+  "Travel spend vs cross-sell readiness for HDBank customers",
+  "Co-brand audience breakdown by priority band and offer",
+  "VietJet customers by membership tier and gross booking value",
+  "Baggage damage classifications by label and confidence score",
 ]
 
 export default function AnalyticsPage() {
@@ -1144,7 +1145,7 @@ export default function AnalyticsPage() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground px-6">
-            <IconChartBar
+            <IconSparkles
               size={40}
               className="opacity-15"
             />

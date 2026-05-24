@@ -1094,12 +1094,12 @@ function PanelSidebar({
 // ── AI Composer (left sidebar) ────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "HDBank customers by preferred channel",
-  "VietJet membership tiers by average booking value",
-  "Travel affinity score distribution across HDBank customers",
-  "HDBank finance candidates from VietJet by propensity",
-  "Shared customers between HDBank and VietJet",
-  "Co-brand signal value by source company",
+  "Cross-sell readiness vs. frequent flyer score by segment",
+  "Top cities for prime target activation candidates",
+  "Service recovery score distribution among high-incident flyers",
+  "VietJet membership tiers by HDBank credit score band",
+  "Competitor booking pressure in prime target cities",
+  "Offer channel mix for co-brand vs. finance use cases",
 ]
 
 const PANEL_MENTION_RE = /@\[(.*?)\]\(panel:([^)]+)\)/g

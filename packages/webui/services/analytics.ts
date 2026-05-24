@@ -78,6 +78,7 @@ async function hybridSearchSchema(
           })
         ).embedding
       : localEmbed(query)
+
     const res = await fetch(
       `${LANCEDB_BASE}/tables/schema_embeddings/search?rerank=true`,
       {
