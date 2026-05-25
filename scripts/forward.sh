@@ -27,7 +27,7 @@ SERVICES=(
   "Shared Postgres|shared-postgres|shared-postgres-svc|5433:5432"
   "DuckDB Server|spark|duckdb-server-svc|8090:8080"
   "Controlplane API|controlplane|controlplane-svc|4000:4000"
-  # "WebUI|webui|webui-svc|3000:3000"
+  "WebUI|webui|webui-svc|3000:3000"
   "LanceDB|lancedb|lancedb-svc|8091:8080"
   "Synthetic API|synthetic|synthetic-server-svc|8092:8092"
 )

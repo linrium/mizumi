@@ -29,6 +29,13 @@ S3_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
 S3_REGION = os.getenv("AWS_REGION", "us-east-1")
 S3_SCOPE = os.getenv("DUCKDB_S3_SCOPE", "s3://unitycatalog")
 
+# Keep this aligned with infra/k8s/unitycatalog/bootstrap-job.yaml.
+CATALOG_DEFAULT_SCHEMAS = {
+    "hdbank": "hdbank_partnership_prod_bronze",
+    "vietjetair": "vietjetair_partnership_prod_bronze",
+    "partnership": "co_brand_silver",
+}
+
 
 def sql_quote(value: str) -> str:
     return value.replace("'", "''")
@@ -92,36 +99,21 @@ def main() -> None:
         )
         con.execute(create_secret_sql)
 
-        hdbank_attach_sql = """
-        ATTACH 'hdbank' AS hdbank (
-            TYPE unity_catalog,
-            READ_ONLY
-        )
-        """
-        debug_log("Attaching Unity Catalog catalog", catalog="hdbank", sql=hdbank_attach_sql)
-        con.execute(hdbank_attach_sql)
-
-        vietjetair_attach_sql = """
-        ATTACH 'vietjetair' AS vietjetair (
-            TYPE unity_catalog,
-            READ_ONLY
-        )
-        """
-        debug_log(
-            "Attaching Unity Catalog catalog",
-            catalog="vietjetair",
-            sql=vietjetair_attach_sql,
-        )
-        con.execute(vietjetair_attach_sql)
-
-        partnership_attach_sql = """
-        ATTACH 'partnership' AS partnership (
-            TYPE unity_catalog,
-            READ_ONLY
-        )
-        """
-        debug_log("Attaching Unity Catalog catalog", catalog="partnership", sql=partnership_attach_sql)
-        con.execute(partnership_attach_sql)
+        for catalog, default_schema in CATALOG_DEFAULT_SCHEMAS.items():
+            attach_sql = f"""
+            ATTACH '{catalog}' AS {catalog} (
+                TYPE unity_catalog,
+                DEFAULT_SCHEMA '{default_schema}',
+                READ_ONLY
+            )
+            """
+            debug_log(
+                "Attaching Unity Catalog catalog",
+                catalog=catalog,
+                default_schema=default_schema,
+                sql=attach_sql,
+            )
+            con.execute(attach_sql)
 
         debug_log("Executing query", sql=SQL)
         result = con.execute(SQL).fetchdf()
