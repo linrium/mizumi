@@ -474,6 +474,24 @@ daft-baggage-damage-trainer-image-build:
     docker build -t {{ daft_baggage_damage_trainer_image }} -f packages/daft/Dockerfile.baggage-damage-trainer .
 
 daft-baggage-damage-train-local: daft-baggage-damage-trainer-image-build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kubectl port-forward --address 0.0.0.0 -n {{ rustfs_namespace }} svc/rustfs-svc 9000:9000 >/tmp/rustfs-train-local.port-forward.log 2>&1 &
+    rustfs_pf_pid=$!
+    kubectl port-forward --address 0.0.0.0 -n {{ mlflow_namespace }} svc/mlflow-svc 5000:5000 >/tmp/mlflow-train-local.port-forward.log 2>&1 &
+    mlflow_pf_pid=$!
+    cleanup() {
+        kill "$rustfs_pf_pid" "$mlflow_pf_pid" 2>/dev/null || true
+        wait "$rustfs_pf_pid" "$mlflow_pf_pid" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+    sleep 3
+    docker run --rm \
+      --add-host=host.docker.internal:host-gateway \
+      --entrypoint /bin/sh \
+      minio/mc:latest -ec '\
+        mc alias set rustfs http://host.docker.internal:9000 {{ rustfs_access_key }} {{ rustfs_secret_key }} && \
+        mc mb --ignore-existing rustfs/mlflow'
     docker run --rm \
       --add-host=host.docker.internal:host-gateway \
       -e RUSTFS_ENDPOINT_URL={{ rustfs_endpoint }} \

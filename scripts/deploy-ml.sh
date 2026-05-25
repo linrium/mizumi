@@ -13,9 +13,15 @@ NC='\033[0m'
 #─── config ────────────────────────────────────────────────────────────────────
 ML_NS=ml
 ML_MANIFESTS=infra/k8s/ml
+RUSTFS_NS=rustfs
 
 MLFLOW_IMAGE=mizumi-mlflow:0.1.0
+BAGGAGE_DAMAGE_TRAINER_IMAGE=mizumi-daft-baggage-damage-trainer:0.1.0
 BAGGAGE_MODEL_SERVER_IMAGE=mizumi-baggage-model-server:0.1.0
+
+RUSTFS_ENDPOINT=http://host.docker.internal:9000
+RUSTFS_ACCESS_KEY=rustfsadmin
+RUSTFS_SECRET_KEY=rustfsadmin
 
 #─── spinner ───────────────────────────────────────────────────────────────────
 _SPR_PID=""
@@ -46,7 +52,7 @@ _stop_spinner() {
 trap '_stop_spinner' EXIT INT TERM
 
 #─── step helpers ──────────────────────────────────────────────────────────────
-TOTAL=2
+TOTAL=3
 STEP=0
 _STEP_START=0
 
@@ -122,6 +128,57 @@ q "Build ${MLFLOW_IMAGE}"        docker build -t "${MLFLOW_IMAGE}" packages/mlfl
 q "Apply MLflow manifests"       kubectl apply -f "${ML_MANIFESTS}/mlflow.yaml"
 v "Wait for MLflow rollout" \
   kubectl rollout status deployment/mlflow -n "${ML_NS}" --timeout=180s
+q "Delete stale bucket-create job" \
+  kubectl delete job mlflow-artifact-bucket-create -n "${RUSTFS_NS}" --ignore-not-found
+q "Create mlflow artifact bucket" \
+  kubectl create job mlflow-artifact-bucket-create -n "${RUSTFS_NS}" \
+    --image=minio/mc:latest -- /bin/sh -ec \
+    'mc alias set rustfs http://rustfs-svc.rustfs.svc.cluster.local:9000 rustfsadmin rustfsadmin && mc mb --ignore-existing rustfs/mlflow'
+q "Wait for bucket-create job" \
+  kubectl wait --for=condition=complete job/mlflow-artifact-bucket-create \
+    -n "${RUSTFS_NS}" --timeout=120s
+step_done
+
+#───────────────────────────────────────────────────────────────────────────────
+step "Train baggage damage model"
+#───────────────────────────────────────────────────────────────────────────────
+q "Build ${BAGGAGE_DAMAGE_TRAINER_IMAGE}" \
+  docker build -t "${BAGGAGE_DAMAGE_TRAINER_IMAGE}" -f packages/daft/Dockerfile.baggage-damage-trainer .
+kubectl port-forward --address 0.0.0.0 -n "${RUSTFS_NS}" svc/rustfs-svc 9000:9000 \
+  >/tmp/rustfs-train-local.port-forward.log 2>&1 &
+_RUSTFS_PF_PID=$!
+kubectl port-forward --address 0.0.0.0 -n "${ML_NS}" svc/mlflow-svc 5000:5000 \
+  >/tmp/mlflow-train-local.port-forward.log 2>&1 &
+_MLFLOW_PF_PID=$!
+_cleanup_pf() {
+  kill "$_RUSTFS_PF_PID" "$_MLFLOW_PF_PID" 2>/dev/null || true
+  wait "$_RUSTFS_PF_PID" "$_MLFLOW_PF_PID" 2>/dev/null || true
+}
+trap '_stop_spinner; _cleanup_pf' EXIT INT TERM
+sleep 3
+q "Ensure mlflow bucket exists" \
+  docker run --rm \
+    --add-host=host.docker.internal:host-gateway \
+    --entrypoint /bin/sh \
+    minio/mc:latest -ec \
+    "mc alias set rustfs ${RUSTFS_ENDPOINT} ${RUSTFS_ACCESS_KEY} ${RUSTFS_SECRET_KEY} && mc mb --ignore-existing rustfs/mlflow"
+v "Train baggage damage model" \
+  docker run --rm \
+    --add-host=host.docker.internal:host-gateway \
+    -e RUSTFS_ENDPOINT_URL="${RUSTFS_ENDPOINT}" \
+    -e AWS_ACCESS_KEY_ID="${RUSTFS_ACCESS_KEY}" \
+    -e AWS_SECRET_ACCESS_KEY="${RUSTFS_SECRET_KEY}" \
+    -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 \
+    -e MLFLOW_EXPERIMENT_NAME=vietjetair-baggage-damage \
+    -e MLFLOW_S3_ENDPOINT_URL="${RUSTFS_ENDPOINT}" \
+    -e AWS_DEFAULT_REGION=us-east-1 \
+    -e SOURCE_BUCKET=unitycatalog \
+    -e GOLD_TABLE_PATH=s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1 \
+    -e MODEL_BUCKET=unitycatalog \
+    -e MODEL_KEY_PREFIX=vietjetair/models/baggage_damage_detector \
+    "${BAGGAGE_DAMAGE_TRAINER_IMAGE}"
+_cleanup_pf
+trap '_stop_spinner' EXIT INT TERM
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────

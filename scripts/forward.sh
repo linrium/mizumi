@@ -22,7 +22,7 @@ SERVICES=(
   "Redpanda UI|redpanda|redpanda-console-svc|8081:8080"
   "Keycloak|keycloak|keycloak-svc|8080:8080 8083:8080"
   "Dagster UI|dagster|dagster-dagster-webserver|8088:80"
-  "MLflow UI|mlflow|mlflow-svc|5000:5000"
+  "MLflow UI|ml|mlflow-svc|5000:5000"
   "Unity Catalog API|unitycatalog|unitycatalog-svc|8082:8080"
   "Shared Postgres|shared-postgres|shared-postgres-svc|5433:5432"
   "DuckDB Server|spark|duckdb-server-svc|8090:8080"
