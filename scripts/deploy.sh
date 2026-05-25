@@ -59,6 +59,7 @@ DUCKDB_SERVER_IMAGE=mizumi-duckdb-server:0.1.0
 DAFT_IMAGE=mizumi-daft:0.7.10
 DAFT_BAGGAGE_CLASSIFIER_IMAGE=mizumi-daft-baggage-classifier:0.1.0
 
+
 LANCEDB_NS=lancedb
 LANCEDB_MANIFESTS=infra/k8s/lancedb
 LANCEDB_IMAGE=mizumi-lancedb-server:0.1.0
@@ -148,6 +149,16 @@ v() {
 
 #─── reusable operations ───────────────────────────────────────────────────────
 
+apply_openai_secret() {
+  local namespace="$1"
+  local secret_name="$2"
+  kubectl create secret generic "${secret_name}" \
+    -n "${namespace}" \
+    --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
+    --from-literal=OPENAI_BASE_URL="${OPENAI_BASE_URL}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+}
+
 apply_unitycatalog_auth_secrets() {
   kubectl create namespace "${UNITYCATALOG_NS}" 2>/dev/null || true
   kubectl create namespace "${CONTROLPLANE_NS}" 2>/dev/null || true
@@ -189,7 +200,7 @@ baggage_upload() {
     echo "missing directory: ${RUSTFS_BAGGAGE_DIR}" >&2
     return 1
   fi
-  kubectl port-forward -n "${RUSTFS_NS}" svc/rustfs-svc 9000:9000 \
+  kubectl port-forward -n "${RUSTFS_NS}" svc/rustfs-svc --address 0.0.0.0 9000:9000 \
     >/tmp/mizumi-rustfs-pf.log 2>&1 &
   local pf_pid=$!
   sleep 3
@@ -206,6 +217,23 @@ baggage_upload() {
   wait "$pf_pid" 2>/dev/null || true
   return $rc
 }
+
+#═══════════════════════════════════════════════════════════════════════════════
+# DEPENDENCY CHECKS
+#═══════════════════════════════════════════════════════════════════════════════
+
+_missing=0
+for _tool in brew docker helm kubectl; do
+  if ! command -v "$_tool" &>/dev/null; then
+    err "$_tool is not installed or not in PATH"
+    _missing=1
+  fi
+done
+if [[ $_missing -eq 1 ]]; then
+  printf "\n  Install missing tools and re-run.\n" >&2
+  exit 1
+fi
+ok "brew / docker / helm / kubectl found"
 
 #═══════════════════════════════════════════════════════════════════════════════
 # ENV CHECKS
@@ -452,6 +480,7 @@ step "Build & deploy Controlplane"
 q "Build ${CONTROLPLANE_IMAGE}" \
   docker build -f packages/controlplane/Dockerfile -t "${CONTROLPLANE_IMAGE}" .
 q "Create namespace" kubectl create namespace "${CONTROLPLANE_NS}" 2>/dev/null || true
+q "Create controlplane-secret" apply_openai_secret "${CONTROLPLANE_NS}" controlplane-secret
 q "Apply Postgres alias" kubectl apply -f "${CONTROLPLANE_MANIFESTS}/postgres.yaml"
 q "Apply Controlplane deployment" kubectl apply -f "${CONTROLPLANE_MANIFESTS}/deployment.yaml"
 v "Wait for Controlplane rollout" \
@@ -470,6 +499,7 @@ step "Build & deploy WebUI"
 #───────────────────────────────────────────────────────────────────────────────
 q "Build ${WEBUI_IMAGE}" docker build -t "${WEBUI_IMAGE}" packages/webui
 q "Create namespace" kubectl create namespace "${WEBUI_NS}" 2>/dev/null || true
+q "Create webui-secret" apply_openai_secret "${WEBUI_NS}" webui-secret
 q "Apply WebUI deployment" kubectl apply -f "${WEBUI_MANIFESTS}/deployment.yaml"
 v "Wait for WebUI rollout" \
   kubectl rollout status deployment/webui -n "${WEBUI_NS}" --timeout=180s
@@ -480,6 +510,7 @@ step "Build & deploy LanceDB + embed schema"
 #───────────────────────────────────────────────────────────────────────────────
 q "Build ${LANCEDB_IMAGE}" docker build -t "${LANCEDB_IMAGE}" packages/lancedb-server
 q "Create namespace" kubectl create namespace "${LANCEDB_NS}" 2>/dev/null || true
+q "Create lancedb-secret" apply_openai_secret "${LANCEDB_NS}" lancedb-secret
 q "Apply LanceDB server manifests" kubectl apply -f "${LANCEDB_MANIFESTS}/server.yaml"
 v "Wait for LanceDB rollout" \
   kubectl rollout status deployment/lancedb-server -n "${LANCEDB_NS}" --timeout=120s

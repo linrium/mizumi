@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: baggage-model-server
+  namespace: ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: baggage-model-server
+  template:
+    metadata:
+      labels:
+        app: baggage-model-server
+    spec:
+      containers:
+        - name: baggage-model-server
+          image: mizumi-baggage-model-server:0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow-svc.ml.svc.cluster.local:5000
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: vietjetair-baggage-damage
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: baggage-model-svc
+  namespace: ml
+spec:
+  selector:
+    app: baggage-model-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

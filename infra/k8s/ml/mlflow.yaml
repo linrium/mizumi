@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlflow-secret
+  namespace: ml
+type: Opaque
+stringData:
+  BACKEND_STORE_URI: postgresql+psycopg2://mlflow:mlflow_password@shared-postgres-svc.shared-postgres.svc.cluster.local:5432/mlflow
+  AWS_ACCESS_KEY_ID: rustfsadmin
+  AWS_SECRET_ACCESS_KEY: rustfsadmin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: mizumi-mlflow:0.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          env:
+            - name: BACKEND_STORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: BACKEND_STORE_URI
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-secret
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+          command:
+            - mlflow
+            - server
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5000"
+            - --backend-store-uri
+            - $(BACKEND_STORE_URI)
+            - --default-artifact-root
+            - s3://mlflow/artifacts
+            - --serve-artifacts
+            - --allowed-hosts
+            - localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,host.docker.internal,host.docker.internal:5000,mlflow-svc,mlflow-svc:5000,mlflow-svc.ml,mlflow-svc.ml:5000,mlflow-svc.ml.svc.cluster.local,mlflow-svc.ml.svc.cluster.local:5000,10.*,192.168.*,172.16.*,172.17.*,172.18.*,172.19.*,172.20.*,172.21.*,172.22.*,172.23.*,172.24.*,172.25.*,172.26.*,172.27.*,172.28.*,172.29.*,172.30.*,172.31.*
+            - --cors-allowed-origins
+            - http://localhost:*,http://127.0.0.1:*
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 3Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-svc
+  namespace: ml
+spec:
+  selector:
+    app: mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000
