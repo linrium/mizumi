@@ -1,59 +1,59 @@
-"use client";
+"use client"
 
-import type { SankeyNode as SankeyNodeType } from "d3-sankey";
-import { motion } from "motion/react";
-import { useCallback, useMemo } from "react";
-import { transitionWithDelay } from "../motion-utils";
+import type { SankeyNode as SankeyNodeType } from "d3-sankey"
+import { motion } from "motion/react"
+import { useCallback, useMemo } from "react"
+import { transitionWithDelay } from "../motion-utils"
 import {
   type SankeyLinkDatum,
   type SankeyNodeDatum,
   useSankey,
-} from "./sankey-context";
+} from "./sankey-context"
 
 // Helper to get node index from link source/target
-type NodeOrIndex = SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum> | number;
+type NodeOrIndex = SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum> | number
 
 function getNodeIndex(nodeOrIndex: NodeOrIndex): number | undefined {
   if (typeof nodeOrIndex === "number") {
-    return nodeOrIndex;
+    return nodeOrIndex
   }
-  return nodeOrIndex.index;
+  return nodeOrIndex.index
 }
 
 export interface SankeyNodeProps {
   /** Fill color for nodes. Default: uses theme colors */
-  fill?: string;
+  fill?: string
   /** Corner radius for nodes. Default: 4 */
-  lineCap?: number;
+  lineCap?: number
   /** Opacity when another node/link is hovered. Default: 0.4 */
-  fadedOpacity?: number;
+  fadedOpacity?: number
   /** Show node labels. Default: true */
-  showLabels?: boolean;
+  showLabels?: boolean
   /** Custom node color function */
   getNodeColor?: (
     node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
-    index: number
-  ) => string;
+    index: number,
+  ) => string
 }
 
 interface AnimatedNodeProps {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fill: string;
-  rx: number;
-  index: number;
-  totalNodes: number;
-  isFaded: boolean;
-  fadedOpacity: number;
-  animationDuration: number;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-  name: string;
-  value: number;
-  isLeftSide: boolean;
-  showLabels: boolean;
+  x: number
+  y: number
+  width: number
+  height: number
+  fill: string
+  rx: number
+  index: number
+  totalNodes: number
+  isFaded: boolean
+  fadedOpacity: number
+  animationDuration: number
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+  name: string
+  value: number
+  isLeftSide: boolean
+  showLabels: boolean
 }
 
 function AnimatedNode({
@@ -75,23 +75,22 @@ function AnimatedNode({
   isLeftSide,
   showLabels,
 }: AnimatedNodeProps) {
-  const { enterTransition, revealEpoch } = useSankey();
+  const { enterTransition, revealEpoch } = useSankey()
 
-  const nodeAnimDuration = animationDuration * 0.6;
-  const staggerDelaySec =
-    ((index / totalNodes) * nodeAnimDuration * 0.4) / 1000;
+  const nodeAnimDuration = animationDuration * 0.6
+  const staggerDelaySec = ((index / totalNodes) * nodeAnimDuration * 0.4) / 1000
   const nameLabelDelaySec =
-    staggerDelaySec + (nodeAnimDuration * 0.6 * 0.3) / 1000;
-  const valueLabelDelaySec = nameLabelDelaySec + 0.06;
+    staggerDelaySec + (nodeAnimDuration * 0.6 * 0.3) / 1000
+  const valueLabelDelaySec = nameLabelDelaySec + 0.06
 
-  const nodeEnter = transitionWithDelay(enterTransition, staggerDelaySec);
-  const nameEnter = transitionWithDelay(enterTransition, nameLabelDelaySec);
-  const valueEnter = transitionWithDelay(enterTransition, valueLabelDelaySec);
-  const nameLabelX = isLeftSide ? x - 12 : x + width + 12;
-  const valueLabelX = isLeftSide ? x - 12 : x + width + 12;
-  const nodeOpacity = isFaded ? fadedOpacity : 1;
-  const nameOpacity = isFaded ? fadedOpacity : 1;
-  const valueOpacity = isFaded ? fadedOpacity * 0.8 : 0.6;
+  const nodeEnter = transitionWithDelay(enterTransition, staggerDelaySec)
+  const nameEnter = transitionWithDelay(enterTransition, nameLabelDelaySec)
+  const valueEnter = transitionWithDelay(enterTransition, valueLabelDelaySec)
+  const nameLabelX = isLeftSide ? x - 12 : x + width + 12
+  const valueLabelX = isLeftSide ? x - 12 : x + width + 12
+  const nodeOpacity = isFaded ? fadedOpacity : 1
+  const nameOpacity = isFaded ? fadedOpacity : 1
+  const valueOpacity = isFaded ? fadedOpacity * 0.8 : 0.6
 
   return (
     <motion.g
@@ -142,7 +141,7 @@ function AnimatedNode({
         </>
       )}
     </motion.g>
-  );
+  )
 }
 
 export function SankeyNode({
@@ -162,109 +161,112 @@ export function SankeyNode({
     setHoveredNodeIndex,
     setTooltipData,
     animationDuration,
-  } = useSankey();
+  } = useSankey()
 
   // Default colors using CSS variables
   const defaultColors = useMemo(
     () => [
-      "var(--chart-1)",
-      "var(--chart-2)",
-      "var(--chart-3)",
-      "var(--chart-4)",
-      "var(--chart-5)",
+      "var(--chart-line-primary)",
+      "var(--chart-line-secondary)",
+      "color-mix(in oklab, var(--chart-line-primary) 78%, white)",
+      "color-mix(in oklab, var(--chart-line-secondary) 72%, white)",
+      "color-mix(in oklab, var(--chart-line-primary) 62%, white)",
     ],
-    []
-  );
+    [],
+  )
 
   // Get color for a node
   const getColor = useCallback(
     (
       node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
-      index: number
+      index: number,
     ): string => {
       if (fill) {
-        return fill;
+        return fill
       }
       if (getNodeColorProp) {
-        return getNodeColorProp(node, index);
+        return getNodeColorProp(node, index)
       }
 
-      return defaultColors[index % defaultColors.length] ?? "var(--chart-1)";
+      return (
+        defaultColors[index % defaultColors.length] ??
+        "var(--chart-line-primary)"
+      )
     },
-    [fill, getNodeColorProp, defaultColors]
-  );
+    [fill, getNodeColorProp, defaultColors],
+  )
 
   // Check if a node is connected to the hovered element
   const isNodeConnected = useCallback(
     (nodeIndex: number) => {
       if (hoveredNodeIndex !== null) {
         if (hoveredNodeIndex === nodeIndex) {
-          return true;
+          return true
         }
         return links.some((link) => {
-          const sIdx = getNodeIndex(link.source as NodeOrIndex);
-          const tIdx = getNodeIndex(link.target as NodeOrIndex);
+          const sIdx = getNodeIndex(link.source as NodeOrIndex)
+          const tIdx = getNodeIndex(link.target as NodeOrIndex)
           return (
             (sIdx === hoveredNodeIndex && tIdx === nodeIndex) ||
             (tIdx === hoveredNodeIndex && sIdx === nodeIndex)
-          );
-        });
+          )
+        })
       }
       if (hoveredLinkIndex !== null) {
-        const link = links[hoveredLinkIndex];
+        const link = links[hoveredLinkIndex]
         if (!link) {
-          return false;
+          return false
         }
-        const sIdx = getNodeIndex(link.source as NodeOrIndex);
-        const tIdx = getNodeIndex(link.target as NodeOrIndex);
-        return sIdx === nodeIndex || tIdx === nodeIndex;
+        const sIdx = getNodeIndex(link.source as NodeOrIndex)
+        const tIdx = getNodeIndex(link.target as NodeOrIndex)
+        return sIdx === nodeIndex || tIdx === nodeIndex
       }
-      return false;
+      return false
     },
-    [hoveredNodeIndex, hoveredLinkIndex, links]
-  );
+    [hoveredNodeIndex, hoveredLinkIndex, links],
+  )
 
-  const isAnyHovered = hoveredNodeIndex !== null || hoveredLinkIndex !== null;
-  const innerWidth = width - margin.left - margin.right;
+  const isAnyHovered = hoveredNodeIndex !== null || hoveredLinkIndex !== null
+  const innerWidth = width - margin.left - margin.right
 
   return (
     <g className="sankey-nodes">
       {nodes.map((node, index) => {
-        const nodeX = node.x0 ?? 0;
-        const nodeY = node.y0 ?? 0;
-        const nodeWidth = (node.x1 ?? 0) - nodeX;
-        const nodeHeight = (node.y1 ?? 0) - nodeY;
+        const nodeX = node.x0 ?? 0
+        const nodeY = node.y0 ?? 0
+        const nodeWidth = (node.x1 ?? 0) - nodeX
+        const nodeHeight = (node.y1 ?? 0) - nodeY
 
-        const isConnected = isNodeConnected(index);
-        const isFaded = isAnyHovered && !isConnected;
-        const isLeftSide = nodeX < innerWidth / 2;
+        const isConnected = isNodeConnected(index)
+        const isFaded = isAnyHovered && !isConnected
+        const isLeftSide = nodeX < innerWidth / 2
 
-        let displayValue = 0;
+        let displayValue = 0
         for (const l of links) {
-          const sIdx = getNodeIndex(l.source as NodeOrIndex);
-          const tIdx = getNodeIndex(l.target as NodeOrIndex);
+          const sIdx = getNodeIndex(l.source as NodeOrIndex)
+          const tIdx = getNodeIndex(l.target as NodeOrIndex)
           if (node.category === "source" && sIdx === index) {
-            displayValue += l.value;
+            displayValue += l.value
           } else if (node.category !== "source" && tIdx === index) {
-            displayValue += l.value;
+            displayValue += l.value
           }
         }
 
         const handleMouseEnter = () => {
-          setHoveredNodeIndex(index);
+          setHoveredNodeIndex(index)
           setTooltipData({
             type: "node",
             nodeIndex: index,
             x: 0,
             y: 0,
             data: node,
-          });
-        };
+          })
+        }
 
         const handleMouseLeave = () => {
-          setHoveredNodeIndex(null);
-          setTooltipData(null);
-        };
+          setHoveredNodeIndex(null)
+          setTooltipData(null)
+        }
 
         return (
           <AnimatedNode
@@ -275,7 +277,7 @@ export function SankeyNode({
             index={index}
             isFaded={isFaded}
             isLeftSide={isLeftSide}
-            key={`node-${node.name}`}
+            key={`node-${String(node.nodeKey ?? node.name)}-${index}`}
             name={node.name}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
@@ -287,12 +289,12 @@ export function SankeyNode({
             x={nodeX}
             y={nodeY}
           />
-        );
+        )
       })}
     </g>
-  );
+  )
 }
 
-SankeyNode.displayName = "SankeyNode";
+SankeyNode.displayName = "SankeyNode"
 
-export default SankeyNode;
+export default SankeyNode
