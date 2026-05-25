@@ -101,7 +101,7 @@ _stop_spinner() {
 trap '_stop_spinner' EXIT INT TERM
 
 #─── step helpers ──────────────────────────────────────────────────────────────
-TOTAL=19
+TOTAL=20
 STEP=0
 _STEP_START=0
 
@@ -267,9 +267,15 @@ ok "OPENAI_BASE_URL    ${OPENAI_BASE_URL}"
 # DEPLOY
 #═══════════════════════════════════════════════════════════════════════════════
 
-printf "${BLD}Mizumi full-stack deploy${NC}  (19 steps)\n"
+printf "${BLD}Mizumi full-stack deploy${NC}  (${TOTAL} steps)\n"
 printf "${YLW}Started: %s${NC}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
 DEPLOY_START=$SECONDS
+
+#───────────────────────────────────────────────────────────────────────────────
+step "Setup Metrics Server"
+#───────────────────────────────────────────────────────────────────────────────
+v "Setup metrics-server" ./scripts/setup-metrics-server.sh
+step_done
 
 #───────────────────────────────────────────────────────────────────────────────
 step "Pull base Docker images"
