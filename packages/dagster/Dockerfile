@@ -38,9 +38,10 @@ RUN chmod 644 \
 
 RUN pip install --no-cache-dir \
     "dagster==1.13.4" \
-    "dagster-postgres" \
-    "dagster-k8s" \
+    "dagster-postgres==0.29.4" \
+    "dagster-k8s==0.29.4" \
     "dagster-spark==0.29.4" \
+    "kubernetes>=35,<36" \
     "pyspark==4.1.1" \
     "grpcio>=1.48.1" \
     "grpcio-status>=1.48.1" \

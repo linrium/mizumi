@@ -14,31 +14,31 @@ dagster-user-deployments:
       port: 3030
       resources:
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: 75m
+          memory: 256Mi
         limits:
-          cpu: 250m
-          memory: 1Gi
+          cpu: 500m
+          memory: 768Mi
 
 dagsterWebserver:
   replicaCount: 1
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 75m
+      memory: 384Mi
     limits:
-      cpu: 125m
-      memory: 512Mi
+      cpu: 250m
+      memory: 768Mi
 
 dagsterDaemon:
   enabled: true
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 250m
+      memory: 384Mi
     limits:
-      cpu: 125m
-      memory: 512Mi
+      cpu: "1"
+      memory: 768Mi
 
 runLauncher:
   type: K8sRunLauncher

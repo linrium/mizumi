@@ -24,7 +24,7 @@ spec:
   driver:
     serviceAccount: spark-operator-spark
     cores: 1
-    memory: 512m
+    memory: 768m
     labels:
       app: hello-world
   executor:
