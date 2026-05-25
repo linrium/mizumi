@@ -686,10 +686,9 @@ webui-image-build:
 baggage-model-server-image-build:
     docker build -t {{ baggage_model_server_image }} packages/baggage-model-server
 
-webui-deploy: webui-image-build baggage-model-server-image-build
+webui-deploy: webui-image-build
     kubectl apply -f {{ webui_manifests }}/deployment.yaml
     kubectl rollout status deployment/webui -n {{ webui_namespace }} --timeout=180s
-    kubectl rollout status deployment/baggage-model-server -n {{ webui_namespace }} --timeout=300s
     kubectl get pods,svc -n {{ webui_namespace }}
 
 baggage-model-server-forward:

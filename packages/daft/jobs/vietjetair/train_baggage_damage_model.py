@@ -27,10 +27,6 @@ GOLD_TABLE_PATH = os.getenv(
     "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1",
 )
 SOURCE_BUCKET = os.getenv("SOURCE_BUCKET", "unitycatalog")
-MODEL_BUCKET = os.getenv("MODEL_BUCKET", "unitycatalog")
-MODEL_KEY_PREFIX = os.getenv(
-    "MODEL_KEY_PREFIX", "vietjetair/models/baggage_damage_detector"
-)
 CLIP_MODEL_ID = os.getenv("CLIP_MODEL_ID", "openai/clip-vit-base-patch32")
 MIN_CONFIDENCE = float(os.getenv("MIN_CONFIDENCE", "0.25"))
 MAX_ITER = int(os.getenv("MAX_ITER", "1000"))
@@ -39,6 +35,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "")
 MLFLOW_EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT_NAME", "vietjetair-baggage-damage"
 )
+MLFLOW_MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "baggage-damage-detector")
 MLFLOW_RUN_NAME = os.getenv("MLFLOW_RUN_NAME", "")
 
 RUSTFS_ENDPOINT_URL = os.getenv("RUSTFS_ENDPOINT_URL", "http://127.0.0.1:9000")
@@ -82,13 +79,6 @@ def build_s3_client():
         use_ssl=RUSTFS_USE_SSL,
         config=Config(signature_version="s3v4"),
     )
-
-
-def ensure_bucket(s3_client, bucket: str) -> None:
-    try:
-        s3_client.head_bucket(Bucket=bucket)
-    except ClientError:
-        s3_client.create_bucket(Bucket=bucket)
 
 
 def load_training_rows() -> list[dict]:
@@ -170,38 +160,11 @@ def train_classifier(
     return clf, le, y_enc
 
 
-def upload_artifacts(
-    s3_client,
-    run_ts: str,
-    clf: LogisticRegression,
-    le: LabelEncoder,
-    metadata: dict,
-) -> str:
-    ensure_bucket(s3_client, MODEL_BUCKET)
-    prefix = f"{MODEL_KEY_PREFIX}/{run_ts}"
-
-    model_buf = io.BytesIO()
-    joblib.dump({"classifier": clf, "label_encoder": le}, model_buf)
-    model_buf.seek(0)
-    s3_client.put_object(
-        Bucket=MODEL_BUCKET,
-        Key=f"{prefix}/model.joblib",
-        Body=model_buf.getvalue(),
-    )
-
-    s3_client.put_object(
-        Bucket=MODEL_BUCKET,
-        Key=f"{prefix}/metadata.json",
-        Body=json.dumps(metadata, indent=2).encode(),
-        ContentType="application/json",
-    )
-
-    return f"s3://{MODEL_BUCKET}/{prefix}"
-
-
 def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     s3_client = build_s3_client()
+
+    registered_model_uri = None
 
     with maybe_start_mlflow_run(run_ts) as mlflow_run:
         if mlflow_run is not None:
@@ -210,8 +173,6 @@ def main() -> None:
                     "clip_model_id": CLIP_MODEL_ID,
                     "gold_table_path": GOLD_TABLE_PATH,
                     "source_bucket": SOURCE_BUCKET,
-                    "model_bucket": MODEL_BUCKET,
-                    "model_key_prefix": MODEL_KEY_PREFIX,
                     "min_confidence": MIN_CONFIDENCE,
                     "max_iter": MAX_ITER,
                     "batch_size": BATCH_SIZE,
@@ -249,8 +210,6 @@ def main() -> None:
             "sklearn_classifier": type(clf).__name__,
         }
 
-        model_uri = upload_artifacts(s3_client, run_ts, clf, le, metadata)
-
         if mlflow_run is not None:
             mlflow_run.log_metrics(
                 {
@@ -259,29 +218,50 @@ def main() -> None:
                     "train_accuracy": train_acc,
                 }
             )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                bundle_path = os.path.join(tmpdir, "bundle")
+                metadata_path = os.path.join(tmpdir, "metadata")
+                joblib.dump({"classifier": clf, "label_encoder": le}, bundle_path)
+                with open(metadata_path, "w", encoding="utf-8") as fh:
+                    json.dump(metadata, fh, indent=2)
+
+                class _Bundle(mlflow_run.pyfunc.PythonModel):
+                    def predict(self, context, model_input, params=None):
+                        raise NotImplementedError
+
+                mlflow_run.pyfunc.log_model(
+                    artifact_path="model",
+                    python_model=_Bundle(),
+                    artifacts={"bundle": bundle_path, "metadata": metadata_path},
+                )
+
+            run_id = mlflow_run.active_run().info.run_id
+            version = mlflow_run.register_model(
+                model_uri=f"runs:/{run_id}/model",
+                name=MLFLOW_MODEL_NAME,
+            )
+            mlflow_run.MlflowClient().set_registered_model_alias(
+                MLFLOW_MODEL_NAME, "champion", str(version.version)
+            )
+            registered_model_uri = f"models:/{MLFLOW_MODEL_NAME}@champion"
+
             mlflow_run.log_dict(metadata, "metadata.json")
             mlflow_run.set_tags(
                 {
-                    "model_uri": model_uri,
+                    "registered_model_uri": registered_model_uri,
                     "run_ts": run_ts,
                     "engine": "daft",
                     "domain": "vietjetair",
                 }
             )
-            with tempfile.TemporaryDirectory() as tmpdir:
-                model_path = os.path.join(tmpdir, "model.joblib")
-                metadata_path = os.path.join(tmpdir, "metadata.json")
-                joblib.dump({"classifier": clf, "label_encoder": le}, model_path)
-                with open(metadata_path, "w", encoding="utf-8") as fh:
-                    json.dump(metadata, fh, indent=2)
-                mlflow_run.log_artifacts(tmpdir, artifact_path="model")
 
     with maybe_open_dagster_pipes() as pipes:
         if pipes is not None:
             pipes.report_asset_materialization(
                 asset_key="vietjetair_baggage_damage_model",
                 metadata={
-                    "model_uri": model_uri,
+                    "registered_model_uri": registered_model_uri,
                     "training_samples": len(y),
                     "classes": ", ".join(classes),
                     "train_accuracy": train_acc,

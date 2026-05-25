@@ -1,0 +1,97 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: baggage-model-serve
+  namespace: ml
+spec:
+  # Allow 15 min for the first model load (CLIP + artifacts download)
+  serviceUnhealthySecondThreshold: 900
+  deploymentUnhealthySecondThreshold: 300
+
+  serveConfigV2: |
+    applications:
+    - name: baggage-model
+      import_path: serve_app:deployment
+      route_prefix: /
+      deployments:
+      - name: BaggageModelDeployment
+        num_replicas: 1
+        ray_actor_options:
+          num_cpus: 1
+          num_gpus: 0
+
+  rayClusterConfig:
+    # Single-node: head only, no workers
+    rayVersion: "2.30.0"
+    enableInTreeAutoscaling: false
+
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        # Expose all CPUs to Serve deployments running on the head
+        num-cpus: "2"
+
+      template:
+        metadata:
+          labels:
+            app: baggage-model-serve
+        spec:
+          containers:
+            - name: ray-head
+              image: mizumi-baggage-model-server:0.1.0
+              imagePullPolicy: Always
+              workingDir: /opt/baggage-model-server
+              env:
+                - name: PYTHONPATH
+                  value: /opt/baggage-model-server
+                - name: MLFLOW_TRACKING_URI
+                  value: http://mlflow-svc.ml.svc.cluster.local:5000
+                - name: MLFLOW_MODEL_NAME
+                  value: baggage-damage-detector
+                - name: MLFLOW_MODEL_ALIAS
+                  value: champion
+                - name: GIT_PYTHON_REFRESH
+                  value: quiet
+                - name: MLFLOW_S3_ENDPOINT_URL
+                  value: http://rustfs-svc.rustfs.svc.cluster.local:9000
+                - name: AWS_ACCESS_KEY_ID
+                  value: rustfsadmin
+                - name: AWS_SECRET_ACCESS_KEY
+                  value: rustfsadmin
+                - name: AWS_DEFAULT_REGION
+                  value: us-east-1
+                - name: HF_HOME
+                  value: /opt/hf-cache
+                - name: RAY_USAGE_STATS_ENABLED
+                  value: "0"
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+---
+# Stable cluster-internal alias at the same address the rest of the stack used to call.
+# Routes to the Ray Serve HTTP port (8000) on the head pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: baggage-model-svc
+  namespace: ml
+spec:
+  selector:
+    app: baggage-model-serve
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8000
