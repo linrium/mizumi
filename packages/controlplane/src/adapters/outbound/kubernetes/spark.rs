@@ -8,6 +8,9 @@ use crate::domain::{
     error::AppError,
 };
 
+const STREAMING_DRIVER_CORE_REQUEST: &str = "100m";
+const STREAMING_EXECUTOR_CORE_REQUEST: &str = "50m";
+
 pub async fn client() -> Result<Client, kube::Error> {
     Client::try_default().await
 }
@@ -144,7 +147,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "driver": {
                 "serviceAccount": "spark-operator-spark",
                 "cores": job.driver_cores,
-                "coreRequest": "500m",
+                "coreRequest": STREAMING_DRIVER_CORE_REQUEST,
                 "memory": job.driver_memory,
                 "labels": {
                     "app": job.name,
@@ -154,7 +157,7 @@ fn build_spark_application(job: &StreamingJob) -> Value {
             "executor": {
                 "instances": job.executor_instances,
                 "cores": job.executor_cores,
-                "coreRequest": "500m",
+                "coreRequest": STREAMING_EXECUTOR_CORE_REQUEST,
                 "memory": job.executor_memory,
                 "labels": { "app": job.name }
             }

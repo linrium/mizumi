@@ -176,6 +176,13 @@ spec:
           ports:
             - containerPort: 443
               name: https
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           volumeMounts:
             - name: config
               mountPath: /etc/caddy/Caddyfile

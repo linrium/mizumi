@@ -37,6 +37,13 @@ spec:
           ports:
             - containerPort: 50050
               name: flight
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           volumeMounts:
             - mountPath: /mnt
               name: data
@@ -71,6 +78,13 @@ spec:
           ports:
             - containerPort: 50051
               name: flight
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
           volumeMounts:
             - mountPath: /mnt
               name: data
