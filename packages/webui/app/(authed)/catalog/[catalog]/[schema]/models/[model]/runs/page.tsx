@@ -3,28 +3,31 @@
 import { IconClock, IconTimeline } from "@tabler/icons-react"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { cn } from "@/lib/utils"
 import type { MlflowRun } from "@/services/mlflow"
-import {
-  getMlflowRunsForVersionsAction,
-  getModelVersionsAction,
-  searchMlflowExperimentsAction,
-  searchMlflowRunsAction,
-} from "../../../../../actions"
+import { searchMlflowRunsAction } from "../../../../../actions"
 import {
   EmptyRow,
   ErrorRow,
+  formatDuration,
+  formatTimestamp,
   LoadingRow,
   StatusBadge,
   TableHeader,
-  formatDuration,
-  formatTimestamp,
 } from "../model-ui"
-import { cn } from "@/lib/utils"
 
-const COLS = ["Run ID", "Name", "Experiment", "Status", "Duration", "Started", "Metrics"]
+const COLS = ["Name", "Model", "Status", "Duration", "Started"]
+
+function getTag(run: MlflowRun, key: string) {
+  return run.data?.tags?.find((tag) => tag.key === key)?.value
+}
+
+function mlflowModelName(model: string) {
+  return model.replaceAll("_", "-")
+}
 
 export default function RunsPage() {
-  const { catalog, schema, model } = useParams<{
+  const { model } = useParams<{
     catalog: string
     schema: string
     model: string
@@ -38,21 +41,10 @@ export default function RunsPage() {
     setError(null)
 
     async function load() {
-      const versionsData = await getModelVersionsAction(catalog, schema, model)
-      const runIds = (versionsData.model_versions ?? [])
-        .map((v) => v.run_id)
-        .filter((id): id is string => Boolean(id))
-
-      if (runIds.length > 0) {
-        const fetched = await getMlflowRunsForVersionsAction(runIds)
-        if (fetched.length > 0) return fetched
-      }
-
-      const expsData = await searchMlflowExperimentsAction()
-      const expIds = (expsData.experiments ?? []).map((e) => e.experiment_id)
-      if (expIds.length === 0) return []
-
-      const runsData = await searchMlflowRunsAction(expIds)
+      const registeredModelUri = `models:/${mlflowModelName(model)}@champion`
+      const runsData = await searchMlflowRunsAction(["1"], {
+        registeredModelUri,
+      })
       return runsData.runs ?? []
     }
 
@@ -60,7 +52,7 @@ export default function RunsPage() {
       .then(setRuns)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [catalog, schema, model])
+  }, [model])
 
   return (
     <div className="flex-1 overflow-auto">
@@ -87,8 +79,6 @@ export default function RunsPage() {
             />
           ) : (
             runs.map((run, i) => {
-              const metrics = run.data?.metrics ?? []
-              const topMetrics = metrics.slice(0, 3)
               return (
                 <tr
                   key={run.info.run_id}
@@ -97,14 +87,12 @@ export default function RunsPage() {
                     i % 2 === 0 ? "bg-background" : "bg-muted/20",
                   )}
                 >
-                  <td className="px-4 py-2 font-mono text-muted-foreground truncate max-w-[120px]">
-                    {run.info.run_id.slice(0, 8)}…
-                  </td>
                   <td className="px-4 py-2 font-medium truncate max-w-[140px]">
                     {run.info.run_name ?? "—"}
                   </td>
                   <td className="px-4 py-2 font-mono text-muted-foreground truncate">
-                    {run.info.experiment_id}
+                    {getTag(run, "registered_model_uri") ??
+                      `models:/${mlflowModelName(model)}@champion`}
                   </td>
                   <td className="px-4 py-2">
                     <StatusBadge status={run.info.status} />
@@ -120,29 +108,6 @@ export default function RunsPage() {
                       <IconClock size={13} className="shrink-0" />
                       {formatTimestamp(run.info.start_time)}
                     </span>
-                  </td>
-                  <td className="px-4 py-2">
-                    {topMetrics.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {topMetrics.map((m) => (
-                          <span key={m.key} className="font-mono text-[10px]">
-                            <span className="text-muted-foreground">
-                              {m.key}=
-                            </span>
-                            {typeof m.value === "number"
-                              ? m.value.toPrecision(4)
-                              : m.value}
-                          </span>
-                        ))}
-                        {metrics.length > 3 && (
-                          <span className="text-muted-foreground text-[10px]">
-                            +{metrics.length - 3} more
-                          </span>
-                        )}
-                      </span>
-                    )}
                   </td>
                 </tr>
               )

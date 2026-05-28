@@ -1,48 +1,85 @@
 "use client"
 
-import { IconArchive, IconClock, IconRun, IconUser } from "@tabler/icons-react"
+import { IconClock, IconRun, IconTag } from "@tabler/icons-react"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import type { ModelVersionSummary } from "@/services/catalog-types"
-import { getModelVersionsAction } from "../../../../actions"
+import { cn } from "@/lib/utils"
+import type { MlflowLoggedModel } from "@/services/mlflow"
+import { searchMlflowLoggedModelsAction } from "../../../../actions"
 import {
   EmptyRow,
   ErrorRow,
+  formatTimestamp,
   LoadingRow,
   StatusBadge,
   TableHeader,
-  formatTimestamp,
 } from "./model-ui"
-import { cn } from "@/lib/utils"
 
-const COLS = ["Version", "Status", "Source", "Run ID", "Created", "Comment"]
+const COLS = ["Model", "Version", "Status", "Run", "Created"]
 
-export default function VersionsPage() {
-  const { catalog, schema, model } = useParams<{
+function getTag(model: MlflowLoggedModel, key: string) {
+  return model.info.tags?.find((tag) => tag.key === key)?.value
+}
+
+function mlflowModelName(model: string) {
+  return model.replaceAll("_", "-")
+}
+
+function getRegisteredVersions(
+  loggedModel: MlflowLoggedModel,
+  modelName: string,
+) {
+  const tag = getTag(loggedModel, "mlflow.modelVersions")
+  if (!tag) return []
+
+  try {
+    const parsed = JSON.parse(tag) as {
+      name?: string
+      version?: string | number
+    }[]
+    return parsed
+      .filter((version) => version.name === modelName)
+      .map((version) => String(version.version))
+      .filter((version, index, versions) => versions.indexOf(version) === index)
+  } catch {
+    return []
+  }
+}
+
+export default function ModelsPage() {
+  const { model } = useParams<{
     catalog: string
     schema: string
     model: string
   }>()
-  const [versions, setVersions] = useState<ModelVersionSummary[]>([])
+  const [models, setModels] = useState<MlflowLoggedModel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    getModelVersionsAction(catalog, schema, model)
-      .then((d) => setVersions(d.model_versions ?? []))
+    const modelName = mlflowModelName(model)
+    searchMlflowLoggedModelsAction()
+      .then((data) =>
+        setModels(
+          (data.models ?? []).filter(
+            (loggedModel) =>
+              getRegisteredVersions(loggedModel, modelName).length > 0,
+          ),
+        ),
+      )
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [catalog, schema, model])
+  }, [model])
 
   return (
     <div className="flex-1 overflow-auto">
       <div className="px-5 py-3 border-b">
-        <h3 className="text-xs font-semibold">Versions</h3>
+        <h3 className="text-xs font-semibold">Models</h3>
         {!loading && !error && (
           <p className="text-xs text-muted-foreground mt-0.5">
-            {versions.length} version{versions.length !== 1 ? "s" : ""}
+            {models.length} model{models.length !== 1 ? "s" : ""}
           </p>
         )}
       </div>
@@ -54,61 +91,65 @@ export default function VersionsPage() {
             <LoadingRow cols={COLS.length} />
           ) : error ? (
             <ErrorRow cols={COLS.length} message={error} />
-          ) : versions.length === 0 ? (
-            <EmptyRow cols={COLS.length} message="No model versions found" />
+          ) : models.length === 0 ? (
+            <EmptyRow cols={COLS.length} message="No logged models found" />
           ) : (
-            versions.map((v, i) => (
-              <tr
-                key={v.id ?? v.version ?? i}
-                className={cn(
-                  "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
-                  i % 2 === 0 ? "bg-background" : "bg-muted/20",
-                )}
-              >
-                <td className="px-4 py-2 font-mono font-medium">
-                  {v.version ?? "—"}
-                </td>
-                <td className="px-4 py-2">
-                  <StatusBadge status={v.status} />
-                </td>
-                <td className="px-4 py-2">
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <IconArchive
-                      size={13}
-                      className="shrink-0 text-muted-foreground"
-                    />
-                    <span className="font-mono text-muted-foreground truncate">
-                      {v.source ?? v.storage_location ?? "—"}
+            models.map((loggedModel, i) => {
+              const versions = getRegisteredVersions(
+                loggedModel,
+                mlflowModelName(model),
+              )
+
+              return (
+                <tr
+                  key={loggedModel.info.model_id}
+                  className={cn(
+                    "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
+                    i % 2 === 0 ? "bg-background" : "bg-muted/20",
+                  )}
+                >
+                  <td className="px-4 py-2 font-medium">
+                    {loggedModel.info.name}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className="flex flex-wrap gap-1">
+                      {versions.length > 0 ? (
+                        versions.map((version) => (
+                          <span
+                            key={version}
+                            className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                          >
+                            <IconTag size={11} />v{version}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </span>
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <IconRun
-                      size={13}
-                      className="shrink-0 text-muted-foreground"
-                    />
-                    <span className="font-mono text-muted-foreground truncate">
-                      {v.run_id ?? "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    <StatusBadge status={loggedModel.info.status} />
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <IconRun
+                        size={13}
+                        className="shrink-0 text-muted-foreground"
+                      />
+                      <span className="font-mono text-muted-foreground truncate">
+                        {loggedModel.info.source_run_id ?? "—"}
+                      </span>
                     </span>
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <IconClock size={13} className="shrink-0" />
-                    {formatTimestamp(v.created_at)}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <IconUser size={13} className="shrink-0" />
-                    <span className="truncate">
-                      {v.comment ?? v.created_by ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <IconClock size={13} className="shrink-0" />
+                      {formatTimestamp(loggedModel.info.creation_timestamp_ms)}
                     </span>
-                  </span>
-                </td>
-              </tr>
-            ))
+                  </td>
+                </tr>
+              )
+            })
           )}
         </tbody>
       </table>

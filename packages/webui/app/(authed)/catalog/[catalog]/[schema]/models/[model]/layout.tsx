@@ -1,28 +1,18 @@
 "use client"
 
-import {
-  IconBrain,
-  IconCopy,
-  IconFlask,
-  IconHistory,
-  IconRun,
-  IconTimeline,
-} from "@tabler/icons-react"
+import { IconBoxModel, IconBrain, IconCopy, IconRun } from "@tabler/icons-react"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { getModelAction } from "../../../../actions"
-import { Field, formatTimestamp } from "./model-ui"
 import { ModelContext, type RegisteredModelDetail } from "./model-context"
 
-type Tab = "versions" | "runs" | "experiments" | "traces"
+type Tab = "models" | "runs"
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "versions", label: "Versions", icon: IconHistory },
+  { key: "models", label: "Models", icon: IconBoxModel },
   { key: "runs", label: "Runs", icon: IconRun },
-  { key: "experiments", label: "Experiments", icon: IconFlask },
-  { key: "traces", label: "Traces", icon: IconTimeline },
 ]
 
 export default function ModelLayout({
@@ -40,13 +30,7 @@ export default function ModelLayout({
   const [detail, setDetail] = useState<RegisteredModelDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const activeTab: Tab = pathname.endsWith("/runs")
-    ? "runs"
-    : pathname.endsWith("/experiments")
-      ? "experiments"
-      : pathname.endsWith("/traces")
-        ? "traces"
-        : "versions"
+  const activeTab: Tab = pathname.endsWith("/runs") ? "runs" : "models"
 
   useEffect(() => {
     setDetail(null)
@@ -74,7 +58,7 @@ export default function ModelLayout({
   const basePath = `/catalog/${catalog}/${schema}/models/${model}`
 
   function navigate(tab: Tab) {
-    router.push(tab === "versions" ? basePath : `${basePath}/${tab}`)
+    router.push(tab === "models" ? basePath : `${basePath}/${tab}`)
   }
 
   return (
@@ -90,7 +74,9 @@ export default function ModelLayout({
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-1 group/path">
-            <p className="text-xs text-muted-foreground font-mono">{fullPath}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {fullPath}
+            </p>
             <button
               type="button"
               onClick={() => {
@@ -107,19 +93,6 @@ export default function ModelLayout({
               {detail.comment}
             </p>
           )}
-        </div>
-
-        {/* Metadata fields */}
-        <div className="px-5 py-3 border-b shrink-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Field label="Created" value={formatTimestamp(detail.created_at)} />
-          <Field label="Updated" value={formatTimestamp(detail.updated_at)} />
-          <Field
-            label="Storage"
-            value={detail.storage_location}
-            mono
-            copyValue={detail.storage_location}
-          />
-          <Field label="Model ID" value={detail.id} mono />
         </div>
 
         {/* Tab bar */}

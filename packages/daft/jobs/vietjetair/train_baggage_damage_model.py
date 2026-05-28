@@ -161,6 +161,27 @@ def train_classifier(
     return clf, le, y_enc
 
 
+def build_mlflow_model_signature():
+    from mlflow.models.signature import ModelSignature
+    from mlflow.types import ColSpec, Schema
+
+    input_schema = Schema(
+        [
+            ColSpec("binary", "image_bytes"),
+        ]
+    )
+    output_schema = Schema(
+        [
+            ColSpec("string", "label"),
+            ColSpec("double", "score"),
+            ColSpec("string", "rankings_json"),
+            ColSpec("string", "model_uri"),
+            ColSpec("string", "metadata_json"),
+        ]
+    )
+    return ModelSignature(inputs=input_schema, outputs=output_schema)
+
+
 def main() -> None:
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     s3_client = build_s3_client()
@@ -292,6 +313,7 @@ def main() -> None:
                         artifact_path="model",
                         python_model=_Bundle(),
                         artifacts={"bundle": bundle_path, "metadata": metadata_path},
+                        signature=build_mlflow_model_signature(),
                     )
 
                 run_id = mlflow_run.active_run().info.run_id

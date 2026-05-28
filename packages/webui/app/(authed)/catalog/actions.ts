@@ -20,6 +20,7 @@ import {
   getRun,
   listTraces,
   searchExperiments,
+  searchLoggedModels,
   searchRuns,
 } from "@/services/mlflow"
 import type {
@@ -116,11 +117,22 @@ export async function searchMlflowExperimentsAction() {
   }
 }
 
-export async function searchMlflowRunsAction(experimentIds: string[]) {
+export async function searchMlflowRunsAction(
+  experimentIds: string[],
+  options?: { registeredModelUri?: string },
+) {
   try {
-    return await searchRuns(experimentIds)
+    return await searchRuns(experimentIds, options)
   } catch {
     return { runs: [] }
+  }
+}
+
+export async function searchMlflowLoggedModelsAction() {
+  try {
+    return await searchLoggedModels()
+  } catch {
+    return { models: [] }
   }
 }
 

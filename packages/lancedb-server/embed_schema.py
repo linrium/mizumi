@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import os
 import re
+import signal
 import boto3
 import pyarrow as pa
 import lancedb
@@ -25,8 +26,20 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
+EMBED_SCHEMA_TIMEOUT_SECONDS = int(os.getenv("EMBED_SCHEMA_TIMEOUT_SECONDS", "240"))
 TABLE_NAME = "schema_embeddings"
 LOCAL_EMBEDDING_MODEL = "local-hash-v1"
+PLACEHOLDER_OPENAI_API_KEY = "test"
+
+
+class EmbedSchemaTimeout(TimeoutError):
+    pass
+
+
+def handle_timeout(_signum: int, _frame: object) -> None:
+    raise EmbedSchemaTimeout(
+        f"embed-schema exceeded {EMBED_SCHEMA_TIMEOUT_SECONDS}s timeout; skipping."
+    )
 
 # Mirror of STATIC_CATALOGS from packages/webui/services/unity-catalog.ts.
 # Each entry becomes one embedded document (one table = one row in LanceDB).
@@ -479,8 +492,16 @@ def local_embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 async def async_main() -> None:
+    openai_api_key = OPENAI_API_KEY.strip()
+    if openai_api_key.lower() == PLACEHOLDER_OPENAI_API_KEY:
+        print(
+            f"OPENAI_API_KEY is {PLACEHOLDER_OPENAI_API_KEY!r}; skipping schema embeddings.",
+            flush=True,
+        )
+        return
+
     client: OpenAI | None = None
-    using_local_embeddings = not OPENAI_API_KEY.strip()
+    using_local_embeddings = not openai_api_key
     if using_local_embeddings:
         print(
             "OPENAI_API_KEY is not set; using deterministic local fallback embeddings "
@@ -488,7 +509,7 @@ async def async_main() -> None:
             flush=True,
         )
     else:
-        openai_kwargs: dict = {"api_key": OPENAI_API_KEY}
+        openai_kwargs: dict = {"api_key": openai_api_key}
         if OPENAI_BASE_URL:
             openai_kwargs["base_url"] = OPENAI_BASE_URL
         client = OpenAI(**openai_kwargs)
@@ -557,4 +578,14 @@ async def async_main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(async_main())
+    if EMBED_SCHEMA_TIMEOUT_SECONDS > 0:
+        signal.signal(signal.SIGALRM, handle_timeout)
+        signal.alarm(EMBED_SCHEMA_TIMEOUT_SECONDS)
+
+    try:
+        asyncio.run(async_main())
+    except EmbedSchemaTimeout as e:
+        print(str(e), flush=True)
+    finally:
+        if EMBED_SCHEMA_TIMEOUT_SECONDS > 0:
+            signal.alarm(0)
