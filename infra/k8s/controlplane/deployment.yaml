@@ -72,6 +72,8 @@ spec:
                   key: DATABASE_URL
             - name: DAGSTER__BASE_URL
               value: "http://dagster-dagster-webserver.dagster.svc.cluster.local:80"
+            - name: MLFLOW__BASE_URL
+              value: "http://mlflow-svc.mlflow.svc.cluster.local:5000"
             - name: KAFKA__BOOTSTRAP_SERVERS
               value: "redpanda-svc.redpanda.svc.cluster.local:9092"
             - name: UNITY_CATALOG__BASE_URL

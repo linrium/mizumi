@@ -16,7 +16,8 @@ admin_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzUxMiIsImtpZCI6IjA5MWJlZjFhMjc0ODY0M
 #admin_token_file = "../uc/config/token.txt"
 
 [keycloak]
-url = "http://keycloak-svc.keycloak.svc.cluster.local:8080"
+# url = "http://keycloak-svc.keycloak.svc.cluster.local:8080"
+url = "http://localhost:8080"
 realm = "sovico"
 issuers = [
   "http://keycloak-svc.keycloak.svc.cluster.local:8080/realms/sovico",

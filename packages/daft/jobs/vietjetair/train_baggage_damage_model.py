@@ -64,6 +64,7 @@ def maybe_start_mlflow_run(run_ts: str) -> Iterator[Any]:
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    mlflow.tracing.enable()
     run_name = MLFLOW_RUN_NAME or f"baggage-damage-{run_ts}"
     with mlflow.start_run(run_name=run_name):
         yield mlflow
@@ -180,7 +181,17 @@ def main() -> None:
                 }
             )
 
-        rows = load_training_rows()
+        # --- span: load data ---
+        if mlflow_run is not None:
+            with mlflow_run.start_span("load_training_rows") as span:
+                span.set_inputs(
+                    {"gold_table_path": GOLD_TABLE_PATH, "min_confidence": MIN_CONFIDENCE}
+                )
+                rows = load_training_rows()
+                span.set_outputs({"row_count": len(rows)})
+        else:
+            rows = load_training_rows()
+
         if mlflow_run is not None:
             mlflow_run.log_metric("candidate_rows", len(rows))
         if not rows:
@@ -189,15 +200,52 @@ def main() -> None:
                 f"(min_confidence={MIN_CONFIDENCE})"
             )
 
-        processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID, use_fast=False)
-        clip_model = CLIPModel.from_pretrained(CLIP_MODEL_ID, low_cpu_mem_usage=False)
-        clip_model.eval()
+        # --- span: load CLIP model ---
+        if mlflow_run is not None:
+            with mlflow_run.start_span("load_clip_model") as span:
+                span.set_inputs({"clip_model_id": CLIP_MODEL_ID})
+                processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID, use_fast=False)
+                clip_model = CLIPModel.from_pretrained(
+                    CLIP_MODEL_ID, low_cpu_mem_usage=False
+                )
+                clip_model.eval()
+                span.set_outputs({"status": "loaded"})
+        else:
+            processor = CLIPProcessor.from_pretrained(CLIP_MODEL_ID, use_fast=False)
+            clip_model = CLIPModel.from_pretrained(CLIP_MODEL_ID, low_cpu_mem_usage=False)
+            clip_model.eval()
 
-        X, y = extract_embeddings(rows, s3_client, processor, clip_model)
-        clf, le, y_enc = train_classifier(X, y)
+        # --- span: extract embeddings ---
+        if mlflow_run is not None:
+            with mlflow_run.start_span("extract_embeddings") as span:
+                span.set_inputs(
+                    {
+                        "row_count": len(rows),
+                        "batch_size": BATCH_SIZE,
+                        "clip_model_id": CLIP_MODEL_ID,
+                    }
+                )
+                X, y = extract_embeddings(rows, s3_client, processor, clip_model)
+                span.set_outputs(
+                    {"embeddings_shape": list(X.shape), "label_count": len(y)}
+                )
+        else:
+            X, y = extract_embeddings(rows, s3_client, processor, clip_model)
 
-        train_acc = float((clf.predict(X) == y_enc).mean())
-        classes = le.classes_.tolist()
+        # --- span: train classifier ---
+        if mlflow_run is not None:
+            with mlflow_run.start_span("train_classifier") as span:
+                span.set_inputs({"n_samples": len(y), "max_iter": MAX_ITER, "C": 1.0})
+                clf, le, y_enc = train_classifier(X, y)
+                train_acc = float((clf.predict(X) == y_enc).mean())
+                classes = le.classes_.tolist()
+                span.set_outputs(
+                    {"train_accuracy": round(train_acc, 4), "classes": classes}
+                )
+        else:
+            clf, le, y_enc = train_classifier(X, y)
+            train_acc = float((clf.predict(X) == y_enc).mean())
+            classes = le.classes_.tolist()
 
         metadata = {
             "run_ts": run_ts,
@@ -219,32 +267,48 @@ def main() -> None:
                 }
             )
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                bundle_path = os.path.join(tmpdir, "bundle")
-                metadata_path = os.path.join(tmpdir, "metadata")
-                joblib.dump({"classifier": clf, "label_encoder": le}, bundle_path)
-                with open(metadata_path, "w", encoding="utf-8") as fh:
-                    json.dump(metadata, fh, indent=2)
-
-                class _Bundle(mlflow_run.pyfunc.PythonModel):
-                    def predict(self, context, model_input, params=None):
-                        raise NotImplementedError
-
-                mlflow_run.pyfunc.log_model(
-                    artifact_path="model",
-                    python_model=_Bundle(),
-                    artifacts={"bundle": bundle_path, "metadata": metadata_path},
+            # --- span: log and register model ---
+            with mlflow_run.start_span("register_model") as span:
+                span.set_inputs(
+                    {
+                        "model_name": MLFLOW_MODEL_NAME,
+                        "alias": "champion",
+                        "training_samples": len(y),
+                    }
                 )
 
-            run_id = mlflow_run.active_run().info.run_id
-            version = mlflow_run.register_model(
-                model_uri=f"runs:/{run_id}/model",
-                name=MLFLOW_MODEL_NAME,
-            )
-            mlflow_run.MlflowClient().set_registered_model_alias(
-                MLFLOW_MODEL_NAME, "champion", str(version.version)
-            )
-            registered_model_uri = f"models:/{MLFLOW_MODEL_NAME}@champion"
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    bundle_path = os.path.join(tmpdir, "bundle")
+                    metadata_path = os.path.join(tmpdir, "metadata")
+                    joblib.dump({"classifier": clf, "label_encoder": le}, bundle_path)
+                    with open(metadata_path, "w", encoding="utf-8") as fh:
+                        json.dump(metadata, fh, indent=2)
+
+                    class _Bundle(mlflow_run.pyfunc.PythonModel):
+                        def predict(self, context, model_input, params=None):
+                            raise NotImplementedError
+
+                    mlflow_run.pyfunc.log_model(
+                        artifact_path="model",
+                        python_model=_Bundle(),
+                        artifacts={"bundle": bundle_path, "metadata": metadata_path},
+                    )
+
+                run_id = mlflow_run.active_run().info.run_id
+                version = mlflow_run.register_model(
+                    model_uri=f"runs:/{run_id}/model",
+                    name=MLFLOW_MODEL_NAME,
+                )
+                mlflow_run.MlflowClient().set_registered_model_alias(
+                    MLFLOW_MODEL_NAME, "champion", str(version.version)
+                )
+                registered_model_uri = f"models:/{MLFLOW_MODEL_NAME}@champion"
+                span.set_outputs(
+                    {
+                        "registered_model_uri": registered_model_uri,
+                        "model_version": str(version.version),
+                    }
+                )
 
             mlflow_run.log_dict(metadata, "metadata.json")
             mlflow_run.set_tags(

@@ -150,7 +150,7 @@ q "Build ${BAGGAGE_DAMAGE_TRAINER_IMAGE}" \
 kubectl port-forward --address 0.0.0.0 -n "${RUSTFS_NS}" svc/rustfs-svc 9000:9000 \
   >/tmp/rustfs-train-local.port-forward.log 2>&1 &
 _RUSTFS_PF_PID=$!
-kubectl port-forward --address 0.0.0.0 -n "${ML_NS}" svc/mlflow-svc 5000:5000 \
+kubectl port-forward --address 0.0.0.0 -n "${ML_NS}" svc/mlflow-svc 5001:5000 \
   >/tmp/mlflow-train-local.port-forward.log 2>&1 &
 _MLFLOW_PF_PID=$!
 _cleanup_pf() {
@@ -172,7 +172,7 @@ v "Train baggage damage model" \
     -e RUSTFS_ENDPOINT_URL="${RUSTFS_ENDPOINT}" \
     -e AWS_ACCESS_KEY_ID="${RUSTFS_ACCESS_KEY}" \
     -e AWS_SECRET_ACCESS_KEY="${RUSTFS_SECRET_KEY}" \
-    -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 \
+    -e MLFLOW_TRACKING_URI=http://host.docker.internal:5001 \
     -e MLFLOW_EXPERIMENT_NAME=vietjetair-baggage-damage \
     -e MLFLOW_S3_ENDPOINT_URL="${RUSTFS_ENDPOINT}" \
     -e AWS_DEFAULT_REGION=us-east-1 \

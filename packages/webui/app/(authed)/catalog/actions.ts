@@ -15,6 +15,13 @@ import {
   getVolumes,
   patchPermissions,
 } from "@/services/catalog"
+import type { MlflowRun } from "@/services/mlflow"
+import {
+  getRun,
+  listTraces,
+  searchExperiments,
+  searchRuns,
+} from "@/services/mlflow"
 import type {
   PermissionApprovalStep,
   RequestScope,
@@ -99,6 +106,41 @@ export async function getModelVersionsAction(
   model: string,
 ) {
   return getModelVersions(catalog, schema, model)
+}
+
+export async function searchMlflowExperimentsAction() {
+  try {
+    return await searchExperiments()
+  } catch {
+    return { experiments: [] }
+  }
+}
+
+export async function searchMlflowRunsAction(experimentIds: string[]) {
+  try {
+    return await searchRuns(experimentIds)
+  } catch {
+    return { runs: [] }
+  }
+}
+
+export async function getMlflowRunsForVersionsAction(runIds: string[]) {
+  const unique = [...new Set(runIds.filter(Boolean))]
+  const results = await Promise.allSettled(unique.map((id) => getRun(id)))
+  return results
+    .filter(
+      (r): r is PromiseFulfilledResult<{ run: MlflowRun }> =>
+        r.status === "fulfilled",
+    )
+    .map((r) => r.value.run)
+}
+
+export async function listMlflowTracesAction(experimentId: string) {
+  try {
+    return await listTraces(experimentId)
+  } catch {
+    return { traces: [] }
+  }
 }
 
 export async function getTableAction(

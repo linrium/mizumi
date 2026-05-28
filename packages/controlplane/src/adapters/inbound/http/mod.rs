@@ -2,6 +2,7 @@ pub mod chat_threads;
 pub mod dagster;
 pub mod k8s;
 pub mod lineage;
+pub mod mlflow;
 pub mod permissions;
 pub mod streaming;
 pub mod teams;
@@ -223,6 +224,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(dagster::get_schedule_tick_history),
         )
         .route("/uc/{*path}", any(uc::proxy))
+        .route("/mlflow/{*path}", any(mlflow::proxy))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .with_state(state.clone());
 

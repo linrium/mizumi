@@ -26,6 +26,12 @@ pub struct DagsterConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct MlflowConfig {
+    #[serde(default = "default_mlflow_base_url")]
+    pub base_url: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct KeycloakConfig {
     pub url: String,
     pub realm: String,
@@ -72,6 +78,8 @@ pub struct Config {
     pub dagster: DagsterConfig,
     pub kafka: KafkaConfig,
     pub unity_catalog: UnityCatalogConfig,
+    #[serde(default)]
+    pub mlflow: MlflowConfig,
     pub keycloak: KeycloakConfig,
     #[serde(default)]
     pub duckdb_server: DuckdbServerConfig,
@@ -93,10 +101,22 @@ fn default_dagster_base_url() -> String {
     "http://localhost:8080".to_string()
 }
 
+fn default_mlflow_base_url() -> String {
+    "http://localhost:5000".to_string()
+}
+
 impl Default for DagsterConfig {
     fn default() -> Self {
         Self {
             base_url: default_dagster_base_url(),
+        }
+    }
+}
+
+impl Default for MlflowConfig {
+    fn default() -> Self {
+        Self {
+            base_url: default_mlflow_base_url(),
         }
     }
 }
