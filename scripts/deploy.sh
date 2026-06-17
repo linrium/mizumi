@@ -223,7 +223,7 @@ baggage_upload() {
 #═══════════════════════════════════════════════════════════════════════════════
 
 _missing=0
-for _tool in brew docker helm kubectl; do
+for _tool in brew docker kubectl; do
   if ! command -v "$_tool" &>/dev/null; then
     err "$_tool is not installed or not in PATH"
     _missing=1
@@ -232,6 +232,11 @@ done
 if [[ $_missing -eq 1 ]]; then
   printf "\n  Install missing tools and re-run.\n" >&2
   exit 1
+fi
+
+if ! command -v helm &>/dev/null; then
+  info "helm not found — installing via get-helm-4 script..."
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
 fi
 ok "brew / docker / helm / kubectl found"
 
