@@ -451,6 +451,10 @@ q "Build ${DAFT_IMAGE}"                    docker build -t "${DAFT_IMAGE}" -f pa
 q "Build ${DAFT_BAGGAGE_CLASSIFIER_IMAGE}" docker build -t "${DAFT_BAGGAGE_CLASSIFIER_IMAGE}" -f packages/daft/Dockerfile.baggage-classifier .
 q "Build ${DUCKDB_IMAGE}"                  docker build -t "${DUCKDB_IMAGE}" -f packages/duckdb/Dockerfile .
 q "Build ${DUCKDB_SERVER_IMAGE}"           docker build -t "${DUCKDB_SERVER_IMAGE}" packages/duckdb-server
+q "Build ${CONTROLPLANE_IMAGE}"            docker build -f packages/controlplane/Dockerfile -t "${CONTROLPLANE_IMAGE}" .
+q "Build ${WEBUI_IMAGE}"                   docker build -t "${WEBUI_IMAGE}" packages/webui
+q "Build ${LANCEDB_IMAGE}"                 docker build -t "${LANCEDB_IMAGE}" packages/lancedb-server
+q "Build ${SYNTHETIC_IMAGE}"               docker build -t "${SYNTHETIC_IMAGE}" packages/synthetic
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -483,8 +487,6 @@ step_done
 #───────────────────────────────────────────────────────────────────────────────
 step "Build & deploy Controlplane"
 #───────────────────────────────────────────────────────────────────────────────
-q "Build ${CONTROLPLANE_IMAGE}" \
-  docker build -f packages/controlplane/Dockerfile -t "${CONTROLPLANE_IMAGE}" .
 q "Create namespace" kubectl create namespace "${CONTROLPLANE_NS}" 2>/dev/null || true
 q "Create controlplane-secret" apply_openai_secret "${CONTROLPLANE_NS}" controlplane-secret
 q "Apply Postgres alias" kubectl apply -f "${CONTROLPLANE_MANIFESTS}/postgres.yaml"
@@ -503,7 +505,6 @@ step_done
 #───────────────────────────────────────────────────────────────────────────────
 step "Build & deploy WebUI"
 #───────────────────────────────────────────────────────────────────────────────
-q "Build ${WEBUI_IMAGE}" docker build -t "${WEBUI_IMAGE}" packages/webui
 q "Create namespace" kubectl create namespace "${WEBUI_NS}" 2>/dev/null || true
 q "Create webui-secret" apply_openai_secret "${WEBUI_NS}" webui-secret
 q "Apply WebUI deployment" kubectl apply -f "${WEBUI_MANIFESTS}/deployment.yaml"
@@ -514,7 +515,6 @@ step_done
 #───────────────────────────────────────────────────────────────────────────────
 step "Build & deploy LanceDB + embed schema"
 #───────────────────────────────────────────────────────────────────────────────
-q "Build ${LANCEDB_IMAGE}" docker build -t "${LANCEDB_IMAGE}" packages/lancedb-server
 q "Create namespace" kubectl create namespace "${LANCEDB_NS}" 2>/dev/null || true
 q "Create lancedb-secret" apply_openai_secret "${LANCEDB_NS}" lancedb-secret
 q "Apply LanceDB server manifests" kubectl apply -f "${LANCEDB_MANIFESTS}/server.yaml"
@@ -532,7 +532,6 @@ step_done
 #───────────────────────────────────────────────────────────────────────────────
 step "Bootstrap & deploy Synthetic server"
 #───────────────────────────────────────────────────────────────────────────────
-q "Build ${SYNTHETIC_IMAGE}" docker build -t "${SYNTHETIC_IMAGE}" packages/synthetic
 q "Create namespace" kubectl create namespace "${SYNTHETIC_NS}" 2>/dev/null || true
 q "Delete stale bootstrap job + configmap" bash -c "
   kubectl delete job synthetic-bootstrap -n ${SYNTHETIC_NS} --ignore-not-found
