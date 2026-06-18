@@ -221,13 +221,13 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
         className="!w-2 !h-2 !bg-zinc-300 !border-0"
       />
 
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-200/80">
-        <span className="text-zinc-500">{nodeIcon(data.nodeType)}</span>
+      <div className="flex items-start gap-2 px-3 py-2 border-b border-zinc-200/80">
+        <span className="text-zinc-500 mt-0.5 shrink-0">{nodeIcon(data.nodeType)}</span>
         <div className="min-w-0 flex-1">
-          <div className="font-mono font-semibold truncate">
+          <div className="font-mono font-semibold break-words whitespace-normal leading-snug">
             {data.displayName}
           </div>
-          <div className="text-[10px] text-zinc-500 uppercase tracking-wide truncate">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">
             {data.nodeType.replaceAll("_", " ")}
           </div>
         </div>
@@ -238,9 +238,9 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
           <span className="text-zinc-500">Platform</span>
           <span className="text-zinc-700 capitalize">{data.platform}</span>
         </div>
-        <div className="flex justify-between items-center px-3 py-1.5 gap-2">
-          <span className="text-zinc-500">Scope</span>
-          <span className="text-zinc-700 truncate">
+        <div className="flex justify-between items-start px-3 py-1.5 gap-2">
+          <span className="text-zinc-500 shrink-0">Scope</span>
+          <span className="text-zinc-700 break-words text-right">
             {typeLabel({
               id: data.id,
               node_type: data.nodeType,
@@ -370,35 +370,16 @@ const nodeTypes: NodeTypes = {
 }
 
 const CARD_W = 290
-const BASE_CARD_H = 190
-const EXPANDABLE_CARD_H = 228
+const BASE_CARD_H = 210
+const EXPANDABLE_CARD_H = 250
 const GROUP_HEADER_H = 44
 const GROUP_PAD_X = 20
 const GROUP_PAD_Y = 18
 const GROUP_MIN_W = 260
 const GROUP_MIN_H = 120
-const CATALOG_EXTRA_H = GROUP_HEADER_H + GROUP_PAD_Y * 2 + 44
-const SCHEMA_EXTRA_H = GROUP_HEADER_H + GROUP_PAD_Y * 2
-const CATALOG_PER_SCHEMA_BUFFER = 14
-const TOP_LEVEL_GROUP_GAP = 28
 
 function cardHeight(node: ApiLineageNode) {
   return node.properties.__canExpand ? EXPANDABLE_CARD_H : BASE_CARD_H
-}
-
-function countLeafDescendants(
-  nodeId: string,
-  schemaChildren: Map<string, string[]>,
-  catalogChildren: Map<string, string[]>,
-) {
-  const directTables = schemaChildren.get(nodeId)
-  if (directTables) return directTables.length
-
-  const childSchemas = catalogChildren.get(nodeId) ?? []
-  return childSchemas.reduce(
-    (total, schemaId) => total + (schemaChildren.get(schemaId)?.length ?? 0),
-    0,
-  )
 }
 
 function isGroupNodeType(nodeType: string) {
@@ -417,55 +398,6 @@ function boundsFromRects(
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
-  }
-}
-
-function rectsOverlap(
-  a: { x: number; y: number; width: number; height: number },
-  b: { x: number; y: number; width: number; height: number },
-) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  )
-}
-
-function resolveTopLevelGroupOverlaps(nodes: LineageFlowNode[]) {
-  const topLevelGroups = nodes
-    .filter(
-      (node) =>
-        node.type === "lineageGroup" &&
-        !(node as { parentId?: string }).parentId,
-    )
-    .sort((a, b) => {
-      if (a.position.x !== b.position.x) return a.position.x - b.position.x
-      return a.position.y - b.position.y
-    })
-
-  const placed: Array<{ x: number; y: number; width: number; height: number }> =
-    []
-  for (const node of topLevelGroups) {
-    const width = Number(node.style?.width ?? GROUP_MIN_W)
-    const height = Number(node.style?.height ?? GROUP_MIN_H)
-    let rect = {
-      x: node.position.x,
-      y: node.position.y,
-      width,
-      height,
-    }
-
-    for (const existing of placed) {
-      if (!rectsOverlap(rect, existing)) continue
-      rect = {
-        ...rect,
-        y: existing.y + existing.height + TOP_LEVEL_GROUP_GAP,
-      }
-    }
-
-    node.position = { x: rect.x, y: rect.y }
-    placed.push(rect)
   }
 }
 
@@ -513,117 +445,278 @@ function buildLayout(
     }
   }
 
-  const g = new dagre.graphlib.Graph()
-  g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 })
-
   const schemaForLeaf = new Map<string, string>()
-  const catalogForLeaf = new Map<string, string>()
   for (const [schemaId, childIds] of schemaChildren) {
     for (const childId of childIds) {
       schemaForLeaf.set(childId, schemaId)
     }
   }
+  const catalogForSchema = new Map<string, string>()
   for (const [catalogId, childSchemaIds] of catalogChildren) {
     for (const schemaId of childSchemaIds) {
-      for (const childId of schemaChildren.get(schemaId) ?? []) {
-        catalogForLeaf.set(childId, catalogId)
-      }
+      catalogForSchema.set(schemaId, catalogId)
     }
   }
 
-  const schemaLeafCounts = new Map<string, number>()
-  for (const schemaId of schemaChildren.keys()) {
-    schemaLeafCounts.set(
-      schemaId,
-      Math.max(
-        countLeafDescendants(schemaId, schemaChildren, catalogChildren),
-        1,
-      ),
-    )
-  }
-  const catalogLeafCounts = new Map<string, number>()
-  const catalogSchemaCounts = new Map<string, number>()
-  for (const catalogId of catalogChildren.keys()) {
-    const schemaCount = catalogChildren.get(catalogId)?.length ?? 0
-    catalogSchemaCounts.set(catalogId, Math.max(schemaCount, 1))
-    catalogLeafCounts.set(
-      catalogId,
-      Math.max(
-        countLeafDescendants(catalogId, schemaChildren, catalogChildren),
-        1,
-      ),
-    )
-  }
+  // Compound dagre layout: schemas and catalogs are cluster nodes containing
+  // their children. Dagre keeps cluster children together and places unrelated
+  // nodes outside the cluster bounds, eliminating the visual-wrapping problem
+  // where standalone leaves landed inside a schema's bounding box.
+  const g = new dagre.graphlib.Graph({ compound: true })
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 })
 
+  // Dagre's compound layout sizes each cluster from a tight bound around its
+  // children plus a small auto-margin (~25px). Our visual schema/catalog rects
+  // are taller because of the custom header + extra padding. To make dagre
+  // reserve enough room around each cluster — so neighboring non-child nodes
+  // (placed at the rank directly above/below) don't visually clip into our
+  // headers — we inflate each cluster-child leaf's dagre height by the parent
+  // chain's header+padding overhead. The leaf's *rendered* size stays the
+  // original `cardHeight(node)`; only its position is shifted within the
+  // inflated dagre slot so the extra room sits where the header will live.
+  const LEAF_EXTRA_TOP_PER_LEVEL = GROUP_HEADER_H + GROUP_PAD_Y
+  const LEAF_EXTRA_BOTTOM_PER_LEVEL = GROUP_PAD_Y
+  const leafExtraTop = new Map<string, number>()
+  const leafExtraBottom = new Map<string, number>()
   for (const node of leafNodes) {
     const schemaId = schemaForLeaf.get(node.id)
-    const catalogId = catalogForLeaf.get(node.id)
-    const layoutHeight =
-      cardHeight(node) +
-      (schemaId ? SCHEMA_EXTRA_H / (schemaLeafCounts.get(schemaId) ?? 1) : 0) +
-      (catalogId
-        ? (CATALOG_EXTRA_H +
-            CATALOG_PER_SCHEMA_BUFFER *
-              (catalogSchemaCounts.get(catalogId) ?? 1)) /
-          (catalogLeafCounts.get(catalogId) ?? 1)
-        : 0)
-    g.setNode(node.id, { width: CARD_W, height: layoutHeight })
-  }
-  for (const node of groupedNodes) {
-    const needsFallback =
-      node.node_type === "schema"
-        ? (schemaChildren.get(node.id)?.length ?? 0) === 0
-        : (catalogChildren.get(node.id)?.length ?? 0) === 0
-    if (!needsFallback) continue
+    let extraTop = 0
+    let extraBottom = 0
+    if (schemaId) {
+      extraTop += LEAF_EXTRA_TOP_PER_LEVEL
+      extraBottom += LEAF_EXTRA_BOTTOM_PER_LEVEL
+      if (catalogForSchema.has(schemaId)) {
+        extraTop += LEAF_EXTRA_TOP_PER_LEVEL
+        extraBottom += LEAF_EXTRA_BOTTOM_PER_LEVEL
+      }
+    }
+    leafExtraTop.set(node.id, extraTop)
+    leafExtraBottom.set(node.id, extraBottom)
     g.setNode(node.id, {
-      width: GROUP_MIN_W,
-      height: GROUP_MIN_H,
+      width: CARD_W,
+      height: cardHeight(node) + extraTop + extraBottom,
     })
+    if (schemaId) g.setParent(node.id, schemaId)
   }
-  for (const edge of graph.edges.filter(
-    (edge) => edge.edge_type !== "contains",
+
+  for (const schemaNode of groupedNodes.filter(
+    (node) => node.node_type === "schema",
   )) {
+    const hasChildren = (schemaChildren.get(schemaNode.id) ?? []).length > 0
+    if (hasChildren) {
+      // Compound parent — size derived from children.
+      g.setNode(schemaNode.id, {})
+    } else {
+      // Fallback standalone group with explicit size.
+      g.setNode(schemaNode.id, { width: GROUP_MIN_W, height: GROUP_MIN_H })
+    }
+    const catalogId = catalogForSchema.get(schemaNode.id)
+    if (catalogId) g.setParent(schemaNode.id, catalogId)
+  }
+
+  for (const catalogNode of groupedNodes.filter(
+    (node) => node.node_type === "catalog",
+  )) {
+    const hasChildSchemas =
+      (catalogChildren.get(catalogNode.id) ?? []).length > 0
+    if (hasChildSchemas) {
+      g.setNode(catalogNode.id, {})
+    } else {
+      g.setNode(catalogNode.id, {
+        width: GROUP_MIN_W + 40,
+        height: GROUP_MIN_H,
+      })
+    }
+  }
+
+  for (const edge of graph.edges) {
+    if (edge.edge_type === "contains") continue
     if (!nodesById.has(edge.source) || !nodesById.has(edge.target)) continue
     if (isGroupNodeType(nodesById.get(edge.source)?.node_type ?? "")) continue
     if (isGroupNodeType(nodesById.get(edge.target)?.node_type ?? "")) continue
     g.setEdge(edge.source, edge.target)
   }
-  for (const edge of containsEdges) {
-    const sourceNode = nodesById.get(edge.source)
-    const targetNode = nodesById.get(edge.target)
-    if (!sourceNode || !targetNode) continue
-    if (
-      sourceNode.node_type !== "catalog" ||
-      targetNode.node_type !== "schema"
-    ) {
-      continue
-    }
-    const sourceNeedsFallback =
-      (catalogChildren.get(edge.source)?.length ?? 0) === 0
-    const targetNeedsFallback =
-      (schemaChildren.get(edge.target)?.length ?? 0) === 0
-    if (!sourceNeedsFallback && !targetNeedsFallback) continue
-    g.setEdge(edge.source, edge.target)
-  }
 
   dagre.layout(g)
 
-  const absoluteLeafNodes = new Map<
+  // Absolute leaf rects from dagre positions. The rendered leaf is shifted
+  // within its (possibly inflated) dagre slot so the reserved header room
+  // ends up above it. shift = (extraTop - extraBottom) / 2 from dagre center.
+  const leafAbsRects = new Map<
     string,
-    Node<LineageNodeData, "lineageCard">
+    { x: number; y: number; width: number; height: number }
   >()
   for (const node of leafNodes) {
     const pos = g.node(node.id)
     const height = cardHeight(node)
-    absoluteLeafNodes.set(node.id, {
+    const extraTop = leafExtraTop.get(node.id) ?? 0
+    const extraBottom = leafExtraBottom.get(node.id) ?? 0
+    const centerY = (pos?.y ?? 0) + (extraTop - extraBottom) / 2
+    leafAbsRects.set(node.id, {
+      x: (pos?.x ?? 0) - CARD_W / 2,
+      y: centerY - height / 2,
+      width: CARD_W,
+      height,
+    })
+  }
+
+  // Schema rects: tight bounds around children + custom header/padding so the
+  // visual cluster matches our rendered header. Fallback to dagre's own size
+  // if the schema has no children.
+  const schemaRects = new Map<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >()
+  for (const schemaNode of groupedNodes.filter(
+    (node) => node.node_type === "schema",
+  )) {
+    const childIds = schemaChildren.get(schemaNode.id) ?? []
+    const childRects = childIds
+      .map((id) => leafAbsRects.get(id))
+      .filter(
+        (
+          rect,
+        ): rect is { x: number; y: number; width: number; height: number } =>
+          !!rect,
+      )
+
+    if (childRects.length === 0) {
+      const pos = g.node(schemaNode.id)
+      const width = pos?.width ?? GROUP_MIN_W
+      const height = pos?.height ?? GROUP_MIN_H
+      schemaRects.set(schemaNode.id, {
+        x: (pos?.x ?? 0) - width / 2,
+        y: (pos?.y ?? 0) - height / 2,
+        width,
+        height,
+      })
+      continue
+    }
+
+    const bounds = boundsFromRects(childRects)
+    schemaRects.set(schemaNode.id, {
+      x: bounds.x - GROUP_PAD_X,
+      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
+      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W),
+      height: Math.max(
+        bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
+        GROUP_MIN_H,
+      ),
+    })
+  }
+
+  // Catalog rects: tight bounds around contained schemas + header/padding.
+  const catalogRects = new Map<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >()
+  for (const catalogNode of groupedNodes.filter(
+    (node) => node.node_type === "catalog",
+  )) {
+    const childSchemaIds = catalogChildren.get(catalogNode.id) ?? []
+    const childRects = childSchemaIds
+      .map((id) => schemaRects.get(id))
+      .filter(
+        (
+          rect,
+        ): rect is { x: number; y: number; width: number; height: number } =>
+          !!rect,
+      )
+
+    if (childRects.length === 0) {
+      const pos = g.node(catalogNode.id)
+      const width = pos?.width ?? GROUP_MIN_W + 40
+      const height = pos?.height ?? GROUP_MIN_H
+      catalogRects.set(catalogNode.id, {
+        x: (pos?.x ?? 0) - width / 2,
+        y: (pos?.y ?? 0) - height / 2,
+        width,
+        height,
+      })
+      continue
+    }
+
+    const bounds = boundsFromRects(childRects)
+    catalogRects.set(catalogNode.id, {
+      x: bounds.x - GROUP_PAD_X,
+      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
+      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W + 40),
+      height: Math.max(
+        bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
+        GROUP_MIN_H + 20,
+      ),
+    })
+  }
+
+  // Assemble React Flow nodes. Catalogs first (lowest z-index), then schemas
+  // (positioned relative to their catalog if any), then leaves (positioned
+  // relative to their schema if any).
+  const rfNodes: LineageFlowNode[] = []
+
+  for (const catalogNode of groupedNodes.filter(
+    (node) => node.node_type === "catalog",
+  )) {
+    const rect = catalogRects.get(catalogNode.id)
+    if (!rect) continue
+    rfNodes.push({
+      id: catalogNode.id,
+      type: "lineageGroup",
+      position: { x: rect.x, y: rect.y },
+      style: { width: rect.width, height: rect.height, zIndex: -2 },
+      data: {
+        id: catalogNode.id,
+        displayName: catalogNode.display_name,
+        nodeType: "catalog",
+        isCurrent: catalogNode.id === currentId,
+      },
+      draggable: false,
+      selectable: true,
+    })
+  }
+
+  for (const schemaNode of groupedNodes.filter(
+    (node) => node.node_type === "schema",
+  )) {
+    const rect = schemaRects.get(schemaNode.id)
+    if (!rect) continue
+    const catalogId = catalogForSchema.get(schemaNode.id)
+    const catalogRect = catalogId ? catalogRects.get(catalogId) : undefined
+    const schemaFlow: Node<LineageGroupData, "lineageGroup"> = {
+      id: schemaNode.id,
+      type: "lineageGroup",
+      position: catalogRect
+        ? { x: rect.x - catalogRect.x, y: rect.y - catalogRect.y }
+        : { x: rect.x, y: rect.y },
+      style: { width: rect.width, height: rect.height, zIndex: -1 },
+      data: {
+        id: schemaNode.id,
+        displayName: schemaNode.display_name,
+        nodeType: "schema",
+        isCurrent: schemaNode.id === currentId,
+      },
+      draggable: false,
+      selectable: true,
+    }
+    if (catalogRect) {
+      schemaFlow.parentId = catalogId
+      schemaFlow.extent = "parent"
+    }
+    rfNodes.push(schemaFlow)
+  }
+
+  for (const node of leafNodes) {
+    const absRect = leafAbsRects.get(node.id)
+    if (!absRect) continue
+    const schemaId = schemaForLeaf.get(node.id)
+    const schemaRect = schemaId ? schemaRects.get(schemaId) : undefined
+    const leafFlow: Node<LineageNodeData, "lineageCard"> = {
       id: node.id,
       type: "lineageCard",
-      position: {
-        x: (pos?.x ?? 0) - CARD_W / 2,
-        y: (pos?.y ?? 0) - height / 2,
-      },
-      style: { width: CARD_W, height },
+      position: schemaRect
+        ? { x: absRect.x - schemaRect.x, y: absRect.y - schemaRect.y }
+        : { x: absRect.x, y: absRect.y },
+      style: { width: CARD_W, height: absRect.height },
       data: {
         id: node.id,
         displayName: node.display_name,
@@ -638,211 +731,12 @@ function buildLayout(
         onExpand: null,
       } satisfies LineageNodeData,
       draggable: false,
-    })
-  }
-
-  const groupNodes = new Map<string, Node<LineageGroupData, "lineageGroup">>()
-  const schemaRects = new Map<
-    string,
-    { x: number; y: number; width: number; height: number }
-  >()
-
-  for (const schemaNode of groupedNodes.filter(
-    (node) => node.node_type === "schema",
-  )) {
-    const childRects = (schemaChildren.get(schemaNode.id) ?? [])
-      .map((childId) => absoluteLeafNodes.get(childId))
-      .filter((node): node is Node<LineageNodeData, "lineageCard"> => !!node)
-      .map((node) => ({
-        x: node.position.x,
-        y: node.position.y,
-        width: CARD_W,
-        height: Number(node.style?.height ?? BASE_CARD_H),
-      }))
-
-    const rect =
-      childRects.length === 0
-        ? {
-            x: (g.node(schemaNode.id)?.x ?? 0) - GROUP_MIN_W / 2,
-            y: (g.node(schemaNode.id)?.y ?? 0) - GROUP_MIN_H / 2,
-            width: GROUP_MIN_W,
-            height: GROUP_MIN_H,
-          }
-        : (() => {
-            const bounds = boundsFromRects(childRects)
-            return {
-              x: bounds.x - GROUP_PAD_X,
-              y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
-              width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W),
-              height: Math.max(
-                bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
-                GROUP_MIN_H,
-              ),
-            }
-          })()
-    schemaRects.set(schemaNode.id, rect)
-    groupNodes.set(schemaNode.id, {
-      id: schemaNode.id,
-      type: "lineageGroup",
-      position: { x: rect.x, y: rect.y },
-      style: { width: rect.width, height: rect.height, zIndex: -1 },
-      data: {
-        id: schemaNode.id,
-        displayName: schemaNode.display_name,
-        nodeType: "schema",
-        isCurrent: schemaNode.id === currentId,
-      },
-      draggable: false,
-      selectable: true,
-    })
-  }
-
-  for (const [schemaId, rect] of schemaRects) {
-    for (const childId of schemaChildren.get(schemaId) ?? []) {
-      const childNode = absoluteLeafNodes.get(childId)
-      if (!childNode) continue
-      childNode.parentId = schemaId
-      childNode.extent = "parent"
-      childNode.position = {
-        x: childNode.position.x - rect.x,
-        y: childNode.position.y - rect.y,
-      }
     }
-  }
-
-  for (const catalogNode of groupedNodes.filter(
-    (node) => node.node_type === "catalog",
-  )) {
-    const childRects = (catalogChildren.get(catalogNode.id) ?? [])
-      .map((schemaId) => schemaRects.get(schemaId))
-      .filter(
-        (
-          rect,
-        ): rect is { x: number; y: number; width: number; height: number } =>
-          !!rect,
-      )
-
-    const rect =
-      childRects.length === 0
-        ? {
-            x: (g.node(catalogNode.id)?.x ?? 0) - (GROUP_MIN_W + 40) / 2,
-            y:
-              (g.node(catalogNode.id)?.y ?? 0) -
-              (GROUP_MIN_H +
-                CATALOG_EXTRA_H +
-                CATALOG_PER_SCHEMA_BUFFER *
-                  (catalogSchemaCounts.get(catalogNode.id) ?? 1)) /
-                2,
-            width: GROUP_MIN_W + 40,
-            height:
-              GROUP_MIN_H +
-              CATALOG_EXTRA_H +
-              CATALOG_PER_SCHEMA_BUFFER *
-                (catalogSchemaCounts.get(catalogNode.id) ?? 1),
-          }
-        : (() => {
-            const bounds = boundsFromRects(childRects)
-            return {
-              x: bounds.x - GROUP_PAD_X,
-              y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
-              width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W + 40),
-              height: Math.max(
-                bounds.height +
-                  CATALOG_EXTRA_H +
-                  CATALOG_PER_SCHEMA_BUFFER *
-                    (catalogSchemaCounts.get(catalogNode.id) ?? 1),
-                GROUP_MIN_H + 20,
-              ),
-            }
-          })()
-
-    groupNodes.set(catalogNode.id, {
-      id: catalogNode.id,
-      type: "lineageGroup",
-      position: { x: rect.x, y: rect.y },
-      style: { width: rect.width, height: rect.height, zIndex: -2 },
-      data: {
-        id: catalogNode.id,
-        displayName: catalogNode.display_name,
-        nodeType: "catalog",
-        isCurrent: catalogNode.id === currentId,
-      },
-      draggable: false,
-      selectable: true,
-    })
-
-    for (const schemaId of catalogChildren.get(catalogNode.id) ?? []) {
-      const schemaNode = groupNodes.get(schemaId)
-      const schemaRect = schemaRects.get(schemaId)
-      if (!schemaNode || !schemaRect) continue
-      schemaNode.parentId = catalogNode.id
-      schemaNode.extent = "parent"
-      schemaNode.position = {
-        x: schemaRect.x - rect.x,
-        y: schemaRect.y - rect.y,
-      }
+    if (schemaRect) {
+      leafFlow.parentId = schemaId
+      leafFlow.extent = "parent"
     }
-  }
-
-  const catalogGroupNodes = groupedNodes
-    .filter((node) => node.node_type === "catalog")
-    .map((node) => groupNodes.get(node.id))
-    .filter((node): node is Node<LineageGroupData, "lineageGroup"> => !!node)
-  const schemaGroupNodes = groupedNodes
-    .filter((node) => node.node_type === "schema")
-    .map((node) => groupNodes.get(node.id))
-    .filter((node): node is Node<LineageGroupData, "lineageGroup"> => !!node)
-  const rfNodes: LineageFlowNode[] = [
-    ...catalogGroupNodes,
-    ...schemaGroupNodes,
-    ...absoluteLeafNodes.values(),
-  ]
-  // Track y positions before overlap resolution so we can propagate
-  // group deltas to standalone leaf nodes that connect into the moved groups.
-  const preOverlapY = new Map(rfNodes.map((n) => [n.id, n.position.y]))
-  resolveTopLevelGroupOverlaps(rfNodes)
-
-  // Compute how much each top-level group moved
-  const topGroupDelta = new Map<string, number>()
-  for (const n of rfNodes) {
-    if (n.type !== "lineageGroup" || (n as { parentId?: string }).parentId)
-      continue
-    const delta = n.position.y - (preOverlapY.get(n.id) ?? n.position.y)
-    if (Math.abs(delta) > 0.5) topGroupDelta.set(n.id, delta)
-  }
-
-  if (topGroupDelta.size > 0) {
-    const rfNodeById = new Map(rfNodes.map((n) => [n.id, n]))
-    const topGroupOf = (id: string): string | null => {
-      let cur = rfNodeById.get(id)
-      let top: string | null = null
-      while ((cur as { parentId?: string } | undefined)?.parentId) {
-        top = (cur as { parentId?: string }).parentId!
-        cur = rfNodeById.get(top)
-      }
-      return top
-    }
-    for (const n of rfNodes) {
-      if (n.type !== "lineageCard" || (n as { parentId?: string }).parentId)
-        continue
-      const deltas: number[] = []
-      for (const edge of graph.edges) {
-        if (edge.edge_type === "contains") continue
-        const otherId =
-          edge.source === n.id
-            ? edge.target
-            : edge.target === n.id
-              ? edge.source
-              : null
-        if (!otherId) continue
-        const gid = topGroupOf(otherId)
-        if (gid) deltas.push(topGroupDelta.get(gid) ?? 0)
-      }
-      if (deltas.length === 0) continue
-      const avg = deltas.reduce((s, d) => s + d, 0) / deltas.length
-      if (Math.abs(avg) > 0.5)
-        n.position = { ...n.position, y: n.position.y + avg }
-    }
+    rfNodes.push(leafFlow)
   }
 
   const rfEdges: Edge[] = graph.edges.map((edge) => ({
@@ -959,7 +853,7 @@ export function LineageGraph({
     const includeContains = filters?.includeContains ?? true
     const runtimeOnly = filters?.runtimeOnly ?? false
 
-    const visibleNodes = graph.nodes.filter((node) => {
+    const matchesFilters = (node: ApiLineageNode) => {
       const matchesQuery =
         query.length === 0 ||
         node.display_name.toLowerCase().includes(query) ||
@@ -980,9 +874,11 @@ export function LineageGraph({
         )
 
       return matchesQuery && matchesType && matchesRuntime
-    })
+    }
 
-    const visibleIds = new Set(visibleNodes.map((node) => node.id))
+    const matchedNodes = graph.nodes.filter(matchesFilters)
+    const visibleIds = new Set(matchedNodes.map((n) => n.id))
+
     const containmentEdges = graph.edges.filter(
       (edge) =>
         edge.edge_type === "contains" &&
@@ -994,44 +890,51 @@ export function LineageGraph({
       return visibleIds.has(edge.source) && visibleIds.has(edge.target)
     })
 
-    const visibleContainmentTargets = new Set<string>(visibleIds)
-    const keptContainmentAncestors = new Set<string>()
-    let changed = true
-    while (changed) {
-      changed = false
-      for (const edge of graph.edges) {
-        if (edge.edge_type !== "contains") continue
-        if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target))
-          continue
-        if (
-          visibleContainmentTargets.has(edge.target) ||
-          keptContainmentAncestors.has(edge.target)
-        ) {
-          if (!keptContainmentAncestors.has(edge.source)) {
-            keptContainmentAncestors.add(edge.source)
-            changed = true
+    // When a node-type filter is active every matched node is shown regardless
+    // of whether it has edges to other visible nodes — the user explicitly asked
+    // to see all nodes of that type.  For text/runtime-only filters we keep the
+    // previous behaviour of pruning isolated nodes to reduce clutter, but we
+    // always keep the root node.
+    let finalNodes: ApiLineageNode[]
+    if (enforceNodeTypes) {
+      finalNodes = matchedNodes
+    } else {
+      const keptContainmentAncestors = new Set<string>()
+      let changed = true
+      while (changed) {
+        changed = false
+        for (const edge of graph.edges) {
+          if (edge.edge_type !== "contains") continue
+          if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target))
+            continue
+          if (
+            visibleIds.has(edge.target) ||
+            keptContainmentAncestors.has(edge.target)
+          ) {
+            if (!keptContainmentAncestors.has(edge.source)) {
+              keptContainmentAncestors.add(edge.source)
+              changed = true
+            }
           }
         }
       }
-    }
 
-    const connectedIds = new Set<string>()
-    for (const edge of visibleEdges) {
-      connectedIds.add(edge.source)
-      connectedIds.add(edge.target)
-    }
-    for (const node of visibleNodes) {
-      if (node.id === graph.root?.id) connectedIds.add(node.id)
-    }
+      const connectedIds = new Set<string>()
+      for (const edge of visibleEdges) {
+        connectedIds.add(edge.source)
+        connectedIds.add(edge.target)
+      }
+      if (graph.root?.id) connectedIds.add(graph.root.id)
 
-    const finalNodes =
-      visibleEdges.length === 0
-        ? visibleNodes
-        : visibleNodes.filter(
-            (node) =>
-              connectedIds.has(node.id) ||
-              keptContainmentAncestors.has(node.id),
-          )
+      finalNodes =
+        visibleEdges.length === 0
+          ? matchedNodes
+          : matchedNodes.filter(
+              (node) =>
+                connectedIds.has(node.id) ||
+                keptContainmentAncestors.has(node.id),
+            )
+    }
 
     return {
       ...graph,

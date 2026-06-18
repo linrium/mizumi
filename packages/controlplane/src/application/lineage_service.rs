@@ -99,6 +99,7 @@ impl LineageService {
         self.ingest_dagster(&mut graph).await?;
         self.ingest_repo_jobs(&mut graph)?;
         self.ingest_streaming_job_submissions(&mut graph).await?;
+        ingest_static_nodes(&mut graph);
 
         let nodes = graph
             .nodes
@@ -190,7 +191,7 @@ impl LineageService {
                 direct += 1;
             }
             match node.node_type.as_str() {
-                "table" | "topic" => datasets += 1,
+                "table" | "topic" | "volume" => datasets += 1,
                 "spark_job" | "streaming_job" | "daft_job" | "dagster_job" => jobs += 1,
                 "dagster_asset" => assets += 1,
                 "schedule" => schedules += 1,
@@ -733,13 +734,45 @@ impl LineageService {
 
     fn ingest_spark_jobs(&self, graph: &mut GraphBuilder) -> Result<(), AppError> {
         let spark_root = self.repo_root.join("packages/spark/jobs");
+
+        // Constants shared across all jobs via common.py; merge into every job's map.
+        let common_constants = {
+            let common_path = spark_root.join("common.py");
+            if common_path.exists() {
+                let src = fs::read_to_string(&common_path).map_err(|e| {
+                    AppError::QueryFailed(format!("failed to read common.py: {e}"))
+                })?;
+                extract_constants(&src)
+            } else {
+                HashMap::new()
+            }
+        };
+
         for path in collect_python_files(&spark_root)? {
+            // Skip common.py (shared helpers, no job) and the data/ directory (generators).
+            if path.file_name().and_then(|n| n.to_str()) == Some("common.py") {
+                continue;
+            }
+            if path.components().any(|c| c.as_os_str() == "data") {
+                continue;
+            }
+
             let contents = fs::read_to_string(&path).map_err(|e| {
                 AppError::QueryFailed(format!("failed to read {}: {e}", path.display()))
             })?;
             let rel_path = relative_to_repo(&self.repo_root, &path);
-            let constants = extract_constants(&contents);
-            let app_name = extract_app_name(&contents).unwrap_or_else(|| rel_path.clone());
+            let short_path = rel_path
+                .strip_prefix("packages/spark/jobs/")
+                .unwrap_or(&rel_path)
+                .to_string();
+
+            // Merge file-local constants on top of common ones so local overrides win,
+            // then resolve any variable-to-variable aliases against the merged map.
+            let mut constants = common_constants.clone();
+            constants.extend(extract_constants(&contents));
+            resolve_var_aliases(&contents, &mut constants);
+
+            let app_name = extract_app_name(&contents).unwrap_or_else(|| short_path.clone());
             let is_streaming = contents.contains("readStream.format(\"kafka\")")
                 || contents.contains("readStream.format('kafka')");
             let job_type = if is_streaming {
@@ -751,10 +784,11 @@ impl LineageService {
                 job_type,
                 "spark",
                 "spark://mizumi",
-                &rel_path,
+                &short_path,
                 &app_name,
                 json!({ "path": rel_path, "app_name": app_name }),
             );
+            graph.add_alias(job_id, short_path.clone(), AliasPriority::RepoPath);
             graph.add_alias(job_id, rel_path.clone(), AliasPriority::RepoPath);
             graph.add_alias(job_id, app_name.clone(), AliasPriority::ShortName);
 
@@ -766,22 +800,34 @@ impl LineageService {
 
     fn ingest_daft_jobs(&self, graph: &mut GraphBuilder) -> Result<(), AppError> {
         let daft_root = self.repo_root.join("packages/daft/jobs");
+        let skip_files = ["co_brand_campaign_summary"];
         for path in collect_python_files(&daft_root)? {
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| skip_files.contains(&n))
+            {
+                continue;
+            }
             let contents = fs::read_to_string(&path).map_err(|e| {
                 AppError::QueryFailed(format!("failed to read {}: {e}", path.display()))
             })?;
             let rel_path = relative_to_repo(&self.repo_root, &path);
+            let short_path = rel_path
+                .strip_prefix("packages/daft/jobs/")
+                .unwrap_or(&rel_path)
+                .to_string();
             let constants = extract_constants(&contents);
+            let display_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or(&short_path).to_string();
             let job_id = graph.ensure_node(
                 "daft_job",
                 "daft",
                 "daft://mizumi",
-                &rel_path,
-                path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(&rel_path),
+                &short_path,
+                &display_name,
                 json!({ "path": rel_path }),
             );
+            graph.add_alias(job_id, short_path.clone(), AliasPriority::RepoPath);
             graph.add_alias(job_id, rel_path.clone(), AliasPriority::RepoPath);
 
             for source_var in extract_var_usages(
@@ -845,28 +891,38 @@ impl LineageService {
                     graph.add_alias(asset_id, asset_name.clone(), AliasPriority::ShortName);
 
                     if let Some(job_path) = &job_path {
-                        let (node_type, namespace) = if job_path.contains("/opt/daft/jobs/") {
-                            ("daft_job", "daft://mizumi")
-                        } else {
-                            ("spark_job", "spark://mizumi")
-                        };
-                        let rel = normalize_job_path(job_path);
-                        let job_id = graph.ensure_node(
-                            node_type,
-                            if node_type == "daft_job" {
-                                "daft"
+                        let (node_type, platform, namespace, prefix) =
+                            if job_path.contains("/opt/daft/jobs/") {
+                                ("daft_job", "daft", "daft://mizumi", "packages/daft/jobs/")
                             } else {
-                                "spark"
-                            },
-                            namespace,
-                            &rel,
-                            Path::new(&rel)
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or(&rel),
-                            json!({ "path": rel }),
-                        );
-                        graph.add_alias(job_id, rel, AliasPriority::RepoPath);
+                                ("spark_job", "spark", "spark://mizumi", "packages/spark/jobs/")
+                            };
+                        let full_rel = normalize_job_path(job_path);
+                        let short_rel = full_rel
+                            .strip_prefix(prefix)
+                            .unwrap_or(&full_rel)
+                            .to_string();
+                        let job_id = graph
+                            .resolve_alias(&full_rel)
+                            .or_else(|| graph.resolve_alias(&short_rel))
+                            .unwrap_or_else(|| {
+                                let display = Path::new(&short_rel)
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .unwrap_or(&short_rel)
+                                    .to_string();
+                                let id = graph.ensure_node(
+                                    node_type,
+                                    platform,
+                                    namespace,
+                                    &short_rel,
+                                    &display,
+                                    json!({ "path": full_rel }),
+                                );
+                                graph.add_alias(id, short_rel.clone(), AliasPriority::RepoPath);
+                                graph.add_alias(id, full_rel.clone(), AliasPriority::RepoPath);
+                                id
+                            });
                         graph.add_edge(
                             asset_id,
                             job_id,
@@ -1458,8 +1514,21 @@ fn relative_to_repo(repo_root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
+fn resolve_var_aliases(contents: &str, map: &mut HashMap<String, String>) {
+    for caps in VAR_ALIAS_PATTERN.get_or_init(var_alias_regex).captures_iter(contents) {
+        let Some(lhs) = caps.get(1).map(|m| m.as_str().to_string()) else { continue };
+        let Some(rhs) = caps.get(2).map(|m| m.as_str().to_string()) else { continue };
+        if map.contains_key(&lhs) {
+            continue;
+        }
+        if let Some(value) = map.get(&rhs).cloned() {
+            map.insert(lhs, value);
+        }
+    }
+}
+
 fn extract_constants(contents: &str) -> HashMap<String, String> {
-    CONSTANT_PATTERN
+    let mut map: HashMap<String, String> = CONSTANT_PATTERN
         .get_or_init(constant_regex)
         .captures_iter(contents)
         .filter_map(|caps| {
@@ -1468,7 +1537,10 @@ fn extract_constants(contents: &str) -> HashMap<String, String> {
                 caps.get(2)?.as_str().to_string(),
             ))
         })
-        .collect()
+        .collect();
+    // Resolve within-file variable aliases (e.g. TARGET_PATH = OTHER_PATH).
+    resolve_var_aliases(contents, &mut map);
+    map
 }
 
 fn extract_app_name(contents: &str) -> Option<String> {
@@ -1592,7 +1664,11 @@ fn add_spark_job_edges(
         }
     }
 
-    for target_var in extract_var_usages(contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex)) {
+    let save_vars: BTreeSet<String> = extract_var_usages(contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex))
+        .into_iter()
+        .chain(extract_var_usages(contents, WRITE_DELTA_VAR_PATTERN.get_or_init(write_delta_var_regex)))
+        .collect();
+    for target_var in save_vars {
         if let Some(value) = constants.get(&target_var) {
             if let Some(table_id) = graph.ensure_table_for_path(value) {
                 graph.add_edge(
@@ -1658,8 +1734,20 @@ fn add_spark_job_edges(
 }
 
 fn constant_regex() -> Regex {
-    Regex::new(r#"(?s)([A-Z][A-Z0-9_]+)\s*=\s*(?:os\.getenv\([^,]+,\s*|\()?\s*"([^"]+)""#)
+    // Matches:
+    //   VAR = "literal"
+    //   VAR = ("literal")
+    //   VAR = os.getenv("KEY", "default")       ← no wrapping parens
+    //   VAR = (os.getenv("KEY", "default"))      ← with wrapping parens
+    Regex::new(r#"([A-Z][A-Z0-9_]+)\s*=\s*(?:\(?\s*os\.getenv\s*\([^,)]+,\s*|\()?\s*"([^"]+)""#)
         .expect("valid constant regex")
+}
+
+fn var_alias_regex() -> Regex {
+    // Matches VAR = OTHER_VAR or VAR = os.getenv("KEY", OTHER_VAR) — indirection to another constant.
+    // (?m) makes $ match end-of-line, not end-of-string.
+    Regex::new(r#"(?m)([A-Z][A-Z0-9_]+)\s*=\s*(?:os\.getenv\s*\([^,)]+,\s*)?([A-Z][A-Z0-9_]+)\s*\)?\s*$"#)
+        .expect("valid var alias regex")
 }
 
 fn app_name_regex() -> Regex {
@@ -1672,6 +1760,11 @@ fn load_var_regex() -> Regex {
 
 fn save_var_regex() -> Regex {
     Regex::new(r#"\.save\(\s*(\w+)\s*\)"#).expect("valid save regex")
+}
+
+fn write_delta_var_regex() -> Regex {
+    // Matches write_delta(df, VAR) — the shared helper used across all spark jobs.
+    Regex::new(r#"write_delta\s*\(\s*\w+\s*,\s*(\w+)\s*\)"#).expect("valid write_delta regex")
 }
 
 fn daft_source_var_regex() -> Regex {
@@ -1712,9 +1805,11 @@ fn metadata_path_regex() -> Regex {
 }
 
 static CONSTANT_PATTERN: OnceLock<Regex> = OnceLock::new();
+static VAR_ALIAS_PATTERN: OnceLock<Regex> = OnceLock::new();
 static APP_NAME_PATTERN: OnceLock<Regex> = OnceLock::new();
 static LOAD_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
 static SAVE_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
+static WRITE_DELTA_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
 static DAFT_SOURCE_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
 static DAFT_TARGET_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
 static TOPIC_VAR_PATTERN: OnceLock<Regex> = OnceLock::new();
@@ -2049,4 +2144,253 @@ query AssetLatestInfo($assetKeys: [AssetKeyInput!]!) {
 
 fn is_internal_dagster_job(name: &str) -> bool {
     name == "__ASSET_JOB" || name.starts_with("__")
+}
+
+fn ingest_static_nodes(graph: &mut GraphBuilder) {
+    // ── Dashboard ──────────────────────────────────────────────────────────────
+    // The webui dashboard queries these gold/silver tables directly via SQL.
+    let dashboard_id = graph.ensure_node(
+        "dashboard",
+        "webui",
+        "webui://mizumi",
+        "cross_company_journey_dashboard",
+        "Cross-company Journey Dashboard",
+        json!({
+            "description": "Operational dashboard for cross-company journey engine and activation platform",
+            "url_path": "/dashboard",
+        }),
+    );
+    graph.add_alias(
+        dashboard_id,
+        "cross_company_journey_dashboard".to_string(),
+        AliasPriority::ShortName,
+    );
+
+    let dashboard_tables = [
+        "partnership.co_brand_gold.co_brand_offer_audience_v1",
+        "partnership.co_brand_silver.customer_360_v1",
+        "hdbank.hdbank_partnership_prod_silver.customers_v1",
+        "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1",
+    ];
+    for table_fqn in &dashboard_tables {
+        let parts: Vec<&str> = table_fqn.splitn(3, '.').collect();
+        if parts.len() == 3 {
+            let (catalog, schema, table) = (parts[0], parts[1], parts[2]);
+            let catalog_id = graph.ensure_node(
+                "catalog",
+                "unitycatalog",
+                "uc://mizumi",
+                catalog,
+                catalog,
+                json!({}),
+            );
+            graph.add_alias(catalog_id, catalog.to_string(), AliasPriority::CatalogName);
+
+            let schema_fqn = format!("{catalog}.{schema}");
+            let schema_id = graph.ensure_node(
+                "schema",
+                "unitycatalog",
+                "uc://mizumi",
+                &schema_fqn,
+                schema,
+                json!({ "catalog_name": catalog }),
+            );
+            graph.add_alias(schema_id, schema_fqn.clone(), AliasPriority::SchemaFqn);
+            graph.add_edge(
+                catalog_id,
+                schema_id,
+                "contains",
+                1.0,
+                json!({ "source": "static" }),
+            );
+
+            let table_id = graph.ensure_node(
+                "table",
+                "unitycatalog",
+                "uc://mizumi",
+                table_fqn,
+                table,
+                json!({ "catalog_name": catalog, "schema_name": schema }),
+            );
+            graph.add_alias(table_id, table_fqn.to_string(), AliasPriority::TableFqn);
+            graph.add_edge(
+                schema_id,
+                table_id,
+                "contains",
+                1.0,
+                json!({ "source": "static" }),
+            );
+
+            graph.add_edge(
+                table_id,
+                dashboard_id,
+                "reads_from",
+                1.0,
+                json!({ "source": "static" }),
+            );
+        }
+    }
+
+    // ── MLflow model registry ──────────────────────────────────────────────────
+    // The daft train_baggage_damage_model.py job registers a model under this URI.
+    let mlflow_model_id = graph.ensure_node(
+        "mlflow_model",
+        "mlflow",
+        "mlflow://mizumi",
+        "baggage-damage-detector",
+        "Baggage Damage Detector",
+        json!({
+            "model_name": "baggage-damage-detector",
+            "alias": "champion",
+            "model_uri": "models:/baggage-damage-detector@champion",
+            "experiment": "vietjetair-baggage-damage",
+            "description": "CLIP-based zero-shot image classifier for baggage damage detection, trained via LogisticRegression on top of CLIP embeddings",
+        }),
+    );
+    graph.add_alias(
+        mlflow_model_id,
+        "baggage-damage-detector".to_string(),
+        AliasPriority::ShortName,
+    );
+    graph.add_alias(
+        mlflow_model_id,
+        "models:/baggage-damage-detector@champion".to_string(),
+        AliasPriority::RepoPath,
+    );
+
+    // The training job (train_baggage_damage_model.py) reads the gold
+    // classifications table and writes (registers) the model.
+    let gold_classifications_path =
+        "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1";
+    let gold_classifications_fqn =
+        "vietjetair.vietjetair_partnership_prod_gold.baggage_damage_classifications_v1";
+    let gold_table_id = graph.ensure_node(
+        "table",
+        "unitycatalog",
+        "uc://mizumi",
+        gold_classifications_fqn,
+        "baggage_damage_classifications_v1",
+        json!({
+            "catalog_name": "vietjetair",
+            "schema_name": "vietjetair_partnership_prod_gold",
+            "storage_location": gold_classifications_path,
+        }),
+    );
+    graph.add_alias(
+        gold_table_id,
+        gold_classifications_fqn.to_string(),
+        AliasPriority::TableFqn,
+    );
+    graph.add_alias(
+        gold_table_id,
+        normalize_storage_path(gold_classifications_path),
+        AliasPriority::StoragePath,
+    );
+
+    // train job → reads gold classifications table → writes mlflow model
+    let train_job_id = graph.ensure_node(
+        "daft_job",
+        "daft",
+        "daft://mizumi",
+        "vietjetair/train_baggage_damage_model.py",
+        "train_baggage_damage_model",
+        json!({ "path": "packages/daft/jobs/vietjetair/train_baggage_damage_model.py" }),
+    );
+    graph.add_alias(
+        train_job_id,
+        "vietjetair/train_baggage_damage_model.py".to_string(),
+        AliasPriority::RepoPath,
+    );
+    graph.add_alias(
+        train_job_id,
+        "packages/daft/jobs/vietjetair/train_baggage_damage_model.py".to_string(),
+        AliasPriority::RepoPath,
+    );
+    graph.add_alias(
+        train_job_id,
+        "train_baggage_damage_model".to_string(),
+        AliasPriority::ShortName,
+    );
+    graph.add_edge(
+        gold_table_id,
+        train_job_id,
+        "reads_from",
+        1.0,
+        json!({ "source": "static" }),
+    );
+    graph.add_edge(
+        train_job_id,
+        mlflow_model_id,
+        "writes_to",
+        1.0,
+        json!({ "source": "static" }),
+    );
+
+    // ── Volume: baggage images in RustFS ───────────────────────────────────────
+    // classify_baggage_damage.py reads raw images from this S3 prefix.
+    let volume_id = graph.ensure_node(
+        "volume",
+        "rustfs",
+        "s3://unitycatalog",
+        "vietjetair/baggage_damaged_reports",
+        "Baggage Damaged Reports (images)",
+        json!({
+            "bucket": "unitycatalog",
+            "prefix": "vietjetair/baggage_damaged_reports/",
+            "description": "Raw baggage damage images uploaded by ground staff, used for zero-shot CLIP classification",
+        }),
+    );
+    graph.add_alias(
+        volume_id,
+        "vietjetair/baggage_damaged_reports".to_string(),
+        AliasPriority::RepoPath,
+    );
+
+    // classify job → reads volume → writes gold classifications table
+    let classify_job_id = graph.ensure_node(
+        "daft_job",
+        "daft",
+        "daft://mizumi",
+        "vietjetair/classify_baggage_damage.py",
+        "classify_baggage_damage",
+        json!({ "path": "packages/daft/jobs/vietjetair/classify_baggage_damage.py" }),
+    );
+    graph.add_alias(
+        classify_job_id,
+        "vietjetair/classify_baggage_damage.py".to_string(),
+        AliasPriority::RepoPath,
+    );
+    graph.add_alias(
+        classify_job_id,
+        "packages/daft/jobs/vietjetair/classify_baggage_damage.py".to_string(),
+        AliasPriority::RepoPath,
+    );
+    graph.add_alias(
+        classify_job_id,
+        "classify_baggage_damage".to_string(),
+        AliasPriority::ShortName,
+    );
+    graph.add_edge(
+        volume_id,
+        classify_job_id,
+        "reads_from",
+        1.0,
+        json!({ "source": "static" }),
+    );
+    graph.add_edge(
+        classify_job_id,
+        gold_table_id,
+        "writes_to",
+        1.0,
+        json!({ "source": "static" }),
+    );
+
+    // The trained model is consumed by the classify job at inference time.
+    graph.add_edge(
+        mlflow_model_id,
+        classify_job_id,
+        "reads_from",
+        1.0,
+        json!({ "source": "static", "usage": "inference" }),
+    );
 }

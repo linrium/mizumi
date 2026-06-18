@@ -23,7 +23,7 @@ import { SankeyTooltip } from "@/components/charts/sankey/sankey-tooltip"
 import type { SankeyData } from "@/components/charts/sankey/sankey-chart"
 import {
   IconArrowUp,
-  IconBook2,
+  IconTriangleSquareCircle,
   IconChartBar,
   IconCheck,
   IconChevronDown,
@@ -915,7 +915,7 @@ function ExploreCatalogCard({
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <IconBook2 size={12} className="text-muted-foreground shrink-0" />
+        <IconTriangleSquareCircle size={12} className="text-muted-foreground shrink-0" />
         <span className="font-medium flex-1">Catalog Explorer</span>
         {output.search && (
           <span className="text-muted-foreground text-[11px] font-mono">

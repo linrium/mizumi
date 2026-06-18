@@ -3,7 +3,7 @@
 import {
   IconArrowBarLeft,
   IconArrowBarRight,
-  IconBook2,
+  IconTriangleSquareCircle,
   IconBoxModel,
   IconBuildingBank,
   IconChartBar,
@@ -43,7 +43,7 @@ import { signOut } from "@/lib/auth/actions"
 import type { AppSession } from "@/lib/auth/types"
 
 const navItems = [
-  { title: "Catalog", href: "/catalog", icon: IconBook2 },
+  { title: "Catalog", href: "/catalog", icon: IconTriangleSquareCircle },
   { title: "Governance", href: "/permissions", icon: IconShield },
   { title: "Teams", href: "/teams", icon: IconUsers },
   { title: "SQL Editor", href: "/editor", icon: IconCode },

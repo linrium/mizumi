@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  IconBook2,
+  IconTriangleSquareCircle,
   IconBrain,
   IconChevronRight,
   IconDatabase,
@@ -238,7 +238,7 @@ export default function CatalogLayout({
                       catOpen && "rotate-90",
                     )}
                   />
-                  <IconBook2
+                  <IconTriangleSquareCircle
                     size={15}
                     className={cn(
                       "shrink-0 text-muted-foreground",

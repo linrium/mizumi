@@ -47,7 +47,7 @@ const DEFAULT_SELECTED_NODE_TYPES = [
   "spark_job",
   "streaming_job",
   "daft_job",
-  "schema",
+  // "schema",
 ];
 
 export default function LineagePage() {
