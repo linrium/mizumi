@@ -40,6 +40,8 @@ const NODE_TYPE_OPTIONS = [
   { value: "dashboard", label: "dashboards" },
   { value: "mlflow_experiment", label: "mlflow experiments" },
   { value: "mlflow_model", label: "mlflow models" },
+  { value: "pretrained_model", label: "pretrained models" },
+  { value: "volume", label: "volumes" },
   { value: "catalog", label: "catalogs" },
   { value: "schema", label: "schemas" },
 ] as const;
@@ -50,7 +52,11 @@ const DEFAULT_SELECTED_NODE_TYPES = [
   "spark_job",
   "streaming_job",
   "daft_job",
-  "dashboard"
+  "mlflow_experiment",
+  "mlflow_model",
+  "pretrained_model",
+  "volume",
+  // "dashboard"
   // "schema",
 ];
 

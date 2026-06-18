@@ -2332,6 +2332,24 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
         AliasPriority::RepoPath,
     );
 
+    // ── CLIP pretrained model (HuggingFace) ────────────────────────────────────
+    let clip_model_id = graph.ensure_node(
+        "pretrained_model",
+        "huggingface",
+        "huggingface://hub",
+        "openai/clip-vit-base-patch32",
+        "openai/clip-vit-base-patch32",
+        json!({
+            "model_id": "openai/clip-vit-base-patch32",
+            "description": "CLIP ViT-B/32 zero-shot image classification model used by classify_baggage_damage and train_baggage_damage_model",
+        }),
+    );
+    graph.add_alias(
+        clip_model_id,
+        "openai/clip-vit-base-patch32".to_string(),
+        AliasPriority::ShortName,
+    );
+
     let classify_job_id = graph
         .resolve_alias("vietjetair/classify_baggage_damage.py")
         .unwrap_or_else(|| {
@@ -2353,5 +2371,21 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
         "reads_from",
         1.0,
         json!({ "source": "static" }),
+    );
+    // CLIP model → classify job (loaded at inference time)
+    graph.add_edge(
+        clip_model_id,
+        classify_job_id,
+        "reads_from",
+        1.0,
+        json!({ "source": "static", "usage": "inference" }),
+    );
+    // CLIP model is also used by the training job for embedding extraction
+    graph.add_edge(
+        clip_model_id,
+        train_job_id,
+        "reads_from",
+        1.0,
+        json!({ "source": "static", "usage": "embedding_extraction" }),
     );
 }
