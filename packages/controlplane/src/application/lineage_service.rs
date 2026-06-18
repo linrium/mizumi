@@ -2258,76 +2258,62 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
         AliasPriority::RepoPath,
     );
 
-    // The training job (train_baggage_damage_model.py) reads the gold
-    // classifications table and writes (registers) the model.
-    let gold_classifications_path =
-        "s3://unitycatalog/vietjetair/vietjetair_partnership_prod_gold/baggage_damage_classifications_v1";
-    let gold_classifications_fqn =
-        "vietjetair.vietjetair_partnership_prod_gold.baggage_damage_classifications_v1";
-    let gold_table_id = graph.ensure_node(
-        "table",
-        "unitycatalog",
-        "uc://mizumi",
-        gold_classifications_fqn,
-        "baggage_damage_classifications_v1",
+    // ── MLflow experiment ──────────────────────────────────────────────────────
+    let mlflow_experiment_id = graph.ensure_node(
+        "mlflow_experiment",
+        "mlflow",
+        "mlflow://mizumi",
+        "vietjetair-baggage-damage",
+        "vietjetair-baggage-damage",
         json!({
-            "catalog_name": "vietjetair",
-            "schema_name": "vietjetair_partnership_prod_gold",
-            "storage_location": gold_classifications_path,
+            "experiment_name": "vietjetair-baggage-damage",
+            "description": "MLflow experiment tracking training runs for the baggage damage detector model",
         }),
     );
     graph.add_alias(
-        gold_table_id,
-        gold_classifications_fqn.to_string(),
-        AliasPriority::TableFqn,
-    );
-    graph.add_alias(
-        gold_table_id,
-        normalize_storage_path(gold_classifications_path),
-        AliasPriority::StoragePath,
-    );
-
-    // train job → reads gold classifications table → writes mlflow model
-    let train_job_id = graph.ensure_node(
-        "daft_job",
-        "daft",
-        "daft://mizumi",
-        "vietjetair/train_baggage_damage_model.py",
-        "train_baggage_damage_model",
-        json!({ "path": "packages/daft/jobs/vietjetair/train_baggage_damage_model.py" }),
-    );
-    graph.add_alias(
-        train_job_id,
-        "vietjetair/train_baggage_damage_model.py".to_string(),
-        AliasPriority::RepoPath,
-    );
-    graph.add_alias(
-        train_job_id,
-        "packages/daft/jobs/vietjetair/train_baggage_damage_model.py".to_string(),
-        AliasPriority::RepoPath,
-    );
-    graph.add_alias(
-        train_job_id,
-        "train_baggage_damage_model".to_string(),
+        mlflow_experiment_id,
+        "vietjetair-baggage-damage".to_string(),
         AliasPriority::ShortName,
     );
+    // Experiment promotes champion run to model registry
     graph.add_edge(
-        gold_table_id,
-        train_job_id,
-        "reads_from",
-        1.0,
-        json!({ "source": "static" }),
-    );
-    graph.add_edge(
-        train_job_id,
+        mlflow_experiment_id,
         mlflow_model_id,
         "writes_to",
         1.0,
-        json!({ "source": "static" }),
+        json!({ "source": "static", "usage": "model_registration" }),
+    );
+
+    // ── Wire train job → experiment (repo scanner handles table↔job edges) ──────
+    // ingest_daft_jobs already creates the train/classify job nodes and their
+    // table reads_from/writes_to edges. We only add what the scanner can't derive:
+    // the train job logging runs to the MLflow experiment, and the classify job
+    // loading the registered model for inference.
+    let train_job_id = graph
+        .resolve_alias("vietjetair/train_baggage_damage_model.py")
+        .unwrap_or_else(|| {
+            let id = graph.ensure_node(
+                "daft_job",
+                "daft",
+                "daft://mizumi",
+                "vietjetair/train_baggage_damage_model.py",
+                "train_baggage_damage_model",
+                json!({ "path": "packages/daft/jobs/vietjetair/train_baggage_damage_model.py" }),
+            );
+            graph.add_alias(id, "vietjetair/train_baggage_damage_model.py".to_string(), AliasPriority::RepoPath);
+            id
+        });
+    graph.add_edge(
+        train_job_id,
+        mlflow_experiment_id,
+        "writes_to",
+        1.0,
+        json!({ "source": "static", "usage": "logs_run" }),
     );
 
     // ── Volume: baggage images in RustFS ───────────────────────────────────────
     // classify_baggage_damage.py reads raw images from this S3 prefix.
+    // The repo scanner handles the classify_job → gold_table writes_to edge.
     let volume_id = graph.ensure_node(
         "volume",
         "rustfs",
@@ -2346,51 +2332,26 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
         AliasPriority::RepoPath,
     );
 
-    // classify job → reads volume → writes gold classifications table
-    let classify_job_id = graph.ensure_node(
-        "daft_job",
-        "daft",
-        "daft://mizumi",
-        "vietjetair/classify_baggage_damage.py",
-        "classify_baggage_damage",
-        json!({ "path": "packages/daft/jobs/vietjetair/classify_baggage_damage.py" }),
-    );
-    graph.add_alias(
-        classify_job_id,
-        "vietjetair/classify_baggage_damage.py".to_string(),
-        AliasPriority::RepoPath,
-    );
-    graph.add_alias(
-        classify_job_id,
-        "packages/daft/jobs/vietjetair/classify_baggage_damage.py".to_string(),
-        AliasPriority::RepoPath,
-    );
-    graph.add_alias(
-        classify_job_id,
-        "classify_baggage_damage".to_string(),
-        AliasPriority::ShortName,
-    );
+    let classify_job_id = graph
+        .resolve_alias("vietjetair/classify_baggage_damage.py")
+        .unwrap_or_else(|| {
+            let id = graph.ensure_node(
+                "daft_job",
+                "daft",
+                "daft://mizumi",
+                "vietjetair/classify_baggage_damage.py",
+                "classify_baggage_damage",
+                json!({ "path": "packages/daft/jobs/vietjetair/classify_baggage_damage.py" }),
+            );
+            graph.add_alias(id, "vietjetair/classify_baggage_damage.py".to_string(), AliasPriority::RepoPath);
+            id
+        });
+    // volume → classify job (can't be derived from repo scan; volume is not a UC table)
     graph.add_edge(
         volume_id,
         classify_job_id,
         "reads_from",
         1.0,
         json!({ "source": "static" }),
-    );
-    graph.add_edge(
-        classify_job_id,
-        gold_table_id,
-        "writes_to",
-        1.0,
-        json!({ "source": "static" }),
-    );
-
-    // The trained model is consumed by the classify job at inference time.
-    graph.add_edge(
-        mlflow_model_id,
-        classify_job_id,
-        "reads_from",
-        1.0,
-        json!({ "source": "static", "usage": "inference" }),
     );
 }

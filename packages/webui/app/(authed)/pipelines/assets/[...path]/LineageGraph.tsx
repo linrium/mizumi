@@ -138,6 +138,10 @@ function nodeAccent(nodeType: string) {
       return "border-violet-300 bg-violet-50/60"
     case "dashboard":
       return "border-indigo-300 bg-indigo-50/60"
+    case "mlflow_experiment":
+      return "border-orange-300 bg-orange-50/60"
+    case "mlflow_model":
+      return "border-pink-300 bg-pink-50/60"
     case "catalog":
     case "schema":
       return "border-zinc-300 bg-zinc-50/60"
@@ -163,6 +167,10 @@ function nodeIcon(nodeType: string) {
       return "▸"
     case "dashboard":
       return "▣"
+    case "mlflow_experiment":
+      return "⊞"
+    case "mlflow_model":
+      return "⊕"
     case "schedule":
       return "◷"
     case "catalog":

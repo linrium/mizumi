@@ -38,6 +38,8 @@ const NODE_TYPE_OPTIONS = [
   { value: "dagster_job", label: "dagster jobs" },
   { value: "schedule", label: "schedules" },
   { value: "dashboard", label: "dashboards" },
+  { value: "mlflow_experiment", label: "mlflow experiments" },
+  { value: "mlflow_model", label: "mlflow models" },
   { value: "catalog", label: "catalogs" },
   { value: "schema", label: "schemas" },
 ] as const;
