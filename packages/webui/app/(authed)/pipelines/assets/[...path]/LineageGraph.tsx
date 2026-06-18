@@ -136,6 +136,8 @@ function nodeAccent(nodeType: string) {
       return "border-rose-300 bg-rose-50/60"
     case "schedule":
       return "border-violet-300 bg-violet-50/60"
+    case "dashboard":
+      return "border-indigo-300 bg-indigo-50/60"
     case "catalog":
     case "schema":
       return "border-zinc-300 bg-zinc-50/60"
@@ -159,6 +161,8 @@ function nodeIcon(nodeType: string) {
       return "◇"
     case "dagster_job":
       return "▸"
+    case "dashboard":
+      return "▣"
     case "schedule":
       return "◷"
     case "catalog":

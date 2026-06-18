@@ -37,6 +37,7 @@ const NODE_TYPE_OPTIONS = [
   { value: "daft_job", label: "daft jobs" },
   { value: "dagster_job", label: "dagster jobs" },
   { value: "schedule", label: "schedules" },
+  { value: "dashboard", label: "dashboards" },
   { value: "catalog", label: "catalogs" },
   { value: "schema", label: "schemas" },
 ] as const;
@@ -47,6 +48,7 @@ const DEFAULT_SELECTED_NODE_TYPES = [
   "spark_job",
   "streaming_job",
   "daft_job",
+  "dashboard"
   // "schema",
 ];
 
