@@ -58,6 +58,10 @@ spec:
               value: rustfsadmin
             - name: RUSTFS_SECRET_ACCESS_KEY
               value: rustfsadmin
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow-svc.mlflow.svc.cluster.local:5000
+            - name: MLFLOW_PUBLIC_URL
+              value: http://mlflow-svc.mlflow.svc.cluster.local:5000
             - name: LANCEDB_BASE_URL
               value: http://lancedb-svc.lancedb.svc.cluster.local:8080
             - name: BAGGAGE_MODEL_SERVER_BASE_URL

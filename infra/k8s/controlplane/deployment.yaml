@@ -73,7 +73,7 @@ spec:
             - name: DAGSTER__BASE_URL
               value: "http://dagster-dagster-webserver.dagster.svc.cluster.local:80"
             - name: MLFLOW__BASE_URL
-              value: "http://mlflow-svc.mlflow.svc.cluster.local:5000"
+              value: "http://mlflow-svc.ml.svc.cluster.local:5000"
             - name: KAFKA__BOOTSTRAP_SERVERS
               value: "redpanda-svc.redpanda.svc.cluster.local:9092"
             - name: UNITY_CATALOG__BASE_URL
@@ -102,6 +102,10 @@ spec:
                   name: controlplane-secret
                   key: OPENAI_API_KEY
                   optional: true
+            - name: KEYCLOAK__URL
+              value: "http://keycloak-svc.keycloak.svc.cluster.local:8080"
+            - name: KEYCLOAK__REALM
+              value: "sovico"
             - name: RUST_LOG
               value: "debug"
           readinessProbe:
