@@ -75,7 +75,7 @@ function AnimatedNode({
   isLeftSide,
   showLabels,
 }: AnimatedNodeProps) {
-  const { enterTransition, revealEpoch } = useSankey()
+  const { enterTransition } = useSankey()
 
   const nodeAnimDuration = animationDuration * 0.6
   const staggerDelaySec = ((index / totalNodes) * nodeAnimDuration * 0.4) / 1000
@@ -103,7 +103,6 @@ function AnimatedNode({
         fill={fill}
         height={height}
         initial={{ opacity: 0, scaleY: 0 }}
-        key={`node-${index}-${revealEpoch}`}
         rx={rx}
         ry={rx}
         style={{ originY: 0.5 }}
@@ -119,7 +118,6 @@ function AnimatedNode({
             className="fill-foreground font-medium text-[13px]"
             dy="0.35em"
             initial={{ opacity: 0, x: isLeftSide ? x + 8 : x + width - 8 }}
-            key={`name-${index}-${revealEpoch}`}
             textAnchor={isLeftSide ? "end" : "start"}
             transition={nameEnter}
             y={y + height / 2}
@@ -131,7 +129,6 @@ function AnimatedNode({
             className="fill-foreground text-[11px]"
             dy="0.35em"
             initial={{ opacity: 0, x: isLeftSide ? x + 8 : x + width - 8 }}
-            key={`value-${index}-${revealEpoch}`}
             textAnchor={isLeftSide ? "end" : "start"}
             transition={valueEnter}
             y={y + height / 2 + 16}
@@ -161,6 +158,7 @@ export function SankeyNode({
     setHoveredNodeIndex,
     setTooltipData,
     animationDuration,
+    revealEpoch,
   } = useSankey()
 
   // Default colors using CSS variables
@@ -241,16 +239,7 @@ export function SankeyNode({
         const isFaded = isAnyHovered && !isConnected
         const isLeftSide = nodeX < innerWidth / 2
 
-        let displayValue = 0
-        for (const l of links) {
-          const sIdx = getNodeIndex(l.source as NodeOrIndex)
-          const tIdx = getNodeIndex(l.target as NodeOrIndex)
-          if (node.category === "source" && sIdx === index) {
-            displayValue += l.value
-          } else if (node.category !== "source" && tIdx === index) {
-            displayValue += l.value
-          }
-        }
+        const displayValue = node.value ?? 0
 
         const handleMouseEnter = () => {
           setHoveredNodeIndex(index)
@@ -277,7 +266,7 @@ export function SankeyNode({
             index={index}
             isFaded={isFaded}
             isLeftSide={isLeftSide}
-            key={`node-${String(node.nodeKey ?? node.name)}-${index}`}
+            key={`node-${String(node.nodeKey ?? node.name)}-${index}-${revealEpoch}`}
             name={node.name}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
