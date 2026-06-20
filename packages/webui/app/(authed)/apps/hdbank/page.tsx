@@ -42,7 +42,12 @@ type SendResult =
   | {
       ok: true
       status: number
-      data: { sent: number; accepted: number; failed: number; sample: unknown[] }
+      data: {
+        sent: number
+        accepted: number
+        failed: number
+        sample: unknown[]
+      }
     }
   | { ok: false; status?: number; error: string }
 
@@ -57,7 +62,11 @@ async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
 }
 
 type EventPanelProps = {
-  icon: React.ComponentType<{ size?: number; className?: string; stroke?: number }>
+  icon: React.ComponentType<{
+    size?: number
+    className?: string
+    stroke?: number
+  }>
   label: string
   dataset: string
   endpoint: string
@@ -199,9 +208,7 @@ function EventPanel({
                 result.ok ? "text-foreground" : "text-destructive"
               }`}
             >
-              {result.ok
-                ? JSON.stringify(result.data, null, 2)
-                : result.error}
+              {result.ok ? JSON.stringify(result.data, null, 2) : result.error}
             </pre>
           )}
         </div>

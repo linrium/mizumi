@@ -1,86 +1,86 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import dynamic from "next/dynamic";
-import { cn } from "@/lib/utils";
-import { apiFetch as fetchWithAuth } from "@/lib/api-client";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import { Badge } from "@/components/ui/badge";
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status";
-import type { RunEvent } from "./StepGraph";
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useParams } from "next/navigation"
+import Link from "next/link"
+import dynamic from "next/dynamic"
+import { cn } from "@/lib/utils"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import dayjs from "dayjs"
+import relativeTime from "dayjs/plugin/relativeTime"
+import { Badge } from "@/components/ui/badge"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import type { RunEvent } from "./StepGraph"
 
-dayjs.extend(relativeTime);
+dayjs.extend(relativeTime)
 
 const StepGraph = dynamic(
   () => import("./StepGraph").then((m) => m.StepGraph),
   { ssr: false },
-);
+)
 
 const LineageGraph = dynamic(
   () =>
     import("../../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
   { ssr: false },
-);
+)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type RunStats = {
-  steps_succeeded: number | null;
-  steps_failed: number | null;
-  enqueued_time: number | null;
-  launch_time: number | null;
-  start_time: number | null;
-  end_time: number | null;
-};
+  steps_succeeded: number | null
+  steps_failed: number | null
+  enqueued_time: number | null
+  launch_time: number | null
+  start_time: number | null
+  end_time: number | null
+}
 
-type RunTag = { key: string; value: string };
+type RunTag = { key: string; value: string }
 
 type Run = {
-  run_id: string;
-  job_name: string;
-  status: string;
-  tags: RunTag[];
-  creation_time: number | null;
-  start_time: number | null;
-  end_time: number | null;
-  run_config_yaml: string | null;
-  root_run_id: string | null;
-  parent_run_id: string | null;
-  can_terminate: boolean | null;
-  stats: RunStats | null;
-};
+  run_id: string
+  job_name: string
+  status: string
+  tags: RunTag[]
+  creation_time: number | null
+  start_time: number | null
+  end_time: number | null
+  run_config_yaml: string | null
+  root_run_id: string | null
+  parent_run_id: string | null
+  can_terminate: boolean | null
+  stats: RunStats | null
+}
 
 type EventsResponse = {
-  events: RunEvent[];
-  cursor: string | null;
-  has_more: boolean;
-};
+  events: RunEvent[]
+  cursor: string | null
+  has_more: boolean
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTs(ts: string | number | null | undefined): string {
-  if (!ts) return "—";
-  const v = Number(ts);
+  if (!ts) return "—"
+  const v = Number(ts)
   return isFinite(v)
     ? dayjs(v > 1e12 ? v : v * 1000).format("MMM D, h:mm:ss A")
-    : "—";
+    : "—"
 }
 
 function fmtDuration(start: number | null, end: number | null): string {
-  if (!start) return "—";
-  const sec = Math.round((end ?? Date.now() / 1000) - start);
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
-  return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+  if (!start) return "—"
+  const sec = Math.round((end ?? Date.now() / 1000) - start)
+  if (sec < 60) return `${sec}s`
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
 type StatusConfig = {
-  label: string;
-  variant: "success" | "error" | "info" | "warning" | "default";
-};
+  label: string
+  variant: "success" | "error" | "info" | "warning" | "default"
+}
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
   SUCCESS: { label: "Success", variant: "success" },
@@ -91,7 +91,7 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
   CANCELING: { label: "Canceling", variant: "warning" },
   CANCELED: { label: "Canceled", variant: "default" },
   NOT_STARTED: { label: "Not started", variant: "default" },
-};
+}
 
 const VARIANT_DOT_CLS: Record<string, string> = {
   success: "bg-green-600 dark:bg-green-400",
@@ -99,19 +99,19 @@ const VARIANT_DOT_CLS: Record<string, string> = {
   info: "bg-blue-600 dark:bg-blue-400",
   warning: "bg-orange-600 dark:bg-orange-400",
   default: "bg-muted-foreground",
-};
+}
 
-const ACTIVE_STATUSES = new Set(["QUEUED", "STARTED", "STARTING", "CANCELING"]);
+const ACTIVE_STATUSES = new Set(["QUEUED", "STARTED", "STARTING", "CANCELING"])
 
 function RunStatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status];
-  if (!cfg) return <Badge variant="outline">{status}</Badge>;
+  const cfg = STATUS_CONFIG[status]
+  if (!cfg) return <Badge variant="outline">{status}</Badge>
   return (
     <Status variant={cfg.variant}>
       <StatusIndicator />
       <StatusLabel>{cfg.label}</StatusLabel>
     </Status>
-  );
+  )
 }
 
 // ── Event log row ─────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   RunCanceledEvent: "text-zinc-400",
   EngineEvent: "text-zinc-400",
   LogMessageEvent: "text-zinc-500",
-};
+}
 
 const SHORT_TYPE: Record<string, string> = {
   ExecutionStepStartEvent: "STEP_START",
@@ -155,26 +155,26 @@ const SHORT_TYPE: Record<string, string> = {
   ResourceInitStartedEvent: "RESOURCE_START",
   ResourceInitSuccessEvent: "RESOURCE_OK",
   StepExpectationResultEvent: "EXPECTATION",
-};
+}
 
 function fmtEventTimestamp(ts: string | null | undefined): string {
-  if (!ts) return "";
-  const v = Number(ts);
-  if (!isFinite(v)) return "";
+  if (!ts) return ""
+  const v = Number(ts)
+  if (!isFinite(v)) return ""
   // Dagster timestamps in events are milliseconds
-  return dayjs(v).format("h:mm:ss.SSS A");
+  return dayjs(v).format("h:mm:ss.SSS A")
 }
 
 function EventRow({
   event,
   highlight,
 }: {
-  event: RunEvent;
-  highlight: boolean;
+  event: RunEvent
+  highlight: boolean
 }) {
-  const typeColor = EVENT_TYPE_COLORS[event.type] ?? "text-zinc-400";
-  const shortType = SHORT_TYPE[event.type] ?? event.type;
-  const isError = event.type === "ExecutionStepFailureEvent";
+  const typeColor = EVENT_TYPE_COLORS[event.type] ?? "text-zinc-400"
+  const shortType = SHORT_TYPE[event.type] ?? event.type
+  const isError = event.type === "ExecutionStepFailureEvent"
 
   return (
     <tr
@@ -213,15 +213,15 @@ function EventRow({
         )}
       </td>
     </tr>
-  );
+  )
 }
 
 // ── Step status summary ───────────────────────────────────────────────────────
 
-type StepSummaryItem = { label: string; count: number; cls: string };
+type StepSummaryItem = { label: string; count: number; cls: string }
 
 function StepSummary({ stats }: { stats: RunStats | null }) {
-  if (!stats) return null;
+  if (!stats) return null
   const items: StepSummaryItem[] = [
     { label: "Preparing", count: 0, cls: "text-muted-foreground" },
     { label: "Executing", count: 0, cls: "text-blue-500" },
@@ -231,7 +231,7 @@ function StepSummary({ stats }: { stats: RunStats | null }) {
       count: stats.steps_succeeded ?? 0,
       cls: "text-green-500",
     },
-  ];
+  ]
   return (
     <div className="flex flex-col gap-1">
       {items.map((item) => (
@@ -245,7 +245,7 @@ function StepSummary({ stats }: { stats: RunStats | null }) {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // ── Re-executions ─────────────────────────────────────────────────────────────
@@ -254,25 +254,25 @@ function ReExecutions({
   rootRunId,
   runId,
 }: {
-  rootRunId: string | null;
-  runId: string;
+  rootRunId: string | null
+  runId: string
 }) {
-  const [runs, setRuns] = useState<Run[]>([]);
+  const [runs, setRuns] = useState<Run[]>([])
 
   useEffect(() => {
-    if (!rootRunId) return;
+    if (!rootRunId) return
     fetchWithAuth(`/api/dagster/runs?limit=20`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { runs: Run[] }) => {
         const related = d.runs.filter(
           (r) => r.root_run_id === rootRunId || r.run_id === rootRunId,
-        );
-        setRuns(related);
+        )
+        setRuns(related)
       })
-      .catch(() => {});
-  }, [rootRunId]);
+      .catch(() => {})
+  }, [rootRunId])
 
-  if (runs.length <= 1) return null;
+  if (runs.length <= 1) return null
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -283,8 +283,8 @@ function ReExecutions({
       </div>
       <div className="divide-y">
         {runs.map((r) => {
-          const cfg = STATUS_CONFIG[r.status];
-          const isThis = r.run_id === runId;
+          const cfg = STATUS_CONFIG[r.status]
+          const isThis = r.run_id === runId
           return (
             <Link
               key={r.run_id}
@@ -316,24 +316,24 @@ function ReExecutions({
                 </span>
               </div>
             </Link>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 }
 
 // ── Polling hook ──────────────────────────────────────────────────────────────
 
 function useRunDetail(runId: string) {
-  const [run, setRun] = useState<Run | null>(null);
-  const [events, setEvents] = useState<RunEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [run, setRun] = useState<Run | null>(null)
+  const [events, setEvents] = useState<RunEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     async function fetchAll() {
       try {
@@ -342,102 +342,102 @@ function useRunDetail(runId: string) {
           fetchWithAuth(`/api/dagster/runs/${runId}/events`, {
             cache: "no-store",
           }),
-        ]);
-        if (!runRes.ok) throw new Error(`HTTP ${runRes.status}`);
-        const runData = (await runRes.json()) as Run;
-        const eventsData = (await eventsRes.json()) as EventsResponse;
+        ])
+        if (!runRes.ok) throw new Error(`HTTP ${runRes.status}`)
+        const runData = (await runRes.json()) as Run
+        const eventsData = (await eventsRes.json()) as EventsResponse
 
         if (!cancelled) {
-          setRun(runData);
-          setEvents(eventsData.events ?? []);
-          setLoading(false);
-          const active = ACTIVE_STATUSES.has(runData.status);
-          timerRef.current = setTimeout(fetchAll, active ? 3000 : 30000);
+          setRun(runData)
+          setEvents(eventsData.events ?? [])
+          setLoading(false)
+          const active = ACTIVE_STATUSES.has(runData.status)
+          timerRef.current = setTimeout(fetchAll, active ? 3000 : 30000)
         }
       } catch (e) {
         if (!cancelled) {
-          setError((e as Error).message);
-          setLoading(false);
+          setError((e as Error).message)
+          setLoading(false)
         }
       }
     }
 
-    fetchAll();
+    fetchAll()
     return () => {
-      cancelled = true;
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [runId]);
+      cancelled = true
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [runId])
 
-  return { run, events, loading, error };
+  return { run, events, loading, error }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RunDetailPage() {
-  const params = useParams();
+  const params = useParams()
   const runId =
     typeof params.run_id === "string"
       ? params.run_id
-      : (params.run_id as string[])[0];
+      : (params.run_id as string[])[0]
 
-  const { run, events, loading, error } = useRunDetail(runId);
-  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const { run, events, loading, error } = useRunDetail(runId)
+  const [selectedStep, setSelectedStep] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"events" | "config" | "lineage">(
     "events",
-  );
-  const [graphHeight, setGraphHeight] = useState(500);
-  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+  )
+  const [graphHeight, setGraphHeight] = useState(500)
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
 
   function onDividerMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    dragRef.current = { startY: e.clientY, startH: graphHeight };
+    e.preventDefault()
+    dragRef.current = { startY: e.clientY, startH: graphHeight }
     function onMove(ev: MouseEvent) {
-      if (!dragRef.current) return;
-      const delta = ev.clientY - dragRef.current.startY;
+      if (!dragRef.current) return
+      const delta = ev.clientY - dragRef.current.startY
       setGraphHeight(
         Math.max(80, Math.min(600, dragRef.current.startH + delta)),
-      );
+      )
     }
     function onUp() {
-      dragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      dragRef.current = null
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
     }
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
   }
 
   const selectedStepAssetPath = useMemo(() => {
-    if (!selectedStep) return undefined;
+    if (!selectedStep) return undefined
     const e = events.find(
       (ev) =>
         ev.step_key === selectedStep && ev.asset_key && ev.asset_key.length > 0,
-    );
-    return e?.asset_key ?? undefined;
-  }, [selectedStep, events]);
+    )
+    return e?.asset_key ?? undefined
+  }, [selectedStep, events])
 
   const filteredEvents = selectedStep
     ? events.filter((e) => !e.step_key || e.step_key === selectedStep)
-    : events;
+    : events
 
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
         Loading run…
       </div>
-    );
+    )
   }
   if (error || !run) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
         {error ?? "Run not found"}
       </div>
-    );
+    )
   }
 
   const totalSteps =
-    (run.stats?.steps_succeeded ?? 0) + (run.stats?.steps_failed ?? 0);
+    (run.stats?.steps_succeeded ?? 0) + (run.stats?.steps_failed ?? 0)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -678,5 +678,5 @@ export default function RunDetailPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

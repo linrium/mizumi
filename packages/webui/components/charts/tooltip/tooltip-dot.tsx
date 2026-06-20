@@ -1,19 +1,19 @@
-"use client";
+"use client"
 
-import { motion, useSpring } from "motion/react";
-import { chartCssVars } from "../chart-context";
+import { motion, useSpring } from "motion/react"
+import { chartCssVars } from "../chart-context"
 
 // Faster spring to stay in sync with indicator
-const crosshairSpringConfig = { stiffness: 300, damping: 30 };
+const crosshairSpringConfig = { stiffness: 300, damping: 30 }
 
 export interface TooltipDotProps {
-  x: number;
-  y: number;
-  visible: boolean;
-  color: string;
-  size?: number;
-  strokeColor?: string;
-  strokeWidth?: number;
+  x: number
+  y: number
+  visible: boolean
+  color: string
+  size?: number
+  strokeColor?: string
+  strokeWidth?: number
 }
 
 export function TooltipDot({
@@ -25,14 +25,14 @@ export function TooltipDot({
   strokeColor = chartCssVars.background,
   strokeWidth = 2,
 }: TooltipDotProps) {
-  const animatedX = useSpring(x, crosshairSpringConfig);
-  const animatedY = useSpring(y, crosshairSpringConfig);
+  const animatedX = useSpring(x, crosshairSpringConfig)
+  const animatedY = useSpring(y, crosshairSpringConfig)
 
-  animatedX.set(x);
-  animatedY.set(y);
+  animatedX.set(x)
+  animatedY.set(y)
 
   if (!visible) {
-    return null;
+    return null
   }
 
   return (
@@ -44,9 +44,9 @@ export function TooltipDot({
       stroke={strokeColor}
       strokeWidth={strokeWidth}
     />
-  );
+  )
 }
 
-TooltipDot.displayName = "TooltipDot";
+TooltipDot.displayName = "TooltipDot"
 
-export default TooltipDot;
+export default TooltipDot

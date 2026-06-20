@@ -53,7 +53,9 @@ export default function VolumeLayout({
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-1 group/path">
-            <p className="text-xs text-muted-foreground font-mono">{fullPath}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {fullPath}
+            </p>
             <button
               type="button"
               onClick={() => {

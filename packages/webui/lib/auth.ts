@@ -34,7 +34,9 @@ function getKeycloakRealm() {
 }
 
 function getKeycloakPublicBaseUrl() {
-  return process.env.KEYCLOAK_PUBLIC_BASE_URL ?? DEFAULT_KEYCLOAK_PUBLIC_BASE_URL
+  return (
+    process.env.KEYCLOAK_PUBLIC_BASE_URL ?? DEFAULT_KEYCLOAK_PUBLIC_BASE_URL
+  )
 }
 
 function getKeycloakInternalBaseUrl() {

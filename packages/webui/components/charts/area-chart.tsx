@@ -1,97 +1,97 @@
-"use client";
+"use client"
 
-import { ParentSize } from "@visx/responsive";
-import type { Transition } from "motion/react";
+import { ParentSize } from "@visx/responsive"
+import type { Transition } from "motion/react"
 import {
   Children,
   isValidElement,
   type ReactNode,
   useMemo,
   useRef,
-} from "react";
-import { cn } from "@/lib/utils";
-import { Area, type AreaProps } from "./area";
-import type { LineConfig, Margin } from "./chart-context";
-import { PatternArea } from "./pattern-area";
-import { TimeSeriesChartInner } from "./time-series-chart-shell";
+} from "react"
+import { cn } from "@/lib/utils"
+import { Area, type AreaProps } from "./area"
+import type { LineConfig, Margin } from "./chart-context"
+import { PatternArea } from "./pattern-area"
+import { TimeSeriesChartInner } from "./time-series-chart-shell"
 
 export interface AreaChartProps {
   /** Data array - each item should have a date field and numeric values */
-  data: Record<string, unknown>[];
+  data: Record<string, unknown>[]
   /** Key in data for the x-axis (date). Default: "date" */
-  xDataKey?: string;
+  xDataKey?: string
   /** Chart margins */
-  margin?: Partial<Margin>;
+  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
-  animationDuration?: number;
+  animationDuration?: number
   /** CSS easing for clip-reveal. Default: cubic-bezier(0.85, 0, 0.15, 1) */
-  animationEasing?: string;
+  animationEasing?: string
   /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition;
+  enterTransition?: Transition
   /** Signature of motion URL state — triggers reveal replay when it changes. */
-  revealSignature?: string;
+  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
-  aspectRatio?: string;
+  aspectRatio?: string
   /** Additional class name for the container */
-  className?: string;
+  className?: string
   /** Child components (Area, Grid, ChartTooltip, etc.) */
-  children: ReactNode;
+  children: ReactNode
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 };
+const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 }
 
 function extractAreaConfigs(children: ReactNode): LineConfig[] {
-  const configs: LineConfig[] = [];
+  const configs: LineConfig[] = []
 
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) {
-      return;
+      return
     }
 
     const childType = child.type as {
-      displayName?: string;
-      name?: string;
-    };
+      displayName?: string
+      name?: string
+    }
     const componentName =
       typeof child.type === "function"
         ? childType.displayName || childType.name || ""
-        : "";
+        : ""
 
-    const props = child.props as AreaProps | undefined;
+    const props = child.props as AreaProps | undefined
     const isPatternArea =
-      componentName === "PatternArea" || child.type === PatternArea;
+      componentName === "PatternArea" || child.type === PatternArea
     const isAreaComponent =
       componentName === "Area" ||
       child.type === Area ||
       (props &&
         typeof props.dataKey === "string" &&
         props.dataKey.length > 0 &&
-        !isPatternArea);
+        !isPatternArea)
 
     if (isAreaComponent && props?.dataKey) {
       configs.push({
         dataKey: props.dataKey,
         stroke: props.stroke || props.fill || "var(--chart-line-primary)",
         strokeWidth: props.strokeWidth || 2,
-      });
+      })
     }
-  });
+  })
 
-  return configs;
+  return configs
 }
 
 interface ChartInnerProps {
-  width: number;
-  height: number;
-  data: Record<string, unknown>[];
-  xDataKey: string;
-  margin: Margin;
-  animationDuration: number;
-  animationEasing?: string;
-  enterTransition?: Transition;
-  revealSignature?: string;
-  children: ReactNode;
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  width: number
+  height: number
+  data: Record<string, unknown>[]
+  xDataKey: string
+  margin: Margin
+  animationDuration: number
+  animationEasing?: string
+  enterTransition?: Transition
+  revealSignature?: string
+  children: ReactNode
+  containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 function ChartInner({
@@ -107,7 +107,7 @@ function ChartInner({
   children,
   containerRef,
 }: ChartInnerProps) {
-  const lines = useMemo(() => extractAreaConfigs(children), [children]);
+  const lines = useMemo(() => extractAreaConfigs(children), [children])
 
   return (
     <TimeSeriesChartInner
@@ -126,7 +126,7 @@ function ChartInner({
     >
       {children}
     </TimeSeriesChartInner>
-  );
+  )
 }
 
 export function AreaChart({
@@ -141,8 +141,8 @@ export function AreaChart({
   className = "",
   children,
 }: AreaChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const margin = { ...DEFAULT_MARGIN, ...marginProp };
+  const containerRef = useRef<HTMLDivElement>(null)
+  const margin = { ...DEFAULT_MARGIN, ...marginProp }
 
   return (
     <div
@@ -169,9 +169,9 @@ export function AreaChart({
         )}
       </ParentSize>
     </div>
-  );
+  )
 }
 
-export { Area, type AreaProps } from "./area";
+export { Area, type AreaProps } from "./area"
 
-export default AreaChart;
+export default AreaChart

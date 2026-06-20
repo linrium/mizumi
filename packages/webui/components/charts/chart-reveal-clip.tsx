@@ -1,18 +1,18 @@
-"use client";
+"use client"
 
-import type { Transition } from "motion/react";
-import { motion } from "motion/react";
-import { clipRevealTransition } from "./animation";
+import type { Transition } from "motion/react"
+import { motion } from "motion/react"
+import { clipRevealTransition } from "./animation"
 
 export interface ChartRevealClipProps {
-  clipPathId: string;
-  height: number;
-  targetWidth: number;
-  enterTransition?: Transition;
+  clipPathId: string
+  height: number
+  targetWidth: number
+  enterTransition?: Transition
   /** Bumps when motion settings change to replay the reveal. */
-  revealEpoch: number;
+  revealEpoch: number
   /** Extra inset around the clip rect so edge glyphs are not cut off. */
-  padding?: number;
+  padding?: number
 }
 
 /**
@@ -27,9 +27,9 @@ export function ChartRevealClip({
   revealEpoch,
   padding = 0,
 }: ChartRevealClipProps) {
-  const transition = clipRevealTransition(enterTransition);
-  const paddedWidth = Math.max(0, targetWidth + padding * 2);
-  const paddedHeight = height + padding * 2;
+  const transition = clipRevealTransition(enterTransition)
+  const paddedWidth = Math.max(0, targetWidth + padding * 2)
+  const paddedHeight = height + padding * 2
 
   return (
     <clipPath id={clipPathId}>
@@ -44,5 +44,5 @@ export function ChartRevealClip({
         y={-padding}
       />
     </clipPath>
-  );
+  )
 }

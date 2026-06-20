@@ -45,7 +45,11 @@ import {
 import { DataGrid } from "@/components/data-grid/data-grid"
 import { useDataGrid } from "@/hooks/use-data-grid"
 import { MODELS, type ModelId } from "@/services/ai-models"
-import { createPermissionRequest, listPermissionRequests, type PermissionRequest } from "@/services/permissions"
+import {
+  createPermissionRequest,
+  listPermissionRequests,
+  type PermissionRequest,
+} from "@/services/permissions"
 import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -71,7 +75,11 @@ type VisualizeChartOutput = {
   error?: string
 }
 
-type QueryResponse = { columns: string[]; rows: unknown[][]; row_count: number }
+type QueryResponse = {
+  columns: string[]
+  rows: unknown[][]
+  row_count: number
+}
 type Row = Record<string, unknown>
 
 type AccessRequestPreviewOutput = {
@@ -249,7 +257,13 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
 
 // ── VisualizationCard ─────────────────────────────────────────────────────────
 
-const VIZ_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
+const VIZ_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
 function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
   const [sqlOpen, setSqlOpen] = useState(false)
@@ -279,7 +293,9 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
       keys.map((k, i) => {
         const parsed = new Date(k)
         return {
-          [output.x]: Number.isNaN(parsed.getTime()) ? new Date(i * 86400000) : parsed,
+          [output.x]: Number.isNaN(parsed.getTime())
+            ? new Date(i * 86400000)
+            : parsed,
           [output.y]: values[i] ?? 0,
         }
       }),
@@ -290,13 +306,18 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
     () => keys.map((k, i) => ({ label: k, value: values[i] ?? 0 })),
     [keys, values],
   )
-  const pieTotal = useMemo(() => pieData.reduce((s, d) => s + d.value, 0), [pieData])
+  const pieTotal = useMemo(
+    () => pieData.reduce((s, d) => s + d.value, 0),
+    [pieData],
+  )
 
   const sankeyData = useMemo<SankeyData>(() => {
     if (!output.columns || !output.rows) return { nodes: [], links: [] }
     const srcIdx = output.columns.indexOf(output.x)
     const tgtIdx = output.columns.indexOf(output.y)
-    const valIdx = output.columns.findIndex((_, i) => i !== srcIdx && i !== tgtIdx)
+    const valIdx = output.columns.findIndex(
+      (_, i) => i !== srcIdx && i !== tgtIdx,
+    )
     const rv = (row: unknown, i: number) => (row as unknown[])[i]
     const nodeNames = new Set<string>()
     const rawLinks: { source: string; target: string; value: number }[] = []
@@ -406,9 +427,17 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                 chart axes
               </div>
             ) : output.chartType === "pie" ? (
-              <div style={{ height: 260 }} className="flex items-center gap-6 px-4">
+              <div
+                style={{ height: 260 }}
+                className="flex items-center gap-6 px-4"
+              >
                 <div className="h-full aspect-square shrink-0">
-                  <PieChart data={pieData} innerRadius={55} padAngle={0.02} cornerRadius={3}>
+                  <PieChart
+                    data={pieData}
+                    innerRadius={55}
+                    padAngle={0.02}
+                    cornerRadius={3}
+                  >
                     {pieData.map((_, i) => (
                       <PieSlice key={i} index={i} />
                     ))}
@@ -416,14 +445,24 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-2 overflow-y-auto max-h-full">
                   {pieData.map((item, i) => {
-                    const pct = pieTotal > 0 ? ((item.value / pieTotal) * 100).toFixed(1) : "0.0"
+                    const pct =
+                      pieTotal > 0
+                        ? ((item.value / pieTotal) * 100).toFixed(1)
+                        : "0.0"
                     return (
-                      <div key={item.label} className="flex items-center gap-2 text-[11px]">
+                      <div
+                        key={item.label}
+                        className="flex items-center gap-2 text-[11px]"
+                      >
                         <span
                           className="w-2 h-2 rounded-sm shrink-0"
-                          style={{ background: VIZ_COLORS[i % VIZ_COLORS.length] }}
+                          style={{
+                            background: VIZ_COLORS[i % VIZ_COLORS.length],
+                          }}
                         />
-                        <span className="truncate text-foreground/75">{item.label}</span>
+                        <span className="truncate text-foreground/75">
+                          {item.label}
+                        </span>
                         <span className="ml-auto shrink-0 tabular-nums text-muted-foreground pl-2">
                           {pct}%
                         </span>
@@ -457,7 +496,10 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                   animationDuration={600}
                 >
                   <Grid />
-                  <Area dataKey={output.y} fillOpacity={output.chartType === "line" ? 0 : 0.4} />
+                  <Area
+                    dataKey={output.y}
+                    fillOpacity={output.chartType === "line" ? 0 : 0.4}
+                  />
                   <ChartTooltip />
                 </AreaChart>
               </div>
@@ -505,7 +547,10 @@ function AccessRequestCard({
 }) {
   const [rationale, setRationale] = useState(output.rationale)
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState<{ code: string; status: string } | null>(null)
+  const [submitted, setSubmitted] = useState<{
+    code: string
+    status: string
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async () => {
@@ -547,21 +592,27 @@ function AccessRequestCard({
 
         <div className="flex flex-wrap gap-1">
           {output.privileges.map((p) => (
-            <span key={p} className="px-1.5 py-0.5 rounded bg-muted/60 font-mono text-[10px]">
+            <span
+              key={p}
+              className="px-1.5 py-0.5 rounded bg-muted/60 font-mono text-[10px]"
+            >
               {p}
             </span>
           ))}
         </div>
 
         {output.explanation && (
-          <p className="text-muted-foreground text-[11px]">{output.explanation}</p>
+          <p className="text-muted-foreground text-[11px]">
+            {output.explanation}
+          </p>
         )}
 
         {submitted ? (
           <div className="flex items-center gap-2 py-1 text-emerald-600">
             <IconCheck size={13} className="shrink-0" />
             <span>
-              Request submitted — <span className="font-mono font-semibold">{submitted.code}</span>
+              Request submitted —{" "}
+              <span className="font-mono font-semibold">{submitted.code}</span>
             </span>
           </div>
         ) : (
@@ -575,7 +626,9 @@ function AccessRequestCard({
                 className="w-full resize-none rounded border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
-            {error && <div className="text-destructive text-[11px]">{error}</div>}
+            {error && (
+              <div className="text-destructive text-[11px]">{error}</div>
+            )}
             <Button
               size="sm"
               disabled={submitting || !rationale.trim()}
@@ -624,7 +677,12 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
         <IconShieldCheck size={12} className="text-muted-foreground shrink-0" />
         <span className="font-mono font-semibold flex-1">{output.code}</span>
-        <span className={cn("px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize", colorClass)}>
+        <span
+          className={cn(
+            "px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize",
+            colorClass,
+          )}
+        >
           {output.status}
         </span>
       </div>
@@ -635,7 +693,9 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
           <code className="font-mono text-[11px] bg-muted/40 px-1.5 py-0.5 rounded break-all">
             {output.resource}
           </code>
-          <span className="ml-1.5 text-muted-foreground capitalize">{output.scope}</span>
+          <span className="ml-1.5 text-muted-foreground capitalize">
+            {output.scope}
+          </span>
         </div>
 
         {output.approval_steps?.length > 0 && (
@@ -656,10 +716,14 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
                             : "bg-muted-foreground/20",
                     )}
                   />
-                  <span className={cn("flex-1", step.is_current && "font-medium")}>
+                  <span
+                    className={cn("flex-1", step.is_current && "font-medium")}
+                  >
                     {step.approver_label}
                   </span>
-                  <span className="text-muted-foreground capitalize text-[10px]">{step.status}</span>
+                  <span className="text-muted-foreground capitalize text-[10px]">
+                    {step.status}
+                  </span>
                 </div>
               ))}
             </div>
@@ -668,7 +732,8 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
 
         {output.status === "approved" && output.expires_at && (
           <div className="text-muted-foreground text-[11px]">
-            Access expires in {output.expires_in_days} day{output.expires_in_days === 1 ? "" : "s"}
+            Access expires in {output.expires_in_days} day
+            {output.expires_in_days === 1 ? "" : "s"}
           </div>
         )}
       </div>
@@ -679,11 +744,26 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
 // ── AccessRequestsListCard ────────────────────────────────────────────────────
 
 const REQUEST_STATUS_COLORS: Record<string, { dot: string; badge: string }> = {
-  pending:      { dot: "bg-amber-400",          badge: "text-amber-700 bg-amber-50 border-amber-200" },
-  "needs-info": { dot: "bg-orange-400",          badge: "text-orange-700 bg-orange-50 border-orange-200" },
-  approved:     { dot: "bg-emerald-500",         badge: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-  cancelled:    { dot: "bg-muted-foreground/40", badge: "text-muted-foreground bg-muted/30 border-border" },
-  ready:        { dot: "bg-blue-400",            badge: "text-blue-700 bg-blue-50 border-blue-200" },
+  pending: {
+    dot: "bg-amber-400",
+    badge: "text-amber-700 bg-amber-50 border-amber-200",
+  },
+  "needs-info": {
+    dot: "bg-orange-400",
+    badge: "text-orange-700 bg-orange-50 border-orange-200",
+  },
+  approved: {
+    dot: "bg-emerald-500",
+    badge: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  },
+  cancelled: {
+    dot: "bg-muted-foreground/40",
+    badge: "text-muted-foreground bg-muted/30 border-border",
+  },
+  ready: {
+    dot: "bg-blue-400",
+    badge: "text-blue-700 bg-blue-50 border-blue-200",
+  },
 }
 
 function AccessRequestsListCard({
@@ -719,8 +799,11 @@ function AccessRequestsListCard({
 
       <div className="divide-y">
         {output.requests.map((req) => {
-          const colors = REQUEST_STATUS_COLORS[req.status] ?? REQUEST_STATUS_COLORS.pending
-          const ago = formatDistanceToNowStrict(new Date(req.submitted_at), { addSuffix: true })
+          const colors =
+            REQUEST_STATUS_COLORS[req.status] ?? REQUEST_STATUS_COLORS.pending
+          const ago = formatDistanceToNowStrict(new Date(req.submitted_at), {
+            addSuffix: true,
+          })
 
           return (
             <button
@@ -733,7 +816,12 @@ function AccessRequestsListCard({
               }
               className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-accent/40 transition-colors text-left"
             >
-              <div className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0", colors.dot)} />
+              <div
+                className={cn(
+                  "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
+                  colors.dot,
+                )}
+              />
 
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex items-center gap-2">
@@ -747,13 +835,19 @@ function AccessRequestsListCard({
                     {req.status}
                   </span>
                 </div>
-                <div className="font-mono text-muted-foreground truncate">{req.resource}</div>
+                <div className="font-mono text-muted-foreground truncate">
+                  {req.resource}
+                </div>
                 {req.rationale && (
-                  <div className="text-muted-foreground line-clamp-1">{req.rationale}</div>
+                  <div className="text-muted-foreground line-clamp-1">
+                    {req.rationale}
+                  </div>
                 )}
               </div>
 
-              <div className="shrink-0 text-muted-foreground text-[10px] pt-0.5">{ago}</div>
+              <div className="shrink-0 text-muted-foreground text-[10px] pt-0.5">
+                {ago}
+              </div>
             </button>
           )
         })}
@@ -802,7 +896,8 @@ function CatalogTableList({
               {catalog}
             </span>
             <span className="text-muted-foreground text-[10px]">
-              {catalogTables.length} {catalogTables.length === 1 ? "table" : "tables"}
+              {catalogTables.length}{" "}
+              {catalogTables.length === 1 ? "table" : "tables"}
             </span>
             {locked && (
               <span className="ml-auto text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-px rounded">
@@ -818,7 +913,7 @@ function CatalogTableList({
                 .find((l) => l.startsWith("Description:"))
               const summary = descLine
                 ? descLine.replace(/^Description:\s*/, "")
-                : t.description.split("\n")[1] ?? ""
+                : (t.description.split("\n")[1] ?? "")
               const existingRequest = requestByFqn?.get(t.fqn)
 
               return (
@@ -828,7 +923,9 @@ function CatalogTableList({
                 >
                   <div className={cn("flex-1 min-w-0", locked && "opacity-50")}>
                     <div className="flex items-baseline gap-1.5 min-w-0">
-                      <span className="font-mono text-[11px] font-medium truncate">{t.table}</span>
+                      <span className="font-mono text-[11px] font-medium truncate">
+                        {t.table}
+                      </span>
                       <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
                         {t.schema}
                       </span>
@@ -853,12 +950,15 @@ function CatalogTableList({
                     </button>
                   )}
 
-                  {locked && onSendMessage && (
-                    existingRequest ? (
+                  {locked &&
+                    onSendMessage &&
+                    (existingRequest ? (
                       <button
                         type="button"
                         onClick={() =>
-                          onSendMessage(`Check my access request status for ${existingRequest.code}`)
+                          onSendMessage(
+                            `Check my access request status for ${existingRequest.code}`,
+                          )
                         }
                         className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors"
                       >
@@ -876,8 +976,7 @@ function CatalogTableList({
                         <IconShieldLock size={10} />
                         Request Access
                       </button>
-                    )
-                  )}
+                    ))}
                 </div>
               )
             })}
@@ -895,12 +994,16 @@ function ExploreCatalogCard({
   output: ExploreCatalogOutput
   onSendMessage?: (text: string) => void
 }) {
-  const [requestByFqn, setRequestByFqn] = useState<Map<string, PermissionRequest>>(new Map())
+  const [requestByFqn, setRequestByFqn] = useState<
+    Map<string, PermissionRequest>
+  >(new Map())
 
   useEffect(() => {
-    listPermissionRequests().then((reqs) => {
-      setRequestByFqn(new Map(reqs.map((r) => [r.resource, r])))
-    }).catch(() => {})
+    listPermissionRequests()
+      .then((reqs) => {
+        setRequestByFqn(new Map(reqs.map((r) => [r.resource, r])))
+      })
+      .catch(() => {})
   }, [])
 
   const tables = output.tables ?? []
@@ -908,14 +1011,17 @@ function ExploreCatalogCard({
   const inaccessibleCatalogs = output.inaccessible_catalogs ?? []
   const tableCount = tables.length
   const catalogCount = output.catalogs.length
-  const hasInaccessible = inaccessibleCatalogs.length > 0 || inaccessibleTables.length > 0
-
+  const hasInaccessible =
+    inaccessibleCatalogs.length > 0 || inaccessibleTables.length > 0
 
   return (
     <div className="rounded-lg border overflow-hidden text-xs mt-1">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <IconTriangleSquareCircle size={12} className="text-muted-foreground shrink-0" />
+        <IconTriangleSquareCircle
+          size={12}
+          className="text-muted-foreground shrink-0"
+        />
         <span className="font-medium flex-1">Catalog Explorer</span>
         {output.search && (
           <span className="text-muted-foreground text-[11px] font-mono">
@@ -930,7 +1036,9 @@ function ExploreCatalogCard({
 
       {/* Overview */}
       {output.overview && (
-        <p className="px-3 py-2 text-[11px] text-muted-foreground border-b">{output.overview}</p>
+        <p className="px-3 py-2 text-[11px] text-muted-foreground border-b">
+          {output.overview}
+        </p>
       )}
 
       {/* Empty state */}
@@ -953,12 +1061,16 @@ function ExploreCatalogCard({
       {hasInaccessible && (
         <>
           <div className="px-3 py-1.5 flex items-center gap-2 bg-muted/5 border-t border-b">
-            <IconShieldLock size={11} className="text-muted-foreground shrink-0" />
+            <IconShieldLock
+              size={11}
+              className="text-muted-foreground shrink-0"
+            />
             <span className="text-[11px] text-muted-foreground font-medium">
               Additional results — access required
             </span>
             <span className="text-[10px] text-muted-foreground ml-auto">
-              {inaccessibleTables.length} {inaccessibleTables.length === 1 ? "table" : "tables"}
+              {inaccessibleTables.length}{" "}
+              {inaccessibleTables.length === 1 ? "table" : "tables"}
             </span>
           </div>
           <CatalogTableList
@@ -992,10 +1104,7 @@ function ToolPart({
       const input = part.input as { explanation?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <IconLoader2
-            size={12}
-            className="animate-spin shrink-0"
-          />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
           {input?.explanation ?? "Running query…"}
         </div>
       )
@@ -1013,7 +1122,9 @@ function ToolPart({
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <IconLoader2 size={12} className="animate-spin shrink-0" />
           <IconSearch size={11} className="shrink-0" />
-          {input?.search ? `Searching catalog for "${input.search}"…` : "Exploring catalog…"}
+          {input?.search
+            ? `Searching catalog for "${input.search}"…`
+            : "Exploring catalog…"}
         </div>
       )
     }
@@ -1024,7 +1135,8 @@ function ToolPart({
           onSendMessage={onSendMessage}
         />
       )
-    if (part.state === "output-error") return <ToolError text={part.errorText} />
+    if (part.state === "output-error")
+      return <ToolError text={part.errorText} />
   }
 
   if (name === "listMyAccessRequests") {
@@ -1053,12 +1165,19 @@ function ToolPart({
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <IconLoader2 size={12} className="animate-spin shrink-0" />
-          {input?.resource ? `Preparing access request for ${input.resource}…` : "Preparing access request…"}
+          {input?.resource
+            ? `Preparing access request for ${input.resource}…`
+            : "Preparing access request…"}
         </div>
       )
     }
     if (part.state === "output-available")
-      return <AccessRequestCard output={part.output as AccessRequestPreviewOutput} onSendMessage={onSendMessage} />
+      return (
+        <AccessRequestCard
+          output={part.output as AccessRequestPreviewOutput}
+          onSendMessage={onSendMessage}
+        />
+      )
     if (part.state === "output-error")
       return <ToolError text={part.errorText} />
   }
@@ -1083,10 +1202,7 @@ function ToolPart({
       const input = part.input as { title?: string } | undefined
       return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-          <IconLoader2
-            size={12}
-            className="animate-spin shrink-0"
-          />
+          <IconLoader2 size={12} className="animate-spin shrink-0" />
           {input?.title ? `Charting: ${input.title}` : "Building chart…"}
         </div>
       )
@@ -1149,7 +1265,8 @@ function MessageBubble({
             </Streamdown>
           )
         }
-        if (isToolUIPart(part)) return <ToolPart key={i} part={part} onSendMessage={onSendMessage} />
+        if (isToolUIPart(part))
+          return <ToolPart key={i} part={part} onSendMessage={onSendMessage} />
         return null
       })}
     </div>
@@ -1219,10 +1336,7 @@ export default function AnalyticsPage() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-muted-foreground px-6">
-            <IconSparkles
-              size={40}
-              className="opacity-15"
-            />
+            <IconSparkles size={40} className="opacity-15" />
             <p className="text-sm font-medium">Ask anything about your data</p>
             <div className="flex flex-wrap justify-center gap-2 max-w-md">
               {SUGGESTIONS.map((s) => (
@@ -1253,10 +1367,7 @@ export default function AnalyticsPage() {
 
             {isLoading && messages.at(-1)?.role === "user" && (
               <div className="flex items-center gap-2 px-4 py-1.5 text-sm text-muted-foreground">
-                <IconLoader2
-                  size={14}
-                  className="animate-spin"
-                />
+                <IconLoader2 size={14} className="animate-spin" />
                 Thinking…
               </div>
             )}
@@ -1303,10 +1414,7 @@ export default function AnalyticsPage() {
                 className="h-7 px-3 text-xs"
               >
                 {isLoading ? (
-                  <IconLoader2
-                    size={12}
-                    className="animate-spin"
-                  />
+                  <IconLoader2 size={12} className="animate-spin" />
                 ) : (
                   <IconArrowUp size={12} />
                 )}

@@ -6,7 +6,8 @@ export async function GET(
 ) {
   const { path } = await params
   const base =
-    process.env.RUSTFS_S3_URL ?? "http://rustfs-svc.rustfs.svc.cluster.local:9000"
+    process.env.RUSTFS_S3_URL ??
+    "http://rustfs-svc.rustfs.svc.cluster.local:9000"
   const url = `${base}/${path.join("/")}`
 
   const upstream = await fetch(url)
@@ -15,7 +16,8 @@ export async function GET(
     return new Response(null, { status: upstream.status })
   }
 
-  const contentType = upstream.headers.get("content-type") ?? "application/octet-stream"
+  const contentType =
+    upstream.headers.get("content-type") ?? "application/octet-stream"
   return new Response(upstream.body, {
     headers: {
       "content-type": contentType,

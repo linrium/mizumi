@@ -1,39 +1,39 @@
-"use client";
+"use client"
 
-import NumberFlow from "@number-flow/react";
-import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import NumberFlow from "@number-flow/react"
+import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
 
 /** Subset of `Intl.NumberFormatOptions` supported by NumberFlow */
 export interface ChartStatFlowFormat {
-  notation?: "standard" | "compact";
-  compactDisplay?: "short" | "long";
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
-  minimumIntegerDigits?: number;
-  minimumSignificantDigits?: number;
-  maximumSignificantDigits?: number;
-  style?: "decimal" | "percent" | "currency";
-  currency?: string;
-  currencyDisplay?: "symbol" | "narrowSymbol" | "code" | "name";
-  unit?: string;
-  unitDisplay?: "short" | "long" | "narrow";
+  notation?: "standard" | "compact"
+  compactDisplay?: "short" | "long"
+  minimumFractionDigits?: number
+  maximumFractionDigits?: number
+  minimumIntegerDigits?: number
+  minimumSignificantDigits?: number
+  maximumSignificantDigits?: number
+  style?: "decimal" | "percent" | "currency"
+  currency?: string
+  currencyDisplay?: "symbol" | "narrowSymbol" | "code" | "name"
+  unit?: string
+  unitDisplay?: "short" | "long" | "narrow"
 }
 
 export const defaultChartStatFlowFormat: ChartStatFlowFormat = {
   notation: "standard",
   maximumFractionDigits: 0,
-};
+}
 
 export interface ChartStatFlowProps {
-  value: number;
-  label: string;
-  formatOptions?: ChartStatFlowFormat;
-  prefix?: string;
-  suffix?: string;
-  valueClassName?: string;
-  labelClassName?: string;
-  icon?: ReactNode;
+  value: number
+  label: string
+  formatOptions?: ChartStatFlowFormat
+  prefix?: string
+  suffix?: string
+  valueClassName?: string
+  labelClassName?: string
+  icon?: ReactNode
 }
 
 /**
@@ -70,7 +70,7 @@ export function ChartStatFlow({
         {label}
       </span>
     </>
-  );
+  )
 }
 
-ChartStatFlow.displayName = "ChartStatFlow";
+ChartStatFlow.displayName = "ChartStatFlow"

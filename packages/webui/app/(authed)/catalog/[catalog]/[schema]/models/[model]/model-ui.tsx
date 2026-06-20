@@ -12,10 +12,7 @@ export function formatTimestamp(value?: number | null) {
   })
 }
 
-export function formatDuration(
-  startMs?: number | null,
-  endMs?: number | null,
-) {
+export function formatDuration(startMs?: number | null, endMs?: number | null) {
   if (!startMs) return "—"
   const end = endMs ?? Date.now()
   const secs = Math.round((end - startMs) / 1000)

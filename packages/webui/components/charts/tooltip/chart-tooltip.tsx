@@ -1,40 +1,40 @@
-"use client";
+"use client"
 
-import { motion, useSpring } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
-import { chartCssVars, useChart } from "../chart-context";
-import { DateTicker } from "./date-ticker";
-import { TooltipBox } from "./tooltip-box";
-import { TooltipContent, type TooltipRow } from "./tooltip-content";
-import { TooltipDot } from "./tooltip-dot";
-import { TooltipIndicator } from "./tooltip-indicator";
+import { motion, useSpring } from "motion/react"
+import { useEffect, useMemo, useState } from "react"
+import { chartCssVars, useChart } from "../chart-context"
+import { DateTicker } from "./date-ticker"
+import { TooltipBox } from "./tooltip-box"
+import { TooltipContent, type TooltipRow } from "./tooltip-content"
+import { TooltipDot } from "./tooltip-dot"
+import { TooltipIndicator } from "./tooltip-indicator"
 
 // Spring config for crosshair
-const crosshairSpringConfig = { stiffness: 300, damping: 30 };
+const crosshairSpringConfig = { stiffness: 300, damping: 30 }
 
 export interface ChartTooltipProps {
   /** Whether to show the date pill at bottom. Default: true */
-  showDatePill?: boolean;
+  showDatePill?: boolean
   /** Whether to show the vertical crosshair line. Default: true */
-  showCrosshair?: boolean;
+  showCrosshair?: boolean
   /** Whether to show dots on the lines. Default: true */
-  showDots?: boolean;
+  showDots?: boolean
   /**
    * Color for the crosshair/indicator line. When a function, receives the hovered point
    * (e.g. for candlestick: match candle color from close vs open). Default: --chart-crosshair.
    */
-  indicatorColor?: string | ((point: Record<string, unknown>) => string);
+  indicatorColor?: string | ((point: Record<string, unknown>) => string)
   /** Custom content renderer for the tooltip box */
   content?: (props: {
-    point: Record<string, unknown>;
-    index: number;
-  }) => React.ReactNode;
+    point: Record<string, unknown>
+    index: number
+  }) => React.ReactNode
   /** Custom row renderer - return array of TooltipRow */
-  rows?: (point: Record<string, unknown>) => TooltipRow[];
+  rows?: (point: Record<string, unknown>) => TooltipRow[]
   /** Additional content to show below rows (e.g., markers) */
-  children?: React.ReactNode;
+  children?: React.ReactNode
   /** Custom class name */
-  className?: string;
+  className?: string
 }
 
 export function ChartTooltip({
@@ -60,41 +60,41 @@ export function ChartTooltip({
     containerRef,
     orientation,
     barXAccessor,
-  } = useChart();
+  } = useChart()
 
-  const isHorizontal = orientation === "horizontal";
+  const isHorizontal = orientation === "horizontal"
 
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(false)
 
   // Only render portals on client side after mount
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
-  const visible = tooltipData !== null;
-  const x = tooltipData?.x ?? 0;
-  const xWithMargin = x + margin.left;
+  const visible = tooltipData !== null
+  const x = tooltipData?.x ?? 0
+  const xWithMargin = x + margin.left
 
   // For horizontal charts, get the y position from the first line's yPosition (center of bar)
-  const firstLineDataKey = lines[0]?.dataKey;
+  const firstLineDataKey = lines[0]?.dataKey
   const firstLineY = firstLineDataKey
     ? (tooltipData?.yPositions[firstLineDataKey] ?? 0)
-    : 0;
-  const yWithMargin = firstLineY + margin.top;
+    : 0
+  const yWithMargin = firstLineY + margin.top
 
   // Animated crosshair position
-  const animatedX = useSpring(xWithMargin, crosshairSpringConfig);
+  const animatedX = useSpring(xWithMargin, crosshairSpringConfig)
 
-  animatedX.set(xWithMargin);
+  animatedX.set(xWithMargin)
 
   // Generate rows from lines
   const tooltipRows = useMemo(() => {
     if (!tooltipData) {
-      return [];
+      return []
     }
 
     if (rowsRenderer) {
-      return rowsRenderer(tooltipData.point);
+      return rowsRenderer(tooltipData.point)
     }
 
     // Default: generate rows from registered lines
@@ -102,48 +102,48 @@ export function ChartTooltip({
       color: line.stroke,
       label: line.dataKey,
       value: (tooltipData.point[line.dataKey] as number) ?? 0,
-    }));
-  }, [tooltipData, lines, rowsRenderer]);
+    }))
+  }, [tooltipData, lines, rowsRenderer])
 
   // Resolve indicator color (static or from hovered point)
   const indicatorColor = useMemo(() => {
     if (indicatorColorProp == null) {
-      return chartCssVars.crosshair;
+      return chartCssVars.crosshair
     }
     if (typeof indicatorColorProp === "function") {
       return tooltipData
         ? indicatorColorProp(tooltipData.point)
-        : chartCssVars.crosshair;
+        : chartCssVars.crosshair
     }
-    return indicatorColorProp;
-  }, [indicatorColorProp, tooltipData]);
+    return indicatorColorProp
+  }, [indicatorColorProp, tooltipData])
 
   // Title from date or category
   const title = useMemo(() => {
     if (!tooltipData) {
-      return undefined;
+      return undefined
     }
     // For bar charts (horizontal or vertical), use the category name
     if (barXAccessor) {
-      return barXAccessor(tooltipData.point);
+      return barXAccessor(tooltipData.point)
     }
     // For line/area charts, use the date
     return xAccessor(tooltipData.point).toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
-    });
-  }, [tooltipData, barXAccessor, xAccessor]);
+    })
+  }, [tooltipData, barXAccessor, xAccessor])
 
   // Use portal to render into the chart container
   // Only render after mount on client side
-  const container = containerRef.current;
+  const container = containerRef.current
   if (!(mounted && container)) {
-    return null;
+    return null
   }
 
   // Dynamic import to avoid SSR issues
-  const { createPortal } = require("react-dom") as typeof import("react-dom");
+  const { createPortal } = require("react-dom") as typeof import("react-dom")
 
   const tooltipContent = (
     <>
@@ -234,11 +234,11 @@ export function ChartTooltip({
         </motion.div>
       )}
     </>
-  );
+  )
 
-  return createPortal(tooltipContent, container);
+  return createPortal(tooltipContent, container)
 }
 
-ChartTooltip.displayName = "ChartTooltip";
+ChartTooltip.displayName = "ChartTooltip"
 
-export default ChartTooltip;
+export default ChartTooltip

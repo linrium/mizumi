@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { localPoint } from "@visx/event";
-import { ParentSize } from "@visx/responsive";
-import { sankey, sankeyCenter, sankeyLinkHorizontal } from "@visx/sankey";
-import type { Transition } from "motion/react";
+import { localPoint } from "@visx/event"
+import { ParentSize } from "@visx/responsive"
+import { sankey, sankeyCenter, sankeyLinkHorizontal } from "@visx/sankey"
+import type { Transition } from "motion/react"
 import {
   type ReactNode,
   useCallback,
@@ -11,45 +11,45 @@ import {
   useMemo,
   useRef,
   useState,
-} from "react";
-import { cn } from "@/lib/utils";
+} from "react"
+import { cn } from "@/lib/utils"
 import {
   type Margin,
   type SankeyLinkDatum,
   type SankeyNodeDatum,
   SankeyProvider,
   type SankeyTooltipData,
-} from "./sankey-context";
+} from "./sankey-context"
 
 export interface SankeyData {
-  nodes: SankeyNodeDatum[];
-  links: SankeyLinkDatum[];
+  nodes: SankeyNodeDatum[]
+  links: SankeyLinkDatum[]
 }
 
 export interface SankeyChartProps {
   /** Sankey data with nodes and links */
-  data: SankeyData;
+  data: SankeyData
   /** Chart margins */
-  margin?: Partial<Margin>;
+  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
-  animationDuration?: number;
+  animationDuration?: number
   /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition;
+  enterTransition?: Transition
   /** Signature of motion URL state — triggers enter replay when it changes. */
-  revealSignature?: string;
+  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
-  aspectRatio?: string;
+  aspectRatio?: string
   /** Node width in pixels. Default: 16 */
-  nodeWidth?: number;
+  nodeWidth?: number
   /** Node padding in pixels. Default: 24 */
-  nodePadding?: number;
+  nodePadding?: number
   /** Additional class name for the container */
-  className?: string;
+  className?: string
   /** Child components (SankeyNode, SankeyLink, SankeyTooltip) */
-  children: ReactNode;
+  children: ReactNode
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 180, bottom: 40, left: 180 };
+const DEFAULT_MARGIN: Margin = { top: 40, right: 180, bottom: 40, left: 180 }
 
 function SankeyChartInner({
   data,
@@ -63,41 +63,39 @@ function SankeyChartInner({
   nodePadding,
   children,
 }: {
-  data: SankeyData;
-  width: number;
-  height: number;
-  margin: Margin;
-  animationDuration: number;
-  enterTransition?: Transition;
-  revealSignature?: string;
-  nodeWidth: number;
-  nodePadding: number;
-  children: ReactNode;
+  data: SankeyData
+  width: number
+  height: number
+  margin: Margin
+  animationDuration: number
+  enterTransition?: Transition
+  revealSignature?: string
+  nodeWidth: number
+  nodePadding: number
+  children: ReactNode
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [revealEpoch, setRevealEpoch] = useState(0);
-  const [hoveredNodeIndex, setHoveredNodeIndex] = useState<number | null>(null);
-  const [hoveredLinkIndex, setHoveredLinkIndex] = useState<number | null>(null);
-  const [tooltipData, setTooltipData] = useState<SankeyTooltipData | null>(
-    null
-  );
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [revealEpoch, setRevealEpoch] = useState(0)
+  const [hoveredNodeIndex, setHoveredNodeIndex] = useState<number | null>(null)
+  const [hoveredLinkIndex, setHoveredLinkIndex] = useState<number | null>(null)
+  const [tooltipData, setTooltipData] = useState<SankeyTooltipData | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(
-    null
-  );
+    null,
+  )
 
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
+  const innerWidth = width - margin.left - margin.right
+  const innerHeight = height - margin.top - margin.bottom
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature
   useEffect(() => {
-    setRevealEpoch((n) => n + 1);
-    setIsLoaded(false);
+    setRevealEpoch((n) => n + 1)
+    setIsLoaded(false)
     const timeout = setTimeout(() => {
-      setIsLoaded(true);
-    }, animationDuration);
-    return () => clearTimeout(timeout);
-  }, [animationDuration, revealSignature]);
+      setIsLoaded(true)
+    }, animationDuration)
+    return () => clearTimeout(timeout)
+  }, [animationDuration, revealSignature])
 
   const sankeyGenerator = useMemo(() => {
     return sankey<SankeyNodeDatum, SankeyLinkDatum>()
@@ -107,46 +105,46 @@ function SankeyChartInner({
       .extent([
         [0, 0],
         [innerWidth, innerHeight],
-      ]);
-  }, [innerWidth, innerHeight, nodeWidth, nodePadding]);
+      ])
+  }, [innerWidth, innerHeight, nodeWidth, nodePadding])
 
   const graph = useMemo(() => {
     const clonedData = {
       nodes: data.nodes.map((node) => ({ ...node })),
       links: data.links.map((link) => ({ ...link })),
-    };
-    return sankeyGenerator(clonedData);
-  }, [data, sankeyGenerator]);
+    }
+    return sankeyGenerator(clonedData)
+  }, [data, sankeyGenerator])
 
   const createPath = useCallback(
     // biome-ignore lint/suspicious/noExplicitAny: d3-sankey types are complex
     (link: any) => {
       try {
-        const pathGenerator = sankeyLinkHorizontal();
-        return pathGenerator(link) || "";
+        const pathGenerator = sankeyLinkHorizontal()
+        return pathGenerator(link) || ""
       } catch {
-        return "";
+        return ""
       }
     },
-    []
-  );
+    [],
+  )
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    const point = localPoint(event);
+    const point = localPoint(event)
     if (point) {
-      setMousePos({ x: point.x, y: point.y });
+      setMousePos({ x: point.x, y: point.y })
     }
-  }, []);
+  }, [])
 
   const handleMouseLeave = useCallback(() => {
-    setHoveredNodeIndex(null);
-    setHoveredLinkIndex(null);
-    setTooltipData(null);
-    setMousePos(null);
-  }, []);
+    setHoveredNodeIndex(null)
+    setHoveredLinkIndex(null)
+    setTooltipData(null)
+    setMousePos(null)
+  }, [])
 
   if (width < 10 || height < 10) {
-    return null;
+    return null
   }
 
   const contextValue = {
@@ -171,7 +169,7 @@ function SankeyChartInner({
     revealEpoch,
     mousePos,
     createPath,
-  };
+  }
 
   return (
     <SankeyProvider value={contextValue}>
@@ -189,7 +187,7 @@ function SankeyChartInner({
         </svg>
       </div>
     </SankeyProvider>
-  );
+  )
 }
 
 export function SankeyChart({
@@ -204,7 +202,7 @@ export function SankeyChart({
   className = "",
   children,
 }: SankeyChartProps) {
-  const margin = { ...DEFAULT_MARGIN, ...marginProp };
+  const margin = { ...DEFAULT_MARGIN, ...marginProp }
 
   return (
     <div className={cn("relative w-full", className)} style={{ aspectRatio }}>
@@ -226,9 +224,9 @@ export function SankeyChart({
         )}
       </ParentSize>
     </div>
-  );
+  )
 }
 
-SankeyChart.displayName = "SankeyChart";
+SankeyChart.displayName = "SankeyChart"
 
-export default SankeyChart;
+export default SankeyChart

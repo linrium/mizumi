@@ -73,7 +73,12 @@ type SendResult =
   | {
       ok: true
       status: number
-      data: { sent: number; accepted: number; failed: number; sample: unknown[] }
+      data: {
+        sent: number
+        accepted: number
+        failed: number
+        sample: unknown[]
+      }
     }
   | { ok: false; status?: number; error: string }
 
@@ -101,10 +106,7 @@ function normalizeFlightIncident(
   }
 }
 
-async function fetchBatch<T>(
-  dataset: string,
-  batchSize: number,
-): Promise<T[]> {
+async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
   const response = await fetch(
     `/api/synthetic/${dataset}?limit=${batchSize}&random=true`,
     { cache: "no-store" },
@@ -115,7 +117,11 @@ async function fetchBatch<T>(
 }
 
 type EventPanelProps = {
-  icon: React.ComponentType<{ size?: number; className?: string; stroke?: number }>
+  icon: React.ComponentType<{
+    size?: number
+    className?: string
+    stroke?: number
+  }>
   label: string
   dataset: string
   endpoint: string
@@ -261,9 +267,7 @@ function EventPanel({
                 result.ok ? "text-foreground" : "text-destructive"
               }`}
             >
-              {result.ok
-                ? JSON.stringify(result.data, null, 2)
-                : result.error}
+              {result.ok ? JSON.stringify(result.data, null, 2) : result.error}
             </pre>
           )}
         </div>
@@ -276,7 +280,11 @@ export default function VietjetairBookingPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b bg-muted/30 px-4 py-3">
-        <IconWaveSine size={15} className="text-muted-foreground" stroke={1.5} />
+        <IconWaveSine
+          size={15}
+          className="text-muted-foreground"
+          stroke={1.5}
+        />
         <div className="min-w-0">
           <div className="text-sm font-medium">VietJet Air Events</div>
           <div className="text-xs text-muted-foreground">
@@ -295,7 +303,9 @@ export default function VietjetairBookingPage() {
           label="Flight Ticket Events"
           dataset="flight-tickets"
           endpoint="/api/tests/vietjetair/flight-tickets/batch"
-          normalize={normalizeFlightTicket as (item: unknown) => Record<string, unknown>}
+          normalize={
+            normalizeFlightTicket as (item: unknown) => Record<string, unknown>
+          }
           isFirst
         />
         <EventPanel
@@ -303,7 +313,11 @@ export default function VietjetairBookingPage() {
           label="Flight Incident Events"
           dataset="flight-incidents"
           endpoint="/api/tests/vietjetair/flight-incidents/batch"
-          normalize={normalizeFlightIncident as (item: unknown) => Record<string, unknown>}
+          normalize={
+            normalizeFlightIncident as (
+              item: unknown,
+            ) => Record<string, unknown>
+          }
         />
       </div>
     </div>
