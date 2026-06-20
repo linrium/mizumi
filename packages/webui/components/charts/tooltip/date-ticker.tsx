@@ -1,79 +1,79 @@
-"use client";
+"use client"
 
-import { motion, useSpring } from "motion/react";
-import { useMemo, useRef } from "react";
+import { motion, useSpring } from "motion/react"
+import { useMemo, useRef } from "react"
 
-const TICKER_ITEM_HEIGHT = 24;
+const TICKER_ITEM_HEIGHT = 24
 
 export interface DateTickerProps {
-  currentIndex: number;
-  labels: string[];
-  visible: boolean;
+  currentIndex: number
+  labels: string[]
+  visible: boolean
 }
 
 export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
   // Parse labels into month and day parts
   const parsedLabels = useMemo(() => {
     return labels.map((label, index) => {
-      const parts = label.split(" ");
-      const month = parts[0] || "";
-      const day = parts[1] || "";
-      return { month, day, full: label, key: `${label}::${index}` };
-    });
-  }, [labels]);
+      const parts = label.split(" ")
+      const month = parts[0] || ""
+      const day = parts[1] || ""
+      return { month, day, full: label, key: `${label}::${index}` }
+    })
+  }, [labels])
 
   // Month segments: one entry per consecutive run (Jan → Feb → …), keyed by start index
   const monthSegments = useMemo(() => {
-    const segments: { month: string; key: string; startIndex: number }[] = [];
+    const segments: { month: string; key: string; startIndex: number }[] = []
 
     parsedLabels.forEach((label, index) => {
-      const prev = segments.at(-1);
+      const prev = segments.at(-1)
       if (!prev || prev.month !== label.month) {
         segments.push({
           month: label.month,
           key: `${label.month}-${index}`,
           startIndex: index,
-        });
+        })
       }
-    });
+    })
 
-    return segments;
-  }, [parsedLabels]);
+    return segments
+  }, [parsedLabels])
 
   // Index into monthSegments for the current data point
   const currentMonthIndex = useMemo(() => {
     if (currentIndex < 0 || currentIndex >= parsedLabels.length) {
-      return 0;
+      return 0
     }
     for (let i = monthSegments.length - 1; i >= 0; i--) {
-      const segment = monthSegments[i];
+      const segment = monthSegments[i]
       if (segment && segment.startIndex <= currentIndex) {
-        return i;
+        return i
       }
     }
-    return 0;
-  }, [currentIndex, parsedLabels.length, monthSegments]);
+    return 0
+  }, [currentIndex, parsedLabels.length, monthSegments])
 
   // Track previous month index
-  const prevMonthIndexRef = useRef(-1);
+  const prevMonthIndexRef = useRef(-1)
 
   // Animated Y offsets
-  const dayY = useSpring(0, { stiffness: 400, damping: 35 });
-  const monthY = useSpring(0, { stiffness: 400, damping: 35 });
+  const dayY = useSpring(0, { stiffness: 400, damping: 35 })
+  const monthY = useSpring(0, { stiffness: 400, damping: 35 })
 
-  dayY.set(-currentIndex * TICKER_ITEM_HEIGHT);
+  dayY.set(-currentIndex * TICKER_ITEM_HEIGHT)
 
   if (currentMonthIndex >= 0) {
-    const isFirstRender = prevMonthIndexRef.current === -1;
-    const monthChanged = prevMonthIndexRef.current !== currentMonthIndex;
+    const isFirstRender = prevMonthIndexRef.current === -1
+    const monthChanged = prevMonthIndexRef.current !== currentMonthIndex
     if (isFirstRender || monthChanged) {
-      monthY.set(-currentMonthIndex * TICKER_ITEM_HEIGHT);
-      prevMonthIndexRef.current = currentMonthIndex;
+      monthY.set(-currentMonthIndex * TICKER_ITEM_HEIGHT)
+      prevMonthIndexRef.current = currentMonthIndex
     }
   }
 
   if (!visible || labels.length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -114,9 +114,9 @@ export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-DateTicker.displayName = "DateTicker";
+DateTicker.displayName = "DateTicker"
 
-export default DateTicker;
+export default DateTicker

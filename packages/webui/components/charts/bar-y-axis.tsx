@@ -1,22 +1,22 @@
-"use client";
+"use client"
 
-import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
-import { useChart } from "./chart-context";
+import { motion } from "motion/react"
+import { useEffect, useMemo, useState } from "react"
+import { cn } from "@/lib/utils"
+import { useChart } from "./chart-context"
 
 export interface BarYAxisProps {
   /** Whether to show all labels or skip some for dense data. Default: true */
-  showAllLabels?: boolean;
+  showAllLabels?: boolean
   /** Maximum number of labels to show. Default: 20 */
-  maxLabels?: number;
+  maxLabels?: number
 }
 
 interface BarYAxisLabelProps {
-  label: string;
-  y: number;
-  bandHeight: number;
-  isHovered: boolean;
+  label: string
+  y: number
+  bandHeight: number
+  isHovered: boolean
 }
 
 function BarYAxisLabel({
@@ -51,7 +51,7 @@ function BarYAxisLabel({
         {label}
       </motion.span>
     </div>
-  );
+  )
 }
 
 export function BarYAxis({
@@ -66,36 +66,36 @@ export function BarYAxis({
     barXAccessor,
     data,
     hoveredBarIndex,
-  } = useChart();
-  const [mounted, setMounted] = useState(false);
+  } = useChart()
+  const [mounted, setMounted] = useState(false)
 
   // Only render on client side after mount
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
   // Generate labels for each bar
   const labelsToShow = useMemo(() => {
     if (!(barScale && bandWidth && barXAccessor)) {
-      return [];
+      return []
     }
 
     const allLabels = data.map((d, i) => {
-      const label = barXAccessor(d);
-      const bandY = barScale(label) ?? 0;
+      const label = barXAccessor(d)
+      const bandY = barScale(label) ?? 0
       // Center the label vertically within the band
-      const y = bandY + margin.top;
-      return { label, y, bandHeight: bandWidth, index: i };
-    });
+      const y = bandY + margin.top
+      return { label, y, bandHeight: bandWidth, index: i }
+    })
 
     // If showAllLabels is true or we have fewer than maxLabels, show all
     if (showAllLabels || allLabels.length <= maxLabels) {
-      return allLabels;
+      return allLabels
     }
 
     // Otherwise, skip some labels to avoid crowding
-    const step = Math.ceil(allLabels.length / maxLabels);
-    return allLabels.filter((_, i) => i % step === 0);
+    const step = Math.ceil(allLabels.length / maxLabels)
+    return allLabels.filter((_, i) => i % step === 0)
   }, [
     barScale,
     bandWidth,
@@ -104,21 +104,21 @@ export function BarYAxis({
     margin.top,
     showAllLabels,
     maxLabels,
-  ]);
+  ])
 
   // Use portal to render into the chart container
-  const container = containerRef.current;
+  const container = containerRef.current
   if (!(mounted && container)) {
-    return null;
+    return null
   }
 
   // Early return if not in a BarChart
   if (!barScale) {
-    return null;
+    return null
   }
 
   // Dynamic import to avoid SSR issues
-  const { createPortal } = require("react-dom") as typeof import("react-dom");
+  const { createPortal } = require("react-dom") as typeof import("react-dom")
 
   return createPortal(
     <div
@@ -138,10 +138,10 @@ export function BarYAxis({
         />
       ))}
     </div>,
-    container
-  );
+    container,
+  )
 }
 
-BarYAxis.displayName = "BarYAxis";
+BarYAxis.displayName = "BarYAxis"
 
-export default BarYAxis;
+export default BarYAxis

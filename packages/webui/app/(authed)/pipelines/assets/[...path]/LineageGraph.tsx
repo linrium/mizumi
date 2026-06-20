@@ -238,7 +238,9 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
       />
 
       <div className="flex items-start gap-2 px-3 py-2 border-b border-zinc-200/80">
-        <span className="text-zinc-500 mt-0.5 shrink-0">{nodeIcon(data.nodeType)}</span>
+        <span className="text-zinc-500 mt-0.5 shrink-0">
+          {nodeIcon(data.nodeType)}
+        </span>
         <div className="min-w-0 flex-1">
           <div className="font-mono font-semibold break-words whitespace-normal leading-snug">
             {data.displayName}

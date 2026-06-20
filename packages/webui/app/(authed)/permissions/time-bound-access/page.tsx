@@ -415,7 +415,11 @@ export default function TimeBoundAccessPage() {
           </DialogHeader>
           {dialogGrant && <GrantSummary grant={dialogGrant} />}
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={submitting}>
+            <Button
+              variant="outline"
+              onClick={closeDialog}
+              disabled={submitting}
+            >
               Cancel
             </Button>
             <Button
@@ -471,7 +475,11 @@ export default function TimeBoundAccessPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={submitting}>
+            <Button
+              variant="outline"
+              onClick={closeDialog}
+              disabled={submitting}
+            >
               Cancel
             </Button>
             <Button onClick={handleConfirmRenew} disabled={submitting}>

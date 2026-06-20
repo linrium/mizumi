@@ -1,6 +1,12 @@
 "use client"
 
-import { IconChevronLeft, IconChevronRight, IconEye, IconFile, IconPhoto } from "@tabler/icons-react"
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconEye,
+  IconFile,
+  IconPhoto,
+} from "@tabler/icons-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { S3Object } from "@/services/catalog-types"
@@ -188,7 +194,9 @@ export default function VolumeFilesPage() {
                           {formatBytes(obj.size)}
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">
-                          {obj.last_modified ? formatDate(obj.last_modified) : "—"}
+                          {obj.last_modified
+                            ? formatDate(obj.last_modified)
+                            : "—"}
                         </td>
                         <td className="px-4 py-2">
                           {isImage && (
@@ -233,13 +241,20 @@ export default function VolumeFilesPage() {
         )}
       </div>
 
-      <Sheet open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null) }}>
+      <Sheet
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+      >
         <SheetContent className="w-[420px] sm:max-w-[420px] flex flex-col gap-0 p-0 overflow-hidden">
           <SheetHeader className="px-5 py-4 border-b shrink-0">
             <SheetTitle className="text-sm font-semibold truncate">
               {selected ? baseName(selected.key) : ""}
             </SheetTitle>
-            <SheetDescription className="sr-only">File preview</SheetDescription>
+            <SheetDescription className="sr-only">
+              File preview
+            </SheetDescription>
           </SheetHeader>
 
           {selected && (
@@ -257,7 +272,11 @@ export default function VolumeFilesPage() {
                 <MetaRow label="Size" value={formatBytes(selected.size)} />
                 <MetaRow
                   label="Modified"
-                  value={selected.last_modified ? formatDate(selected.last_modified) : "—"}
+                  value={
+                    selected.last_modified
+                      ? formatDate(selected.last_modified)
+                      : "—"
+                  }
                 />
               </div>
             </div>
@@ -268,7 +287,15 @@ export default function VolumeFilesPage() {
   )
 }
 
-function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function MetaRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">

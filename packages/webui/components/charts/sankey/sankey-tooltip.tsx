@@ -1,39 +1,39 @@
-"use client";
+"use client"
 
-import type { SankeyLink, SankeyNode } from "d3-sankey";
-import { TooltipBox } from "../tooltip/tooltip-box";
-import { TooltipContent, type TooltipRow } from "../tooltip/tooltip-content";
+import type { SankeyLink, SankeyNode } from "d3-sankey"
+import { TooltipBox } from "../tooltip/tooltip-box"
+import { TooltipContent, type TooltipRow } from "../tooltip/tooltip-content"
 import {
   type SankeyLinkDatum,
   type SankeyNodeDatum,
   useSankey,
-} from "./sankey-context";
+} from "./sankey-context"
 
 // Helper to get node name from link source/target
-type NodeOrIndex = SankeyNode<SankeyNodeDatum, SankeyLinkDatum> | number;
+type NodeOrIndex = SankeyNode<SankeyNodeDatum, SankeyLinkDatum> | number
 
 function getNodeName(nodeOrIndex: NodeOrIndex, fallbackIndex: number): string {
   if (typeof nodeOrIndex === "number") {
-    return `Node ${nodeOrIndex}`;
+    return `Node ${nodeOrIndex}`
   }
-  return nodeOrIndex.name ?? `Node ${fallbackIndex}`;
+  return nodeOrIndex.name ?? `Node ${fallbackIndex}`
 }
 
 export interface SankeyTooltipProps {
   /** Custom content renderer for node tooltips */
   nodeContent?: (props: {
-    node: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>;
-    index: number;
-  }) => React.ReactNode;
+    node: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>
+    index: number
+  }) => React.ReactNode
   /** Custom content renderer for link tooltips */
   linkContent?: (props: {
-    link: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>;
-    index: number;
-  }) => React.ReactNode;
+    link: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>
+    index: number
+  }) => React.ReactNode
   /** Value formatter function */
-  formatValue?: (value: number) => string;
+  formatValue?: (value: number) => string
   /** Custom class name */
-  className?: string;
+  className?: string
 }
 
 export function SankeyTooltip({
@@ -51,25 +51,25 @@ export function SankeyTooltip({
     nodes,
     links,
     mousePos,
-  } = useSankey();
+  } = useSankey()
 
   if (!tooltipData) {
-    return null;
+    return null
   }
 
   // Use mouse position if available, otherwise fallback to anchor point
-  const x = mousePos ? mousePos.x : tooltipData.x + margin.left;
-  const y = mousePos ? mousePos.y : tooltipData.y + margin.top;
+  const x = mousePos ? mousePos.x : tooltipData.x + margin.left
+  const y = mousePos ? mousePos.y : tooltipData.y + margin.top
 
   // Render node tooltip
   if (tooltipData.type === "node" && tooltipData.nodeIndex !== undefined) {
-    const node = nodes[tooltipData.nodeIndex];
+    const node = nodes[tooltipData.nodeIndex]
     if (!node) {
-      return null;
+      return null
     }
 
     // Calculate total value flowing through this node
-    const totalValue = node.value ?? 0;
+    const totalValue = node.value ?? 0
 
     // Custom content
     if (nodeContent) {
@@ -85,7 +85,7 @@ export function SankeyTooltip({
         >
           {nodeContent({ node, index: tooltipData.nodeIndex })}
         </TooltipBox>
-      );
+      )
     }
 
     // Default node tooltip
@@ -95,7 +95,7 @@ export function SankeyTooltip({
         label: "Sessions",
         value: formatValue(totalValue),
       },
-    ];
+    ]
 
     return (
       <TooltipBox
@@ -109,25 +109,25 @@ export function SankeyTooltip({
       >
         <TooltipContent rows={rows} title={node.name} />
       </TooltipBox>
-    );
+    )
   }
 
   // Render link tooltip
   if (tooltipData.type === "link" && tooltipData.linkIndex !== undefined) {
-    const link = links[tooltipData.linkIndex];
+    const link = links[tooltipData.linkIndex]
     if (!link) {
-      return null;
+      return null
     }
 
     // Get source and target names
     const sourceName = getNodeName(
       link.source as NodeOrIndex,
-      tooltipData.linkIndex
-    );
+      tooltipData.linkIndex,
+    )
     const targetName = getNodeName(
       link.target as NodeOrIndex,
-      tooltipData.linkIndex
-    );
+      tooltipData.linkIndex,
+    )
 
     // Custom content
     if (linkContent) {
@@ -143,7 +143,7 @@ export function SankeyTooltip({
         >
           {linkContent({ link, index: tooltipData.linkIndex })}
         </TooltipBox>
-      );
+      )
     }
 
     // Default link tooltip
@@ -153,7 +153,7 @@ export function SankeyTooltip({
         label: "Flow",
         value: formatValue(link.value),
       },
-    ];
+    ]
 
     return (
       <TooltipBox
@@ -167,12 +167,12 @@ export function SankeyTooltip({
       >
         <TooltipContent rows={rows} title={`${sourceName} → ${targetName}`} />
       </TooltipBox>
-    );
+    )
   }
 
-  return null;
+  return null
 }
 
-SankeyTooltip.displayName = "SankeyTooltip";
+SankeyTooltip.displayName = "SankeyTooltip"
 
-export default SankeyTooltip;
+export default SankeyTooltip

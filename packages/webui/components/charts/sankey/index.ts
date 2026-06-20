@@ -2,7 +2,7 @@ export {
   SankeyChart,
   type SankeyChartProps,
   type SankeyData,
-} from "./sankey-chart";
+} from "./sankey-chart"
 export {
   type Margin,
   type SankeyContextValue,
@@ -12,7 +12,7 @@ export {
   type SankeyTooltipData,
   sankeyCssVars,
   useSankey,
-} from "./sankey-context";
-export { SankeyLink, type SankeyLinkProps } from "./sankey-link";
-export { SankeyNode, type SankeyNodeProps } from "./sankey-node";
-export { SankeyTooltip, type SankeyTooltipProps } from "./sankey-tooltip";
+} from "./sankey-context"
+export { SankeyLink, type SankeyLinkProps } from "./sankey-link"
+export { SankeyNode, type SankeyNodeProps } from "./sankey-node"
+export { SankeyTooltip, type SankeyTooltipProps } from "./sankey-tooltip"

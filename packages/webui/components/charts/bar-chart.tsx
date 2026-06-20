@@ -1,9 +1,9 @@
-"use client";
+"use client"
 
-import { localPoint } from "@visx/event";
-import { ParentSize } from "@visx/responsive";
-import { scaleBand, scaleLinear } from "@visx/scale";
-import type { Transition } from "motion/react";
+import { localPoint } from "@visx/event"
+import { ParentSize } from "@visx/responsive"
+import { scaleBand, scaleLinear } from "@visx/scale"
+import type { Transition } from "motion/react"
 import {
   Children,
   isValidElement,
@@ -14,131 +14,130 @@ import {
   useMemo,
   useRef,
   useState,
-} from "react";
-import { cn } from "@/lib/utils";
-import { DEFAULT_ANIMATION_EASING } from "./animation";
-import type { BarProps } from "./bar";
+} from "react"
+import { cn } from "@/lib/utils"
+import { DEFAULT_ANIMATION_EASING } from "./animation"
+import type { BarProps } from "./bar"
 import {
   ChartProvider,
   type LineConfig,
   type Margin,
   type TooltipData,
-} from "./chart-context";
-import { isGradientDefComponent, isPatternDefComponent } from "./chart-defs";
+} from "./chart-context"
+import { isGradientDefComponent, isPatternDefComponent } from "./chart-defs"
 
-export type BarOrientation = "vertical" | "horizontal";
+export type BarOrientation = "vertical" | "horizontal"
 
 export interface BarChartProps {
   /** Data array - each item should have an x-axis key and numeric values */
-  data: Record<string, unknown>[];
+  data: Record<string, unknown>[]
   /** Key in data for the categorical axis. Default: "name" */
-  xDataKey?: string;
+  xDataKey?: string
   /** Chart margins */
-  margin?: Partial<Margin>;
+  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
-  animationDuration?: number;
+  animationDuration?: number
   /** CSS easing for bar grow transitions. */
-  animationEasing?: string;
+  animationEasing?: string
   /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition;
+  enterTransition?: Transition
   /** Signature of motion URL state — triggers enter replay when it changes. */
-  revealSignature?: string;
+  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
-  aspectRatio?: string;
+  aspectRatio?: string
   /** Additional class name for the container */
-  className?: string;
+  className?: string
   /** Gap between bar groups as a fraction of band width (0-1). Default: 0.2 */
-  barGap?: number;
+  barGap?: number
   /** Fixed bar width in pixels. If not set, bars auto-size to fill the band. */
-  barWidth?: number;
+  barWidth?: number
   /** Bar chart orientation. Default: "vertical" */
-  orientation?: BarOrientation;
+  orientation?: BarOrientation
   /** Whether to stack bars instead of grouping them. Default: false */
-  stacked?: boolean;
+  stacked?: boolean
   /** Gap between stacked bar segments in pixels. Default: 0 */
-  stackGap?: number;
+  stackGap?: number
   /** Child components (Bar, Grid, ChartTooltip, etc.) */
-  children: ReactNode;
+  children: ReactNode
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 };
+const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 }
 
 // Extract bar configs from children synchronously
 function extractBarConfigs(children: ReactNode): LineConfig[] {
-  const configs: LineConfig[] = [];
+  const configs: LineConfig[] = []
 
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) {
-      return;
+      return
     }
 
     const childType = child.type as {
-      displayName?: string;
-      name?: string;
-    };
+      displayName?: string
+      name?: string
+    }
     const componentName =
       typeof child.type === "function"
         ? childType.displayName || childType.name || ""
-        : "";
+        : ""
 
-    const props = child.props as BarProps | undefined;
+    const props = child.props as BarProps | undefined
     const isBarComponent =
       componentName === "Bar" ||
-      (props && typeof props.dataKey === "string" && props.dataKey.length > 0);
+      (props && typeof props.dataKey === "string" && props.dataKey.length > 0)
 
     if (isBarComponent && props?.dataKey) {
       // Use stroke for tooltip dot color if provided, otherwise fall back to fill
       // This allows gradient/pattern fills to have a solid dot color
-      const dotColor =
-        props.stroke || props.fill || "var(--chart-line-primary)";
+      const dotColor = props.stroke || props.fill || "var(--chart-line-primary)"
       configs.push({
         dataKey: props.dataKey,
         stroke: dotColor,
         strokeWidth: 0,
-      });
+      })
     }
-  });
+  })
 
-  return configs;
+  return configs
 }
 
 // Check if a component should render after the mouse overlay
 function isPostOverlayComponent(child: ReactElement): boolean {
   const childType = child.type as {
-    displayName?: string;
-    name?: string;
-    __isChartMarkers?: boolean;
-  };
+    displayName?: string
+    name?: string
+    __isChartMarkers?: boolean
+  }
 
   if (childType.__isChartMarkers) {
-    return true;
+    return true
   }
 
   const componentName =
     typeof child.type === "function"
       ? childType.displayName || childType.name || ""
-      : "";
+      : ""
 
-  return componentName === "ChartMarkers" || componentName === "MarkerGroup";
+  return componentName === "ChartMarkers" || componentName === "MarkerGroup"
 }
 
 interface ChartInnerProps {
-  width: number;
-  height: number;
-  data: Record<string, unknown>[];
-  xDataKey: string;
-  margin: Margin;
-  animationDuration: number;
-  animationEasing: string;
-  enterTransition?: Transition;
-  revealSignature?: string;
-  barGap: number;
-  barWidthProp?: number;
-  orientation: BarOrientation;
-  stacked: boolean;
-  stackGap: number;
-  children: ReactNode;
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  width: number
+  height: number
+  data: Record<string, unknown>[]
+  xDataKey: string
+  margin: Margin
+  animationDuration: number
+  animationEasing: string
+  enterTransition?: Transition
+  revealSignature?: string
+  barGap: number
+  barWidthProp?: number
+  orientation: BarOrientation
+  stacked: boolean
+  stackGap: number
+  children: ReactNode
+  containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 function ChartInner({
@@ -159,268 +158,267 @@ function ChartInner({
   children,
   containerRef,
 }: ChartInnerProps) {
-  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [revealEpoch, setRevealEpoch] = useState(0);
-  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
+  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [revealEpoch, setRevealEpoch] = useState(0)
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null)
 
-  const isHorizontal = orientation === "horizontal";
+  const isHorizontal = orientation === "horizontal"
 
   // Extract bar configs synchronously from children
-  const lines = useMemo(() => extractBarConfigs(children), [children]);
+  const lines = useMemo(() => extractBarConfigs(children), [children])
 
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
+  const innerWidth = width - margin.left - margin.right
+  const innerHeight = height - margin.top - margin.bottom
 
   // Category accessor function - returns string for categorical scale
   const categoryAccessor = useCallback(
     (d: Record<string, unknown>): string => {
-      const value = d[xDataKey];
+      const value = d[xDataKey]
       if (value instanceof Date) {
         return value.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
-        });
+        })
       }
-      return String(value ?? "");
+      return String(value ?? "")
     },
-    [xDataKey]
-  );
+    [xDataKey],
+  )
 
   // For compatibility with ChartContext, provide a Date-based xAccessor
   const xAccessorDate = useCallback(
     (d: Record<string, unknown>): Date => {
-      const value = d[xDataKey];
+      const value = d[xDataKey]
       if (value instanceof Date) {
-        return value;
+        return value
       }
-      return new Date();
+      return new Date()
     },
-    [xDataKey]
-  );
+    [xDataKey],
+  )
 
   // Category scale (band) - for the categorical axis
   const categoryScale = useMemo(() => {
-    const domain = data.map((d) => categoryAccessor(d));
+    const domain = data.map((d) => categoryAccessor(d))
     const range: [number, number] = isHorizontal
       ? [0, innerHeight]
-      : [0, innerWidth];
+      : [0, innerWidth]
     return scaleBand<string>({
       range,
       domain,
       padding: barGap,
-    });
-  }, [innerWidth, innerHeight, data, categoryAccessor, barGap, isHorizontal]);
+    })
+  }, [innerWidth, innerHeight, data, categoryAccessor, barGap, isHorizontal])
 
   // Band width for bars - use prop if provided, otherwise use scale's bandwidth
-  const bandWidth = barWidthProp ?? categoryScale.bandwidth();
+  const bandWidth = barWidthProp ?? categoryScale.bandwidth()
 
   // Compute max value considering stacking
   const maxValue = useMemo(() => {
     if (stacked) {
       // For stacked bars, sum all values at each data point
-      let max = 0;
+      let max = 0
       for (const d of data) {
-        let sum = 0;
+        let sum = 0
         for (const line of lines) {
-          const value = d[line.dataKey];
+          const value = d[line.dataKey]
           if (typeof value === "number") {
-            sum += value;
+            sum += value
           }
         }
         if (sum > max) {
-          max = sum;
+          max = sum
         }
       }
-      return max || 100;
+      return max || 100
     }
     // For grouped bars, find max single value
-    let max = 0;
+    let max = 0
     for (const line of lines) {
       for (const d of data) {
-        const value = d[line.dataKey];
+        const value = d[line.dataKey]
         if (typeof value === "number" && value > max) {
-          max = value;
+          max = value
         }
       }
     }
-    return max || 100;
-  }, [data, lines, stacked]);
+    return max || 100
+  }, [data, lines, stacked])
 
   // Value scale (linear) - for the value axis
   const valueScale = useMemo(() => {
-    const range = isHorizontal ? [0, innerWidth] : [innerHeight, 0];
+    const range = isHorizontal ? [0, innerWidth] : [innerHeight, 0]
     return scaleLinear({
       range,
       domain: [0, maxValue * 1.1],
       nice: true,
-    });
-  }, [innerWidth, innerHeight, maxValue, isHorizontal]);
+    })
+  }, [innerWidth, innerHeight, maxValue, isHorizontal])
 
   // Compute stack offsets for stacked bars
   const stackOffsets = useMemo(() => {
     if (!stacked) {
-      return undefined;
+      return undefined
     }
-    const offsets = new Map<number, Map<string, number>>();
+    const offsets = new Map<number, Map<string, number>>()
     for (let i = 0; i < data.length; i++) {
-      const d = data[i];
+      const d = data[i]
       if (!d) {
-        continue;
+        continue
       }
-      const pointOffsets = new Map<string, number>();
-      let cumulative = 0;
+      const pointOffsets = new Map<string, number>()
+      let cumulative = 0
       for (const line of lines) {
-        pointOffsets.set(line.dataKey, cumulative);
-        const value = d[line.dataKey];
+        pointOffsets.set(line.dataKey, cumulative)
+        const value = d[line.dataKey]
         if (typeof value === "number") {
-          cumulative += value;
+          cumulative += value
         }
       }
-      offsets.set(i, pointOffsets);
+      offsets.set(i, pointOffsets)
     }
-    return offsets;
-  }, [data, lines, stacked]);
+    return offsets
+  }, [data, lines, stacked])
 
   // Column width for tooltip indicator
   const columnWidth = useMemo(() => {
     if (data.length < 1) {
-      return 0;
+      return 0
     }
-    return isHorizontal ? innerHeight / data.length : innerWidth / data.length;
-  }, [innerWidth, innerHeight, data.length, isHorizontal]);
+    return isHorizontal ? innerHeight / data.length : innerWidth / data.length
+  }, [innerWidth, innerHeight, data.length, isHorizontal])
 
   // Pre-compute labels for ticker animation
   const dateLabels = useMemo(
     () => data.map((d) => categoryAccessor(d)),
-    [data, categoryAccessor]
-  );
+    [data, categoryAccessor],
+  )
 
   // Create a fake time scale for compatibility with ChartContext
   const fakeTimeScale = useMemo(() => {
-    const now = Date.now();
-    const start = now - data.length * 24 * 60 * 60 * 1000;
+    const now = Date.now()
+    const start = now - data.length * 24 * 60 * 60 * 1000
     const scale = {
       ...categoryScale,
       domain: () => [new Date(start), new Date(now)],
       range: () => [0, innerWidth] as [number, number],
       invert: (x: number) => new Date(start + (x / innerWidth) * (now - start)),
       copy: () => scale,
-    };
-    return scale;
-  }, [categoryScale, innerWidth, data.length]);
+    }
+    return scale
+  }, [categoryScale, innerWidth, data.length])
 
   // Animation timing — replay when motion settings change
   // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature
   useEffect(() => {
-    setRevealEpoch((n) => n + 1);
-    setIsLoaded(false);
+    setRevealEpoch((n) => n + 1)
+    setIsLoaded(false)
     const timer = setTimeout(() => {
-      setIsLoaded(true);
-    }, animationDuration);
-    return () => clearTimeout(timer);
-  }, [animationDuration, revealSignature]);
+      setIsLoaded(true)
+    }, animationDuration)
+    return () => clearTimeout(timer)
+  }, [animationDuration, revealSignature])
 
   // Mouse move handler
   const handleMouseMove = useCallback(
     (event: React.MouseEvent<SVGGElement>) => {
-      const point = localPoint(event);
+      const point = localPoint(event)
       if (!point) {
-        return;
+        return
       }
 
-      const pos = isHorizontal ? point.y - margin.top : point.x - margin.left;
+      const pos = isHorizontal ? point.y - margin.top : point.x - margin.left
 
       // Find which band the mouse is over
-      const bandIndex = Math.floor(pos / columnWidth);
-      const clampedIndex = Math.max(0, Math.min(data.length - 1, bandIndex));
-      const d = data[clampedIndex];
+      const bandIndex = Math.floor(pos / columnWidth)
+      const clampedIndex = Math.max(0, Math.min(data.length - 1, bandIndex))
+      const d = data[clampedIndex]
 
       if (!d) {
-        return;
+        return
       }
 
       // Calculate positions for each bar
-      const yPositions: Record<string, number> = {};
-      const xPositions: Record<string, number> = {};
-      const barPos = categoryScale(categoryAccessor(d)) ?? 0;
+      const yPositions: Record<string, number> = {}
+      const xPositions: Record<string, number> = {}
+      const barPos = categoryScale(categoryAccessor(d)) ?? 0
 
       if (isHorizontal) {
         // Horizontal bars: dots at end of bar (x = value), centered vertically in band
-        const seriesCount = lines.length;
-        const groupGap = seriesCount > 1 ? 4 : 0;
+        const seriesCount = lines.length
+        const groupGap = seriesCount > 1 ? 4 : 0
         const individualBarHeight =
           seriesCount > 0
             ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount
-            : bandWidth;
+            : bandWidth
 
         if (stacked) {
           // Stacked horizontal: all bars same y, x at cumulative end
-          let cumulative = 0;
+          let cumulative = 0
           for (const line of lines) {
-            const value = d[line.dataKey];
+            const value = d[line.dataKey]
             if (typeof value === "number") {
-              cumulative += value;
-              xPositions[line.dataKey] = valueScale(cumulative) ?? 0;
-              yPositions[line.dataKey] = barPos + bandWidth / 2;
+              cumulative += value
+              xPositions[line.dataKey] = valueScale(cumulative) ?? 0
+              yPositions[line.dataKey] = barPos + bandWidth / 2
             }
           }
         } else {
           // Grouped horizontal: each bar at its own y position
           lines.forEach((line, idx) => {
-            const value = d[line.dataKey];
+            const value = d[line.dataKey]
             if (typeof value === "number") {
-              xPositions[line.dataKey] = valueScale(value) ?? 0;
+              xPositions[line.dataKey] = valueScale(value) ?? 0
               yPositions[line.dataKey] =
                 barPos +
                 idx * (individualBarHeight + groupGap) +
-                individualBarHeight / 2;
+                individualBarHeight / 2
             }
-          });
+          })
         }
       } else if (stacked) {
         // Vertical stacked bars
-        let cumulative = 0;
-        let seriesIdx = 0;
+        let cumulative = 0
+        let seriesIdx = 0
         for (const line of lines) {
-          const value = d[line.dataKey];
+          const value = d[line.dataKey]
           if (typeof value === "number") {
-            cumulative += value;
-            const gapOffset = seriesIdx * stackGap;
-            yPositions[line.dataKey] =
-              (valueScale(cumulative) ?? 0) - gapOffset;
-            seriesIdx++;
+            cumulative += value
+            const gapOffset = seriesIdx * stackGap
+            yPositions[line.dataKey] = (valueScale(cumulative) ?? 0) - gapOffset
+            seriesIdx++
           }
         }
       } else {
         // Vertical grouped bars
-        const seriesCount = lines.length;
-        const groupGap = seriesCount > 1 ? 4 : 0;
+        const seriesCount = lines.length
+        const groupGap = seriesCount > 1 ? 4 : 0
         const individualBarWidth =
           seriesCount > 0
             ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount
-            : bandWidth;
+            : bandWidth
 
         lines.forEach((line, idx) => {
-          const value = d[line.dataKey];
+          const value = d[line.dataKey]
           if (typeof value === "number") {
-            yPositions[line.dataKey] = valueScale(value) ?? 0;
+            yPositions[line.dataKey] = valueScale(value) ?? 0
             xPositions[line.dataKey] =
               barPos +
               idx * (individualBarWidth + groupGap) +
-              individualBarWidth / 2;
+              individualBarWidth / 2
           }
-        });
+        })
       }
 
       // Tooltip position: for horizontal, position at max bar end; for vertical, center of band
-      let tooltipX: number;
+      let tooltipX: number
       if (isHorizontal) {
         // Position tooltip at the end of the longest bar
-        const maxX = Math.max(...Object.values(xPositions), 0);
-        tooltipX = maxX;
+        const maxX = Math.max(...Object.values(xPositions), 0)
+        tooltipX = maxX
       } else {
-        tooltipX = barPos + bandWidth / 2;
+        tooltipX = barPos + bandWidth / 2
       }
 
       setTooltipData({
@@ -429,8 +427,8 @@ function ChartInner({
         x: tooltipX,
         yPositions,
         xPositions: Object.keys(xPositions).length > 0 ? xPositions : undefined,
-      });
-      setHoveredBarIndex(clampedIndex);
+      })
+      setHoveredBarIndex(clampedIndex)
     },
     [
       categoryScale,
@@ -445,41 +443,41 @@ function ChartInner({
       isHorizontal,
       stacked,
       stackGap,
-    ]
-  );
+    ],
+  )
 
   const handleMouseLeave = useCallback(() => {
-    setTooltipData(null);
-    setHoveredBarIndex(null);
-  }, []);
+    setTooltipData(null)
+    setHoveredBarIndex(null)
+  }, [])
 
   // Early return if dimensions not ready
   if (width < 10 || height < 10) {
-    return null;
+    return null
   }
 
-  const canInteract = isLoaded;
+  const canInteract = isLoaded
 
   // Separate children into defs, pre-overlay, and post-overlay
-  const defsChildren: ReactElement[] = [];
-  const preOverlayChildren: ReactElement[] = [];
-  const postOverlayChildren: ReactElement[] = [];
+  const defsChildren: ReactElement[] = []
+  const preOverlayChildren: ReactElement[] = []
+  const postOverlayChildren: ReactElement[] = []
 
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) {
-      return;
+      return
     }
 
     if (isGradientDefComponent(child)) {
-      defsChildren.push(child);
+      defsChildren.push(child)
     } else if (isPatternDefComponent(child)) {
-      preOverlayChildren.push(child);
+      preOverlayChildren.push(child)
     } else if (isPostOverlayComponent(child)) {
-      postOverlayChildren.push(child);
+      postOverlayChildren.push(child)
     } else {
-      preOverlayChildren.push(child);
+      preOverlayChildren.push(child)
     }
-  });
+  })
 
   const contextValue = {
     data,
@@ -513,7 +511,7 @@ function ChartInner({
     orientation,
     stacked,
     stackOffsets,
-  };
+  }
 
   return (
     <ChartProvider value={contextValue}>
@@ -547,7 +545,7 @@ function ChartInner({
         </g>
       </svg>
     </ChartProvider>
-  );
+  )
 }
 
 export function BarChart({
@@ -567,8 +565,8 @@ export function BarChart({
   stackGap = 0,
   children,
 }: BarChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const margin = { ...DEFAULT_MARGIN, ...marginProp };
+  const containerRef = useRef<HTMLDivElement>(null)
+  const margin = { ...DEFAULT_MARGIN, ...marginProp }
 
   return (
     <div
@@ -600,9 +598,9 @@ export function BarChart({
         )}
       </ParentSize>
     </div>
-  );
+  )
 }
 
-BarChart.displayName = "BarChart";
+BarChart.displayName = "BarChart"
 
-export default BarChart;
+export default BarChart

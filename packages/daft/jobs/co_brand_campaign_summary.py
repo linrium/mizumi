@@ -11,7 +11,9 @@ import pyarrow as pa
 from daft.io import IOConfig, S3Config
 from dagster_pipes import open_dagster_pipes
 
-AUDIENCE_SOURCE_PATH = "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1"
+AUDIENCE_SOURCE_PATH = (
+    "s3://unitycatalog/partnership/co_brand_gold/co_brand_offer_audience_v1"
+)
 SUMMARY_TARGET_PATH = "s3://unitycatalog/partnership/co_brand_gold/campaign_summary_v1"
 
 S3_STORAGE_OPTIONS = {
@@ -70,7 +72,9 @@ def main() -> None:
                     "target_company": target_company,
                     "offer_name": offer_name,
                     "customer_count": count,
-                    "avg_propensity_score": round(metrics["propensity_total"] / count, 2),
+                    "avg_propensity_score": round(
+                        metrics["propensity_total"] / count, 2
+                    ),
                     "total_signal_value": round(metrics["signal_total"], 2),
                 }
             )
