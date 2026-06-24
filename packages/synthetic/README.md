@@ -146,3 +146,27 @@ Optional deterministic seed:
 ```bash
 bun run generate:brand-customers --count 500 --seed 42
 ```
+
+## Generate dbx_example CSVs
+
+```bash
+bun run generate:dbx-example -- --output output/dbx_example
+```
+
+This command writes the five CSV files consumed by `packages/dbx_example`:
+
+- `hdbank_customers.csv`
+- `banking_transactions.csv`
+- `vietjetair_customers.csv`
+- `flight_tickets.csv`
+- `flight_incidents.csv`
+
+The command generates a temporary Vietnamese residents CSV internally, then
+uses the existing domain generators so each output file keeps the column names
+expected by the schemas in `packages/dbx_example/src/common.py`.
+
+Optional row counts and deterministic seed:
+
+```bash
+bun run generate:dbx-example -- --residents 10000 --customers 5000 --transactions 50000 --tickets 20000 --incidents 2000 --seed 42
+```

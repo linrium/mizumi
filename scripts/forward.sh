@@ -16,6 +16,8 @@ NC='\033[0m'
 #
 # Justfile had two separate port-forwards for keycloak (8080 + 8083) and dagster
 # (8088:80 duplicate) — combined into single commands here.
+FORWARD_ADDRESS="${MIZUMI_FORWARD_ADDRESS:-0.0.0.0}"
+
 SERVICES=(
   "RustFS S3 + Console|rustfs|rustfs-svc|9000:9000 9001:9001"
   "Redpanda Kafka + Admin|redpanda|redpanda-svc|19092:19092 9644:9644"
@@ -51,7 +53,7 @@ _forward_loop() {
   shift 2
   local log="/tmp/mizumi-pf-${ns}-${svc}.log"
   while true; do
-    kubectl port-forward -n "$ns" svc/"$svc" "$@" >"$log" 2>&1 || true
+    kubectl port-forward --address "$FORWARD_ADDRESS" -n "$ns" svc/"$svc" "$@" >"$log" 2>&1 || true
     sleep 3
   done
 }
@@ -76,6 +78,7 @@ for entry in "${SERVICES[@]}"; do
 done
 
 printf "\n  Started: ${GRN}${BLD}%d${NC}  Skipped: ${YLW}%d${NC}\n" "$STARTED" "$SKIPPED"
+printf "  Bind address: ${CYN}%s${NC}\n" "$FORWARD_ADDRESS"
 
 #─── endpoint table ────────────────────────────────────────────────────────────
 printf "\n${BLU}${BLD}─── Endpoints ──────────────────────────────────────────────────────${NC}\n"
@@ -95,6 +98,9 @@ printf "  ${BLD}%-24s${NC}  %s\n" "WebUI"             "http://127.0.0.1:3000"
 printf "  ${BLD}%-24s${NC}  %s\n" "LanceDB"           "http://127.0.0.1:8091"
 printf "  ${BLD}%-24s${NC}  %s\n" "Synthetic API"     "http://127.0.0.1:8092"
 printf "  ${BLD}%-24s${NC}  %s\n" "Shared Postgres"   "localhost:5433"
+if [[ "$FORWARD_ADDRESS" == "0.0.0.0" || "$FORWARD_ADDRESS" == *","* ]]; then
+  printf "  ${BLD}%-24s${NC}  %s\n" "WebUI via host IP" "http://<your-host-ip>:3000"
+fi
 printf "${BLU}${BLD}────────────────────────────────────────────────────────────────────${NC}\n"
 printf "\n  Port-forwards auto-restart on failure. ${YLW}Ctrl-C${NC} to stop.\n\n"
 

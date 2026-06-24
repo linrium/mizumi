@@ -8,6 +8,7 @@
 		"generate:vietnamese-residents": "bun run index.ts",
 		"generate:banking-transactions": "bun run index.ts banking-transactions",
 		"generate:brand-customers": "bun run index.ts brand-customers",
+		"generate:dbx-example": "bun run index.ts dbx-example",
 		"generate:flight-incidents": "bun run index.ts flight-incidents",
 		"generate:flight-tickets": "bun run index.ts flight-tickets",
 		"server": "bun run server.ts",

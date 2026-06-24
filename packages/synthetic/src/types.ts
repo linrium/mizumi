@@ -27,6 +27,7 @@ export interface CliOptions {
 	command:
 		| "banking-transactions"
 		| "brand-customers"
+		| "dbx-example"
 		| "flight-incidents"
 		| "flight-tickets"
 		| "vietnamese-residents"
