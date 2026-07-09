@@ -1,0 +1,38 @@
+# A sample job for dbx_example.
+
+resources:
+  jobs:
+    sample_job:
+      name: sample_job
+
+      trigger:
+        # Run this job every day, exactly one day from the last run; see https://docs.databricks.com/api/workspace/jobs/create#trigger
+        periodic:
+          interval: 1
+          unit: DAYS
+
+      #email_notifications:
+      #  on_failure:
+      #    - your_email@example.com
+
+      parameters:
+        - name: bronze_catalog
+          default: ${var.bronze_catalog}
+        - name: silver_catalog
+          default: ${var.silver_catalog}
+        - name: gold_catalog
+          default: ${var.gold_catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: bronze_volume
+          default: ${var.bronze_volume}
+
+      tasks:
+        - task_key: refresh_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.dbx_example_etl.id}
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"

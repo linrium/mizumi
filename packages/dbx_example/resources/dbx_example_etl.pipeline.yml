@@ -1,0 +1,26 @@
+# The main pipeline for dbx_example
+
+resources:
+  pipelines:
+    dbx_example_etl:
+      name: dbx_example_etl
+      catalog: ${var.bronze_catalog}
+      schema: ${var.schema}
+      serverless: true
+      root_path: "../src"
+      configuration:
+        mizumi.bronze_catalog: ${var.bronze_catalog}
+        mizumi.silver_catalog: ${var.silver_catalog}
+        mizumi.gold_catalog: ${var.gold_catalog}
+        mizumi.schema: ${var.schema}
+        mizumi.bronze_volume: ${var.bronze_volume}
+
+      libraries:
+        - file:
+            path: ../src/common.py
+        - file:
+            path: ../src/bronze.py
+        - file:
+            path: ../src/silver.py
+        - file:
+            path: ../src/gold.py
