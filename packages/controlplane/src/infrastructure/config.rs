@@ -64,8 +64,8 @@ pub struct OpenAiConfig {
 
 #[derive(Clone, Deserialize)]
 pub struct DuckdbServerConfig {
-    #[serde(default = "default_duckdb_server_base_url")]
-    pub base_url: String,
+    #[serde(default = "default_duckdb_server_uri", alias = "base_url")]
+    pub uri: String,
 }
 
 #[derive(Clone, Deserialize)]
@@ -125,8 +125,8 @@ fn default_openai_model() -> String {
     "gpt-5.4-nano".to_string()
 }
 
-fn default_duckdb_server_base_url() -> String {
-    "http://localhost:8090".to_string()
+fn default_duckdb_server_uri() -> String {
+    "quack:localhost:8090".to_string()
 }
 
 fn default_openai_base_url() -> String {
@@ -136,7 +136,7 @@ fn default_openai_base_url() -> String {
 impl Default for DuckdbServerConfig {
     fn default() -> Self {
         Self {
-            base_url: default_duckdb_server_base_url(),
+            uri: default_duckdb_server_uri(),
         }
     }
 }

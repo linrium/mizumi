@@ -27,7 +27,7 @@ issuers = [
 audiences = []
 
 [duckdb_server]
-base_url = "http://localhost:8090"
+uri = "quack:localhost:8090"
 
 [openai]
 api_key = ""

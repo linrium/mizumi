@@ -83,8 +83,8 @@ spec:
                 secretKeyRef:
                   name: unitycatalog-auth
                   key: UC_INTERNAL_SERVICE_TOKEN
-            - name: DUCKDB_SERVER__BASE_URL
-              value: "http://duckdb-server-svc.spark.svc.cluster.local:8080"
+            - name: DUCKDB_SERVER__URI
+              value: "quack:duckdb-server-svc.spark.svc.cluster.local:9494"
             - name: DUCKDB_UC_TOKEN
               valueFrom:
                 secretKeyRef:

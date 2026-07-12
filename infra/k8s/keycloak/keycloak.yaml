@@ -78,6 +78,8 @@ spec:
             - name: KC_TELEMETRY_RESOURCE_ATTRIBUTES
               value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=keycloak"
             # OpenTelemetry traces (sampler ratio is runtime-configurable)
+            - name: KC_TRACING_SAMPLER_TYPE
+              value: "parentbased_traceidratio"
             - name: KC_TRACING_SAMPLER_RATIO
               value: "1.0"
             # OpenTelemetry metrics are enabled at build time;

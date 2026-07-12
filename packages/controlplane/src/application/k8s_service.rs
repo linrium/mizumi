@@ -10,16 +10,12 @@ use crate::{
 
 #[derive(Clone)]
 pub struct K8sQueryService {
-    duckdb_server_base_url: String,
-    http_client: reqwest::Client,
+    duckdb_server_uri: String,
 }
 
 impl K8sQueryService {
-    pub fn new(duckdb_server_base_url: String) -> Self {
-        Self {
-            duckdb_server_base_url: duckdb_server_base_url.trim_end_matches('/').to_string(),
-            http_client: reqwest::Client::new(),
-        }
+    pub fn new(duckdb_server_uri: String) -> Self {
+        Self { duckdb_server_uri }
     }
 
     pub async fn run_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
@@ -31,15 +27,14 @@ impl K8sQueryService {
     }
 
     pub async fn create_session(&self) -> Result<Value, AppError> {
-        self.ensure_server_ready().await?;
-        Ok(json!({ "session_id": default_session_id(), "pod": "duckdb-server" }))
+        Ok(json!({ "session_id": default_session_id(), "uri": self.duckdb_server_uri }))
     }
 
     pub fn list_sessions(&self) -> Value {
         json!({
             "sessions": [{
                 "session_id": default_session_id(),
-                "pod": "duckdb-server"
+                "uri": self.duckdb_server_uri
             }]
         })
     }
@@ -60,53 +55,7 @@ impl K8sQueryService {
             return Err(AppError::NotFound);
         }
 
-        let mut body = json!({ "sql": req.sql });
-        if let Some(token) = req.id_token {
-            body["uc_token"] = Value::String(token);
-        }
-
-        let response = self
-            .http_client
-            .post(format!("{}/query", self.duckdb_server_base_url))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|err| AppError::QueryFailed(err.to_string()))?;
-
-        let status = response.status();
-        let value = response
-            .json::<Value>()
-            .await
-            .map_err(|err| AppError::Parse(err.to_string()))?;
-
-        if !status.is_success() {
-            let message = value
-                .get("error")
-                .and_then(|inner| inner.as_str())
-                .unwrap_or("query failed")
-                .to_string();
-            return Err(AppError::QueryFailed(message));
-        }
-
-        serde_json::from_value(value).map_err(|err| AppError::Parse(err.to_string()))
-    }
-
-    async fn ensure_server_ready(&self) -> Result<(), AppError> {
-        let response = self
-            .http_client
-            .get(format!("{}/health", self.duckdb_server_base_url))
-            .send()
-            .await
-            .map_err(|err| AppError::QueryFailed(err.to_string()))?;
-
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            Err(AppError::QueryFailed(format!(
-                "duckdb server health check failed: HTTP {}",
-                response.status()
-            )))
-        }
+        self.run_query(req).await
     }
 }
 
