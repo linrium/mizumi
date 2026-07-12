@@ -98,9 +98,7 @@ impl KeycloakAuth {
             self.discovery_issuer.trim_end_matches('/')
         );
         tracing::debug!("fetching OIDC discovery: {}", discovery_url);
-        let res = self
-            .http
-            .get(&discovery_url)
+        let res = crate::infrastructure::telemetry::inject_trace(self.http.get(&discovery_url))
             .send()
             .await
             .map_err(|e| AuthError::Internal(format!("OIDC discovery request failed: {e}")))?;
@@ -128,8 +126,7 @@ impl KeycloakAuth {
 
     async fn fetch_jwks(&self) -> Result<JwkSet, AuthError> {
         let uri = self.resolve_jwks_uri().await?;
-        self.http
-            .get(&uri)
+        crate::infrastructure::telemetry::inject_trace(self.http.get(&uri))
             .send()
             .await
             .map_err(|e| AuthError::Internal(format!("JWKS fetch failed: {e}")))?

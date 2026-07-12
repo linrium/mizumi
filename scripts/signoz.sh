@@ -5,6 +5,14 @@ NAMESPACE="signoz"
 INFRA_NAMESPACE="signoz-infra"
 INFRA_RELEASE="signoz-k8s-infra"
 INFRA_CHART_VERSION="${SIGNOZ_K8S_INFRA_VERSION:-0.15.1}"
+OTEL_OPERATOR_NAMESPACE="${OTEL_OPERATOR_NAMESPACE:-opentelemetry-operator-system}"
+OTEL_OPERATOR_RELEASE="${OTEL_OPERATOR_RELEASE:-opentelemetry-operator}"
+OTEL_OPERATOR_CHART_VERSION="${OTEL_OPERATOR_CHART_VERSION:-}"
+CERT_MANAGER_NAMESPACE="${CERT_MANAGER_NAMESPACE:-cert-manager}"
+CERT_MANAGER_RELEASE="${CERT_MANAGER_RELEASE:-cert-manager}"
+CERT_MANAGER_CHART_VERSION="${CERT_MANAGER_CHART_VERSION:-}"
+SIGNOZ_INSTALL_CERT_MANAGER="${SIGNOZ_INSTALL_CERT_MANAGER:-true}"
+SIGNOZ_UNINSTALL_CERT_MANAGER="${SIGNOZ_UNINSTALL_CERT_MANAGER:-false}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-10m}"
 EXPECTED_CONTEXT="${EXPECTED_CONTEXT:-}"
 
@@ -14,6 +22,7 @@ SIGNOZ_DIR="${ROOT_DIR}/infra/k8s/signoz"
 CASTING_FILE="${SIGNOZ_DIR}/casting.yaml"
 DEPLOYMENT_DIR="${SIGNOZ_DIR}/pours/deployment"
 INFRA_VALUES="${SIGNOZ_DIR}/k8s-infra-values.yaml"
+OTEL_INSTRUMENTATION_MANIFEST="${SIGNOZ_DIR}/otel-operator/instrumentation.yaml"
 CLICKHOUSE_CRD_BASE="https://raw.githubusercontent.com/Altinity/clickhouse-operator/0.25.3/deploy/operatorhub/0.25.3"
 
 log() {
@@ -106,6 +115,63 @@ install_clickhouse_crds() {
   done
 }
 
+install_cert_manager() {
+  if [[ "${SIGNOZ_INSTALL_CERT_MANAGER}" != "true" ]]; then
+    log "skipping cert-manager installation"
+    return 0
+  fi
+
+  if kubectl get deployment cert-manager \
+    --namespace "${CERT_MANAGER_NAMESPACE}" >/dev/null 2>&1; then
+    log "cert-manager is already installed"
+    return 0
+  fi
+
+  log "installing cert-manager for OpenTelemetry Operator webhooks"
+  set --
+  if [[ -n "${CERT_MANAGER_CHART_VERSION}" ]]; then
+    set -- --version "${CERT_MANAGER_CHART_VERSION}"
+  fi
+
+  helm repo add jetstack https://charts.jetstack.io --force-update
+  helm upgrade --install "${CERT_MANAGER_RELEASE}" jetstack/cert-manager \
+    --namespace "${CERT_MANAGER_NAMESPACE}" \
+    --create-namespace \
+    "$@" \
+    --set crds.enabled=true \
+    --wait \
+    --timeout "${WAIT_TIMEOUT}"
+}
+
+install_otel_operator() {
+  log "installing OpenTelemetry Operator"
+  local cert_manager_enabled="true"
+  local auto_generate_cert_enabled="false"
+
+  if [[ "${SIGNOZ_INSTALL_CERT_MANAGER}" != "true" ]]; then
+    cert_manager_enabled="false"
+    auto_generate_cert_enabled="true"
+  fi
+
+  helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts --force-update
+  set --
+  if [[ -n "${OTEL_OPERATOR_CHART_VERSION}" ]]; then
+    set -- --version "${OTEL_OPERATOR_CHART_VERSION}"
+  fi
+
+  helm upgrade --install "${OTEL_OPERATOR_RELEASE}" open-telemetry/opentelemetry-operator \
+    --namespace "${OTEL_OPERATOR_NAMESPACE}" \
+    --create-namespace \
+    "$@" \
+    --set "admissionWebhooks.certManager.enabled=${cert_manager_enabled}" \
+    --set "admissionWebhooks.autoGenerateCert.enabled=${auto_generate_cert_enabled}" \
+    --wait \
+    --timeout "${WAIT_TIMEOUT}"
+
+  kubectl wait --for=condition=Established crd/instrumentations.opentelemetry.io \
+    --timeout="${WAIT_TIMEOUT}"
+}
+
 deploy() {
   require_command foundryctl
   require_command kubectl
@@ -131,6 +197,9 @@ deploy() {
   rollout_all "${NAMESPACE}" deployment
   rollout_all "${NAMESPACE}" statefulset
 
+  install_cert_manager
+  install_otel_operator
+
   log "installing the SigNoz Kubernetes infrastructure collectors"
   helm repo add signoz https://charts.signoz.io --force-update
   helm upgrade --install "${INFRA_RELEASE}" signoz/k8s-infra \
@@ -144,8 +213,12 @@ deploy() {
   rollout_all "${INFRA_NAMESPACE}" daemonset
   rollout_all "${INFRA_NAMESPACE}" deployment
 
+  log "applying default OpenTelemetry auto-instrumentation configuration"
+  kubectl apply -f "${OTEL_INSTRUMENTATION_MANIFEST}"
+
   log "deployment complete"
   log "open the UI with: kubectl port-forward -n ${NAMESPACE} svc/signoz-signoz 8080:8080"
+  log "auto-instrument workloads with annotations such as: instrumentation.opentelemetry.io/inject-python=signoz-infra/signoz-instrumentation"
 }
 
 destroy() {
@@ -154,9 +227,22 @@ destroy() {
   check_context
 
   log "removing the SigNoz Kubernetes infrastructure collectors"
+  kubectl delete -f "${OTEL_INSTRUMENTATION_MANIFEST}" --ignore-not-found --wait=true || true
   helm uninstall "${INFRA_RELEASE}" \
     --namespace "${INFRA_NAMESPACE}" --ignore-not-found --wait
   kubectl delete namespace "${INFRA_NAMESPACE}" --ignore-not-found --wait=true
+
+  log "removing the OpenTelemetry Operator"
+  helm uninstall "${OTEL_OPERATOR_RELEASE}" \
+    --namespace "${OTEL_OPERATOR_NAMESPACE}" --ignore-not-found --wait || true
+  kubectl delete namespace "${OTEL_OPERATOR_NAMESPACE}" --ignore-not-found --wait=true
+
+  if [[ "${SIGNOZ_UNINSTALL_CERT_MANAGER}" == "true" ]]; then
+    log "removing cert-manager"
+    helm uninstall "${CERT_MANAGER_RELEASE}" \
+      --namespace "${CERT_MANAGER_NAMESPACE}" --ignore-not-found --wait || true
+    kubectl delete namespace "${CERT_MANAGER_NAMESPACE}" --ignore-not-found --wait=true
+  fi
 
   log "removing ClickHouse resources while the operator is still running"
   kubectl delete clickhouseinstallations.clickhouse.altinity.com \
@@ -186,6 +272,17 @@ Environment variables:
   EXPECTED_CONTEXT   Refuse to run unless this kubectl context is active
   SIGNOZ_K8S_INFRA_VERSION
                      k8s-infra chart version (default: 0.15.1)
+  OTEL_OPERATOR_CHART_VERSION
+                     opentelemetry-operator chart version (default: latest)
+  OTEL_OPERATOR_NAMESPACE
+                     namespace for the OpenTelemetry Operator
+                     (default: opentelemetry-operator-system)
+  SIGNOZ_INSTALL_CERT_MANAGER
+                     install cert-manager if it is missing (default: true)
+  CERT_MANAGER_CHART_VERSION
+                     cert-manager chart version (default: latest)
+  SIGNOZ_UNINSTALL_CERT_MANAGER
+                     remove cert-manager on destroy (default: false)
   WAIT_TIMEOUT       kubectl wait timeout (default: 10m)
 
 Install foundryctl before deploying:

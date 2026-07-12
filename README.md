@@ -130,6 +130,36 @@ Starts the common port-forwards and prints local endpoints for:
 - Web UI on `http://127.0.0.1:3002` when deployed
 - Controlplane on `http://127.0.0.1:6000` when deployed
 
+### Observability with SigNoz and OpenTelemetry Operator
+
+SigNoz deployment is handled by:
+
+```bash
+scripts/signoz.sh deploy
+```
+
+The script deploys the local SigNoz stack, the SigNoz `k8s-infra` collectors,
+and the OpenTelemetry Operator. It also installs cert-manager when it is not
+already present, because the operator uses webhook certificates.
+
+The default auto-instrumentation resource is applied as:
+
+```text
+signoz-infra/signoz-instrumentation
+```
+
+Add one of these annotations under `spec.template.metadata.annotations` on a
+workload to opt it into auto-instrumentation:
+
+```yaml
+instrumentation.opentelemetry.io/inject-python: "signoz-infra/signoz-instrumentation"
+instrumentation.opentelemetry.io/inject-nodejs: "signoz-infra/signoz-instrumentation"
+instrumentation.opentelemetry.io/inject-java: "signoz-infra/signoz-instrumentation"
+```
+
+Python auto-instrumentation exports OTLP over HTTP/protobuf to the in-cluster
+SigNoz ingester at `http://signoz-ingester.signoz.svc.cluster.local:4318`.
+
 You can also forward individual services:
 
 ```bash

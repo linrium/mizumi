@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::infrastructure::config::Config;
+use crate::infrastructure::{config::Config, telemetry};
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 static DAGSTER_BASE_URL: OnceLock<String> = OnceLock::new();
@@ -45,12 +45,12 @@ pub(crate) async fn gql_post<T: for<'de> Deserialize<'de>>(
     variables: Value,
 ) -> Result<T, (StatusCode, Value)> {
     let body = json!({ "query": query, "variables": variables });
-    let resp = client()
-        .post(dagster_graphql_url())
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| {
+    let resp = telemetry::inject_trace(
+        client().post(dagster_graphql_url()).json(&body),
+    )
+    .send()
+    .await
+    .map_err(|e| {
             tracing::error!("Dagster request failed: {e}");
             (StatusCode::BAD_GATEWAY, json!({ "error": e.to_string() }))
         })?;

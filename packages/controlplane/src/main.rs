@@ -7,7 +7,6 @@ use std::fs;
 use std::sync::Arc;
 
 use rdkafka::{ClientConfig, producer::FutureProducer};
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use adapters::inbound::http::create_router;
 use adapters::outbound::http::mlflow::MlflowHttpProxy;
@@ -20,7 +19,7 @@ use application::{
     team_service::TeamService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService, user_service::UserService,
 };
-use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState};
+use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState, telemetry};
 
 fn resolve_uc_admin_token(config: &Config) -> Result<String, Box<dyn std::error::Error>> {
     if let Some(path) = &config.unity_catalog.admin_token_file {
@@ -43,10 +42,7 @@ fn resolve_uc_admin_token(config: &Config) -> Result<String, Box<dyn std::error:
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    let telemetry = telemetry::init()?;
 
     let config = Config::load().expect("failed to load config");
     let uc_admin_token = resolve_uc_admin_token(&config)?;
@@ -117,6 +113,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("listening on {}", config.bind_addr);
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
-    axum::serve(listener, app).await?;
+    let result = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await;
+    telemetry.shutdown();
+    result?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    if let Err(error) = tokio::signal::ctrl_c().await {
+        tracing::warn!(%error, "failed to listen for shutdown signal");
+    }
 }

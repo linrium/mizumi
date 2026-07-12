@@ -7,6 +7,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+use crate::infrastructure::telemetry;
+
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 fn client() -> &'static reqwest::Client {
@@ -54,6 +56,8 @@ impl MlflowHttpProxy {
         if !body_bytes.is_empty() {
             req_builder = req_builder.body(body_bytes.to_vec());
         }
+
+        let req_builder = telemetry::inject_trace(req_builder);
 
         match req_builder.send().await {
             Ok(resp) => {

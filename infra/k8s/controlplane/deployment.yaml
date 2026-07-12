@@ -108,6 +108,16 @@ spec:
               value: "sovico"
             - name: RUST_LOG
               value: "debug"
+            - name: OTEL_SERVICE_NAME
+              value: "controlplane"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=controlplane"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://signoz-ingester.signoz.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "15000"
           readinessProbe:
             httpGet:
               path: /readyz

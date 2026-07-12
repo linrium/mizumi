@@ -33,6 +33,9 @@ spec:
             - --http-port=8080
             - --hostname-strict=false
             - --proxy-headers=xforwarded
+            - --tracing-endpoint=http://signoz-ingester.signoz.svc.cluster.local:4318
+            - --tracing-protocol=http/protobuf
+            - --tracing-service-name=keycloak
           ports:
             - containerPort: 8080
           env:
@@ -64,6 +67,23 @@ spec:
                 secretKeyRef:
                   name: keycloak-secret
                   key: KEYCLOAK_ADMIN_PASSWORD
+            # OpenTelemetry general telemetry options
+            # SignOz ingester exposes OTLP/HTTP on 4318 (not gRPC 4317)
+            - name: KC_TELEMETRY_ENDPOINT
+              value: "http://signoz-ingester.signoz.svc.cluster.local:4318"
+            - name: KC_TELEMETRY_PROTOCOL
+              value: "http/protobuf"
+            - name: KC_TELEMETRY_SERVICE_NAME
+              value: "keycloak"
+            - name: KC_TELEMETRY_RESOURCE_ATTRIBUTES
+              value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=keycloak"
+            # OpenTelemetry traces (sampler ratio is runtime-configurable)
+            - name: KC_TRACING_SAMPLER_RATIO
+              value: "1.0"
+            # OpenTelemetry metrics are enabled at build time;
+            # KC_TELEMETRY_METRICS_ENABLED controls OTel export at runtime
+            - name: KC_TELEMETRY_METRICS_ENABLED
+              value: "true"
           readinessProbe:
             httpGet:
               path: /realms/master
