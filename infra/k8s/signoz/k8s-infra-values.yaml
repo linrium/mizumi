@@ -1,0 +1,38 @@
+global:
+  cloud: other
+  clusterName: mizumi
+  deploymentEnvironment: development
+
+# The Foundry Kustomize installation exposes the ingestion collector through
+# this in-cluster service. No API key or TLS is needed inside the cluster.
+otelCollectorEndpoint: http://signoz-ingester.signoz.svc.cluster.local:4318
+otelInsecure: true
+
+presets:
+  logsCollection:
+    enabled: true
+    startAt: beginning
+    blacklist:
+      enabled: true
+      signozLogs: true
+      namespaces: []
+      pods: []
+      containers: []
+      additionalExclude: []
+  hostMetrics:
+    enabled: true
+  kubeletMetrics:
+    enabled: true
+    insecureSkipVerify: true
+  kubernetesAttributes:
+    enabled: true
+  clusterMetrics:
+    enabled: true
+  k8sEvents:
+    enabled: true
+  otlpExporter:
+    enabled: false
+  otlphttpExporter:
+    enabled: true
+  debugExporter:
+    enabled: false
