@@ -37,7 +37,8 @@ RUSTFS_RELEASE=rustfs
 RUSTFS_CHART=rustfs/rustfs
 RUSTFS_CHART_VERSION=0.1.0
 RUSTFS_VALUES=infra/k8s/rustfs/helm/values.yaml
-RUSTFS_ENDPOINT=http://host.docker.internal:9000
+RUSTFS_LOCAL_PORT=${RUSTFS_LOCAL_PORT:-19000}
+RUSTFS_ENDPOINT=${RUSTFS_ENDPOINT:-http://host.docker.internal:${RUSTFS_LOCAL_PORT}}
 RUSTFS_ACCESS_KEY=rustfsadmin
 RUSTFS_SECRET_KEY=rustfsadmin
 RUSTFS_BAGGAGE_DIR=packages/synthetic/data/train
@@ -200,10 +201,32 @@ baggage_upload() {
     echo "missing directory: ${RUSTFS_BAGGAGE_DIR}" >&2
     return 1
   fi
-  kubectl port-forward -n "${RUSTFS_NS}" svc/rustfs-svc --address 0.0.0.0 9000:9000 \
+  if lsof -nP -iTCP:"${RUSTFS_LOCAL_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "local port ${RUSTFS_LOCAL_PORT} is already in use; set RUSTFS_LOCAL_PORT to a free port and re-run" >&2
+    return 1
+  fi
+  kubectl port-forward -n "${RUSTFS_NS}" svc/rustfs-svc --address 0.0.0.0 "${RUSTFS_LOCAL_PORT}:9000" \
     >/tmp/mizumi-rustfs-pf.log 2>&1 &
   local pf_pid=$!
-  sleep 3
+  local ready=0
+  for _ in {1..30}; do
+    if ! kill -0 "$pf_pid" 2>/dev/null; then
+      cat /tmp/mizumi-rustfs-pf.log >&2
+      return 1
+    fi
+    if lsof -nP -iTCP:"${RUSTFS_LOCAL_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$ready" -ne 1 ]]; then
+    echo "timed out waiting for RustFS port-forward on local port ${RUSTFS_LOCAL_PORT}" >&2
+    cat /tmp/mizumi-rustfs-pf.log >&2
+    kill "$pf_pid" 2>/dev/null || true
+    wait "$pf_pid" 2>/dev/null || true
+    return 1
+  fi
   local rc=0
   docker run --rm \
     --entrypoint /bin/sh \
