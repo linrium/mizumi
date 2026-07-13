@@ -38,6 +38,19 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
+ensure_foundryctl() {
+  if command -v foundryctl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  require_command curl
+  log "foundryctl not found; installing SigNoz Foundry"
+  curl -fsSL https://signoz.io/foundry.sh | bash
+
+  command -v foundryctl >/dev/null 2>&1 || \
+    die "foundryctl was not found after running the SigNoz Foundry installer"
+}
+
 check_context() {
   local current_context
   current_context="$(kubectl config current-context)"
@@ -173,6 +186,7 @@ install_otel_operator() {
 }
 
 deploy() {
+  ensure_foundryctl
   require_command foundryctl
   require_command kubectl
   require_command helm
@@ -285,8 +299,7 @@ Environment variables:
                      remove cert-manager on destroy (default: false)
   WAIT_TIMEOUT       kubectl wait timeout (default: 10m)
 
-Install foundryctl before deploying:
-  curl -fsSL https://signoz.io/foundry.sh | bash
+foundryctl is installed automatically during deploy if it is missing.
 EOF
 }
 

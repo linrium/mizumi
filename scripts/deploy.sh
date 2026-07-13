@@ -441,7 +441,7 @@ step_done
 #───────────────────────────────────────────────────────────────────────────────
 step "Build & deploy Unity Catalog"
 #───────────────────────────────────────────────────────────────────────────────
-q "Build ${UNITYCATALOG_IMAGE}" docker build -t "${UNITYCATALOG_IMAGE}" packages/uc
+q "Build ${UNITYCATALOG_IMAGE}" docker build -f packages/uc/Dockerfile -t "${UNITYCATALOG_IMAGE}" .
 q "Create namespace" kubectl create namespace "${UNITYCATALOG_NS}" 2>/dev/null || true
 q "Apply auth secrets (unitycatalog + controlplane namespaces)" apply_unitycatalog_auth_secrets
 q "Apply Postgres alias" kubectl apply -f infra/k8s/unitycatalog/postgres.yaml
