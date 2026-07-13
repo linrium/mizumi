@@ -22,7 +22,7 @@ use axum::{
 };
 use tower_http::cors::CorsLayer;
 
-use crate::infrastructure::server::AppState;
+use crate::infrastructure::{server::AppState, telemetry};
 
 async fn require_auth(
     State(state): State<Arc<AppState>>,
@@ -228,9 +228,11 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .with_state(state.clone());
 
-    Router::new()
-        .route("/livez", get(|| async { StatusCode::OK }))
-        .route("/readyz", get(|| async { StatusCode::OK }))
-        .merge(protected)
-        .layer(CorsLayer::permissive())
+    telemetry::layer_router(
+        Router::new()
+            .route("/livez", get(|| async { StatusCode::OK }))
+            .route("/readyz", get(|| async { StatusCode::OK }))
+            .merge(protected),
+    )
+    .layer(CorsLayer::permissive())
 }

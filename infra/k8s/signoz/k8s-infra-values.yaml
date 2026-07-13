@@ -1,0 +1,75 @@
+global:
+  cloud: other
+  clusterName: mizumi
+  deploymentEnvironment: development
+
+# The Foundry Kustomize installation exposes the ingestion collector through
+# this in-cluster service. No API key or TLS is needed inside the cluster.
+otelCollectorEndpoint: http://signoz-ingester.signoz.svc.cluster.local:4318
+otelInsecure: true
+
+presets:
+  logsCollection:
+    enabled: true
+    startAt: beginning
+    operators:
+      - id: container-parser
+        type: container
+      - id: parse-json-log
+        type: json_parser
+        parse_from: body
+        parse_to: attributes
+        on_error: send
+      - id: set-json-log-severity
+        type: severity_parser
+        parse_from: attributes.level
+        if: 'attributes.level != nil'
+      - id: set-json-msg-body
+        type: move
+        from: attributes.msg
+        to: body
+        if: 'attributes.msg != nil and attributes.message == nil'
+      - id: set-json-message-body
+        type: move
+        from: attributes.message
+        to: body
+        if: 'attributes.message != nil'
+      - id: parse-log-level-message
+        type: regex_parser
+        parse_from: body
+        regex: '^(?:.*?\s+)?\[?(?P<log_level>(?i:TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL))\]?\s*(?:[:|-]\s*)?(?P<log_message>.*)$'
+        on_error: send
+        if: 'attributes.level == nil'
+      - id: set-log-severity
+        type: severity_parser
+        parse_from: attributes.log_level
+        if: 'attributes.log_level != nil'
+      - id: set-log-message-body
+        type: move
+        from: attributes.log_message
+        to: body
+        if: 'attributes.log_message != nil'
+    blacklist:
+      enabled: true
+      signozLogs: true
+      namespaces: []
+      pods: []
+      containers: []
+      additionalExclude: []
+  hostMetrics:
+    enabled: true
+  kubeletMetrics:
+    enabled: true
+    insecureSkipVerify: true
+  kubernetesAttributes:
+    enabled: true
+  clusterMetrics:
+    enabled: true
+  k8sEvents:
+    enabled: true
+  otlpExporter:
+    enabled: false
+  otlphttpExporter:
+    enabled: true
+  debugExporter:
+    enabled: false

@@ -1,14 +1,14 @@
 FROM rust:1.88-slim-bookworm AS builder
 
-WORKDIR /build
+WORKDIR /build/packages/uc
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY Cargo.toml Cargo.lock ./
-COPY src ./src
-COPY migrations ./migrations
+COPY packages/uc/Cargo.toml packages/uc/Cargo.lock ./
+COPY packages/uc/src ./src
+COPY packages/uc/migrations ./migrations
 
 RUN cargo build --release
 
@@ -21,8 +21,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=builder /build/target/release/unitycatalog-server /usr/local/bin/unitycatalog-server
-COPY config/server.toml ./config/server.toml
+COPY --from=builder /build/packages/uc/target/release/unitycatalog-server /usr/local/bin/unitycatalog-server
+COPY packages/uc/config/server.toml ./config/server.toml
 
 RUN chown -R uc:uc /app
 

@@ -83,8 +83,8 @@ spec:
                 secretKeyRef:
                   name: unitycatalog-auth
                   key: UC_INTERNAL_SERVICE_TOKEN
-            - name: DUCKDB_SERVER__BASE_URL
-              value: "http://duckdb-server-svc.spark.svc.cluster.local:8080"
+            - name: DUCKDB_SERVER__URI
+              value: "quack:duckdb-server-svc.spark.svc.cluster.local:9494"
             - name: DUCKDB_UC_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -108,6 +108,16 @@ spec:
               value: "sovico"
             - name: RUST_LOG
               value: "debug"
+            - name: OTEL_SERVICE_NAME
+              value: "controlplane"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=controlplane"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://signoz-ingester.signoz.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "15000"
           readinessProbe:
             httpGet:
               path: /readyz

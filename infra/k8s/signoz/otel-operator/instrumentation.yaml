@@ -1,0 +1,28 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: signoz-instrumentation
+  namespace: signoz-infra
+spec:
+  exporter:
+    endpoint: http://signoz-ingester.signoz.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  defaults:
+    useLabelsForResourceAttributes: true
+  resource:
+    addK8sUIDAttributes: true
+    resourceAttributes:
+      deployment.environment.name: development
+      k8s.cluster.name: mizumi
+  env:
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: http/protobuf
+  python:
+    env:
+      - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
+        value: "true"

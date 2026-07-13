@@ -7,6 +7,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+use crate::infrastructure::telemetry;
+
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 fn client() -> &'static reqwest::Client {
@@ -69,6 +71,8 @@ impl UnityCatalogHttpProxy {
         if !body_bytes.is_empty() {
             req_builder = req_builder.body(body_bytes.to_vec());
         }
+
+        let req_builder = telemetry::inject_trace(req_builder);
 
         match req_builder.send().await {
             Ok(resp) => {
@@ -138,13 +142,15 @@ impl UnityCatalogHttpProxy {
             }],
         };
 
-        let response = client()
-            .patch(&uc_url)
-            .bearer_auth(&self.admin_token)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("UC permissions request failed: {e}"))?;
+        let response = telemetry::inject_trace(
+            client()
+                .patch(&uc_url)
+                .bearer_auth(&self.admin_token)
+                .json(&body),
+        )
+        .send()
+        .await
+        .map_err(|e| format!("UC permissions request failed: {e}"))?;
 
         if response.status().is_success() {
             return Ok(());

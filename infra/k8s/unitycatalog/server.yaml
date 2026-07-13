@@ -52,6 +52,8 @@ spec:
     metadata:
       labels:
         app: unitycatalog
+      annotations:
+        instrumentation.opentelemetry.io/inject-sdk: "true"
     spec:
       containers:
         - name: unitycatalog
@@ -84,6 +86,16 @@ spec:
           env:
             - name: RUST_LOG
               value: debug
+            - name: OTEL_SERVICE_NAME
+              value: "unitycatalog"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=unitycatalog"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://signoz-ingester.signoz.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "15000"
             - name: UC__DATABASE__URL
               valueFrom:
                 secretKeyRef:

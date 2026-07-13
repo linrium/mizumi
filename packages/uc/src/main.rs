@@ -4,7 +4,6 @@ mod domain;
 mod infrastructure;
 
 use std::sync::Arc;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use adapters::outbound::postgres::{
     catalog::PgCatalogRepository,
@@ -29,16 +28,14 @@ use infrastructure::{
     config::Config,
     db,
     server::{AppState, OAuth2Config},
+    telemetry,
     temporary_credentials::TemporaryCredentialsVendor,
     token_manager::TokenManager,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    let telemetry_guard = telemetry::init().map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let config = Config::load()?;
     tracing::info!("Connecting to database");
@@ -174,11 +171,22 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let router = adapters::inbound::http::create_router(state);
+    let router = telemetry::layer_router(router);
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     tracing::info!("Starting server on {}", addr);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, router).await?;
+    let result = axum::serve(listener, router)
+        .with_graceful_shutdown(shutdown_signal())
+        .await;
+    telemetry_guard.shutdown();
+    result?;
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    if let Err(error) = tokio::signal::ctrl_c().await {
+        tracing::warn!(%error, "failed to listen for shutdown signal");
+    }
 }
