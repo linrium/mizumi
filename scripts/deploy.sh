@@ -150,6 +150,35 @@ v() {
 
 #─── reusable operations ───────────────────────────────────────────────────────
 
+load_openai_env_file() {
+  local env_file="${1:-.env}"
+  [[ -f "${env_file}" ]] || return 0
+
+  local line key value
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "${line}" || "${line}" == \#* ]] && continue
+
+    if [[ "${line}" =~ ^(export[[:space:]]+)?(OPENAI_API_KEY|OPENAI_BASE_URL)[[:space:]]*=(.*)$ ]]; then
+      key="${BASH_REMATCH[2]}"
+      value="${BASH_REMATCH[3]}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+
+      if [[ ${#value} -ge 2 && "${value}" == \"*\" && "${value}" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ ${#value} -ge 2 && "${value}" == \'*\' && "${value}" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+
+      if [[ -z "${!key:-}" ]]; then
+        export "${key}=${value}"
+      fi
+    fi
+  done < "${env_file}"
+}
+
 apply_openai_secret() {
   local namespace="$1"
   local secret_name="$2"
@@ -268,6 +297,7 @@ ok "brew / docker / helm / kubectl found"
 #═══════════════════════════════════════════════════════════════════════════════
 
 _DEFAULT_OPENAI_BASE_URL="https://api.openai.com/v1"
+load_openai_env_file ".env"
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   printf "${YLW}⚠${NC}  OPENAI_API_KEY is not set.\n"
