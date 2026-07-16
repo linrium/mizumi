@@ -16,9 +16,7 @@ NC='\033[0m'
 #
 # Justfile had two separate port-forwards for keycloak (8080 + 8083) and dagster
 # (8088:80 duplicate) — combined into single commands here.
-<<<<<<< HEAD
 FORWARD_ADDRESS="${MIZUMI_FORWARD_ADDRESS:-0.0.0.0}"
-=======
 SIGNOZ_NAMESPACE="${SIGNOZ_NAMESPACE:-signoz}"
 SIGNOZ_UI_PORT="${SIGNOZ_UI_PORT:-8084}"
 SIGNOZ_OPAMP_PORT="${SIGNOZ_OPAMP_PORT:-4320}"
@@ -28,7 +26,6 @@ SIGNOZ_INGESTER_HEALTH_PORT="${SIGNOZ_INGESTER_HEALTH_PORT:-13133}"
 SIGNOZ_CLICKHOUSE_HTTP_PORT="${SIGNOZ_CLICKHOUSE_HTTP_PORT:-8123}"
 SIGNOZ_CLICKHOUSE_NATIVE_PORT="${SIGNOZ_CLICKHOUSE_NATIVE_PORT:-9002}"
 SIGNOZ_POSTGRES_PORT="${SIGNOZ_POSTGRES_PORT:-5434}"
->>>>>>> 9c16b56213025713358718fd175e89342aee31db
 
 SERVICES=(
   "RustFS S3 + Console|rustfs|rustfs-svc|9000:9000 9001:9001"
@@ -139,11 +136,9 @@ printf "  ${BLD}%-24s${NC}  %s\n" "WebUI"             "http://127.0.0.1:3000"
 printf "  ${BLD}%-24s${NC}  %s\n" "LanceDB"           "http://127.0.0.1:8091"
 printf "  ${BLD}%-24s${NC}  %s\n" "Synthetic API"     "http://127.0.0.1:8092"
 printf "  ${BLD}%-24s${NC}  %s\n" "Shared Postgres"   "localhost:5433"
-<<<<<<< HEAD
 if [[ "$FORWARD_ADDRESS" == "0.0.0.0" || "$FORWARD_ADDRESS" == *","* ]]; then
   printf "  ${BLD}%-24s${NC}  %s\n" "WebUI via host IP" "http://<your-host-ip>:3000"
 fi
-=======
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz UI"         "http://127.0.0.1:${SIGNOZ_UI_PORT}"
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz OpAMP"      "127.0.0.1:${SIGNOZ_OPAMP_PORT}"
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz OTLP gRPC"  "127.0.0.1:${SIGNOZ_OTLP_GRPC_PORT}"
@@ -152,7 +147,6 @@ printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz Health"     "http://127.0.0.1:${SIGNOZ
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz ClickHouse" "http://127.0.0.1:${SIGNOZ_CLICKHOUSE_HTTP_PORT}"
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz CH Native"  "127.0.0.1:${SIGNOZ_CLICKHOUSE_NATIVE_PORT}"
 printf "  ${BLD}%-24s${NC}  %s\n" "SigNoz PostgreSQL" "127.0.0.1:${SIGNOZ_POSTGRES_PORT}"
->>>>>>> 9c16b56213025713358718fd175e89342aee31db
 printf "${BLU}${BLD}────────────────────────────────────────────────────────────────────${NC}\n"
 printf "\n  Port-forwards auto-restart on failure. ${YLW}Ctrl-C${NC} to stop.\n\n"
 

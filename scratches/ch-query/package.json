@@ -1,0 +1,14 @@
+{
+  "name": "ch-query",
+  "private": true,
+  "scripts": {
+    "query": "bun run main.ts",
+    "start": "bun run main.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
