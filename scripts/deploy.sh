@@ -42,6 +42,8 @@ RUSTFS_ENDPOINT=${RUSTFS_ENDPOINT:-http://host.docker.internal:${RUSTFS_LOCAL_PO
 RUSTFS_ACCESS_KEY=rustfsadmin
 RUSTFS_SECRET_KEY=rustfsadmin
 RUSTFS_BAGGAGE_DIR=packages/synthetic/data/train
+RUSTFS_S3_PROXY_ENABLED=${RUSTFS_S3_PROXY_ENABLED:-false}
+OPENAI_ENV_FILE=${OPENAI_ENV_FILE:-.env}
 
 KEYCLOAK_NS=keycloak
 KEYCLOAK_MANIFESTS=infra/k8s/keycloak
@@ -160,7 +162,7 @@ load_openai_env_file() {
     line="${line%"${line##*[![:space:]]}"}"
     [[ -z "${line}" || "${line}" == \#* ]] && continue
 
-    if [[ "${line}" =~ ^(export[[:space:]]+)?(OPENAI_API_KEY|OPENAI_BASE_URL)[[:space:]]*=(.*)$ ]]; then
+    if [[ "${line}" =~ ^(export[[:space:]]+)?(OPENAI_[A-Za-z0-9_]+)[[:space:]]*=(.*)$ ]]; then
       key="${BASH_REMATCH[2]}"
       value="${BASH_REMATCH[3]}"
       value="${value#"${value%%[![:space:]]*}"}"
@@ -219,6 +221,20 @@ patch_coredns_for_s3_proxy() {
     }
     { print }
   ')
+  kubectl patch configmap coredns -n kube-system \
+    --patch "{\"data\":{\"Corefile\":$(printf '%s' "$patched" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}}"
+  kubectl rollout restart deployment/coredns -n kube-system
+  kubectl rollout status deployment/coredns -n kube-system --timeout=120s
+}
+
+unpatch_coredns_s3_proxy() {
+  local corefile
+  corefile=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
+  if ! echo "$corefile" | grep -q 'rustfs-s3-proxy'; then
+    return 0
+  fi
+  local patched
+  patched=$(echo "$corefile" | grep -v 'rustfs-s3-proxy')
   kubectl patch configmap coredns -n kube-system \
     --patch "{\"data\":{\"Corefile\":$(printf '%s' "$patched" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}}"
   kubectl rollout restart deployment/coredns -n kube-system
@@ -297,7 +313,7 @@ ok "brew / docker / helm / kubectl found"
 #═══════════════════════════════════════════════════════════════════════════════
 
 _DEFAULT_OPENAI_BASE_URL="https://api.openai.com/v1"
-load_openai_env_file ".env"
+load_openai_env_file "${OPENAI_ENV_FILE}"
 
 if [[ -z "${OPENAI_API_KEY:-}" ]]; then
   printf "${YLW}⚠${NC}  OPENAI_API_KEY is not set.\n"
@@ -344,7 +360,9 @@ q "Pull docker.io/library/postgres:14.6"                     docker pull docker.
 q "Pull ghcr.io/kubeflow/spark-operator/controller:2.5.0"   docker pull ghcr.io/kubeflow/spark-operator/controller:2.5.0
 q "Pull python:3.11-alpine"                                  docker pull python:3.11-alpine
 q "Pull busybox:stable"                                      docker pull busybox:stable
-q "Pull caddy:2.8-alpine"                                    docker pull caddy:2.8-alpine
+if [[ "${RUSTFS_S3_PROXY_ENABLED}" == "true" ]]; then
+  q "Pull caddy:2.8-alpine"                                  docker pull caddy:2.8-alpine
+fi
 q "Pull redpanda console v2.8.3"                             docker pull docker.redpanda.com/redpandadata/console:v2.8.3
 q "Pull redpanda v24.3.11"                                   docker pull docker.redpanda.com/redpandadata/redpanda:v24.3.11
 step_done
@@ -371,16 +389,22 @@ v "Wait for RustFS rollout" \
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────
-step "Deploy RustFS S3 proxy + enable CoreDNS rewrites"
+step "Disable RustFS S3 proxy + CoreDNS rewrites"
 #───────────────────────────────────────────────────────────────────────────────
-q "Create namespaces" bash -c "
-  kubectl create namespace ${RUSTFS_NS} 2>/dev/null || true
-  kubectl create namespace ${SPARK_NS}  2>/dev/null || true
-"
-q "Apply S3 proxy manifests" kubectl apply -f infra/k8s/rustfs/s3-proxy.yaml
-v "Wait for S3 proxy rollout" \
-  kubectl rollout status deployment/rustfs-s3-proxy -n "${RUSTFS_NS}" --timeout=120s
-q "Patch CoreDNS + wait for rollout" patch_coredns_for_s3_proxy
+if [[ "${RUSTFS_S3_PROXY_ENABLED}" == "true" ]]; then
+  q "Create namespaces" bash -c "
+    kubectl create namespace ${RUSTFS_NS} 2>/dev/null || true
+    kubectl create namespace ${SPARK_NS}  2>/dev/null || true
+  "
+  q "Apply S3 proxy manifests" kubectl apply -f infra/k8s/rustfs/s3-proxy.yaml
+  q "Scale S3 proxy deployment" kubectl scale deployment/rustfs-s3-proxy -n "${RUSTFS_NS}" --replicas=1
+  v "Wait for S3 proxy rollout" \
+    kubectl rollout status deployment/rustfs-s3-proxy -n "${RUSTFS_NS}" --timeout=120s
+  q "Patch CoreDNS + wait for rollout" patch_coredns_for_s3_proxy
+else
+  q "Remove CoreDNS S3 proxy rewrites" unpatch_coredns_s3_proxy
+  q "Delete S3 proxy manifests" kubectl delete -f infra/k8s/rustfs/s3-proxy.yaml --ignore-not-found
+fi
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────

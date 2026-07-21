@@ -310,7 +310,6 @@ function ChartInner({
   }, [categoryScale, innerWidth, data.length])
 
   // Animation timing — replay when motion settings change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature
   useEffect(() => {
     setRevealEpoch((n) => n + 1)
     setIsLoaded(false)
@@ -521,7 +520,6 @@ function ChartInner({
 
         <rect fill="transparent" height={height} width={width} x={0} y={0} />
 
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Chart interaction area */}
         <g
           onMouseLeave={canInteract ? handleMouseLeave : undefined}
           onMouseMove={canInteract ? handleMouseMove : undefined}

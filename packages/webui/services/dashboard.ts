@@ -121,13 +121,13 @@ export async function handleDashboardGenerate(req: NextRequest) {
     lastCreatedIds: string[]
   }
 
-  const model = resolveModel(modelId ?? "gpt-5.4-nano")
+  const model = resolveModel(modelId)
   const resolvedSessionId = await ensureSession(sessionId, idToken)
   const schema = await fetchSchema().catch(() => "(schema unavailable)")
 
   const panelList =
-    (panels ?? []).length > 0
-      ? (panels ?? [])
+    panels.length > 0
+      ? panels
           .map((panel) =>
             [
               `  id=${panel.id} title="${panel.title}" chartType=${panel.chartType} xCol=${panel.xCol} yCol=${panel.yCol}`,
@@ -148,14 +148,14 @@ export async function handleDashboardGenerate(req: NextRequest) {
       : "  (none)"
 
   const contextHints = [
-    selectedPanelIds?.length
+    selectedPanelIds.length
       ? `Selected panel ids: ${selectedPanelIds.join(", ")}`
       : null,
     selectedPanelId ? `Selected panel id: ${selectedPanelId}` : null,
-    mentionedPanelIds?.length
+    mentionedPanelIds.length
       ? `Mentioned panel ids: ${mentionedPanelIds.join(", ")}`
       : null,
-    lastCreatedIds?.length
+    lastCreatedIds.length
       ? `Last created panel ids: ${lastCreatedIds.join(", ")}`
       : null,
   ]
@@ -242,7 +242,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
         yCol,
         explanation,
       }) => {
-        const target = (panels ?? []).find((panel) => panel.id === panelId)
+        const target = panels.find((panel) => panel.id === panelId)
         if (!target) {
           return { error: `Panel id "${panelId}" not found`, panelId }
         }

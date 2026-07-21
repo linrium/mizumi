@@ -160,7 +160,9 @@ metadata:
   name: rustfs-s3-proxy
   namespace: rustfs
 spec:
-  replicas: 1
+  # Temporarily disabled. Keep the manifest around so kubectl delete -f can
+  # still clean up any previously deployed proxy resources.
+  replicas: 0
   selector:
     matchLabels:
       app: rustfs-s3-proxy

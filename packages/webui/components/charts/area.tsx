@@ -4,7 +4,6 @@ import { curveMonotoneX } from "@visx/curve"
 import { AreaClosed, LinePath } from "@visx/shape"
 
 // CurveFactory type - simplified version compatible with visx
-// biome-ignore lint/suspicious/noExplicitAny: d3 curve factory type
 type CurveFactory = any
 
 import { motion, useMotionTemplate, useSpring } from "motion/react"

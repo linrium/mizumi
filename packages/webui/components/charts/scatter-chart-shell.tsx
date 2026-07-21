@@ -132,7 +132,6 @@ export function ScatterChartInner({
     [data, xAccessor]
   )
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature
   useEffect(() => {
     setRevealEpoch((n) => n + 1)
     setIsLoaded(false)

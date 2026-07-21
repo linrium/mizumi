@@ -233,7 +233,7 @@ export async function updateRequestStatus(
   return res.json()
 }
 
-export async function cancelPermissionRequest(
+export function cancelPermissionRequest(
   id: string
 ): Promise<PermissionRequest> {
   return updateRequestStatus(id, "cancelled")

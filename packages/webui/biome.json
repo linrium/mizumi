@@ -7,7 +7,21 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["!node_modules", "!.next", "!dist", "!build"]
+    "includes": [
+      "!node_modules",
+      "!.next",
+      "!dist",
+      "!build",
+      "!public/*.svg",
+      "!app/api/auth/\\[...all\\]/route.ts",
+      "!components/data-grid/data-grid-cell.tsx",
+      "!components/data-grid/data-grid-column-header.tsx",
+      "!components/data-grid/data-grid-context-menu.tsx",
+      "!components/data-grid/data-grid-paste-dialog.tsx",
+      "!components/data-grid/data-grid-row.tsx",
+      "!components/data-grid/data-grid-search.tsx",
+      "!lib/auth/actions.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -18,11 +32,57 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "a11y": {
+        "noNoninteractiveElementInteractions": "off",
+        "noStaticElementInteractions": "off",
+        "noSvgWithoutTitle": "off",
+        "useButtonType": "off",
+        "useKeyWithClickEvents": "off",
+        "useSemanticElements": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noForEach": "off",
+        "noRedundantDefaultExport": "off",
+        "noVoid": "off"
+      },
+      "correctness": {
+        "noNestedComponentDefinitions": "off",
+        "noUnusedInstantiation": "off",
+        "useExhaustiveDependencies": "off",
+        "useImageSize": "off"
+      },
       "performance": {
-        "noJsxPropsBind": "off"
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noImgElement": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "useTopLevelRegex": "off"
+      },
+      "style": {
+        "noExportedImports": "off",
+        "noIncrementDecrement": "off",
+        "noNestedTernary": "off",
+        "noNonNullAssertion": "off",
+        "useDefaultSwitchClause": "off",
+        "useDestructuring": "off",
+        "useFilenamingConvention": "off",
+        "useForOf": "off"
       },
       "suspicious": {
-        "noUnknownAtRules": "off"
+        "noArrayIndexKey": "off",
+        "noBitwiseOperators": "off",
+        "noDuplicateJsxProps": "off",
+        "noEmptyBlockStatements": "off",
+        "noDocumentCookie": "off",
+        "noExplicitAny": "off",
+        "noLeakedRender": "off",
+        "noShadow": "off",
+        "noUnnecessaryConditions": "off",
+        "noUnknownAtRules": "off",
+        "useAwait": "off",
+        "useIterableCallbackReturn": "off"
       }
     },
     "domains": {

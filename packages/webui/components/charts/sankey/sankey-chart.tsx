@@ -87,7 +87,6 @@ function SankeyChartInner({
   const innerWidth = width - margin.left - margin.right
   const innerHeight = height - margin.top - margin.bottom
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature
   useEffect(() => {
     setRevealEpoch((n) => n + 1)
     setIsLoaded(false)
@@ -118,18 +117,14 @@ function SankeyChartInner({
     return sankeyGenerator(clonedData)
   }, [data, sankeyGenerator])
 
-  const createPath = useCallback(
-    // biome-ignore lint/suspicious/noExplicitAny: d3-sankey types are complex
-    (link: any) => {
-      try {
-        const pathGenerator = sankeyLinkHorizontal()
-        return pathGenerator(link) || ""
-      } catch {
-        return ""
-      }
-    },
-    []
-  )
+  const createPath = useCallback((link: any) => {
+    try {
+      const pathGenerator = sankeyLinkHorizontal()
+      return pathGenerator(link) || ""
+    } catch {
+      return ""
+    }
+  }, [])
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
     const point = localPoint(event)

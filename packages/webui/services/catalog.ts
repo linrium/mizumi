@@ -64,51 +64,47 @@ async function ucFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-export async function getCatalogs() {
+export function getCatalogs() {
   return ucFetch<{ catalogs: Catalog[] }>("/catalogs")
 }
 
-export async function getSchemas(catalog: string) {
+export function getSchemas(catalog: string) {
   return ucFetch<{ schemas: Schema[] }>(
     `/schemas?catalog_name=${catalog}&max_results=200`
   )
 }
 
-export async function getTables(catalog: string, schema: string) {
+export function getTables(catalog: string, schema: string) {
   return ucFetch<{ tables: TableSummary[] }>(
     `/tables?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
-export async function getTable(catalog: string, schema: string, table: string) {
+export function getTable(catalog: string, schema: string, table: string) {
   return ucFetch<TableDetail>(`/tables/${catalog}.${schema}.${table}`)
 }
 
-export async function getVolumes(catalog: string, schema: string) {
+export function getVolumes(catalog: string, schema: string) {
   return ucFetch<{ volumes: VolumeSummary[] }>(
     `/volumes?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
-export async function getVolume(
-  catalog: string,
-  schema: string,
-  volume: string
-) {
+export function getVolume(catalog: string, schema: string, volume: string) {
   return ucFetch<VolumeDetail>(`/volumes/${catalog}.${schema}.${volume}`)
 }
 
-export async function getModels(catalog: string, schema: string) {
+export function getModels(catalog: string, schema: string) {
   return ucFetch<{ registered_models: RegisteredModelSummary[] }>(
     `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
-export async function getModel(catalog: string, schema: string, model: string) {
+export function getModel(catalog: string, schema: string, model: string) {
   return ucFetch<RegisteredModelDetail>(`/models/${catalog}.${schema}.${model}`)
 }
 
-export async function getModelVersions(
+export function getModelVersions(
   catalog: string,
   schema: string,
   model: string
@@ -118,7 +114,7 @@ export async function getModelVersions(
   )
 }
 
-export async function getPermissions(
+export function getPermissions(
   resourceType: ResourceType,
   catalog: string,
   schema?: string,
@@ -143,7 +139,7 @@ export async function getEffectivePrivileges(
   return data.privileges
 }
 
-export async function patchPermissions(input: {
+export function patchPermissions(input: {
   resourceType: ResourceType
   catalog: string
   schema?: string

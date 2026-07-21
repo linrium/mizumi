@@ -138,19 +138,19 @@ export interface MlflowLoggedModel {
   info: MlflowLoggedModelInfo
 }
 
-export async function searchExperiments() {
+export function searchExperiments() {
   return mlflowFetch<{ experiments?: MlflowExperiment[] }>(
     "/api/2.0/mlflow/experiments/search?max_results=100"
   )
 }
 
-export async function searchRegisteredModels() {
+export function searchRegisteredModels() {
   return mlflowFetch<{ registered_models?: MlflowRegisteredModel[] }>(
     "/api/2.0/mlflow/registered-models/search?filter=&max_results=25&order_by=name+ASC"
   )
 }
 
-export async function searchLoggedModels() {
+export function searchLoggedModels() {
   return mlflowFetch<{ models?: MlflowLoggedModel[] }>(
     "/api/2.0/mlflow/logged-models/search",
     {
@@ -168,7 +168,7 @@ export async function searchLoggedModels() {
   )
 }
 
-export async function searchRuns(
+export function searchRuns(
   experimentIds: string[],
   options?: { registeredModelUri?: string }
 ) {
@@ -190,13 +190,13 @@ export async function searchRuns(
   )
 }
 
-export async function getRun(runId: string) {
+export function getRun(runId: string) {
   return mlflowFetch<{ run: MlflowRun }>(
     `/api/2.0/mlflow/runs/get?run_id=${encodeURIComponent(runId)}`
   )
 }
 
-export async function listTraces(experimentId: string) {
+export function listTraces(experimentId: string) {
   return mlflowFetch<{ traces?: MlflowTrace[] }>(
     `/api/2.0/mlflow/traces?experiment_id=${encodeURIComponent(experimentId)}&max_results=50`
   )

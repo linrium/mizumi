@@ -2264,7 +2264,6 @@ function useDataGrid<TData>({
     tableRef.current = table
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: columnSizingInfo and columnSizing are used for calculating the column size vars
   const columnSizeVars = React.useMemo(() => {
     const headers = table.getFlatHeaders()
     const colSizes: { [key: string]: number } = {}
@@ -2286,7 +2285,6 @@ function useDataGrid<TData>({
     React.useCallback(() => false, [])
   )
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: columnPinning is used for calculating the adjustLayout
   const adjustLayout = React.useMemo(() => {
     const columnPinning = table.getState().columnPinning
     return (

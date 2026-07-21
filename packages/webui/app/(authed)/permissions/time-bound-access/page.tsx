@@ -163,7 +163,6 @@ export default function TimeBoundAccessPage() {
       .finally(() => setLoading(false))
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional filter deps
   useEffect(() => {
     fetchGrants()
   }, [statusFilter, resourceFilter, principalFilter])
