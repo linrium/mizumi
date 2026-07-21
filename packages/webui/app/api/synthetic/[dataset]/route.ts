@@ -14,7 +14,7 @@ const ALLOWED_DATASETS = new Set([
   "flight-incidents",
 ])
 
-type RouteContext = {
+interface RouteContext {
   params: Promise<{
     dataset: string
   }>

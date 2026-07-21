@@ -22,21 +22,21 @@ import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type RunStats = {
-  steps_succeeded: number | null
-  steps_failed: number | null
+interface RunStats {
   steps_canceled: number | null
+  steps_failed: number | null
+  steps_succeeded: number | null
 }
 
-type Run = {
-  run_id: string
-  job_name: string
-  status: string
-  creation_time: number | null
-  start_time: number | null
-  end_time: number | null
+interface Run {
   asset_selection: string[][]
+  creation_time: number | null
+  end_time: number | null
+  job_name: string
+  run_id: string
+  start_time: number | null
   stats: RunStats | null
+  status: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ const COLUMNS: ColumnDef<Run>[] = [
         <div className="flex flex-wrap gap-1">
           {visible.map((path, i) => (
             <Badge className="font-mono" key={i} variant="outline">
-              {path[path.length - 1]}
+              {path.at(-1)}
             </Badge>
           ))}
           {overflow > 0 && (

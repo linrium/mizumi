@@ -129,7 +129,7 @@ interface UseDataGridProps<TData>
     rowIndex: number
     columnId: string
   }) => Promise<FileCellData[]>
-  onPaste?: (updates: Array<CellUpdate>) => void | Promise<void>
+  onPaste?: (updates: CellUpdate[]) => void | Promise<void>
   onRowAdd?: (
     event?: React.MouseEvent<HTMLDivElement>
   ) => Partial<CellPosition> | Promise<Partial<CellPosition> | null> | null
@@ -361,7 +361,7 @@ function useDataGrid<TData>({
   )
 
   const onDataUpdate = React.useCallback(
-    (updates: CellUpdate | Array<CellUpdate>) => {
+    (updates: CellUpdate | CellUpdate[]) => {
       if (propsRef.current.readOnly) {
         return
       }
@@ -376,10 +376,7 @@ function useDataGrid<TData>({
       const currentData = propsRef.current.data
       const rows = currentTable?.getRowModel().rows
 
-      const rowUpdatesMap = new Map<
-        number,
-        Array<Omit<CellUpdate, "rowIndex">>
-      >()
+      const rowUpdatesMap = new Map<number, Omit<CellUpdate, "rowIndex">[]>()
 
       for (const update of updateArray) {
         if (rows && currentTable) {
@@ -471,7 +468,7 @@ function useDataGrid<TData>({
     }
 
     const firstColumnId = columnIds[0]
-    const lastColumnId = columnIds[columnIds.length - 1]
+    const lastColumnId = columnIds.at(-1)
 
     store.setState("selectionState", {
       isSelecting: false,
@@ -793,7 +790,7 @@ function useDataGrid<TData>({
           }
         }
 
-        const updates: Array<CellUpdate> = []
+        const updates: CellUpdate[] = []
         const tableColumns = currentTable?.getAllColumns() ?? []
         let cellsUpdated = 0
         let endRowIndex = startRowIndex
@@ -1298,8 +1295,7 @@ function useDataGrid<TData>({
           break
         case "end":
           if (navigableColumnIds.length > 0) {
-            newColumnId =
-              navigableColumnIds[navigableColumnIds.length - 1] ?? columnId
+            newColumnId = navigableColumnIds.at(-1) ?? columnId
           }
           break
         case "ctrl+home":
@@ -1311,8 +1307,7 @@ function useDataGrid<TData>({
         case "ctrl+end":
           newRowIndex = Math.max(0, rowCount - 1)
           if (navigableColumnIds.length > 0) {
-            newColumnId =
-              navigableColumnIds[navigableColumnIds.length - 1] ?? columnId
+            newColumnId = navigableColumnIds.at(-1) ?? columnId
           }
           break
         case "ctrl+up":
@@ -2746,9 +2741,7 @@ function useDataGrid<TData>({
               currentState.selectionState.selectionRange?.start ||
               currentState.focusedCell
             const targetColumnId =
-              dir === "rtl"
-                ? navigableColumnIds[navigableColumnIds.length - 1]
-                : navigableColumnIds[0]
+              dir === "rtl" ? navigableColumnIds.at(-1) : navigableColumnIds[0]
 
             if (targetColumnId) {
               selectRange(selectionStart, {
@@ -2790,9 +2783,7 @@ function useDataGrid<TData>({
               currentState.selectionState.selectionRange?.start ||
               currentState.focusedCell
             const targetColumnId =
-              dir === "rtl"
-                ? navigableColumnIds[0]
-                : navigableColumnIds[navigableColumnIds.length - 1]
+              dir === "rtl" ? navigableColumnIds[0] : navigableColumnIds.at(-1)
 
             if (targetColumnId) {
               selectRange(selectionStart, {
@@ -2922,9 +2913,7 @@ function useDataGrid<TData>({
               break
             case "end":
               if (navigableColumnIds.length > 0) {
-                newColumnId =
-                  navigableColumnIds[navigableColumnIds.length - 1] ??
-                  newColumnId
+                newColumnId = navigableColumnIds.at(-1) ?? newColumnId
               }
               break
           }

@@ -11,21 +11,21 @@ dayjs.extend(relativeTime)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ScheduleTick = {
-  timestamp: number
+interface ScheduleTick {
   status: string
+  timestamp: number
 }
 
-type Schedule = {
-  name: string
+interface Schedule {
   cron_schedule: string
+  default_status: string | null
   description: string | null
   execution_timezone: string | null
-  default_status: string | null
   job_name: string | null
-  status: string | null
   last_tick: ScheduleTick | null
+  name: string
   next_tick: number | null
+  status: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

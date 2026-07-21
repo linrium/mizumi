@@ -81,7 +81,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "check": "ultracite check",
-    "fix": "ultracite fix",
+    "fix": "ultracite fix --unsafe --max-diagnostics none",
     "prepare": "lefthook install"
   },
   "version": "0.1.0",

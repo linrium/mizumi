@@ -83,19 +83,19 @@ const chartTypeEnum = z.enum([
   "heatmap",
 ])
 
-export type PanelSummary = {
-  id: string
-  title: string
-  description?: string
+export interface PanelSummary {
   chartType: string
-  sql: string
-  xCol: string
-  yCol: string
+  description?: string
+  id: string
   resultPreview?: {
     columns: string[]
     rows: unknown[][]
     rowCount: number
   }
+  sql: string
+  title: string
+  xCol: string
+  yCol: string
 }
 
 export async function handleDashboardGenerate(req: NextRequest) {

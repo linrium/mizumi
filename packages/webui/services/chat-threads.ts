@@ -3,13 +3,13 @@
 import type { UIMessage } from "ai"
 import { apiFetch } from "@/lib/api-client"
 
-export type ChatThreadSummary = {
+export interface ChatThreadSummary {
+  created_at: string
   id: string
-  title: string
+  last_message_at: string | null
   last_message_preview: string
   message_count: number
-  last_message_at: string | null
-  created_at: string
+  title: string
   updated_at: string
 }
 
@@ -17,9 +17,9 @@ export type ChatThread = ChatThreadSummary & {
   messages: UIMessage[]
 }
 
-type ChatThreadPayload = {
-  title?: string
+interface ChatThreadPayload {
   messages?: UIMessage[]
+  title?: string
 }
 
 async function readJsonError(response: Response) {

@@ -45,7 +45,7 @@ function HoleBackground({
       const easeFn = ease === "inExpo" ? easeInExpo : linear
       return start + delta * easeFn(p)
     },
-    []
+    [linear, easeInExpo]
   )
 
   const tweenDisc = React.useCallback(

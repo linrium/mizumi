@@ -25,23 +25,29 @@ import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type LastMaterialization = { timestamp: string; run_id: string }
+interface LastMaterialization {
+  run_id: string
+  timestamp: string
+}
 
-type RunTag = { key: string; value: string }
+interface RunTag {
+  key: string
+  value: string
+}
 
-type AssetNode = {
-  path: string[]
+interface AssetNode {
   compute_kind: string | null
+  depended_by_keys: string[][]
+  dependency_keys: string[][]
   description: string | null
   group_name: string | null
-  is_observable: boolean
   is_executable: boolean
+  is_observable: boolean
   job_names: string[]
-  dependency_keys: string[][]
-  depended_by_keys: string[][]
+  last_materialization: LastMaterialization | null
+  path: string[]
   stale_status: string | null
   tags: RunTag[]
-  last_materialization: LastMaterialization | null
 }
 
 function extractKinds(tags: RunTag[]): string[] {

@@ -6,7 +6,7 @@ import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { getServerSession } from "@/lib/auth"
 import { signInWithKeycloak } from "@/lib/auth/actions"
 
-type LoginPageProps = {
+interface LoginPageProps {
   searchParams: Promise<{
     next?: string
   }>

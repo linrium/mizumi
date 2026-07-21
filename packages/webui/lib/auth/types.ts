@@ -1,15 +1,15 @@
-export type AppSession = {
-  id: string
-  userId: string
-  name: string
+export interface AppSession {
+  accessToken?: string
   email: string
   emailVerified: boolean
+  expiresAt: Date
+  groups?: string[]
+  id: string
+  idToken?: string
   image?: string | null
+  name: string
+  preferredUsername?: string
   realm: string
   sub?: string
-  preferredUsername?: string
-  groups?: string[]
-  idToken?: string
-  accessToken?: string
-  expiresAt: Date
+  userId: string
 }

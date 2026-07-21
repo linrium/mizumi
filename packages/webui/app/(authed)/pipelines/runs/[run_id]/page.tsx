@@ -27,35 +27,38 @@ const LineageGraph = dynamic(
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type RunStats = {
-  steps_succeeded: number | null
-  steps_failed: number | null
+interface RunStats {
+  end_time: number | null
   enqueued_time: number | null
   launch_time: number | null
   start_time: number | null
-  end_time: number | null
+  steps_failed: number | null
+  steps_succeeded: number | null
 }
 
-type RunTag = { key: string; value: string }
+interface RunTag {
+  key: string
+  value: string
+}
 
-type Run = {
-  run_id: string
+interface Run {
+  can_terminate: boolean | null
+  creation_time: number | null
+  end_time: number | null
   job_name: string
+  parent_run_id: string | null
+  root_run_id: string | null
+  run_config_yaml: string | null
+  run_id: string
+  start_time: number | null
+  stats: RunStats | null
   status: string
   tags: RunTag[]
-  creation_time: number | null
-  start_time: number | null
-  end_time: number | null
-  run_config_yaml: string | null
-  root_run_id: string | null
-  parent_run_id: string | null
-  can_terminate: boolean | null
-  stats: RunStats | null
 }
 
-type EventsResponse = {
-  events: RunEvent[]
+interface EventsResponse {
   cursor: string | null
+  events: RunEvent[]
   has_more: boolean
 }
 
@@ -66,7 +69,7 @@ function fmtTs(ts: string | number | null | undefined): string {
     return "—"
   }
   const v = Number(ts)
-  return isFinite(v)
+  return Number.isFinite(v)
     ? dayjs(v > 1e12 ? v : v * 1000).format("MMM D, h:mm:ss A")
     : "—"
 }
@@ -85,7 +88,7 @@ function fmtDuration(start: number | null, end: number | null): string {
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
-type StatusConfig = {
+interface StatusConfig {
   label: string
   variant: "success" | "error" | "info" | "warning" | "default"
 }
@@ -172,7 +175,7 @@ function fmtEventTimestamp(ts: string | null | undefined): string {
     return ""
   }
   const v = Number(ts)
-  if (!isFinite(v)) {
+  if (!Number.isFinite(v)) {
     return ""
   }
   // Dagster timestamps in events are milliseconds
@@ -232,7 +235,11 @@ function EventRow({
 
 // ── Step status summary ───────────────────────────────────────────────────────
 
-type StepSummaryItem = { label: string; count: number; cls: string }
+interface StepSummaryItem {
+  cls: string
+  count: number
+  label: string
+}
 
 function StepSummary({ stats }: { stats: RunStats | null }) {
   if (!stats) {

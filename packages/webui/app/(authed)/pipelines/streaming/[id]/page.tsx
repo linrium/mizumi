@@ -10,26 +10,26 @@ import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type K8sStatus = {
-  state: string
+interface K8sStatus {
   driver_pod: string | null
   spark_ui_url: string | null
+  state: string
 }
 
-type StreamingJob = {
-  id: string
-  name: string
-  namespace: string
-  image: string
-  main_application_file: string
-  spark_version: string
-  spark_conf: Record<string, string>
+interface StreamingJob {
+  created_at: string
   driver_cores: number
   driver_memory: string
-  executor_instances: number
   executor_cores: number
+  executor_instances: number
   executor_memory: string
-  created_at: string
+  id: string
+  image: string
+  main_application_file: string
+  name: string
+  namespace: string
+  spark_conf: Record<string, string>
+  spark_version: string
   updated_at: string
 }
 
@@ -37,9 +37,9 @@ type StreamingJobDetail = StreamingJob & {
   k8s_status: K8sStatus | null
 }
 
-type LogsResponse = {
-  pod: string
+interface LogsResponse {
   logs: string
+  pod: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

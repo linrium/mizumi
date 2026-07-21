@@ -22,137 +22,137 @@ export type ApprovalStepStatus =
   | "approved"
   | "cancelled"
 
-export type PermissionApprovalStep = {
-  id: string
-  stage_order: number
-  approver_team_id: string
-  approver_team: string
-  approver_label: string
-  status: ApprovalStepStatus
+export interface PermissionApprovalStep {
   acted_at: string | null
+  approver_label: string
+  approver_team: string
+  approver_team_id: string
+  id: string
   is_current: boolean
+  stage_order: number
+  status: ApprovalStepStatus
 }
 
-export type PermissionRequest = {
-  id: string
+export interface PermissionRequest {
+  approval_steps: PermissionApprovalStep[]
   code: string
-  submit_as: "personal" | "team"
-  requester_id?: string
-  requester: string
-  requester_email?: string
-  team_id?: string | null
-  team: string | null
-  resource: string
-  scope: RequestScope
-  privileges: string[]
-  submitted_at: string
+  current_approval_step_id: string | null
   expires_at: string
   expires_in_days: number
-  status: RequestStatus
-  reviewer: string
-  rationale: string
-  risk: RiskLevel
+  id: string
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_id: string | null
   policy_template_name: string | null
-  policy_template_resource: string | null
-  policy_template_approval_mode: "auto" | "review" | "escalate" | null
-  policy_template_owner_id: string | null
   policy_template_owner: string | null
-  renewal_of: string | null
-  approval_steps: PermissionApprovalStep[]
-  current_approval_step_id: string | null
+  policy_template_owner_id: string | null
+  policy_template_resource: string | null
+  privileges: string[]
   queue_decision:
     | "auto-approved"
     | "time-bounded"
     | "security-escalation"
     | "manual-review"
+  rationale: string
+  renewal_of: string | null
+  requester: string
+  requester_email?: string
+  requester_id?: string
+  resource: string
+  reviewer: string
+  risk: RiskLevel
+  scope: RequestScope
+  status: RequestStatus
+  submit_as: "personal" | "team"
+  submitted_at: string
+  team: string | null
+  team_id?: string | null
 }
 
-export type PolicyTemplateApprovalStep = {
+export interface PolicyTemplateApprovalStep {
+  approver_label: string
+  approver_team: string
+  approver_team_id: string
   id: string
   stage_order: number
-  approver_team_id: string
-  approver_team: string
-  approver_label: string
 }
 
-export type PolicyTemplate = {
+export interface PolicyTemplate {
+  approval_mode: "auto" | "review" | "escalate"
+  approval_steps: PolicyTemplateApprovalStep[]
   id: string
+  last_updated: string
+  max_grant_duration_days: number
   name: string
-  scope: RequestScope
+  owner: string
+  owner_id: string
+  privileges: string[]
   resource: string | null
+  risk: RiskLevel
+  scope: RequestScope
   team_ids: string[]
   teams: string[]
-  privileges: string[]
-  approval_mode: "auto" | "review" | "escalate"
-  risk: RiskLevel
-  max_grant_duration_days: number
   usage_30d: number
-  owner_id: string
-  owner: string
-  last_updated: string
-  approval_steps: PolicyTemplateApprovalStep[]
 }
 
-export type AffectedComponent = {
+export interface AffectedComponent {
   display_name: string
   node_type: string
 }
 
-export type BlastRadiusPreview = {
-  request_id: string
+export interface BlastRadiusPreview {
+  affected_nodes: AffectedComponent[]
   code: string
-  requester: string
-  resource: string
-  scope: RequestScope
-  risk: RiskLevel
+  consumers: number
+  dashboards: number
   derived_risk: RiskLevel
-  lineage_resolved: boolean
-  lineage_root_id: string | null
-  lineage_root_display_name: string | null
-  lineage_root_type: string | null
-  total_downstream_nodes: number
   direct_downstream_nodes: number
-  downstream_tables: number
   downstream_assets: number
   downstream_jobs: number
   downstream_schedules: number
-  dashboards: number
-  consumers: number
-  sensitive_domains: string[]
-  recommended_guardrail: string
-  llm_risk: LlmRiskStatus
-  llm_recommendation: string
+  downstream_tables: number
+  lineage_resolved: boolean
+  lineage_root_display_name: string | null
+  lineage_root_id: string | null
+  lineage_root_type: string | null
   llm_explanation: string
-  affected_nodes: AffectedComponent[]
+  llm_recommendation: string
+  llm_risk: LlmRiskStatus
+  recommended_guardrail: string
+  request_id: string
+  requester: string
+  resource: string
+  risk: RiskLevel
+  scope: RequestScope
+  sensitive_domains: string[]
+  total_downstream_nodes: number
 }
 
-export type TimeBoundGrant = {
+export interface TimeBoundGrant {
+  created_at: string
+  expires_at: string
   id: string
   principal: string
-  team: string
-  resource: string
-  scope: string
   privilege: string
-  started_at: string
-  expires_at: string
-  reviewer_id: string
-  renewal_status: "healthy" | "expiring" | "expired" | "revoked"
   reason: string
+  renewal_status: "healthy" | "expiring" | "expired" | "revoked"
+  resource: string
+  reviewer_id: string
+  scope: string
   source_request_id: string | null
-  created_at: string
+  started_at: string
+  team: string
   updated_at: string
 }
 
-export type CreatePermissionRequestBody = {
-  submit_as: "personal" | "team"
-  team?: string
-  resource: string
-  scope: RequestScope
+export interface CreatePermissionRequestBody {
   privileges: string[]
   rationale: string
-  requested_duration_days?: number
   renewal_of?: string
+  requested_duration_days?: number
+  resource: string
+  scope: RequestScope
+  submit_as: "personal" | "team"
+  team?: string
 }
 
 export async function listPermissionRequests(params?: {

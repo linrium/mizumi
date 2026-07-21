@@ -3,15 +3,15 @@
 import { createContext, type ReactNode, useContext, useEffect } from "react"
 import { type Session, useSessions } from "@/hooks/use-sessions"
 
-type SessionContextValue = {
-  sessions: Session[]
+interface SessionContextValue {
   activeId: string | null
-  setActiveId: (id: string) => void
-  creating: boolean
-  deleting: string | null
   createSession: () => Promise<Session | null>
+  creating: boolean
   deleteSession: (id: string) => Promise<void>
+  deleting: string | null
   fetchSessions: () => Promise<void>
+  sessions: Session[]
+  setActiveId: (id: string) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)

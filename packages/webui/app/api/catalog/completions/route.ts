@@ -6,7 +6,7 @@ import {
   getTables,
 } from "@/services/catalog"
 
-export type CatalogCompletionSchema = {
+export interface CatalogCompletionSchema {
   catalogs: string[]
   tables: Array<{
     catalog: string

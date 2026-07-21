@@ -84,10 +84,7 @@ export default function ExperimentsPage() {
         </TableCell>
         <TableCell className="max-w-[240px] truncate font-medium">
           <span className="flex items-center gap-1.5">
-            <IconFlask
-              className="shrink-0 text-muted-foreground"
-              size={13}
-            />
+            <IconFlask className="shrink-0 text-muted-foreground" size={13} />
             {experiment.name}
           </span>
         </TableCell>

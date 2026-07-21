@@ -8,7 +8,7 @@ type ScaleLinear<Output, _Input = number> = ReturnType<
 type ScaleTime<Output, _Input = Date | number> = ReturnType<
   typeof scaleTime<Output>
 >
-type ScaleBand<Domain extends { toString(): string }> = ReturnType<
+type ScaleBand<Domain extends { toString: () => string }> = ReturnType<
   typeof scaleBand<Domain>
 >
 

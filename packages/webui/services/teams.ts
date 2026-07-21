@@ -1,20 +1,20 @@
 import { apiFetch } from "@/lib/api-client"
 
-export type Team = {
+export interface Team {
+  created_at: string
   id: string
   name: string
-  workspace: string
-  created_at: string
   updated_at: string
+  workspace: string
 }
 
-export type TeamMember = {
+export interface TeamMember {
+  email: string
+  full_name: string
+  joined_at: string
   team_id: string
   user_id: string
-  full_name: string
-  email: string
   username: string
-  joined_at: string
 }
 
 export async function listTeams(): Promise<Team[]> {

@@ -21,62 +21,65 @@ const LineageGraph = dynamic(
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type RunTag = { key: string; value: string }
-
-type StaleCause = {
-  key: string[]
-  reason: string
-  dependency: string[] | null
-  category: string
+interface RunTag {
+  key: string
+  value: string
 }
 
-type MetadataEntry = {
+interface StaleCause {
+  category: string
+  dependency: string[] | null
+  key: string[]
+  reason: string
+}
+
+interface MetadataEntry {
   label: string
   type: string
   value: unknown
 }
 
-type Materialization = {
-  timestamp: string
+interface Materialization {
+  metadata: MetadataEntry[]
   run_id: string
   tags: RunTag[]
-  metadata: MetadataEntry[]
+  timestamp: string
 }
 
-type AssetNodeDetail = {
-  path: string[]
+interface AssetNodeDetail {
   compute_kind: string | null
+  depended_by_keys: string[][]
+  dependency_keys: string[][]
   description: string | null
   group_name: string | null
-  is_observable: boolean
   is_executable: boolean
+  is_observable: boolean
   job_names: string[]
-  dependency_keys: string[][]
-  depended_by_keys: string[][]
-  stale_status: string | null
-  stale_causes: StaleCause[]
   materializations: Materialization[]
-  tags: RunTag[]
+  path: string[]
   repository_location: string | null
+  stale_causes: StaleCause[]
+  stale_status: string | null
+  tags: RunTag[]
 }
 
-type LatestRunInfo = {
-  run_id: string
-  status: string
-  start_time: number | null
+interface LatestRunInfo {
   end_time: number | null
-}
-
-type LatestMatInfo = {
-  timestamp: string
   run_id: string
+  start_time: number | null
+  status: string
 }
 
-type AssetStatus = {
-  latest_run: LatestRunInfo | null
-  latest_materialization: LatestMatInfo | null
-  unstarted_run_ids: string[]
+interface LatestMatInfo {
+  run_id: string
+  timestamp: string
+}
+
+interface AssetStatus {
   in_progress_run_ids: string[]
+  latest_materialization: LatestMatInfo | null
+  latest_run: LatestRunInfo | null
+  unstarted_run_ids: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ function toDayjs(ts: string | number | null | undefined) {
     return null
   }
   const v = Number(ts)
-  if (!isFinite(v)) {
+  if (!Number.isFinite(v)) {
     return null
   }
   return v > 1e12 ? dayjs(v) : dayjs.unix(v)
@@ -138,10 +141,10 @@ function extractKinds(tags: RunTag[] | undefined): string[] {
 
 const ACTIVE_STATUSES = new Set(["QUEUED", "STARTED", "STARTING", "CANCELING"])
 
-type RunStatusConfig = {
+interface RunStatusConfig {
+  bannerCls: string
   label: string
   variant: "success" | "error" | "info" | "warning" | "default"
-  bannerCls: string
 }
 
 const RUN_STATUS_CONFIG: Record<string, RunStatusConfig> = {
@@ -429,9 +432,9 @@ export default function AssetDetailPage() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathSegments.join("/")])
+  }, [pathSegments.join])
 
-  const assetName = pathSegments[pathSegments.length - 1]
+  const assetName = pathSegments.at(-1)
   const latestMat = detail?.materializations[0]
   const kinds = detail ? extractKinds(detail.tags) : []
 
@@ -661,7 +664,7 @@ export default function AssetDetailPage() {
                               key={i}
                             >
                               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
-                              {k[k.length - 1]}
+                              {k.at(-1)}
                             </Link>
                           ))}
                         </div>
@@ -681,7 +684,7 @@ export default function AssetDetailPage() {
                               href={`/pipelines/assets/${k.join("/")}`}
                               key={i}
                             >
-                              {k[k.length - 1]}
+                              {k.at(-1)}
                             </Link>
                           ))}
                         </div>

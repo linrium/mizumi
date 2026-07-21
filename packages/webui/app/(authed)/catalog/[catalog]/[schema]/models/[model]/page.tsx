@@ -99,9 +99,7 @@ export default function ModelsPage() {
           )}
           key={loggedModel.info.model_id}
         >
-          <td className="px-4 py-2 font-medium">
-            {loggedModel.info.name}
-          </td>
+          <td className="px-4 py-2 font-medium">{loggedModel.info.name}</td>
           <td className="px-4 py-2">
             <span className="flex flex-wrap gap-1">
               {versions.length > 0 ? (
@@ -123,10 +121,7 @@ export default function ModelsPage() {
           </td>
           <td className="px-4 py-2">
             <span className="flex min-w-0 items-center gap-1.5">
-              <IconRun
-                className="shrink-0 text-muted-foreground"
-                size={13}
-              />
+              <IconRun className="shrink-0 text-muted-foreground" size={13} />
               <span className="truncate font-mono text-muted-foreground">
                 {loggedModel.info.source_run_id ?? "—"}
               </span>

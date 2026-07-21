@@ -37,9 +37,9 @@ const SCHEMA_EMBED_MODEL =
 const SCHEMA_EMBED_DIM = Number(process.env.EMBEDDING_DIM ?? "1536")
 const HAS_OPENAI_EMBEDDINGS = Boolean(process.env.OPENAI_API_KEY?.trim())
 
-type SchemaHit = {
-  fqn: string
+interface SchemaHit {
   catalog: string
+  fqn: string
   schema_name: string
   table_name: string
   text: string
@@ -204,11 +204,11 @@ async function runSql(sessionId: string | null, sql: string, token?: string) {
   return data as { columns: string[]; rows: unknown[][]; row_count: number }
 }
 
-type AccessibleTableRef = {
+interface AccessibleTableRef {
   catalog: string
   schemaName: string
-  tableName: string
   searchText: string
+  tableName: string
 }
 
 function parseAccessibleTables(schema: string): AccessibleTableRef[] {

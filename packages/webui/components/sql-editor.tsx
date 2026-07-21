@@ -329,14 +329,14 @@ const RESULTS_MIN = 80
 const RESULTS_MAX = 800
 const RESULTS_DEFAULT = 300
 
-type SqlCodeEditorProps = {
-  value: string
-  onChange: (value: string) => void
-  onSubmit?: () => void
+interface SqlCodeEditorProps {
   className?: string
   editorClassName?: string
   error?: ReactNode
   lineNumbers?: "on" | "off"
+  onChange: (value: string) => void
+  onSubmit?: () => void
+  value: string
 }
 
 export function SqlCodeEditor({

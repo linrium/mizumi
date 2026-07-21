@@ -26,79 +26,79 @@ import { cn } from "@/lib/utils"
 
 dayjs.extend(relativeTime)
 
-type RuntimeInfo = {
-  source_system: string
-  latest_run_id: string | null
-  latest_run_status: string | null
-  latest_run_started_at: string | null
-  latest_run_ended_at: string | null
+interface RuntimeInfo {
+  in_progress_run_ids: string[]
   latest_materialization_at: string | null
   latest_materialization_run_id: string | null
-  unstarted_run_ids: string[]
-  in_progress_run_ids: string[]
+  latest_run_ended_at: string | null
+  latest_run_id: string | null
+  latest_run_started_at: string | null
+  latest_run_status: string | null
   metadata: Record<string, unknown>
   observed_at: string
+  source_system: string
+  unstarted_run_ids: string[]
 }
 
-type ApiLineageNode = {
+interface ApiLineageNode {
+  display_name: string
   id: string
+  name: string
+  namespace: string
   node_type: string
   platform: string
-  namespace: string
-  name: string
-  display_name: string
   properties: Record<string, unknown>
   runtime: RuntimeInfo | null
 }
 
-type ApiLineageEdge = {
+interface ApiLineageEdge {
+  confidence: number
+  edge_type: string
   id: string
+  properties: Record<string, unknown>
   source: string
   target: string
-  edge_type: string
-  confidence: number
-  properties: Record<string, unknown>
 }
 
-type ApiLineageGraph = {
-  root: ApiLineageNode | null
-  direction: string
+interface ApiLineageGraph {
   depth: number
-  nodes: ApiLineageNode[]
+  direction: string
   edges: ApiLineageEdge[]
+  nodes: ApiLineageNode[]
+  root: ApiLineageNode | null
 }
 
 type LineageGraphView = ApiLineageGraph & {
   containmentEdges: ApiLineageEdge[]
 }
 
-export type LineageFilters = {
-  query?: string
-  nodeTypes?: string[]
-  runtimeOnly?: boolean
+export interface LineageFilters {
   includeContains?: boolean
+  nodeTypes?: string[]
+  query?: string
+  runtimeOnly?: boolean
 }
 
-type LineageNodeData = {
-  id: string
+interface LineageNodeData {
+  canExpand: boolean
   displayName: string
+  href: string | null
+  id: string
+  isCurrent: boolean
+  isExpanded: boolean
   nodeType: string
+  onExpand: ((id: string) => void) | null
   platform: string
   properties: Record<string, unknown>
   runtime: RuntimeInfo | null
-  isCurrent: boolean
-  href: string | null
-  canExpand: boolean
-  isExpanded: boolean
-  onExpand: ((id: string) => void) | null
   [key: string]: unknown
 }
 
-type LineageGroupData = {
-  id: string
+interface LineageGroupData {
   displayName: string
-  nodeType: "catalog" | "schema"
+  id: string
   isCurrent: boolean
+  nodeType: "catalog" | "schema"
 }
 
 type LineageFlowNode =

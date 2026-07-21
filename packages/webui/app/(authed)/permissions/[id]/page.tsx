@@ -58,7 +58,7 @@ function getStatusVariant(status: RequestStatus) {
   }
 }
 
-function getRiskVariant(risk: RiskLevel) {
+function _getRiskVariant(risk: RiskLevel) {
   switch (risk) {
     case "high":
       return "destructive"
@@ -69,7 +69,7 @@ function getRiskVariant(risk: RiskLevel) {
   }
 }
 
-function formatRiskLabel(risk: RiskLevel) {
+function _formatRiskLabel(risk: RiskLevel) {
   return `${risk[0]?.toUpperCase() + risk.slice(1)} risk`
 }
 
@@ -433,7 +433,7 @@ export default function PermissionRequestDetailPage() {
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               {currentSteps.length <= 1 && currentSteps[0] ? (
                 <Button
-                  disabled={actioningKey != null}
+                  disabled={actioningKey !== null}
                   onClick={() => handleApprove(currentSteps[0]?.id ?? "")}
                   size="sm"
                 >
@@ -444,7 +444,7 @@ export default function PermissionRequestDetailPage() {
               ) : (
                 currentSteps.map((step) => (
                   <Button
-                    disabled={actioningKey != null}
+                    disabled={actioningKey !== null}
                     key={step.id}
                     onClick={() => handleApprove(step.id)}
                     size="sm"
@@ -457,7 +457,7 @@ export default function PermissionRequestDetailPage() {
               )}
               {currentSteps[0] && (
                 <Button
-                  disabled={actioningKey != null}
+                  disabled={actioningKey !== null}
                   onClick={() =>
                     handleStatusUpdate("needs-info", currentSteps[0]?.id)
                   }
@@ -471,7 +471,7 @@ export default function PermissionRequestDetailPage() {
               )}
               {CANCELLABLE.includes(request.status) && (
                 <Button
-                  disabled={actioningKey != null}
+                  disabled={actioningKey !== null}
                   onClick={() => handleStatusUpdate("cancelled")}
                   size="sm"
                   variant="outline"
@@ -939,7 +939,7 @@ export default function PermissionRequestDetailPage() {
       {/* Time-bound approval dialog */}
       <Dialog
         onOpenChange={(open) => {
-          if (!open && actioningKey == null) {
+          if (!open && actioningKey === null) {
             setApprovalDialog(null)
           }
         }}
@@ -1033,7 +1033,7 @@ export default function PermissionRequestDetailPage() {
 
           <DialogFooter>
             <Button
-              disabled={actioningKey != null}
+              disabled={actioningKey !== null}
               onClick={() => setApprovalDialog(null)}
               variant="outline"
             >
@@ -1041,13 +1041,13 @@ export default function PermissionRequestDetailPage() {
             </Button>
             <Button
               disabled={
-                actioningKey != null ||
+                actioningKey !== null ||
                 !approvalDialog ||
                 !(Number(approvalDialog.durationDays) >= 1)
               }
               onClick={handleApprovalDialogConfirm}
             >
-              {actioningKey == null ? "Confirm & grant access" : "Approving…"}
+              {actioningKey === null ? "Confirm & grant access" : "Approving…"}
             </Button>
           </DialogFooter>
         </DialogContent>

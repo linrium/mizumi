@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { writeStoredIdToken } from "@/lib/auth/storage"
 
-type AuthHeaderProviderProps = {
+interface AuthHeaderProviderProps {
   idToken?: string
 }
 

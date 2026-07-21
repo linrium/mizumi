@@ -72,13 +72,13 @@ const appItems = [
   },
 ]
 
-type NavItem = {
-  title: string
+interface NavItem {
   href: string
   icon: TablerIcon
+  title: string
 }
 
-type AppSidebarProps = {
+interface AppSidebarProps {
   session: AppSession
 }
 

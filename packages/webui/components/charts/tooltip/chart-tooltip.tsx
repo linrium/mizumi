@@ -107,7 +107,7 @@ export function ChartTooltip({
 
   // Resolve indicator color (static or from hovered point)
   const indicatorColor = useMemo(() => {
-    if (indicatorColorProp == null) {
+    if (indicatorColorProp === null) {
       return chartCssVars.crosshair
     }
     if (typeof indicatorColorProp === "function") {

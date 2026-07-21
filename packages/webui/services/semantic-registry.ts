@@ -9,94 +9,90 @@ export type SemanticStatus =
   | "deprecated"
   | "retired"
 
-export type SemanticDefinition = {
-  id: string
-  namespace: string
-  name: string
-  object_type: "metric"
-  version: number
-  status: SemanticStatus
-  owner_principal: string
-  description: string
-  spec: unknown
-  time_semantics: unknown | null
-  supersedes_definition_id: string | null
-  deprecation_deadline: string | null
-  created_by: string
+export interface SemanticDefinition {
   created_at: string
+  created_by: string
+  deprecation_deadline: string | null
+  description: string
+  id: string
+  name: string
+  namespace: string
+  object_type: "metric"
+  owner_principal: string
+  spec: unknown
+  status: SemanticStatus
+  supersedes_definition_id: string | null
+  time_semantics: unknown | null
   updated_at: string
+  version: number
 }
 
-export type SemanticDependency = {
+export interface SemanticDependency {
+  created_at: string
+  dependency_type: string
   id: string
   source_definition_id: string
   target_definition_id: string
-  dependency_type: string
-  created_at: string
 }
 
-export type SemanticPhysicalDependency = {
-  id: string
-  semantic_definition_id: string
+export interface SemanticPhysicalDependency {
   catalog: string
-  schema_name: string
-  object_name: string
-  object_type: string
   contract_version: number | null
   created_at: string
+  id: string
+  object_name: string
+  object_type: string
+  schema_name: string
+  semantic_definition_id: string
 }
 
-export type SemanticLifecycleEvent = {
-  id: string
+export interface SemanticLifecycleEvent {
+  created_at: string
   definition_id: string
-  previous_status: SemanticStatus | null
+  id: string
   new_status: SemanticStatus
+  previous_status: SemanticStatus | null
   principal: string
   reason: string | null
-  created_at: string
 }
 
-export type SemanticDefinitionSummary = {
-  namespace: string
+export interface SemanticDefinitionSummary {
+  active_version: number | null
+  description: string
+  direct_dependent_count: number
+  latest_status: SemanticStatus
+  latest_version: number
   name: string
+  namespace: string
   object_type: "metric"
   owner_principal: string
-  description: string
-  active_version: number | null
-  latest_version: number
-  latest_status: SemanticStatus
-  version_count: number
-  semantic_dependency_count: number
-  direct_dependent_count: number
   physical_dependency_count: number
+  semantic_dependency_count: number
   updated_at: string
+  version_count: number
 }
 
-export type SemanticDefinitionDetail = {
+export interface SemanticDefinitionDetail {
   definition: SemanticDefinition
   dependencies: SemanticDefinition[]
   dependency_edges: SemanticDependency[]
   dependents: SemanticDefinition[]
-  physical_dependencies: SemanticPhysicalDependency[]
   lifecycle_history: SemanticLifecycleEvent[]
+  physical_dependencies: SemanticPhysicalDependency[]
 }
 
-export type CreateSemanticDefinitionBody = {
-  namespace: string
-  name: string
-  object_type?: "metric"
-  version: number
-  owner_principal: string
-  description: string
-  spec: unknown
-  time_semantics?: unknown | null
-  supersedes_version?: number | null
+export interface CreateSemanticDefinitionBody {
   dependencies?: Array<{
     namespace: string
     name: string
     version: number
     dependency_type?: string
   }>
+  description: string
+  name: string
+  namespace: string
+  object_type?: "metric"
+  owner_principal: string
   physical_dependencies?: Array<{
     catalog: string
     schema_name: string
@@ -104,12 +100,16 @@ export type CreateSemanticDefinitionBody = {
     object_type?: string
     contract_version?: number | null
   }>
+  spec: unknown
+  supersedes_version?: number | null
+  time_semantics?: unknown | null
+  version: number
 }
 
-export type SemanticCompareResponse = {
+export interface SemanticCompareResponse {
+  changes: Record<string, boolean>
   from: SemanticDefinitionDetail
   to: SemanticDefinitionDetail
-  changes: Record<string, boolean>
 }
 
 export async function listSemanticDefinitions(params?: {

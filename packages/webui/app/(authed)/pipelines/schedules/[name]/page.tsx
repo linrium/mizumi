@@ -15,75 +15,75 @@ dayjs.extend(relativeTime)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ScheduleTick = {
-  timestamp: number
+interface ScheduleTick {
   status: string
+  timestamp: number
 }
 
-type Schedule = {
-  name: string
+interface Schedule {
   cron_schedule: string
+  default_status: string | null
   description: string | null
   execution_timezone: string | null
-  default_status: string | null
   job_name: string | null
-  status: string | null
   last_tick: ScheduleTick | null
+  name: string
   next_tick: number | null
+  status: string | null
 }
 
-type ScheduleAsset = {
-  key: string[]
+interface ScheduleAsset {
   compute_kind: string | null
   description: string | null
   group_name: string | null
-  is_observable: boolean
   is_executable: boolean
+  is_observable: boolean
   job_names: string[]
+  key: string[]
 }
 
-type ScheduleAssetSelection = {
-  schedule_name: string
+interface ScheduleAssetSelection {
   asset_selection_string: string | null
   assets: ScheduleAsset[]
+  schedule_name: string
 }
 
-type TickRun = {
+interface TickRun {
   id: string
   status: string
 }
 
-type TickError = {
+interface TickError {
   message: string
   stack: string[]
 }
 
-type DynamicPartitionsResult = {
-  partitions_def_name: string
+interface DynamicPartitionsResult {
   partition_keys: string[]
-  skipped_partition_keys: string[]
+  partitions_def_name: string
   result_type: string
+  skipped_partition_keys: string[]
 }
 
-type HistoryTick = {
-  id: string
-  tick_id: string | null
-  status: string
-  timestamp: number
-  end_timestamp: number | null
+interface HistoryTick {
   cursor: string | null
+  dynamic_partitions_request_results: DynamicPartitionsResult[]
+  end_timestamp: number | null
+  error: TickError | null
+  id: string
   instigation_type: string | null
-  skip_reason: string | null
+  log_key: string[] | null
+  origin_run_ids: string[]
   requested_asset_materialization_count: number | null
   run_ids: string[]
   runs: TickRun[]
-  origin_run_ids: string[]
-  error: TickError | null
-  log_key: string[] | null
-  dynamic_partitions_request_results: DynamicPartitionsResult[]
+  skip_reason: string | null
+  status: string
+  tick_id: string | null
+  timestamp: number
 }
 
-type TickHistoryResponse = {
+interface TickHistoryResponse {
   id: string
   instigation_type: string | null
   ticks: HistoryTick[]
@@ -181,7 +181,7 @@ function DetailRow({
 // ── AssetCard ─────────────────────────────────────────────────────────────────
 
 function AssetCard({ asset }: { asset: ScheduleAsset }) {
-  const name = asset.key[asset.key.length - 1]
+  const name = asset.key.at(-1)
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border bg-card px-4 py-3">
       <div className="flex min-w-0 items-center gap-2">
@@ -326,7 +326,7 @@ function TickRow({ tick }: { tick: HistoryTick }) {
                 <pre className="whitespace-pre-wrap font-mono text-[10px] text-destructive leading-relaxed">
                   {tick.error.message}
                   {tick.error.stack.length > 0 &&
-                    "\n\nStack:\n" + tick.error.stack.join("\n")}
+                    `\n\nStack:\n${tick.error.stack.join("\n")}`}
                 </pre>
               </div>
             )}
@@ -569,7 +569,7 @@ export default function ScheduleDetailPage() {
               </div>
             </div>
 
-            {schedule.next_tick != null && (
+            {schedule.next_tick !== null && (
               <>
                 <Separator />
                 <div>

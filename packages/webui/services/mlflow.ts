@@ -26,100 +26,100 @@ async function mlflowFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export type MlflowTag = {
+export interface MlflowTag {
   key: string
   value: string
 }
 
-export type MlflowExperiment = {
-  experiment_id: string
-  name: string
+export interface MlflowExperiment {
   artifact_location: string
-  lifecycle_stage: string
   creation_time?: number
+  experiment_id: string
   last_update_time?: number
+  lifecycle_stage: string
+  name: string
   tags?: MlflowTag[]
 }
 
-export type MlflowMetric = {
+export interface MlflowMetric {
   key: string
-  value: number
-  timestamp: number
   step: number
+  timestamp: number
+  value: number
 }
 
-export type MlflowParam = {
+export interface MlflowParam {
   key: string
   value: string
 }
 
-export type MlflowRunData = {
+export interface MlflowRunData {
   metrics?: MlflowMetric[]
   params?: MlflowParam[]
   tags?: MlflowTag[]
 }
 
-export type MlflowRunInfo = {
+export interface MlflowRunInfo {
+  artifact_uri?: string
+  end_time?: number
+  experiment_id: string
+  lifecycle_stage: string
   run_id: string
   run_name?: string
-  experiment_id: string
-  status: "RUNNING" | "SCHEDULED" | "FINISHED" | "FAILED" | "KILLED"
   start_time?: number
-  end_time?: number
-  artifact_uri?: string
-  lifecycle_stage: string
+  status: "RUNNING" | "SCHEDULED" | "FINISHED" | "FAILED" | "KILLED"
 }
 
-export type MlflowRun = {
-  info: MlflowRunInfo
+export interface MlflowRun {
   data: MlflowRunData
+  info: MlflowRunInfo
 }
 
-export type MlflowTrace = {
-  request_id: string
-  experiment_id: string
-  timestamp_ms: number
+export interface MlflowTrace {
   execution_time_ms?: number
+  experiment_id: string
+  request_id: string
   status: string
   tags?: MlflowTag[]
+  timestamp_ms: number
 }
 
-export type MlflowRegisteredModelAlias = {
+export interface MlflowRegisteredModelAlias {
   alias: string
   version: string
 }
 
-export type MlflowModelVersion = {
-  name: string
-  version: string
+export interface MlflowModelVersion {
   creation_timestamp?: number
-  last_updated_timestamp?: number
   current_stage?: string
   description?: string
-  source?: string
+  last_updated_timestamp?: number
+  name: string
   run_id?: string
-  status?: string
   run_link?: string
+  source?: string
+  status?: string
+  version: string
 }
 
-export type MlflowRegisteredModel = {
-  name: string
+export interface MlflowRegisteredModel {
+  aliases?: MlflowRegisteredModelAlias[]
   creation_timestamp?: number
   last_updated_timestamp?: number
   latest_versions?: MlflowModelVersion[]
-  aliases?: MlflowRegisteredModelAlias[]
+  name: string
 }
 
-export type MlflowLoggedModelInfo = {
-  model_id: string
-  experiment_id: string
-  name: string
-  creation_timestamp_ms?: number
-  last_updated_timestamp_ms?: number
+export interface MlflowLoggedModelInfo {
   artifact_uri?: string
-  status?: string
+  creation_timestamp_ms?: number
+  experiment_id: string
+  last_updated_timestamp_ms?: number
+  model_id: string
   model_type?: string
+  name: string
   source_run_id?: string
+  status?: string
   tags?: MlflowTag[]
 }
 
@@ -128,14 +128,14 @@ export type MlflowLoggedModelMetric = MlflowMetric & {
   run_id?: string
 }
 
-export type MlflowLoggedModelData = {
-  params?: MlflowParam[]
+export interface MlflowLoggedModelData {
   metrics?: MlflowLoggedModelMetric[]
+  params?: MlflowParam[]
 }
 
-export type MlflowLoggedModel = {
-  info: MlflowLoggedModelInfo
+export interface MlflowLoggedModel {
   data?: MlflowLoggedModelData
+  info: MlflowLoggedModelInfo
 }
 
 export async function searchExperiments() {

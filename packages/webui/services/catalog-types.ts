@@ -1,29 +1,23 @@
-export type Catalog = {
-  name: string
+export interface Catalog {
   comment?: string
+  name: string
 }
 
-export type Schema = {
-  name: string
+export interface Schema {
   catalog_name: string
   comment?: string
+  name: string
 }
 
-export type TableSummary = {
-  name: string
+export interface TableSummary {
   catalog_name: string
+  name: string
   schema_name: string
   table_type: string
 }
 
-export type TableDetail = {
-  name: string
+export interface TableDetail {
   catalog_name: string
-  schema_name: string
-  table_type: string
-  data_source_format?: string
-  storage_location?: string
-  comment?: string
   columns: Array<{
     name: string
     type_text: string
@@ -33,82 +27,88 @@ export type TableDetail = {
     position?: number
     comment?: string
   }>
+  comment?: string
+  data_source_format?: string
+  name: string
+  schema_name: string
+  storage_location?: string
+  table_type: string
 }
 
-export type PermissionAssignment = {
+export interface PermissionAssignment {
   principal: string
   privileges?: string[]
 }
 
-export type PermissionsResponse = {
+export interface PermissionsResponse {
   privilege_assignments?: PermissionAssignment[]
 }
 
-export type VolumeSummary = {
-  name: string
+export interface VolumeSummary {
   catalog_name: string
+  name: string
   schema_name: string
   volume_type: string
 }
 
-export type VolumeDetail = {
-  volume_id: string
-  name: string
+export interface VolumeDetail {
   catalog_name: string
-  schema_name: string
-  full_name: string
-  volume_type: string
-  storage_location?: string
   comment?: string
-  owner?: string
   created_at: number
   created_by?: string
-}
-
-export type S3Object = {
-  key: string
-  size: number
-  last_modified: string
-  etag: string
-}
-
-export type ListObjectsResult = {
-  objects: S3Object[]
-  nextContinuationToken?: string
-}
-
-export type RegisteredModelSummary = {
+  full_name: string
   name: string
-  catalog_name: string
+  owner?: string
   schema_name: string
   storage_location?: string
-  full_name?: string
+  volume_id: string
+  volume_type: string
+}
+
+export interface S3Object {
+  etag: string
+  key: string
+  last_modified: string
+  size: number
+}
+
+export interface ListObjectsResult {
+  nextContinuationToken?: string
+  objects: S3Object[]
+}
+
+export interface RegisteredModelSummary {
+  catalog_name: string
   comment?: string
-  owner?: string
   created_at?: number
   created_by?: string
+  full_name?: string
+  id?: string
+  name: string
+  owner?: string
+  schema_name: string
+  storage_location?: string
   updated_at?: number
   updated_by?: string
-  id?: string
 }
 
 export type RegisteredModelDetail = RegisteredModelSummary
 
-export type ModelVersionSummary = {
-  model_name?: string
+export interface ModelVersionSummary {
   catalog_name?: string
-  schema_name?: string
-  version?: number
-  source?: string
-  run_id?: string
-  status?: string
-  storage_location?: string
   comment?: string
   created_at?: number
   created_by?: string
+  id?: string
+  model_name?: string
+  run_id?: string
+  schema_name?: string
+  source?: string
+  status?: string
+  storage_location?: string
   updated_at?: number
   updated_by?: string
-  id?: string
+  version?: number
 }
 
 export type ResourceType = "catalog" | "schema" | "table"

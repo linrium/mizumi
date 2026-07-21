@@ -705,7 +705,7 @@ export default function PermissionsPage() {
             setApproveTarget(null)
           }
         }}
-        open={approveTarget != null}
+        open={approveTarget !== null}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>

@@ -39,27 +39,27 @@ import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type K8sStatus = {
-  state: string
+interface K8sStatus {
   driver_pod: string | null
   spark_ui_url: string | null
+  state: string
 }
 
-type StreamingJob = {
-  id: string
-  name: string
-  namespace: string
-  image: string
-  main_application_file: string
-  spark_version: string
+interface StreamingJob {
+  created_at: string
   driver_cores: number
   driver_memory: string
-  executor_instances: number
   executor_cores: number
+  executor_instances: number
   executor_memory: string
-  created_at: string
-  updated_at: string
+  id: string
+  image: string
   k8s_status: K8sStatus | null
+  main_application_file: string
+  name: string
+  namespace: string
+  spark_version: string
+  updated_at: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export default function StreamingPage() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   async function handleRestart() {
     if (!restartTarget || actionPending) {
@@ -355,7 +355,7 @@ export default function StreamingPage() {
             setRestartTarget(null)
           }
         }}
-        open={restartTarget != null}
+        open={restartTarget !== null}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -409,7 +409,7 @@ export default function StreamingPage() {
             setDeleteTarget(null)
           }
         }}
-        open={deleteTarget != null}
+        open={deleteTarget !== null}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>

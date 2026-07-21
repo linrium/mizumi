@@ -1,24 +1,24 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-type CustomerRow = {
-  unified_customer_id: string
-  full_name: string
-  city: string
+interface CustomerRow {
   age: string
-  hdbank_customer_id: string
-  vietjetair_customer_id: string
-  hdbank_segment: string
-  preferred_channel: string
-  monthly_income: string
+  city: string
   credit_score: string
-  has_credit_card: string
-  membership_tier: string
-  home_airport: string
   email_opt_in: string
-  shared_customer: string
+  full_name: string
+  has_credit_card: string
   has_hdbank: string
   has_vietjetair: string
+  hdbank_customer_id: string
+  hdbank_segment: string
+  home_airport: string
+  membership_tier: string
+  monthly_income: string
+  preferred_channel: string
+  shared_customer: string
+  unified_customer_id: string
+  vietjetair_customer_id: string
 }
 
 function parseCsv(content: string): CustomerRow[] {

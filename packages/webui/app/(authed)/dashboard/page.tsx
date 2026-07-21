@@ -108,24 +108,24 @@ type ChartType =
   | "funnel"
   | "heatmap"
 
-type QueryResult = {
+interface QueryResult {
   columns: string[]
-  rows: unknown[][]
   row_count: number
+  rows: unknown[][]
 }
 
-type PanelData = {
-  status: "idle" | "running" | "ok" | "error"
-  result: QueryResult | null
+interface PanelData {
   error: string | null
+  result: QueryResult | null
+  status: "idle" | "running" | "ok" | "error"
 }
 
-type Panel = {
-  id: string
-  title: string
-  description?: string
+interface Panel {
   chartType: ChartType
+  description?: string
+  id: string
   sql: string
+  title: string
   xCol: string
   yCol: string
   yCols?: string[]
@@ -134,34 +134,34 @@ type Panel = {
 type ResultRow = Record<string, unknown>
 
 // Tool output shape coming back from createPanel
-type CreatePanelOutput = {
-  title: string
-  sql: string
+interface CreatePanelOutput {
   chartType: ChartType
+  columns?: string[]
+  error?: string
+  explanation: string
+  height: number
+  row_count?: number
+  rows?: unknown[][]
+  sql: string
+  title: string
+  width: number
   xCol: string
   yCol: string
-  explanation: string
-  width: number
-  height: number
-  columns?: string[]
-  rows?: unknown[][]
-  row_count?: number
-  error?: string
 }
 
 // Tool output shape coming back from editPanel
-type EditPanelOutput = {
-  panelId: string
-  title: string
-  sql: string
+interface EditPanelOutput {
   chartType: ChartType
+  columns?: string[]
+  error?: string
+  explanation: string
+  panelId: string
+  row_count?: number
+  rows?: unknown[][]
+  sql: string
+  title: string
   xCol: string
   yCol: string
-  explanation: string
-  columns?: string[]
-  rows?: unknown[][]
-  row_count?: number
-  error?: string
 }
 
 // ── Bklit data helpers ────────────────────────────────────────────────────────
@@ -311,11 +311,11 @@ function getNumberValue(row: ResultRow | undefined, key: string) {
 
 function getTextValue(row: ResultRow | undefined, key: string) {
   const value = row?.[key]
-  return value == null ? null : String(value)
+  return value === null ? null : String(value)
 }
 
 function formatCompactNumber(value: number | null, suffix = "") {
-  if (value == null) {
+  if (value === null) {
     return "Loading"
   }
   return `${new Intl.NumberFormat("en", {
@@ -1616,7 +1616,7 @@ function AiComposer({
 
   useEffect(() => {
     setMentionIndex(0)
-  }, [activeMention?.query])
+  }, [])
 
   const transport = useMemo(
     () =>
@@ -1647,10 +1647,7 @@ function AiComposer({
             xCol: p.xCol,
             yCol: p.yCol,
           })),
-          selectedPanelId:
-            selectedPanelIdsRef.current[
-              selectedPanelIdsRef.current.length - 1
-            ] ?? null,
+          selectedPanelId: selectedPanelIdsRef.current.at(-1) ?? null,
           selectedPanelIds: selectedPanelIdsRef.current,
           sessionId: sessionIdRef.current,
         }),
@@ -1673,7 +1670,7 @@ function AiComposer({
   // When tool calls land, apply creates and edits to the dashboard
   useEffect(() => {
     const last = messages.at(-1)
-    if (!last || last.role !== "assistant") {
+    if (last?.role !== "assistant") {
       return
     }
 
@@ -1748,7 +1745,7 @@ function AiComposer({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [])
 
   const insertPanelMention = useCallback(
     (panel: Panel) => {
@@ -2220,7 +2217,7 @@ export default function DashboardPage() {
     }
     // panels intentionally excluded — only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runQuery])
+  }, [runQuery, panels])
 
   const handlePanelChange = useCallback((updated: Panel) => {
     setPanels((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
@@ -2394,7 +2391,7 @@ export default function DashboardPage() {
     return [
       {
         detail:
-          topOpportunity == null
+          topOpportunity === null
             ? "Waiting for query"
             : `${getTextValue(topOpportunity, "source_company")} → ${getTextValue(topOpportunity, "target_company")} from ${formatCompactNumber(getNumberValue(topOpportunity, "customers"))} customers`,
         title: "Opportunity generated",
@@ -2405,7 +2402,7 @@ export default function DashboardPage() {
       },
       {
         detail:
-          topWhitespace == null
+          topWhitespace === null
             ? "Waiting for query"
             : `${getTextValue(topWhitespace, "whitespace_edge")} is the largest open pool`,
         title: "Untapped whitespace",
@@ -2413,7 +2410,7 @@ export default function DashboardPage() {
       },
       {
         detail:
-          topRecovery == null
+          topRecovery === null
             ? "Waiting for query"
             : `${getTextValue(topRecovery, "vietjet_priority_band")} band recovery score ${getNumberValue(topRecovery, "recovery_score") ?? "n/a"}`,
         title: "Revenue at risk",

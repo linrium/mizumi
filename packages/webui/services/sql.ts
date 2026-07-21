@@ -5,17 +5,17 @@ export const sqlSchema = z.object({
   sql: z.string().min(1, "SQL query is required"),
 })
 
-export type QueryResponse = {
+export interface QueryResponse {
   columns: string[]
-  rows: unknown[][]
   row_count: number
+  rows: unknown[][]
 }
 
 export type SqlQueryResult =
   | { ok: true; data: QueryResponse; elapsed: number }
   | { ok: false; error: string }
 
-type SessionLike = {
+interface SessionLike {
   session_id: string
 }
 

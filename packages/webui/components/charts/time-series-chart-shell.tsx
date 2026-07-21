@@ -129,7 +129,7 @@ export function TimeSeriesChartInner({
 
   const yScale = useMemo(() => {
     let maxValue = 0
-    if (yScaleDomainMax != null && yScaleDomainMax > 0) {
+    if (yScaleDomainMax !== null && yScaleDomainMax > 0) {
       maxValue = yScaleDomainMax
     } else {
       for (const line of lines) {

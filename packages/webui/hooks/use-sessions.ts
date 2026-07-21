@@ -3,9 +3,9 @@
 import { useCallback, useState } from "react"
 import { apiFetch } from "@/lib/api-client"
 
-export type Session = {
-  session_id: string
+export interface Session {
   pod: string
+  session_id: string
 }
 
 export function useSessions() {

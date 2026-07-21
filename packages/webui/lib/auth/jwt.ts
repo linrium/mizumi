@@ -1,10 +1,10 @@
-type IdTokenClaims = {
-  sub?: string
+interface IdTokenClaims {
   email?: string
-  preferred_username?: string
-  name?: string
-  groups?: string[] | string
   exp?: number
+  groups?: string[] | string
+  name?: string
+  preferred_username?: string
+  sub?: string
 }
 
 function decodeBase64Url(value: string) {

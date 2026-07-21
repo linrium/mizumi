@@ -21,23 +21,23 @@ type SendResult =
     }
   | { ok: false; status?: number; error: string }
 
-export type EventOption = {
-  id: string
-  label: string
-  endpoint: string
-  createSample?: () => Record<string, unknown>
+export interface EventOption {
   createBatch?: (
     batchSize: number
   ) => Promise<Record<string, unknown>[]> | Record<string, unknown>[]
+  createSample?: () => Record<string, unknown>
+  endpoint: string
+  id: string
+  label: string
 }
 
-type EventPublisherProps = {
-  title: string
-  subtitle: string
-  options: EventOption[]
-  logoSrc?: StaticImageData
-  logoAlt?: string
+interface EventPublisherProps {
   batchSize?: number
+  logoAlt?: string
+  logoSrc?: StaticImageData
+  options: EventOption[]
+  subtitle: string
+  title: string
 }
 
 function prettyJson(value: unknown) {

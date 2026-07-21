@@ -23,30 +23,30 @@ import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type AssetNodeMinimal = {
-  path: string[]
+interface AssetNodeMinimal {
   dependency_keys: string[][]
+  path: string[]
 }
 
-export type RunEvent = {
-  type: string
-  timestamp: string | null
-  message: string | null
-  level: string | null
-  step_key: string | null
-  error: string | null
+export interface RunEvent {
   asset_key: string[] | null
-  label: string | null
   description: string | null
+  error: string | null
+  label: string | null
+  level: string | null
+  message: string | null
+  step_key: string | null
+  timestamp: string | null
+  type: string
 }
 
 type StepStatus = "success" | "failure" | "running" | "skipped" | "pending"
 
-type StepInfo = {
-  key: string
-  status: StepStatus
-  startTime: number | null
+interface StepInfo {
   endTime: number | null
+  key: string
+  startTime: number | null
+  status: StepStatus
   upstream: string[]
 }
 
@@ -143,7 +143,7 @@ function deriveSteps(
 
 // ── Node component ────────────────────────────────────────────────────────────
 
-type StepNodeData = {
+interface StepNodeData {
   info: StepInfo
   selected: boolean
   [key: string]: unknown
