@@ -126,10 +126,11 @@ q_pipe "Apply ${SPARK_NS} namespace" \
 
 q "Copy Unity Catalog token secret into ${SPARK_NS}" upsert_unitycatalog_auth_secret
 
-q "Build ${DUCKDB_SERVER_IMAGE}" docker build -t "$DUCKDB_SERVER_IMAGE" packages/duckdb-server
+q "Build ${DUCKDB_SERVER_IMAGE}" docker build -f packages/duckdb-server/Dockerfile -t "$DUCKDB_SERVER_IMAGE" .
 q "Apply DuckDB server manifest" kubectl apply -f "$DUCKDB_SERVER_MANIFEST"
+q "Restart DuckDB server deployment" kubectl rollout restart deployment/duckdb-server -n "$SPARK_NS"
 v "Wait for DuckDB server rollout" \
   kubectl rollout status deployment/duckdb-server -n "$SPARK_NS" --timeout=120s
 
 printf "\n${GRN}${BLD}DuckDB Quack server deployed.${NC}\n"
-printf "Port-forward with: ${CYN}kubectl port-forward -n %s svc/duckdb-server-svc 8090:9494${NC}\n" "$SPARK_NS"
+printf "Port-forward with: ${CYN}kubectl port-forward -n %s svc/duckdb-server-svc 8090:8080${NC}\n" "$SPARK_NS"

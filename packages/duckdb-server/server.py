@@ -1,6 +1,7 @@
 import asyncio
 import json as _json
 import os
+import subprocess
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,8 +25,6 @@ if CADDY_ROOT_CERT.exists():
     os.environ.setdefault("CURL_CA_BUNDLE", cert_path)
     os.environ.setdefault("REQUESTS_CA_BUNDLE", cert_path)
 
-import duckdb
-
 UC_ENDPOINT = os.getenv(
     "DUCKDB_UC_ENDPOINT", "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080"
 )
@@ -38,6 +37,7 @@ S3_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "rustfsadmin")
 S3_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 PORT = int(os.getenv("PORT", "8080"))
 IDLE_TIMEOUT_SECS = int(os.getenv("IDLE_TIMEOUT_SECS", "300"))
+DUCKDB_BIN = os.getenv("DUCKDB_BIN", "/usr/local/bin/duckdb")
 
 # Keep this aligned with infra/k8s/unitycatalog/bootstrap-job.yaml.
 CATALOG_DEFAULT_SCHEMAS = {
@@ -53,12 +53,14 @@ def sql_quote(s: str) -> str:
     return s.replace("'", "''")
 
 
-def init_duckdb() -> duckdb.DuckDBPyConnection:
-    c = duckdb.connect()
-    c.execute("LOAD httpfs; LOAD delta; LOAD unity_catalog;")
+def base_duckdb_sql(token: str) -> str:
     endpoint_host = S3_ENDPOINT.replace("http://", "").replace("https://", "")
     use_ssl = str(S3_ENDPOINT.startswith("https://")).lower()
-    c.execute(f"""
+    return f"""
+        LOAD httpfs;
+        LOAD delta;
+        LOAD unity_catalog;
+
         CREATE OR REPLACE SECRET __s3__ (
             TYPE s3,
             KEY_ID '{sql_quote(S3_ACCESS_KEY)}',
@@ -67,31 +69,54 @@ def init_duckdb() -> duckdb.DuckDBPyConnection:
             USE_SSL {use_ssl},
             URL_STYLE 'path',
             REGION '{sql_quote(S3_REGION)}'
-        )
-    """)
-    return c
+        );
+
+        CREATE OR REPLACE SECRET (
+            TYPE unity_catalog,
+            TOKEN '{sql_quote(token)}',
+            ENDPOINT '{sql_quote(UC_ENDPOINT)}',
+            AWS_REGION '{sql_quote(UC_AWS_REGION)}',
+            S3_ENDPOINT '{sql_quote(endpoint_host)}',
+            S3_USE_SSL {use_ssl},
+            S3_URL_STYLE 'path'
+        );
+    """
 
 
-def attach_catalogs(c: duckdb.DuckDBPyConnection) -> None:
+def attach_catalogs_sql() -> str:
+    statements = []
     for name, default_schema in CATALOG_DEFAULT_SCHEMAS.items():
-        c.execute(f"""
+        statements.append(f"""
             ATTACH IF NOT EXISTS '{name}' AS {name} (
                 TYPE unity_catalog,
                 DEFAULT_SCHEMA '{default_schema}',
                 READ_ONLY
-            )
+            );
         """)
+    return "\n".join(statements)
 
 
-def create_uc_secret(c: duckdb.DuckDBPyConnection, token: str) -> None:
-    c.execute(f"""
-        CREATE SECRET(
-            TYPE unity_catalog,
-            TOKEN '{sql_quote(token)}',
-            ENDPOINT '{sql_quote(UC_ENDPOINT)}',
-            AWS_REGION '{sql_quote(UC_AWS_REGION)}'
-        )
-    """)
+def run_duckdb_query(sql: str, token: str) -> dict:
+    full_sql = "\n".join([base_duckdb_sql(token), attach_catalogs_sql(), sql])
+    proc = subprocess.run(
+        [DUCKDB_BIN, "-json", "-c", full_sql],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
+
+    json_lines = [line for line in proc.stdout.splitlines() if line.strip()]
+    if not json_lines:
+        return {"columns": [], "rows": [], "row_count": 0}
+
+    rows_as_objects = _json.loads(json_lines[-1])
+    columns = list(rows_as_objects[0].keys()) if rows_as_objects else []
+    rows = [[row.get(column) for column in columns] for row in rows_as_objects]
+    return {"columns": columns, "rows": rows, "row_count": len(rows)}
 
 
 async def idle_watcher() -> None:
@@ -133,25 +158,10 @@ def query(req: QueryRequest):
             content={"error": "uc_token is required for Unity Catalog queries"},
         )
 
-    c = init_duckdb()
     try:
-        create_uc_secret(c, req.uc_token)
-        attach_catalogs(c)
-
-        result = c.execute(req.sql).fetchdf()
-        data = _json.loads(result.to_json(orient="split", date_format="iso"))
-        return {
-            "columns": data["columns"],
-            "rows": data["data"],
-            "row_count": len(data["data"]),
-        }
+        return run_duckdb_query(req.sql, req.uc_token)
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
-    finally:
-        try:
-            c.close()
-        except Exception:
-            pass
 
 
 if __name__ == "__main__":
