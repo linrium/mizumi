@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, process::Stdio, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -7,9 +7,10 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use duckdb::{Connection, types::ValueRef};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
-use tokio::{io::AsyncReadExt, process::Command, time};
+use serde_json::{Number, Value, json};
+use tokio::time;
 
 const CATALOG_DEFAULT_SCHEMAS: &[(&str, &str)] = &[
     ("hdbank", "hdbank_partnership_prod_bronze"),
@@ -25,7 +26,6 @@ struct Config {
     s3_access_key: String,
     s3_secret_key: String,
     s3_region: String,
-    duckdb_bin: String,
 }
 
 #[derive(Clone)]
@@ -96,7 +96,6 @@ impl Config {
             s3_access_key: env_or("AWS_ACCESS_KEY_ID", "rustfsadmin"),
             s3_secret_key: env_or("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
             s3_region: env_or("AWS_DEFAULT_REGION", "us-east-1"),
-            duckdb_bin: env_or("DUCKDB_BIN", "/usr/local/bin/duckdb"),
         }
     }
 }
@@ -117,7 +116,7 @@ async fn query(State(state): State<AppState>, Json(req): Json<QueryRequest>) -> 
         );
     };
 
-    match run_duckdb_query(&state.config, &req.sql, token).await {
+    match run_duckdb_query(state.config.clone(), req.sql, token.to_string()).await {
         Ok(response) => (StatusCode::OK, Json(response)).into_response(),
         Err(error) => error_response(StatusCode::BAD_REQUEST, &error.to_string()),
     }
@@ -134,85 +133,115 @@ fn error_response(status: StatusCode, error: &str) -> Response {
 }
 
 async fn run_duckdb_query(
+    config: Arc<Config>,
+    sql: String,
+    token: String,
+) -> Result<QueryResponse, Box<dyn std::error::Error + Send + Sync>> {
+    match time::timeout(
+        time::Duration::from_secs(120),
+        tokio::task::spawn_blocking(move || run_duckdb_query_blocking(&config, &sql, &token)),
+    )
+    .await
+    {
+        Ok(result) => result?,
+        Err(_) => Err("DuckDB query timed out after 120 seconds".into()),
+    }
+}
+
+fn run_duckdb_query_blocking(
     config: &Config,
     sql: &str,
     token: &str,
 ) -> Result<QueryResponse, Box<dyn std::error::Error + Send + Sync>> {
-    let full_sql = format!(
-        "{}\n{}\n{}",
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch(&format!(
+        "{}\n{}",
         base_duckdb_sql(config, token),
-        attach_catalogs_sql(),
-        sql
-    );
+        attach_catalogs_sql()
+    ))?;
 
-    let mut child = Command::new(&config.duckdb_bin)
-        .arg("-json")
-        .arg("-c")
-        .arg(full_sql)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut query_rows = stmt.query([])?;
+    let stmt_ref = query_rows
+        .as_ref()
+        .ok_or("DuckDB query did not return statement metadata")?;
+    let columns = (0..stmt_ref.column_count())
+        .map(|index| stmt_ref.column_name(index).cloned())
+        .collect::<duckdb::Result<Vec<_>>>()?;
 
-    let mut stdout = child.stdout.take().expect("duckdb stdout pipe missing");
-    let mut stderr = child.stderr.take().expect("duckdb stderr pipe missing");
-
-    let stdout_task = tokio::spawn(async move {
-        let mut buf = String::new();
-        stdout.read_to_string(&mut buf).await.map(|_| buf)
-    });
-    let stderr_task = tokio::spawn(async move {
-        let mut buf = String::new();
-        stderr.read_to_string(&mut buf).await.map(|_| buf)
-    });
-
-    let status = match time::timeout(time::Duration::from_secs(120), child.wait()).await {
-        Ok(status) => status?,
-        Err(_) => {
-            let _ = child.kill().await;
-            return Err("DuckDB query timed out after 120 seconds".into());
+    let mut rows = Vec::new();
+    while let Some(row) = query_rows.next()? {
+        let mut values = Vec::with_capacity(columns.len());
+        for index in 0..columns.len() {
+            values.push(value_ref_to_json(row.get_ref(index)?));
         }
-    };
-
-    let stdout = stdout_task.await??;
-    let stderr = stderr_task.await??;
-
-    if !status.success() {
-        let message = if stderr.trim().is_empty() {
-            stdout.trim()
-        } else {
-            stderr.trim()
-        };
-        return Err(message.to_string().into());
+        rows.push(values);
     }
-
-    let Some(last_json_line) = stdout.lines().filter(|line| !line.trim().is_empty()).last() else {
-        return Ok(QueryResponse {
-            columns: vec![],
-            rows: vec![],
-            row_count: 0,
-        });
-    };
-
-    let objects: Vec<Map<String, Value>> = serde_json::from_str(last_json_line)?;
-    let columns: Vec<String> = objects
-        .first()
-        .map(|row| row.keys().cloned().collect())
-        .unwrap_or_default();
-    let rows: Vec<Vec<Value>> = objects
-        .iter()
-        .map(|row| {
-            columns
-                .iter()
-                .map(|column| row.get(column).cloned().unwrap_or(Value::Null))
-                .collect()
-        })
-        .collect();
 
     Ok(QueryResponse {
         row_count: rows.len(),
         columns,
         rows,
     })
+}
+
+fn value_ref_to_json(value: ValueRef<'_>) -> Value {
+    match value {
+        ValueRef::Null => Value::Null,
+        ValueRef::Boolean(value) => Value::Bool(value),
+        ValueRef::TinyInt(value) => json!(value),
+        ValueRef::SmallInt(value) => json!(value),
+        ValueRef::Int(value) => json!(value),
+        ValueRef::BigInt(value) => json!(value),
+        ValueRef::HugeInt(value) => Value::String(value.to_string()),
+        ValueRef::UTinyInt(value) => json!(value),
+        ValueRef::USmallInt(value) => json!(value),
+        ValueRef::UInt(value) => json!(value),
+        ValueRef::UBigInt(value) => json!(value),
+        ValueRef::Float(value) => number_or_null(value as f64),
+        ValueRef::Double(value) => number_or_null(value),
+        ValueRef::Decimal(value) => Value::String(value.to_string()),
+        ValueRef::Timestamp(unit, value) => {
+            json!({ "unit": format!("{unit:?}"), "value": value })
+        }
+        ValueRef::Text(value) => Value::String(String::from_utf8_lossy(value).into_owned()),
+        ValueRef::Blob(value) => Value::String(format!("\\x{}", bytes_to_hex(value))),
+        ValueRef::Date32(value) => json!(value),
+        ValueRef::Time64(unit, value) => {
+            json!({ "unit": format!("{unit:?}"), "value": value })
+        }
+        ValueRef::Interval {
+            months,
+            days,
+            nanos,
+        } => json!({
+            "months": months,
+            "days": days,
+            "nanos": nanos,
+        }),
+        ValueRef::List(_, _)
+        | ValueRef::Enum(_, _)
+        | ValueRef::Struct(_, _)
+        | ValueRef::Array(_, _)
+        | ValueRef::Map(_, _)
+        | ValueRef::Union(_, _) => Value::String(format!("{value:?}")),
+    }
+}
+
+fn number_or_null(value: f64) -> Value {
+    Number::from_f64(value)
+        .map(Value::Number)
+        .unwrap_or(Value::Null)
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        hex.push(HEX[(byte >> 4) as usize] as char);
+        hex.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    hex
 }
 
 fn base_duckdb_sql(config: &Config, token: &str) -> String {

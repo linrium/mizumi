@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8"
+duckdb = { version = "~1.10504.0", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["full"] }
