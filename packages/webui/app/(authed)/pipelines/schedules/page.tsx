@@ -118,7 +118,7 @@ export default function SchedulesPage() {
                 className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
                 onClick={() =>
                   router.push(
-                    `/pipelines/schedules/${encodeURIComponent(s.name)}`,
+                    `/pipelines/schedules/${encodeURIComponent(s.name)}`
                   )
                 }
               >

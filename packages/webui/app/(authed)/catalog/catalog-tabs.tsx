@@ -22,7 +22,7 @@ export function CatalogTabs({ tabs }: { tabs: Tab[] }) {
             "px-3 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors",
             tab.active
               ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
+              : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
           <span className="flex items-center gap-1.5">

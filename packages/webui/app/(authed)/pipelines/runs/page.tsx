@@ -84,7 +84,7 @@ function RunStatusBadge({ status }: { status: string }) {
 
 async function apiFetch<T>(
   path: string,
-  params?: Record<string, string>,
+  params?: Record<string, string>
 ): Promise<T> {
   const url = params
     ? `/api/dagster/${path}?${new URLSearchParams(params)}`

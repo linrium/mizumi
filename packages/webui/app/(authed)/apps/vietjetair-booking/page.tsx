@@ -98,7 +98,7 @@ function normalizeFlightTicket(ticket: FlightTicket): Record<string, unknown> {
 }
 
 function normalizeFlightIncident(
-  incident: FlightIncident,
+  incident: FlightIncident
 ): Record<string, unknown> {
   return {
     ...incident,
@@ -109,7 +109,7 @@ function normalizeFlightIncident(
 async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
   const response = await fetch(
     `/api/synthetic/${dataset}?limit=${batchSize}&random=true`,
-    { cache: "no-store" },
+    { cache: "no-store" }
   )
   if (!response.ok) throw new Error(`Failed to load ${dataset}`)
   const payload = (await response.json()) as PaginatedResponse<T>
@@ -315,7 +315,7 @@ export default function VietjetairBookingPage() {
           endpoint="/api/tests/vietjetair/flight-incidents/batch"
           normalize={
             normalizeFlightIncident as (
-              item: unknown,
+              item: unknown
             ) => Record<string, unknown>
           }
         />

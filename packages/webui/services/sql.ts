@@ -23,7 +23,7 @@ type CreateSession = () => Promise<SessionLike | null>
 
 export async function ensureSessionId(
   activeSessionId: string | null,
-  createSession: CreateSession,
+  createSession: CreateSession
 ): Promise<string> {
   if (activeSessionId) {
     return activeSessionId
@@ -39,7 +39,7 @@ export async function ensureSessionId(
 
 export async function runSessionSqlQuery(
   sessionId: string,
-  sql: string,
+  sql: string
 ): Promise<QueryResponse> {
   const idToken = await getToken()
   const res = await apiFetch(`/api/sessions/${sessionId}/query`, {
@@ -78,7 +78,7 @@ export async function executeSessionSqlQuery(input: {
   try {
     const sessionId = await ensureSessionId(
       input.activeSessionId,
-      input.createSession,
+      input.createSession
     )
     const data = await runSessionSqlQuery(sessionId, input.sql)
 

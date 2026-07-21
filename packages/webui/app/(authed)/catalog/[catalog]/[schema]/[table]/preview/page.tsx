@@ -19,7 +19,7 @@ function getPreviewQueryKey(catalog: string, schema: string, table: string) {
 function loadPreviewQuery(
   catalog: string,
   schema: string,
-  table: string,
+  table: string
 ): Promise<QueryResponse> {
   const queryKey = getPreviewQueryKey(catalog, schema, table)
   const cachedResult = previewResultCache.get(queryKey)
@@ -34,7 +34,7 @@ function loadPreviewQuery(
 
   const request = runSessionSqlQuery(
     "default",
-    `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`,
+    `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 500`
   )
     .then((result) => {
       previewResultCache.set(queryKey, result)
@@ -56,7 +56,7 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver((entries) =>
-      setHeight(entries[0].contentRect.height),
+      setHeight(entries[0].contentRect.height)
     )
     ro.observe(el)
     return () => ro.disconnect()
@@ -65,9 +65,9 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
   const data = useMemo<Row[]>(
     () =>
       queryResult.rows.map((row) =>
-        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]])),
+        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
       ),
-    [queryResult],
+    [queryResult]
   )
 
   const columns = useMemo<ColumnDef<Row>[]>(
@@ -80,7 +80,7 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
         minSize: 60,
         meta: { cell: { variant: "short-text" as const } },
       })),
-    [queryResult],
+    [queryResult]
   )
 
   const { table, ...dataGridProps } = useDataGrid<Row>({

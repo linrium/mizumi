@@ -91,7 +91,7 @@ export function PieCenter({
     <div
       className={cn(
         "flex flex-col items-center justify-center text-center",
-        className,
+        className
       )}
       style={{ width: centerSize, height: centerSize }}
     >

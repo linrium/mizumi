@@ -165,7 +165,7 @@ export function XAxis({
         />
       ))}
     </div>,
-    container,
+    container
   )
 }
 

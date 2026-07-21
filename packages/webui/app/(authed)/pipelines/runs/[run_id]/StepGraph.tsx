@@ -54,7 +54,7 @@ type StepInfo = {
 
 function deriveSteps(
   events: RunEvent[],
-  assetNodes: AssetNodeMinimal[],
+  assetNodes: AssetNodeMinimal[]
 ): StepInfo[] {
   // Build step ↔ asset key mappings from materialization events
   const stepToAsset = new Map<string, string>()
@@ -161,7 +161,7 @@ function StepNode({ data }: { data: StepNodeData }) {
       className={cn(
         "rounded px-3 py-1.5 text-xs font-mono font-semibold border shadow-sm min-w-[120px] text-center cursor-default select-none",
         STATUS_STYLES[info.status],
-        data.selected && "ring-2 ring-offset-1 ring-foreground",
+        data.selected && "ring-2 ring-offset-1 ring-foreground"
       )}
     >
       <Handle
@@ -191,7 +191,7 @@ const NODE_H = 48
 
 function buildLayout(
   steps: StepInfo[],
-  selectedKey: string | null,
+  selectedKey: string | null
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
   if (steps.length === 0) return { rfNodes: [], rfEdges: [] }
 
@@ -235,7 +235,7 @@ function buildLayout(
           color: "#94a3b8",
         },
         style: { stroke: "#94a3b8", strokeWidth: 1.5 },
-      })),
+      }))
   )
 
   return { rfNodes, rfEdges }
@@ -263,11 +263,11 @@ export function StepGraph({
 
   const steps = useMemo(
     () => deriveSteps(events, assetNodes),
-    [events, assetNodes],
+    [events, assetNodes]
   )
   const { rfNodes, rfEdges } = useMemo(
     () => buildLayout(steps, selectedKey),
-    [steps, selectedKey],
+    [steps, selectedKey]
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)

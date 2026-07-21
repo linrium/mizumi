@@ -201,8 +201,8 @@ export default function PermissionsPage() {
           setRequests(data)
           setBlastRadiusByRequestId(
             Object.fromEntries(
-              blastRadius.map((item) => [item.request_id, item]),
-            ),
+              blastRadius.map((item) => [item.request_id, item])
+            )
           )
         }
       } catch (err) {
@@ -210,7 +210,7 @@ export default function PermissionsPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "Failed to load permission requests",
+              : "Failed to load permission requests"
           )
         }
       } finally {
@@ -284,10 +284,10 @@ export default function PermissionsPage() {
         approveTarget.request.id,
         "approved",
         approveTarget.stepId,
-        days,
+        days
       )
       setRequests((prev) =>
-        prev.map((r) => (r.id === updated.id ? updated : r)),
+        prev.map((r) => (r.id === updated.id ? updated : r))
       )
       setApproveTarget(null)
     } catch (err) {
@@ -300,7 +300,7 @@ export default function PermissionsPage() {
   async function handleDropdownAction(
     id: string,
     action: "approve" | "needs-info",
-    approvalStepId?: string,
+    approvalStepId?: string
   ) {
     const status: RequestStatus =
       action === "approve" ? "approved" : "needs-info"
@@ -309,7 +309,7 @@ export default function PermissionsPage() {
     try {
       const updated = await updateRequestStatus(id, status, approvalStepId)
       setRequests((prev) =>
-        prev.map((r) => (r.id === updated.id ? updated : r)),
+        prev.map((r) => (r.id === updated.id ? updated : r))
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update request")
@@ -353,7 +353,7 @@ export default function PermissionsPage() {
                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors",
                     activeFilter === filter.key
                       ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <filter.icon size={12} />
@@ -363,7 +363,7 @@ export default function PermissionsPage() {
                       "tabular-nums",
                       activeFilter === filter.key
                         ? "text-foreground"
-                        : "text-muted-foreground",
+                        : "text-muted-foreground"
                     )}
                   >
                     {count}
@@ -410,11 +410,11 @@ export default function PermissionsPage() {
               filteredRequests.map((request) => {
                 const submittedLabel = formatDistanceToNowStrict(
                   new Date(request.submitted_at),
-                  { addSuffix: true },
+                  { addSuffix: true }
                 )
                 const isActioning = activeRequestId === request.id
                 const currentSteps = request.approval_steps.filter(
-                  (step) => step.is_current,
+                  (step) => step.is_current
                 )
                 const blastRadius = blastRadiusByRequestId[request.id]
 
@@ -424,7 +424,7 @@ export default function PermissionsPage() {
                     className={cn(
                       request.risk === "high" && "bg-destructive/5",
                       request.expires_in_days <= 2 &&
-                        "border-l-2 border-l-primary",
+                        "border-l-2 border-l-primary"
                     )}
                   >
                     <TableCell className="align-top">
@@ -612,7 +612,7 @@ export default function PermissionsPage() {
                                   request,
                                   stepId: currentSteps[0]?.id,
                                   durationDays: String(
-                                    Math.max(request.expires_in_days, 1),
+                                    Math.max(request.expires_in_days, 1)
                                   ),
                                 })
                               }
@@ -633,7 +633,7 @@ export default function PermissionsPage() {
                                     request,
                                     stepId: step.id,
                                     durationDays: String(
-                                      Math.max(request.expires_in_days, 1),
+                                      Math.max(request.expires_in_days, 1)
                                     ),
                                   })
                                 }
@@ -648,7 +648,7 @@ export default function PermissionsPage() {
                               handleDropdownAction(
                                 request.id,
                                 "needs-info",
-                                currentSteps[0]?.id,
+                                currentSteps[0]?.id
                               )
                             }
                           >
@@ -812,7 +812,7 @@ export default function PermissionsPage() {
               value={approveTarget?.durationDays ?? ""}
               onChange={(e) =>
                 setApproveTarget((prev) =>
-                  prev ? { ...prev, durationDays: e.target.value } : prev,
+                  prev ? { ...prev, durationDays: e.target.value } : prev
                 )
               }
               className="h-8 text-sm"
@@ -822,7 +822,7 @@ export default function PermissionsPage() {
               <p className="text-xs text-muted-foreground">
                 Access expires on{" "}
                 {new Date(
-                  Date.now() + Number(approveTarget.durationDays) * 86_400_000,
+                  Date.now() + Number(approveTarget.durationDays) * 86_400_000
                 ).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",

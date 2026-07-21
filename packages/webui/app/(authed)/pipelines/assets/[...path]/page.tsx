@@ -15,7 +15,7 @@ dayjs.extend(relativeTime)
 
 const LineageGraph = dynamic(
   () => import("./LineageGraph").then((m) => m.LineageGraph),
-  { ssr: false },
+  { ssr: false }
 )
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ function useAssetStatus(pathSegments: string[]) {
           `/api/dagster/asset-status/${pathKey}`,
           {
             cache: "no-store",
-          },
+          }
         )
         if (!res.ok) return
         const data = (await res.json()) as AssetStatus
@@ -328,7 +328,7 @@ function CurrentRunBanner({ liveStatus }: { liveStatus: AssetStatus }) {
     <div
       className={cn(
         "rounded-md px-3 py-2.5 flex items-center justify-between gap-3",
-        bannerCls,
+        bannerCls
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -376,7 +376,7 @@ export default function AssetDetailPage() {
     try {
       const res = await fetchWithAuth(
         `/api/dagster/materialize/${pathSegments.join("/")}`,
-        { method: "POST" },
+        { method: "POST" }
       )
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
@@ -438,7 +438,7 @@ export default function AssetDetailPage() {
                 "px-3 py-3 text-xs capitalize border-b-2 transition-colors",
                 tab === t
                   ? "border-foreground text-foreground font-medium"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               {t}
@@ -589,7 +589,7 @@ export default function AssetDetailPage() {
                                 !metaFilter ||
                                 e.label
                                   .toLowerCase()
-                                  .includes(metaFilter.toLowerCase()),
+                                  .includes(metaFilter.toLowerCase())
                             )
                             .map((entry, i) => (
                               <tr key={i} className="align-top">

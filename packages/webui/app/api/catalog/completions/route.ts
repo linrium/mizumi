@@ -28,7 +28,7 @@ export async function GET() {
         } catch {
           return []
         }
-      }),
+      })
     )
 
     const allSchemas = schemasPerCatalog.flat()
@@ -41,7 +41,7 @@ export async function GET() {
         } catch {
           return []
         }
-      }),
+      })
     )
 
     const allTables = tablesPerSchema.flat()
@@ -53,7 +53,7 @@ export async function GET() {
         } catch {
           return null
         }
-      }),
+      })
     )
 
     const result: CatalogCompletionSchema = {

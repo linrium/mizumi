@@ -43,9 +43,9 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const data = useMemo<Row[]>(
     () =>
       queryResult.rows.map((row) =>
-        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]])),
+        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
       ),
-    [queryResult],
+    [queryResult]
   )
 
   const columns = useMemo<ColumnDef<Row>[]>(
@@ -58,7 +58,7 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
         minSize: 60,
         meta: { cell: { variant: "short-text" as const } },
       })),
-    [queryResult],
+    [queryResult]
   )
 
   const { table, ...dataGridProps } = useDataGrid<Row>({
@@ -83,7 +83,7 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
 
 function tablesInScope(
   sql: string,
-  all: CatalogCompletionSchema["tables"],
+  all: CatalogCompletionSchema["tables"]
 ): CatalogCompletionSchema["tables"] {
   const refs = new Set<string>()
   const re = /(?:FROM|JOIN)\s+([\w.]+)/gi
@@ -106,7 +106,7 @@ function tablesInScope(
 
 function buildCompletionProvider(
   monaco: Monaco,
-  data: CatalogCompletionSchema,
+  data: CatalogCompletionSchema
 ) {
   const CIK = monaco.languages.CompletionItemKind
   return {
@@ -129,7 +129,7 @@ function buildCompletionProvider(
       ) => unknown
         ? P
         : never,
-      context: { triggerKind: number },
+      context: { triggerKind: number }
     ) {
       const wordInfo = model.getWordUntilPosition(position)
       const range = {
@@ -158,7 +158,7 @@ function buildCompletionProvider(
             ...new Set(
               data.tables
                 .filter((t) => t.catalog === parts[0])
-                .map((t) => t.schema),
+                .map((t) => t.schema)
             ),
           ]
           return {
@@ -174,7 +174,7 @@ function buildCompletionProvider(
         if (parts.length === 2) {
           // catalog.schema. → suggest tables
           const tables = data.tables.filter(
-            (t) => t.catalog === parts[0] && t.schema === parts[1],
+            (t) => t.catalog === parts[0] && t.schema === parts[1]
           )
           return {
             suggestions: tables.map((t) => ({
@@ -203,7 +203,7 @@ function buildCompletionProvider(
         // Strip the word currently being typed to find what keyword precedes it
         const beforeWord = textBeforeCursor.slice(
           0,
-          textBeforeCursor.length - wordInfo.word.length,
+          textBeforeCursor.length - wordInfo.word.length
         )
         const isTableContext = /\b(FROM|JOIN)\s*$/i.test(beforeWord)
 
@@ -360,7 +360,7 @@ export function SqlCodeEditor({
           disposeCompletionsRef.current =
             monacoRef.current.languages.registerCompletionItemProvider(
               "sql",
-              buildCompletionProvider(monacoRef.current, data),
+              buildCompletionProvider(monacoRef.current, data)
             )
         }
       })
@@ -385,7 +385,7 @@ export function SqlCodeEditor({
             if (onSubmit) {
               editor.addCommand(
                 monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                () => onSubmit(),
+                () => onSubmit()
               )
             }
             monacoRef.current = monaco
@@ -394,7 +394,7 @@ export function SqlCodeEditor({
               disposeCompletionsRef.current =
                 monaco.languages.registerCompletionItemProvider(
                   "sql",
-                  buildCompletionProvider(monaco, completionDataRef.current),
+                  buildCompletionProvider(monaco, completionDataRef.current)
                 )
             }
           }}
@@ -436,8 +436,8 @@ export function SqlEditor() {
       setResultsHeight(
         Math.min(
           RESULTS_MAX,
-          Math.max(RESULTS_MIN, dragRef.current.startH + delta),
-        ),
+          Math.max(RESULTS_MIN, dragRef.current.startH + delta)
+        )
       )
     }
     const onUp = () => {
@@ -470,7 +470,7 @@ export function SqlEditor() {
             setActiveSessionId(session.session_id)
             return session
           },
-        }),
+        })
       )
     },
   })
@@ -518,7 +518,7 @@ export function SqlEditor() {
                   field.state.meta.errors.length > 0
                     ? String(
                         (field.state.meta.errors[0] as { message?: string })
-                          ?.message ?? field.state.meta.errors[0],
+                          ?.message ?? field.state.meta.errors[0]
                       )
                     : undefined
                 }

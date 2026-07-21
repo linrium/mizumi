@@ -67,7 +67,7 @@ function localEmbed(text: string): number[] {
 
 async function hybridSearchSchema(
   query: string,
-  limit = 3,
+  limit = 3
 ): Promise<SchemaHit[]> {
   try {
     const embedding = HAS_OPENAI_EMBEDDINGS
@@ -91,7 +91,7 @@ async function hybridSearchSchema(
           limit,
         }),
         cache: "no-store",
-      },
+      }
     )
     if (!res.ok) return []
     const data = await res.json()
@@ -137,7 +137,7 @@ async function fetchPermissionRequest(idOrCode: string, token?: string) {
   ) {
     const res = await fetch(
       `${API_BASE}/api/permissions/requests/${encodeURIComponent(code)}`,
-      { headers },
+      { headers }
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
@@ -149,7 +149,7 @@ async function fetchPermissionRequest(idOrCode: string, token?: string) {
     : code.toLowerCase()
   const res = await fetch(
     `${API_BASE}/api/permissions/requests?search=${encodeURIComponent(suffix)}`,
-    { headers },
+    { headers }
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = (await res.json()) as { requests: Array<{ code: string }> }
@@ -287,7 +287,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
           .string()
           .optional()
           .describe(
-            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all accessible catalogs.",
+            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all accessible catalogs."
           ),
       }),
       execute: async ({ search }) => {
@@ -310,7 +310,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
             catalogs,
             tables: [],
             overview: `You have access to the following catalogs: ${catalogs.join(
-              ", ",
+              ", "
             )}. You can ask about specific catalogs or tables to see more details.`,
           }
         }
@@ -329,10 +329,10 @@ export async function handleAnalyticsChat(req: NextRequest) {
 
         if (hits.length > 0) {
           const accessible = hits.filter((h) =>
-            accessibleCatalogs.has(h.catalog),
+            accessibleCatalogs.has(h.catalog)
           )
           const inaccessible = hits.filter(
-            (h) => !accessibleCatalogs.has(h.catalog),
+            (h) => !accessibleCatalogs.has(h.catalog)
           )
 
           const catalogs = [...new Set(accessible.map((h) => h.catalog))]
@@ -389,7 +389,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         resource: z
           .string()
           .describe(
-            "Fully qualified resource path, e.g. vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1",
+            "Fully qualified resource path, e.g. vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1"
           ),
         scope: z
           .enum(["catalog", "schema", "table"])
@@ -397,12 +397,12 @@ export async function handleAnalyticsChat(req: NextRequest) {
         privileges: z
           .array(z.string())
           .describe(
-            "Privileges to request — SELECT for tables, USE SCHEMA for schemas, USE CATALOG for catalogs",
+            "Privileges to request — SELECT for tables, USE SCHEMA for schemas, USE CATALOG for catalogs"
           ),
         rationale: z
           .string()
           .describe(
-            "Pre-filled rationale explaining why the user needs this data",
+            "Pre-filled rationale explaining why the user needs this data"
           ),
         suggested_duration_days: z
           .number()
@@ -411,7 +411,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         explanation: z
           .string()
           .describe(
-            "Short explanation shown to the user about what this data is and why they might want it",
+            "Short explanation shown to the user about what this data is and why they might want it"
           ),
       }),
       execute: async ({
@@ -462,7 +462,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         request_id: z
           .string()
           .describe(
-            "The request UUID or short code, e.g. PR-ABCD1234 or a full UUID like 123e4567-e89b-12d3-a456-426614174000",
+            "The request UUID or short code, e.g. PR-ABCD1234 or a full UUID like 123e4567-e89b-12d3-a456-426614174000"
           ),
       }),
       execute: async ({ request_id }) => {
@@ -482,7 +482,7 @@ export async function handleAnalyticsChat(req: NextRequest) {
         chartType: z
           .enum(["bar", "line", "area", "pie", "scatter"])
           .describe(
-            "bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns",
+            "bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns"
           ),
         x: z.string().describe("Column name for x-axis labels"),
         y: z.string().describe("Column name for numeric values"),

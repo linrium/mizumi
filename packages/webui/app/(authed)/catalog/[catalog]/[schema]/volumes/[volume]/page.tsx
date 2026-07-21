@@ -71,7 +71,7 @@ export default function VolumeFilesPage() {
         .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false))
     },
-    [storageLocation],
+    [storageLocation]
   )
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function VolumeFilesPage() {
                         key={obj.key}
                         className={cn(
                           "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
-                          i % 2 === 0 ? "bg-background" : "bg-muted/20",
+                          i % 2 === 0 ? "bg-background" : "bg-muted/20"
                         )}
                       >
                         <td className="px-4 py-2">

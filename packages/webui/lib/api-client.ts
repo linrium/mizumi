@@ -52,7 +52,7 @@ export async function getToken(): Promise<string | undefined> {
 
 export async function apiFetch(
   input: RequestInfo | URL,
-  init?: RequestInit,
+  init?: RequestInit
 ): Promise<Response> {
   const token = await getToken()
   const headers = new Headers(init?.headers)

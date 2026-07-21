@@ -46,7 +46,7 @@ export default function PipelinesLayout({
               "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors",
               pathname === t.href || pathname.startsWith(`${t.href}/`)
                 ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             <t.icon size={12} />

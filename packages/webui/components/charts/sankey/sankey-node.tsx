@@ -32,7 +32,7 @@ export interface SankeyNodeProps {
   /** Custom node color function */
   getNodeColor?: (
     node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
-    index: number,
+    index: number
   ) => string
 }
 
@@ -170,14 +170,14 @@ export function SankeyNode({
       "color-mix(in oklab, var(--chart-line-secondary) 72%, white)",
       "color-mix(in oklab, var(--chart-line-primary) 62%, white)",
     ],
-    [],
+    []
   )
 
   // Get color for a node
   const getColor = useCallback(
     (
       node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
-      index: number,
+      index: number
     ): string => {
       if (fill) {
         return fill
@@ -191,7 +191,7 @@ export function SankeyNode({
         "var(--chart-line-primary)"
       )
     },
-    [fill, getNodeColorProp, defaultColors],
+    [fill, getNodeColorProp, defaultColors]
   )
 
   // Check if a node is connected to the hovered element
@@ -221,7 +221,7 @@ export function SankeyNode({
       }
       return false
     },
-    [hoveredNodeIndex, hoveredLinkIndex, links],
+    [hoveredNodeIndex, hoveredLinkIndex, links]
   )
 
   const isAnyHovered = hoveredNodeIndex !== null || hoveredLinkIndex !== null

@@ -66,7 +66,7 @@ function PasteDialogImpl({
     (open: boolean) => {
       propsRef.current.onPasteDialogOpenChange?.(open)
     },
-    [propsRef],
+    [propsRef]
   )
 
   const onCancel = React.useCallback(() => {
@@ -140,7 +140,7 @@ function RadioItem({ className, ...props }: React.ComponentProps<"input">) {
         "disabled:cursor-not-allowed disabled:opacity-50",
         "checked:before:absolute checked:before:start-1/2 checked:before:top-1/2 checked:before:size-2 checked:before:-translate-x-1/2 checked:before:-translate-y-1/2 checked:before:rounded-full checked:before:bg-primary checked:before:content-['']",
         "dark:bg-input/30",
-        className,
+        className
       )}
       {...props}
     />

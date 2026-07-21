@@ -147,7 +147,7 @@ function CreateMetricDialog({
   const [timeField, setTimeField] = useState("")
   const [timeGrain, setTimeGrain] = useState("day")
   const [specJson, setSpecJson] = useState(
-    '{\n  "expression": "settled_amount - reversal_amount - cashback_amount",\n  "aggregation": "sum",\n  "valid_dimensions": []\n}',
+    '{\n  "expression": "settled_amount - reversal_amount - cashback_amount",\n  "aggregation": "sum",\n  "valid_dimensions": []\n}'
   )
   const [dependencies, setDependencies] = useState("")
   const [physical, setPhysical] = useState("")
@@ -355,7 +355,7 @@ function CreateMetricDialog({
 
 export default function SemanticRegistryPage() {
   const [definitions, setDefinitions] = useState<SemanticDefinitionSummary[]>(
-    [],
+    []
   )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -375,7 +375,7 @@ export default function SemanticRegistryPage() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load semantic registry",
+            : "Failed to load semantic registry"
         )
       }
     } finally {

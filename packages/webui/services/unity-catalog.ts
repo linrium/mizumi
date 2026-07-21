@@ -788,7 +788,7 @@ const STATIC_CATALOGS: StaticCatalog[] = [
 function formatTableBlock(
   catalog: string,
   schema: string,
-  table: StaticTable,
+  table: StaticTable
 ): string {
   const fqn = `${catalog}.${schema}.${table.name}`
   const cols = table.columns
@@ -885,10 +885,10 @@ export function fetchMatchingSchema(search?: string): string {
 export async function fetchSchema(token?: string): Promise<string> {
   const catalogsData = await ucGet<{ catalogs: CatalogInfo[] }>(
     "/catalogs?max_results=100",
-    token,
+    token
   )
   const catalogs = (catalogsData?.catalogs ?? []).filter(
-    (c) => c.name !== "unity",
+    (c) => c.name !== "unity"
   )
   if (catalogs.length === 0) {
     return FALLBACK_SCHEMA
@@ -898,12 +898,12 @@ export async function fetchSchema(token?: string): Promise<string> {
     catalogs.map(async (catalog) => {
       const data = await ucGet<{ schemas: SchemaInfo[] }>(
         `/schemas?catalog_name=${catalog.name}&max_results=200`,
-        token,
+        token
       )
       return (data?.schemas ?? []).filter(
-        (schema) => schema.name !== "information_schema",
+        (schema) => schema.name !== "information_schema"
       )
-    }),
+    })
   )
 
   const allSchemas = schemasByCatalog.flat()
@@ -911,10 +911,10 @@ export async function fetchSchema(token?: string): Promise<string> {
     allSchemas.map(async (schema) => {
       const data = await ucGet<{ tables: TableInfo[] }>(
         `/tables?catalog_name=${schema.catalog_name}&schema_name=${schema.name}&max_results=200`,
-        token,
+        token
       )
       return data?.tables ?? []
-    }),
+    })
   )
 
   const details = await Promise.all(
@@ -923,9 +923,9 @@ export async function fetchSchema(token?: string): Promise<string> {
       .map((table) =>
         ucGet<TableDetail>(
           `/tables/${table.catalog_name}.${table.schema_name}.${table.name}`,
-          token,
-        ),
-      ),
+          token
+        )
+      )
   )
 
   const live = details

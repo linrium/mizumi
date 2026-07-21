@@ -233,7 +233,7 @@ function TickRow({ tick }: { tick: HistoryTick }) {
       <tr
         className={cn(
           "border-b text-xs transition-colors",
-          hasDetail && "cursor-pointer hover:bg-muted/30",
+          hasDetail && "cursor-pointer hover:bg-muted/30"
         )}
         onClick={() => hasDetail && setExpanded((v) => !v)}
       >
@@ -337,9 +337,7 @@ type Tab = "assets" | "ticks"
 export default function ScheduleDetailPage() {
   const params = useParams()
   const name = decodeURIComponent(
-    typeof params.name === "string"
-      ? params.name
-      : (params.name as string[])[0],
+    typeof params.name === "string" ? params.name : (params.name as string[])[0]
   )
 
   const [tab, setTab] = useState<Tab>("assets")
@@ -347,7 +345,7 @@ export default function ScheduleDetailPage() {
   const [assetSelection, setAssetSelection] =
     useState<ScheduleAssetSelection | null>(null)
   const [tickHistory, setTickHistory] = useState<TickHistoryResponse | null>(
-    null,
+    null
   )
   const [loadingSchedule, setLoadingSchedule] = useState(true)
   const [loadingAssets, setLoadingAssets] = useState(true)
@@ -367,7 +365,7 @@ export default function ScheduleDetailPage() {
 
   useEffect(() => {
     apiFetch<ScheduleAssetSelection>(
-      `schedule-assets/${encodeURIComponent(name)}`,
+      `schedule-assets/${encodeURIComponent(name)}`
     )
       .then(setAssetSelection)
       .catch(() =>
@@ -375,7 +373,7 @@ export default function ScheduleDetailPage() {
           schedule_name: name,
           asset_selection_string: null,
           assets: [],
-        }),
+        })
       )
       .finally(() => setLoadingAssets(false))
   }, [name])
@@ -384,11 +382,11 @@ export default function ScheduleDetailPage() {
     if (tab !== "ticks" || tickHistory) return
     setLoadingTicks(true)
     apiFetch<TickHistoryResponse>(
-      `schedules/${encodeURIComponent(name)}/ticks?limit=50`,
+      `schedules/${encodeURIComponent(name)}/ticks?limit=50`
     )
       .then(setTickHistory)
       .catch(() =>
-        setTickHistory({ id: "", instigation_type: null, ticks: [] }),
+        setTickHistory({ id: "", instigation_type: null, ticks: [] })
       )
       .finally(() => setLoadingTicks(false))
   }, [tab, name, tickHistory])
@@ -447,7 +445,7 @@ export default function ScheduleDetailPage() {
                   "px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors capitalize",
                   tab === t
                     ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t === "assets" ? "Assets" : "Tick History"}

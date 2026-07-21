@@ -81,7 +81,7 @@ function SankeyChartInner({
   const [hoveredLinkIndex, setHoveredLinkIndex] = useState<number | null>(null)
   const [tooltipData, setTooltipData] = useState<SankeyTooltipData | null>(null)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(
-    null,
+    null
   )
 
   const innerWidth = width - margin.left - margin.right
@@ -126,7 +126,7 @@ function SankeyChartInner({
         return ""
       }
     },
-    [],
+    []
   )
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {

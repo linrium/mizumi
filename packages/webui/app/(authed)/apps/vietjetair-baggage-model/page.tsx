@@ -65,7 +65,7 @@ export default function VietjetairBaggageModelPage() {
       const body = await response.json().catch(() => null)
       if (!response.ok) {
         throw new Error(
-          (body as { detail?: string } | null)?.detail ?? "Prediction failed",
+          (body as { detail?: string } | null)?.detail ?? "Prediction failed"
         )
       }
       setPrediction(body as Prediction)

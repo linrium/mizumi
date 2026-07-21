@@ -25,7 +25,7 @@ import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 const LineageGraph = dynamic(
   () => import("../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
-  { ssr: false },
+  { ssr: false }
 )
 
 const NODE_TYPE_OPTIONS = [
@@ -68,7 +68,7 @@ export default function LineagePage() {
   const [rebuilding, setRebuilding] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedNodeTypes, setSelectedNodeTypes] = useState<string[]>(
-    DEFAULT_SELECTED_NODE_TYPES,
+    DEFAULT_SELECTED_NODE_TYPES
   )
 
   const filters = useMemo(
@@ -78,7 +78,7 @@ export default function LineagePage() {
       includeContains,
       nodeTypes: selectedNodeTypes,
     }),
-    [query, runtimeOnly, includeContains, selectedNodeTypes],
+    [query, runtimeOnly, includeContains, selectedNodeTypes]
   )
 
   const activeFilterCount = useMemo(() => {
@@ -96,7 +96,7 @@ export default function LineagePage() {
     setSelectedNodeTypes((current) =>
       current.includes(nodeType)
         ? current.filter((value) => value !== nodeType)
-        : [...current, nodeType],
+        : [...current, nodeType]
     )
   }
 

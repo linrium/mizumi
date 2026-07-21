@@ -227,7 +227,7 @@ export default function CatalogLayout({
                   onClick={() => handleCatalog(cat.name)}
                   className={cn(
                     "flex w-full items-center gap-1.5 pl-2 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                    catActive && activeItemClass,
+                    catActive && activeItemClass
                   )}
                 >
                   <IconChevronRight
@@ -235,14 +235,14 @@ export default function CatalogLayout({
                     size={14}
                     className={cn(
                       "shrink-0 text-muted-foreground transition-transform",
-                      catOpen && "rotate-90",
+                      catOpen && "rotate-90"
                     )}
                   />
                   <IconTriangleSquareCircle
                     size={15}
                     className={cn(
                       "shrink-0 text-muted-foreground",
-                      catActive && activeIconClass,
+                      catActive && activeIconClass
                     )}
                   />
                   <span className="truncate flex-1">{cat.name}</span>
@@ -266,7 +266,7 @@ export default function CatalogLayout({
                           onClick={() => handleSchema(cat.name, sch.name)}
                           className={cn(
                             "flex w-full items-center gap-1.5 pl-6 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                            schActive && activeItemClass,
+                            schActive && activeItemClass
                           )}
                         >
                           <IconChevronRight
@@ -274,14 +274,14 @@ export default function CatalogLayout({
                             size={14}
                             className={cn(
                               "shrink-0 text-muted-foreground transition-transform",
-                              schOpen && "rotate-90",
+                              schOpen && "rotate-90"
                             )}
                           />
                           <IconDatabase
                             size={15}
                             className={cn(
                               "shrink-0 text-muted-foreground",
-                              schActive && activeIconClass,
+                              schActive && activeIconClass
                             )}
                           />
                           <span className="truncate flex-1">{sch.name}</span>
@@ -304,14 +304,14 @@ export default function CatalogLayout({
                                   }
                                   className={cn(
                                     "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    tblActive && activeItemClass,
+                                    tblActive && activeItemClass
                                   )}
                                 >
                                   <IconTable
                                     size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
-                                      tblActive && activeIconClass,
+                                      tblActive && activeIconClass
                                     )}
                                   />
                                   <span className="truncate">{tbl.name}</span>
@@ -334,14 +334,14 @@ export default function CatalogLayout({
                                   }
                                   className={cn(
                                     "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    volActive && activeItemClass,
+                                    volActive && activeItemClass
                                   )}
                                 >
                                   <IconFolder
                                     size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
-                                      volActive && activeIconClass,
+                                      volActive && activeIconClass
                                     )}
                                   />
                                   <span className="truncate">{vol.name}</span>
@@ -364,14 +364,14 @@ export default function CatalogLayout({
                                   }
                                   className={cn(
                                     "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    modActive && activeItemClass,
+                                    modActive && activeItemClass
                                   )}
                                 >
                                   <IconBrain
                                     size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
-                                      modActive && activeIconClass,
+                                      modActive && activeIconClass
                                     )}
                                   />
                                   <span className="truncate">{mod.name}</span>

@@ -140,13 +140,13 @@ export type MlflowLoggedModel = {
 
 export async function searchExperiments() {
   return mlflowFetch<{ experiments?: MlflowExperiment[] }>(
-    "/api/2.0/mlflow/experiments/search?max_results=100",
+    "/api/2.0/mlflow/experiments/search?max_results=100"
   )
 }
 
 export async function searchRegisteredModels() {
   return mlflowFetch<{ registered_models?: MlflowRegisteredModel[] }>(
-    "/api/2.0/mlflow/registered-models/search?filter=&max_results=25&order_by=name+ASC",
+    "/api/2.0/mlflow/registered-models/search?filter=&max_results=25&order_by=name+ASC"
   )
 }
 
@@ -164,13 +164,13 @@ export async function searchLoggedModels() {
           },
         ],
       }),
-    },
+    }
   )
 }
 
 export async function searchRuns(
   experimentIds: string[],
-  options?: { registeredModelUri?: string },
+  options?: { registeredModelUri?: string }
 ) {
   return mlflowFetch<{ runs?: MlflowRun[]; next_page_token?: string }>(
     "/api/2.0/mlflow/runs/search",
@@ -186,18 +186,18 @@ export async function searchRuns(
         max_results: 50,
         order_by: ["start_time DESC"],
       }),
-    },
+    }
   )
 }
 
 export async function getRun(runId: string) {
   return mlflowFetch<{ run: MlflowRun }>(
-    `/api/2.0/mlflow/runs/get?run_id=${encodeURIComponent(runId)}`,
+    `/api/2.0/mlflow/runs/get?run_id=${encodeURIComponent(runId)}`
   )
 }
 
 export async function listTraces(experimentId: string) {
   return mlflowFetch<{ traces?: MlflowTrace[] }>(
-    `/api/2.0/mlflow/traces?experiment_id=${encodeURIComponent(experimentId)}&max_results=50`,
+    `/api/2.0/mlflow/traces?experiment_id=${encodeURIComponent(experimentId)}&max_results=50`
   )
 }

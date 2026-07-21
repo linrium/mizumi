@@ -85,7 +85,7 @@ function formatStatusLabel(status: RequestStatus) {
 }
 
 function formatQueueDecision(
-  decision: StoredPermissionRequest["queue_decision"],
+  decision: StoredPermissionRequest["queue_decision"]
 ) {
   switch (decision) {
     case "auto-approved":
@@ -123,7 +123,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [grantedPrivileges, setGrantedPrivileges] = useState<Set<string>>(
-    new Set(),
+    new Set()
   )
 
   useEffect(() => {
@@ -271,7 +271,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                 <div
                   className={cn(
                     "space-y-1.5",
-                    submitAs !== "team" && "opacity-60",
+                    submitAs !== "team" && "opacity-60"
                   )}
                 >
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -334,7 +334,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                               field.setValue(
                                 checked
                                   ? field.state.value.filter((p) => p !== priv)
-                                  : [...field.state.value, priv],
+                                  : [...field.state.value, priv]
                               )
                             }}
                             className={cn(
@@ -345,8 +345,8 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                     "cursor-pointer focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                                     checked
                                       ? "border-primary bg-primary/5 text-foreground"
-                                      : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
-                                  ),
+                                      : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                                  )
                             )}
                           >
                             <span
@@ -355,7 +355,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                 "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
                                 checked
                                   ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-input bg-background text-transparent dark:bg-input/30",
+                                  : "border-input bg-background text-transparent dark:bg-input/30"
                               )}
                             >
                               <IconCheck size={12} stroke={2} />

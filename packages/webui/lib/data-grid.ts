@@ -29,7 +29,7 @@ import type {
 
 export function flexRender<TProps extends object>(
   Comp: ((props: TProps) => React.ReactNode) | string | undefined,
-  props: TProps,
+  props: TProps
 ): React.ReactNode {
   if (typeof Comp === "string") {
     return Comp
@@ -50,13 +50,13 @@ export function getIsFileCellData(item: unknown): item is FileCellData {
 
 export function matchSelectOption(
   value: string,
-  options: { value: string; label: string }[],
+  options: { value: string; label: string }[]
 ): string | undefined {
   return options.find(
     (o) =>
       o.value === value ||
       o.value.toLowerCase() === value.toLowerCase() ||
-      o.label.toLowerCase() === value.toLowerCase(),
+      o.label.toLowerCase() === value.toLowerCase()
   )?.value
 }
 
@@ -173,7 +173,7 @@ export function getColumnPinningStyle<TData>(params: {
 }
 
 export function getScrollDirection(
-  direction: string,
+  direction: string
 ): "left" | "right" | "home" | "end" | undefined {
   if (
     direction === "left" ||
@@ -211,11 +211,11 @@ export function scrollCellIntoView<TData>(params: {
 
   const leftPinnedWidth = leftPinnedColumns.reduce(
     (sum, c) => sum + c.getSize(),
-    0,
+    0
   )
   const rightPinnedWidth = rightPinnedColumns.reduce(
     (sum, c) => sum + c.getSize(),
-    0,
+    0
   )
 
   const viewportLeft = isActuallyRtl
@@ -264,7 +264,7 @@ function countTabs(s: string): number {
 
 export function parseTsv(
   text: string,
-  fallbackColumnCount: number,
+  fallbackColumnCount: number
 ): string[][] {
   if (text.startsWith('"') || text.includes('\t"')) {
     const rows: string[][] = []
@@ -407,7 +407,7 @@ export function getColumnVariant(variant?: CellOpts["variant"]): {
 }
 
 export function getEmptyCellValue(
-  variant: CellOpts["variant"] | undefined,
+  variant: CellOpts["variant"] | undefined
 ): unknown {
   if (variant === "multi-select" || variant === "file") return []
   if (variant === "number" || variant === "date") return null
@@ -470,13 +470,13 @@ export function formatFileSize(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB"]
   const i = Math.min(
     sizes.length - 1,
-    Math.floor(Math.log(bytes) / Math.log(k)),
+    Math.floor(Math.log(bytes) / Math.log(k))
   )
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`
 }
 
 export function getFileIcon(
-  type: string,
+  type: string
 ): React.ComponentType<React.SVGProps<SVGSVGElement>> {
   if (type.startsWith("image/")) return FileImage
   if (type.startsWith("video/")) return FileVideo

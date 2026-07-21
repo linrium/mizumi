@@ -184,7 +184,7 @@ function DataGridRowImpl<TData>({
         rowMapRef.current?.delete(virtualRowIndex)
       }
     },
-    [virtualRowIndex, measureElement, rowMapRef],
+    [virtualRowIndex, measureElement, rowMapRef]
   )
 
   const rowRef = useComposedRefs(ref, onRowChange)
@@ -196,7 +196,7 @@ function DataGridRowImpl<TData>({
   // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility and columnPinning are used for calculating the visible cells
   const visibleCells = React.useMemo(
     () => row.getVisibleCells(),
-    [row, columnVisibility, columnPinning],
+    [row, columnVisibility, columnPinning]
   )
 
   return (
@@ -213,7 +213,7 @@ function DataGridRowImpl<TData>({
       className={cn(
         "absolute flex w-full border-b [content-visibility:auto]",
         !adjustLayout && "will-change-transform",
-        className,
+        className
       )}
       style={{
         height: `${getRowHeightValue(rowHeight)}px`,

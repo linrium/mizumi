@@ -223,7 +223,7 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
       className={cn(
         "rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none bg-white",
         nodeAccent(data.nodeType),
-        data.isCurrent ? "ring-2 ring-blue-500 border-blue-500" : "",
+        data.isCurrent ? "ring-2 ring-blue-500 border-blue-500" : ""
       )}
     >
       <Handle
@@ -290,7 +290,7 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
                   ? "text-green-600"
                   : runtime?.latest_run_status
                     ? "text-zinc-700"
-                    : "text-zinc-400",
+                    : "text-zinc-400"
             )}
           >
             {isActive ? "Active" : (runtime?.latest_run_status ?? "—")}
@@ -299,7 +299,7 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
         <div
           className={cn(
             "flex justify-between items-center px-3 py-1.5",
-            latest ? "bg-green-50/70" : "",
+            latest ? "bg-green-50/70" : ""
           )}
         >
           <span
@@ -319,7 +319,7 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
                 "rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-wide transition-colors",
                 data.isExpanded
                   ? "border-blue-300 bg-blue-50 text-blue-700"
-                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900",
+                  : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900"
               )}
               onClick={(event) => {
                 event.stopPropagation()
@@ -350,12 +350,12 @@ function groupAccent(nodeType: "catalog" | "schema", isCurrent: boolean) {
   if (nodeType === "catalog") {
     return cn(
       "border-amber-400/80 bg-amber-100/70",
-      isCurrent ? "ring-2 ring-amber-500 border-amber-500" : "",
+      isCurrent ? "ring-2 ring-amber-500 border-amber-500" : ""
     )
   }
   return cn(
     "border-sky-400/75 bg-sky-100/70",
-    isCurrent ? "ring-2 ring-sky-500 border-sky-500" : "",
+    isCurrent ? "ring-2 ring-sky-500 border-sky-500" : ""
   )
 }
 
@@ -364,7 +364,7 @@ function LineageGroupNode({ data }: { data: LineageGroupData }) {
     <div
       className={cn(
         "h-full w-full rounded-2xl border-2 border-dashed px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
-        groupAccent(data.nodeType, data.isCurrent),
+        groupAccent(data.nodeType, data.isCurrent)
       )}
     >
       <div className="flex items-center gap-2 text-zinc-700">
@@ -405,7 +405,7 @@ function isGroupNodeType(nodeType: string) {
 }
 
 function boundsFromRects(
-  rects: Array<{ x: number; y: number; width: number; height: number }>,
+  rects: Array<{ x: number; y: number; width: number; height: number }>
 ) {
   const minX = Math.min(...rects.map((rect) => rect.x))
   const minY = Math.min(...rects.map((rect) => rect.y))
@@ -422,15 +422,15 @@ function boundsFromRects(
 function buildLayout(
   graph: ApiLineageGraph,
   containmentEdges: ApiLineageEdge[],
-  currentId: string | null,
+  currentId: string | null
 ): { rfNodes: LineageFlowNode[]; rfEdges: Edge[] } {
   const containsEdges = containmentEdges
   const nodesById = new Map(graph.nodes.map((node) => [node.id, node]))
   const groupedNodes = graph.nodes.filter((node) =>
-    isGroupNodeType(node.node_type),
+    isGroupNodeType(node.node_type)
   )
   const leafNodes = graph.nodes.filter(
-    (node) => !isGroupNodeType(node.node_type),
+    (node) => !isGroupNodeType(node.node_type)
   )
   const groupedNodeIds = new Set(groupedNodes.map((node) => node.id))
   const leafNodeIds = new Set(leafNodes.map((node) => node.id))
@@ -519,7 +519,7 @@ function buildLayout(
   }
 
   for (const schemaNode of groupedNodes.filter(
-    (node) => node.node_type === "schema",
+    (node) => node.node_type === "schema"
   )) {
     const hasChildren = (schemaChildren.get(schemaNode.id) ?? []).length > 0
     if (hasChildren) {
@@ -534,7 +534,7 @@ function buildLayout(
   }
 
   for (const catalogNode of groupedNodes.filter(
-    (node) => node.node_type === "catalog",
+    (node) => node.node_type === "catalog"
   )) {
     const hasChildSchemas =
       (catalogChildren.get(catalogNode.id) ?? []).length > 0
@@ -587,16 +587,16 @@ function buildLayout(
     { x: number; y: number; width: number; height: number }
   >()
   for (const schemaNode of groupedNodes.filter(
-    (node) => node.node_type === "schema",
+    (node) => node.node_type === "schema"
   )) {
     const childIds = schemaChildren.get(schemaNode.id) ?? []
     const childRects = childIds
       .map((id) => leafAbsRects.get(id))
       .filter(
         (
-          rect,
+          rect
         ): rect is { x: number; y: number; width: number; height: number } =>
-          !!rect,
+          !!rect
       )
 
     if (childRects.length === 0) {
@@ -619,7 +619,7 @@ function buildLayout(
       width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W),
       height: Math.max(
         bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
-        GROUP_MIN_H,
+        GROUP_MIN_H
       ),
     })
   }
@@ -630,16 +630,16 @@ function buildLayout(
     { x: number; y: number; width: number; height: number }
   >()
   for (const catalogNode of groupedNodes.filter(
-    (node) => node.node_type === "catalog",
+    (node) => node.node_type === "catalog"
   )) {
     const childSchemaIds = catalogChildren.get(catalogNode.id) ?? []
     const childRects = childSchemaIds
       .map((id) => schemaRects.get(id))
       .filter(
         (
-          rect,
+          rect
         ): rect is { x: number; y: number; width: number; height: number } =>
-          !!rect,
+          !!rect
       )
 
     if (childRects.length === 0) {
@@ -662,7 +662,7 @@ function buildLayout(
       width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W + 40),
       height: Math.max(
         bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
-        GROUP_MIN_H + 20,
+        GROUP_MIN_H + 20
       ),
     })
   }
@@ -673,7 +673,7 @@ function buildLayout(
   const rfNodes: LineageFlowNode[] = []
 
   for (const catalogNode of groupedNodes.filter(
-    (node) => node.node_type === "catalog",
+    (node) => node.node_type === "catalog"
   )) {
     const rect = catalogRects.get(catalogNode.id)
     if (!rect) continue
@@ -694,7 +694,7 @@ function buildLayout(
   }
 
   for (const schemaNode of groupedNodes.filter(
-    (node) => node.node_type === "schema",
+    (node) => node.node_type === "schema"
   )) {
     const rect = schemaRects.get(schemaNode.id)
     if (!rect) continue
@@ -843,7 +843,7 @@ export function LineageGraph({
                 (n) =>
                   n.node_type === selectRootHint.nodeType &&
                   (n.display_name === selectRootHint.displayName ||
-                    n.name === selectRootHint.displayName),
+                    n.name === selectRootHint.displayName)
               )
               if (match) setSelectedNodeId(match.id)
             }
@@ -901,7 +901,7 @@ export function LineageGraph({
       (edge) =>
         edge.edge_type === "contains" &&
         visibleIds.has(edge.source) &&
-        visibleIds.has(edge.target),
+        visibleIds.has(edge.target)
     )
     const visibleEdges = graph.edges.filter((edge) => {
       if (!includeContains && edge.edge_type === "contains") return false
@@ -950,7 +950,7 @@ export function LineageGraph({
           : matchedNodes.filter(
               (node) =>
                 connectedIds.has(node.id) ||
-                keptContainmentAncestors.has(node.id),
+                keptContainmentAncestors.has(node.id)
             )
     }
 
@@ -972,19 +972,19 @@ export function LineageGraph({
     }
 
     const selectedExists = filteredGraph.nodes.some(
-      (node) => node.id === selectedNodeId,
+      (node) => node.id === selectedNodeId
     )
     if (!selectedExists) return filteredGraph
 
     const expansionSeeds = new Set<string>([
       selectedNodeId,
       ...expandedNodeIds.filter((nodeId) =>
-        filteredGraph.nodes.some((node) => node.id === nodeId),
+        filteredGraph.nodes.some((node) => node.id === nodeId)
       ),
     ])
     const focusedEdges = filteredGraph.edges.filter(
       (edge) =>
-        expansionSeeds.has(edge.source) || expansionSeeds.has(edge.target),
+        expansionSeeds.has(edge.source) || expansionSeeds.has(edge.target)
     )
     const focusedIds = new Set<string>([selectedNodeId])
     for (const edge of focusedEdges) {
@@ -993,7 +993,7 @@ export function LineageGraph({
     }
 
     const focusedNodes = filteredGraph.nodes.filter((node) =>
-      focusedIds.has(node.id),
+      focusedIds.has(node.id)
     )
     const focusedRoot =
       filteredGraph.root && focusedIds.has(filteredGraph.root.id)
@@ -1006,7 +1006,7 @@ export function LineageGraph({
       nodes: focusedNodes,
       edges: focusedEdges,
       containmentEdges: filteredGraph.containmentEdges.filter(
-        (edge) => focusedIds.has(edge.source) && focusedIds.has(edge.target),
+        (edge) => focusedIds.has(edge.source) && focusedIds.has(edge.target)
       ),
       root: focusedRoot,
     }
@@ -1044,7 +1044,7 @@ export function LineageGraph({
     const layout = buildLayout(
       graphForLayout,
       focusedGraph.containmentEdges,
-      currentId,
+      currentId
     )
 
     return {
@@ -1065,7 +1065,7 @@ export function LineageGraph({
                 setExpandedNodeIds((current) =>
                   current.includes(nodeId)
                     ? current.filter((value) => value !== nodeId)
-                    : [...current, nodeId],
+                    : [...current, nodeId]
                 )
               }
             : null,

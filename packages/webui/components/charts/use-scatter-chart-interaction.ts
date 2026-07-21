@@ -19,7 +19,7 @@ interface UseScatterChartInteractionParams {
   bisectDate: (
     data: Record<string, unknown>[],
     date: Date,
-    lo: number,
+    lo: number
   ) => number
   canInteract: boolean
 }
@@ -94,7 +94,7 @@ export function useScatterChartInteraction({
         yPositions,
       }
     },
-    [xScale, yScale, data, lines, xAccessor, bisectDate],
+    [xScale, yScale, data, lines, xAccessor, bisectDate]
   )
 
   const resolveIndexFromX = useCallback(
@@ -115,13 +115,13 @@ export function useScatterChartInteraction({
       }
       return index - 1
     },
-    [xScale, data, xAccessor, bisectDate],
+    [xScale, data, xAccessor, bisectDate]
   )
 
   const getChartX = useCallback(
     (
       event: React.MouseEvent<SVGGElement> | React.TouchEvent<SVGGElement>,
-      touchIndex = 0,
+      touchIndex = 0
     ): number | null => {
       const svg = event.currentTarget.ownerSVGElement
       let clientX: number
@@ -145,7 +145,7 @@ export function useScatterChartInteraction({
       }
       return point.x - margin.left
     },
-    [margin.left],
+    [margin.left]
   )
 
   const handleMouseMove = useCallback(
@@ -173,7 +173,7 @@ export function useScatterChartInteraction({
         setTooltipData(tooltip)
       }
     },
-    [getChartX, resolveTooltipFromX, resolveIndexFromX],
+    [getChartX, resolveTooltipFromX, resolveIndexFromX]
   )
 
   const handleMouseLeave = useCallback(() => {
@@ -195,7 +195,7 @@ export function useScatterChartInteraction({
       setTooltipData(null)
       setSelection(null)
     },
-    [getChartX],
+    [getChartX]
   )
 
   const handleMouseUp = useCallback(() => {
@@ -236,7 +236,7 @@ export function useScatterChartInteraction({
         })
       }
     },
-    [getChartX, resolveTooltipFromX, resolveIndexFromX],
+    [getChartX, resolveTooltipFromX, resolveIndexFromX]
   )
 
   const handleTouchMove = useCallback(
@@ -269,7 +269,7 @@ export function useScatterChartInteraction({
         })
       }
     },
-    [getChartX, resolveTooltipFromX, resolveIndexFromX],
+    [getChartX, resolveTooltipFromX, resolveIndexFromX]
   )
 
   const handleTouchEnd = useCallback(() => {

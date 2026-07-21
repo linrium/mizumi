@@ -84,7 +84,7 @@ function StaleStatusBadge({ status }: { status: string | null }) {
 
 async function apiFetch<T>(
   path: string,
-  params?: Record<string, string>,
+  params?: Record<string, string>
 ): Promise<T> {
   const url = params
     ? `/api/dagster/${path}?${new URLSearchParams(params)}`
@@ -100,7 +100,7 @@ async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
     `/api/dagster/materialize/${path.join("/")}`,
     {
       method: "POST",
-    },
+    }
   )
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
@@ -108,7 +108,7 @@ async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
 }
 
 async function materializeManyAssets(
-  paths: string[][],
+  paths: string[][]
 ): Promise<{ run_id: string }> {
   const res = await fetchWithAuth("/api/dagster/materialize-many", {
     method: "POST",
@@ -279,7 +279,7 @@ export default function AssetsPage() {
         `Materializing ${selectedPaths.length} asset${selectedPaths.length > 1 ? "s" : ""}`,
         {
           description: `Run ${run_id.slice(0, 8)}…`,
-        },
+        }
       )
       setRowSelection({})
     } catch (err) {
@@ -379,7 +379,7 @@ export default function AssetsPage() {
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext(),
+                        cell.getContext()
                       )}
                     </TableCell>
                   ))}

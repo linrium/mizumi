@@ -45,7 +45,7 @@ export async function getChatThread(id: string): Promise<ChatThread> {
 }
 
 export async function createChatThread(
-  payload: ChatThreadPayload = {},
+  payload: ChatThreadPayload = {}
 ): Promise<ChatThread> {
   const response = await apiFetch("/api/chat/threads", {
     method: "POST",
@@ -60,7 +60,7 @@ export async function createChatThread(
 
 export async function updateChatThread(
   id: string,
-  payload: ChatThreadPayload,
+  payload: ChatThreadPayload
 ): Promise<ChatThread> {
   const response = await apiFetch(
     `/api/chat/threads/${encodeURIComponent(id)}`,
@@ -68,7 +68,7 @@ export async function updateChatThread(
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    },
+    }
   )
   if (!response.ok) {
     throw new Error(await readJsonError(response))
@@ -81,7 +81,7 @@ export async function deleteChatThread(id: string): Promise<void> {
     `/api/chat/threads/${encodeURIComponent(id)}`,
     {
       method: "DELETE",
-    },
+    }
   )
   if (!response.ok) {
     throw new Error(await readJsonError(response))

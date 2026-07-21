@@ -79,13 +79,13 @@ export default function PolicyTemplateDetailPage() {
         setTemplate(templateData)
         setRequests(
           requestData.filter((request) =>
-            matchesTemplate(request, templateData),
-          ),
+            matchesTemplate(request, templateData)
+          )
         )
       } catch (err) {
         if (cancelled) return
         setError(
-          err instanceof Error ? err.message : "Failed to load policy template",
+          err instanceof Error ? err.message : "Failed to load policy template"
         )
       } finally {
         if (!cancelled) {
@@ -107,10 +107,10 @@ export default function PolicyTemplateDetailPage() {
         .sort(
           (left, right) =>
             new Date(right.submitted_at).getTime() -
-            new Date(left.submitted_at).getTime(),
+            new Date(left.submitted_at).getTime()
         )
         .slice(0, 6),
-    [requests],
+    [requests]
   )
 
   if (loading) {
@@ -222,7 +222,7 @@ export default function PolicyTemplateDetailPage() {
                         new Date(template.last_updated),
                         {
                           addSuffix: true,
-                        },
+                        }
                       )}
                     </p>
                   </div>
@@ -322,7 +322,7 @@ export default function PolicyTemplateDetailPage() {
                               new Date(request.submitted_at),
                               {
                                 addSuffix: true,
-                              },
+                              }
                             )}
                           </div>
                         </div>

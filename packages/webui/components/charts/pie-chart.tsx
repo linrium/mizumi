@@ -137,7 +137,7 @@ function PieChartInner({
         setInternalHoveredIndex(index)
       }
     },
-    [isControlled, onHoverChange],
+    [isControlled, onHoverChange]
   )
 
   // Use the smaller dimension to ensure the chart fits
@@ -152,7 +152,7 @@ function PieChartInner({
   // Calculate total value
   const totalValue = useMemo(
     () => data.reduce((sum, d) => sum + d.value, 0),
-    [data],
+    [data]
   )
 
   // Get color for a slice index
@@ -164,7 +164,7 @@ function PieChartInner({
       }
       return defaultPieColors[index % defaultPieColors.length] as string
     },
-    [data],
+    [data]
   )
 
   // Get fill for a slice index (supports patterns/gradients)
@@ -178,7 +178,7 @@ function PieChartInner({
       // Fall back to color
       return getColor(index)
     },
-    [data, getColor],
+    [data, getColor]
   )
 
   // Compute arcs using d3-shape pie

@@ -98,7 +98,7 @@ function K8sStateBadge({ state }: { state: string | null | undefined }) {
 
 function buildColumns(
   onRestart: (job: StreamingJob) => void,
-  onDelete: (job: StreamingJob) => void,
+  onDelete: (job: StreamingJob) => void
 ): ColumnDef<StreamingJob>[] {
   return [
     {
@@ -229,7 +229,7 @@ export default function StreamingPage() {
     try {
       const res = await fetchWithAuth(
         `/api/streaming/jobs/${restartTarget.id}/restart`,
-        { method: "POST" },
+        { method: "POST" }
       )
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
@@ -251,7 +251,7 @@ export default function StreamingPage() {
     try {
       const res = await fetchWithAuth(
         `/api/streaming/jobs/${deleteTarget.id}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       )
       if (res.status !== 204 && !res.ok) {
         const json = await res.json()

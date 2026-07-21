@@ -74,14 +74,14 @@ export async function getVolumesAction(catalog: string, schema: string) {
 export async function getVolumeAction(
   catalog: string,
   schema: string,
-  volume: string,
+  volume: string
 ) {
   return getVolume(catalog, schema, volume)
 }
 
 export async function listVolumeFilesAction(
   storageLocation: string,
-  continuationToken?: string,
+  continuationToken?: string
 ) {
   const match = storageLocation.match(/^s3:\/\/([^/]+)\/(.+)$/)
   if (!match) throw new Error(`Invalid storage location: ${storageLocation}`)
@@ -96,7 +96,7 @@ export async function getModelsAction(catalog: string, schema: string) {
 export async function getModelAction(
   catalog: string,
   schema: string,
-  model: string,
+  model: string
 ) {
   return getModel(catalog, schema, model)
 }
@@ -104,7 +104,7 @@ export async function getModelAction(
 export async function getModelVersionsAction(
   catalog: string,
   schema: string,
-  model: string,
+  model: string
 ) {
   return getModelVersions(catalog, schema, model)
 }
@@ -119,7 +119,7 @@ export async function searchMlflowExperimentsAction() {
 
 export async function searchMlflowRunsAction(
   experimentIds: string[],
-  options?: { registeredModelUri?: string },
+  options?: { registeredModelUri?: string }
 ) {
   try {
     return await searchRuns(experimentIds, options)
@@ -142,7 +142,7 @@ export async function getMlflowRunsForVersionsAction(runIds: string[]) {
   return results
     .filter(
       (r): r is PromiseFulfilledResult<{ run: MlflowRun }> =>
-        r.status === "fulfilled",
+        r.status === "fulfilled"
     )
     .map((r) => r.value.run)
 }
@@ -158,7 +158,7 @@ export async function listMlflowTracesAction(experimentId: string) {
 export async function getTableAction(
   catalog: string,
   schema: string,
-  table: string,
+  table: string
 ) {
   return getTable(catalog, schema, table)
 }
@@ -167,7 +167,7 @@ export async function getPermissionsAction(
   resourceType: "catalog" | "schema" | "table",
   catalog: string,
   schema?: string,
-  table?: string,
+  table?: string
 ) {
   return getPermissions(resourceType, catalog, schema, table)
 }
@@ -176,7 +176,7 @@ export async function getMyPrivilegesAction(
   resourceType: "catalog" | "schema" | "table",
   catalog: string,
   schema?: string,
-  table?: string,
+  table?: string
 ): Promise<string[]> {
   try {
     return await getEffectivePrivileges(resourceType, catalog, schema, table)
@@ -407,7 +407,7 @@ type PermissionRequestApiResponse = {
 }
 
 function mapPermissionRequest(
-  request: PermissionRequestApiResponse,
+  request: PermissionRequestApiResponse
 ): StoredPermissionRequest {
   return {
     id: request.id,
@@ -450,7 +450,7 @@ export async function listMyTeamsAction(): Promise<MyTeamOption[]> {
     const fallbackTeamId = resolveRequesterTeamId(session?.groups)
     const fallbackTeamName =
       Object.entries(TEAM_IDS_BY_NAME).find(
-        ([, id]) => id === fallbackTeamId,
+        ([, id]) => id === fallbackTeamId
       )?.[0] ?? "VietJetair Data Platform"
     return [{ id: fallbackTeamId, name: fallbackTeamName }]
   }
@@ -478,13 +478,13 @@ export async function listMyTeamsAction(): Promise<MyTeamOption[]> {
   const fallbackTeamId = resolveRequesterTeamId(session.groups)
   const fallbackTeamName =
     Object.entries(TEAM_IDS_BY_NAME).find(
-      ([, id]) => id === fallbackTeamId,
+      ([, id]) => id === fallbackTeamId
     )?.[0] ?? "VietJetair Data Platform"
   return [{ id: fallbackTeamId, name: fallbackTeamName }]
 }
 
 export async function listPermissionRequestsAction(
-  resource: string,
+  resource: string
 ): Promise<StoredPermissionRequest[]> {
   const session = await getServerSession()
   if (!session?.idToken) {
@@ -587,7 +587,7 @@ export async function submitPermissionRequestAction(body: {
 }
 
 export async function cancelPermissionRequestAction(
-  id: string,
+  id: string
 ): Promise<{ data?: StoredPermissionRequest; error?: string }> {
   const session = await getServerSession()
   if (session?.idToken) {
@@ -602,7 +602,7 @@ export async function cancelPermissionRequestAction(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ status: "cancelled" }),
-        },
+        }
       )
 
       if (res.ok) {

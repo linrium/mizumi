@@ -97,7 +97,7 @@ function DataGridSearchImpl({
         }
       }
     },
-    [propsRef],
+    [propsRef]
   )
 
   const debouncedSearch = useDebouncedCallback((query: string) => {
@@ -110,7 +110,7 @@ function DataGridSearchImpl({
       propsRef.current.onSearchQueryChange(value)
       debouncedSearch(value)
     },
-    [propsRef, debouncedSearch],
+    [propsRef, debouncedSearch]
   )
 
   const onTriggerPointerDown = React.useCallback(
@@ -133,19 +133,19 @@ function DataGridSearchImpl({
         event.preventDefault()
       }
     },
-    [],
+    []
   )
 
   const onPrevMatchPointerDown = React.useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) =>
       onTriggerPointerDown(event),
-    [onTriggerPointerDown],
+    [onTriggerPointerDown]
   )
 
   const onNextMatchPointerDown = React.useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) =>
       onTriggerPointerDown(event),
-    [onTriggerPointerDown],
+    [onTriggerPointerDown]
   )
 
   const onClose = React.useCallback(() => {

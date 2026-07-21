@@ -121,7 +121,7 @@ function ContextMenuImpl<TData>({
       pointerEvents: "none",
       opacity: 0,
     }),
-    [contextMenu.x, contextMenu.y],
+    [contextMenu.x, contextMenu.y]
   )
 
   const onCloseAutoFocus: NonNullable<
@@ -131,7 +131,7 @@ function ContextMenuImpl<TData>({
       event.preventDefault()
       propsRef.current.dataGridRef?.current?.focus()
     },
-    [propsRef],
+    [propsRef]
   )
 
   const onCopy = React.useCallback(() => {
@@ -179,7 +179,7 @@ function ContextMenuImpl<TData>({
     onDataUpdate?.(updates)
 
     toast.success(
-      `${updates.length} cell${updates.length !== 1 ? "s" : ""} cleared`,
+      `${updates.length} cell${updates.length !== 1 ? "s" : ""} cleared`
     )
   }, [propsRef])
 

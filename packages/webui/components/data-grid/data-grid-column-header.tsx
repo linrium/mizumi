@@ -66,7 +66,7 @@ export function DataGridColumnHeader<TData, TValue>({
     (direction: SortDirection) => {
       table.setSorting((prev: SortingState) => {
         const existingSortIndex = prev.findIndex(
-          (sort) => sort.id === column.id,
+          (sort) => sort.id === column.id
         )
         const newSort: ColumnSort = {
           id: column.id,
@@ -82,12 +82,12 @@ export function DataGridColumnHeader<TData, TValue>({
         }
       })
     },
-    [column.id, table],
+    [column.id, table]
   )
 
   const onSortRemove = React.useCallback(() => {
     table.setSorting((prev: SortingState) =>
-      prev.filter((sort) => sort.id !== column.id),
+      prev.filter((sort) => sort.id !== column.id)
     )
   }, [column.id, table])
 
@@ -113,7 +113,7 @@ export function DataGridColumnHeader<TData, TValue>({
       }
       table.options.meta?.onColumnClick?.(column.id)
     },
-    [table.options.meta, column.id, onPointerDown],
+    [table.options.meta, column.id, onPointerDown]
   )
 
   return (
@@ -123,7 +123,7 @@ export function DataGridColumnHeader<TData, TValue>({
           className={cn(
             "flex size-full items-center justify-between gap-2 p-2 text-sm hover:bg-accent/40 data-[state=open]:bg-accent/40 [&_svg]:size-4",
             isAnyColumnResizing && "pointer-events-none",
-            className,
+            className
           )}
           onPointerDown={onTriggerPointerDown}
           {...props}
@@ -247,7 +247,7 @@ const DataGridColumnResizer = React.memo(
     if (prev.label !== next.label) return false
 
     return true
-  },
+  }
 ) as typeof DataGridColumnResizerImpl
 
 interface DataGridColumnResizerProps<TData, TValue>
@@ -279,7 +279,7 @@ function DataGridColumnResizerImpl<TData, TValue>({
         "absolute -end-px top-0 z-50 h-full w-0.5 cursor-ew-resize touch-none select-none bg-border transition-opacity after:absolute after:inset-y-0 after:start-1/2 after:h-full after:w-[18px] after:-translate-x-1/2 after:content-[''] hover:bg-primary focus:bg-primary focus:outline-none",
         header.column.getIsResizing()
           ? "bg-primary"
-          : "opacity-0 hover:opacity-100",
+          : "opacity-0 hover:opacity-100"
       )}
       onDoubleClick={onDoubleClick}
       onMouseDown={header.getResizeHandler()}

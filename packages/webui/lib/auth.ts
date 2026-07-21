@@ -88,7 +88,7 @@ function buildAppSession(input: {
 
 async function hydrateSessionTokens(
   session: AppSession | null,
-  requestHeaders: Headers,
+  requestHeaders: Headers
 ) {
   if (!session) {
     return null
@@ -131,12 +131,12 @@ export const auth = betterAuth({
           issuer: getKeycloakIssuer(),
           authorizationUrl: getKeycloakEndpoint(
             getKeycloakPublicBaseUrl(),
-            "auth",
+            "auth"
           ),
           tokenUrl: getKeycloakEndpoint(getKeycloakInternalBaseUrl(), "token"),
           userInfoUrl: getKeycloakEndpoint(
             getKeycloakInternalBaseUrl(),
-            "userinfo",
+            "userinfo"
           ),
           scopes: ["openid", "profile", "email", "offline_access"],
         },
@@ -145,7 +145,7 @@ export const auth = betterAuth({
     customSession(async ({ session, user }, ctx) => {
       const accounts = await ctx.context.internalAdapter.findAccounts(user.id)
       const account = accounts.find(
-        (candidate) => candidate.providerId === KEYCLOAK_PROVIDER_ID,
+        (candidate) => candidate.providerId === KEYCLOAK_PROVIDER_ID
       )
 
       return buildAppSession({
@@ -166,7 +166,7 @@ export async function getServerSession() {
 
 export async function getSessionFromHeaders(
   requestHeaders: Headers,
-  options?: { includeTokens?: boolean },
+  options?: { includeTokens?: boolean }
 ) {
   const session = await auth.api.getSession({
     headers: requestHeaders,

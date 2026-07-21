@@ -18,7 +18,7 @@ function createS3Client() {
 export async function listS3Objects(
   bucket: string,
   prefix: string,
-  options?: { limit?: number; continuationToken?: string },
+  options?: { limit?: number; continuationToken?: string }
 ): Promise<ListObjectsResult> {
   const client = createS3Client()
   const normalizedPrefix = prefix.endsWith("/") ? prefix : `${prefix}/`
@@ -29,7 +29,7 @@ export async function listS3Objects(
       Prefix: normalizedPrefix,
       MaxKeys: options?.limit ?? 10,
       ContinuationToken: options?.continuationToken,
-    }),
+    })
   )
 
   const objects: S3Object[] = (res.Contents ?? []).map((obj) => ({

@@ -193,7 +193,7 @@ function toPieData(result: QueryResult, xCol: string, yCol: string): PieData[] {
 function toFunnelData(
   result: QueryResult,
   xCol: string,
-  yCol: string,
+  yCol: string
 ): FunnelStage[] {
   const xi = result.columns.indexOf(xCol)
   const yi = result.columns.indexOf(yCol)
@@ -222,7 +222,7 @@ function toStackedBarData(result: QueryResult, xCol: string, yCols: string[]) {
 function toSankeyData(
   result: QueryResult,
   xCol: string,
-  yCol: string,
+  yCol: string
 ): SankeyData {
   const srcIdx = xCol ? result.columns.indexOf(xCol) : 0
   const tgtIdx = yCol ? result.columns.indexOf(yCol) : 1
@@ -236,10 +236,10 @@ function toSankeyData(
   const tgtLabelIdx = result.columns.indexOf(tgtLabelCol)
   const valIdx =
     result.columns.findIndex((column) =>
-      ["value", "signal_value", "customers", "count"].includes(column),
+      ["value", "signal_value", "customers", "count"].includes(column)
     ) >= 0
       ? result.columns.findIndex((column) =>
-          ["value", "signal_value", "customers", "count"].includes(column),
+          ["value", "signal_value", "customers", "count"].includes(column)
         )
       : result.columns.findIndex(
           (column, i) =>
@@ -247,7 +247,7 @@ function toSankeyData(
             i !== tgtIdx &&
             i !== srcLabelIdx &&
             i !== tgtLabelIdx &&
-            !column.endsWith("_label"),
+            !column.endsWith("_label")
         )
   const rowValue = (row: unknown, index: number) => (row as unknown[])[index]
 
@@ -259,10 +259,10 @@ function toSankeyData(
     const src = String(rowValue(row, srcIdx) ?? "")
     const tgt = String(rowValue(row, tgtIdx) ?? "")
     const srcLabel = String(
-      rowValue(row, srcLabelIdx >= 0 ? srcLabelIdx : srcIdx) ?? src,
+      rowValue(row, srcLabelIdx >= 0 ? srcLabelIdx : srcIdx) ?? src
     )
     const tgtLabel = String(
-      rowValue(row, tgtLabelIdx >= 0 ? tgtLabelIdx : tgtIdx) ?? tgt,
+      rowValue(row, tgtLabelIdx >= 0 ? tgtLabelIdx : tgtIdx) ?? tgt
     )
     const val = parseFloat(String(rowValue(row, Math.max(0, valIdx)) ?? "0"))
     if (src && tgt && src !== tgt && Number.isFinite(val) && val > 0) {
@@ -293,11 +293,8 @@ function resultToRows(result: QueryResult | null | undefined): ResultRow[] {
   if (!result) return []
   return result.rows.map((row) =>
     Object.fromEntries(
-      result.columns.map((column, index) => [
-        column,
-        (row as unknown[])[index],
-      ]),
-    ),
+      result.columns.map((column, index) => [column, (row as unknown[])[index]])
+    )
   )
 }
 
@@ -474,7 +471,7 @@ function HeatmapChart({
   const valIdx = result.columns.findIndex((_, i) => {
     if (i === xi || i === yi) return false
     return result.rows.some((row) =>
-      Number.isFinite(parseFloat(String((row as unknown[])[i] ?? ""))),
+      Number.isFinite(parseFloat(String((row as unknown[])[i] ?? "")))
     )
   })
 
@@ -1005,10 +1002,10 @@ function PreviewGrid({ result }: { result: QueryResult }) {
     () =>
       result.rows.map((row) =>
         Object.fromEntries(
-          result.columns.map((col, i) => [col, (row as unknown[])[i]]),
-        ),
+          result.columns.map((col, i) => [col, (row as unknown[])[i]])
+        )
       ),
-    [result],
+    [result]
   )
   const columns = useMemo<ColumnDef<Row>[]>(
     () =>
@@ -1019,7 +1016,7 @@ function PreviewGrid({ result }: { result: QueryResult }) {
         size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
         meta: { cell: { variant: "short-text" as const } },
       })),
-    [result],
+    [result]
   )
   const { table, ...gridProps } = useDataGrid<Row>({
     data,
@@ -1060,14 +1057,14 @@ function PanelCard({
       className={cn(
         "h-full flex flex-col rounded-lg border bg-card overflow-hidden transition-all",
         selected && "ring-2 ring-primary border-primary",
-        editing && !selected && "border-dashed",
+        editing && !selected && "border-dashed"
       )}
       onClick={onClick}
     >
       <div
         className={cn(
           "panel-drag-handle flex items-center gap-1.5 px-3 py-2 border-b bg-muted/20 shrink-0 select-none",
-          editing && "cursor-grab active:cursor-grabbing",
+          editing && "cursor-grab active:cursor-grabbing"
         )}
       >
         {editing && (
@@ -1181,7 +1178,7 @@ function HeadlineCard({
       <div
         className={cn(
           "panel-drag-handle flex items-center gap-1.5 border-b bg-muted/20 px-3 py-2 select-none",
-          editing && "cursor-grab active:cursor-grabbing",
+          editing && "cursor-grab active:cursor-grabbing"
         )}
       >
         {editing && (
@@ -1519,10 +1516,10 @@ function AiComposer({
   onModelChange: (m: ModelId) => void
   onPanelsCreated: (
     panels: Panel[],
-    results: Record<string, QueryResult>,
+    results: Record<string, QueryResult>
   ) => void
   onPanelsEdited: (
-    updates: Array<{ panel: Panel; result: QueryResult }>,
+    updates: Array<{ panel: Panel; result: QueryResult }>
   ) => void
 }) {
   const [input, setInput] = useState("")
@@ -1566,14 +1563,14 @@ function AiComposer({
 
   const activeMention = useMemo(
     () => getActiveMention(input, caretPos),
-    [input, caretPos],
+    [input, caretPos]
   )
   const selectedPanels = useMemo(
     () =>
       selectedPanelIds
         .map((id) => panels.find((panel) => panel.id === id) ?? null)
         .filter((panel): panel is Panel => !!panel),
-    [panels, selectedPanelIds],
+    [panels, selectedPanelIds]
   )
 
   const mentionPanels = useMemo(() => {
@@ -1638,7 +1635,7 @@ function AiComposer({
           return res
         },
       }),
-    [fetchSessions, setActiveId],
+    [fetchSessions, setActiveId]
   )
 
   const { messages, sendMessage, status } = useChat({ transport })
@@ -1728,7 +1725,7 @@ function AiComposer({
         textareaRef.current?.setSelectionRange(nextCaret, nextCaret)
       })
     },
-    [activeMention, caretPos, input],
+    [activeMention, caretPos, input]
   )
 
   const handleSend = () => {
@@ -1750,7 +1747,7 @@ function AiComposer({
       if (e.key === "ArrowUp") {
         e.preventDefault()
         setMentionIndex(
-          (idx) => (idx - 1 + mentionPanels.length) % mentionPanels.length,
+          (idx) => (idx - 1 + mentionPanels.length) % mentionPanels.length
         )
         return
       }
@@ -1770,7 +1767,7 @@ function AiComposer({
         textareaRef.current?.focus()
         textareaRef.current?.setSelectionRange(
           activeMention.start,
-          activeMention.start,
+          activeMention.start
         )
       })
       return
@@ -1936,7 +1933,7 @@ function AiComposer({
                       "flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                       idx === mentionIndex
                         ? "bg-muted text-foreground"
-                        : "text-foreground/85 hover:bg-muted/70",
+                        : "text-foreground/85 hover:bg-muted/70"
                     )}
                   >
                     <span className="font-medium">{panel.title}</span>
@@ -2103,8 +2100,8 @@ export default function DashboardPage() {
       DEFAULT_PANELS.map((p) => [
         p.id,
         { status: "idle", result: null, error: null },
-      ]),
-    ),
+      ])
+    )
   )
   const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT)
   const [editing, setEditing] = useState(false)
@@ -2115,7 +2112,7 @@ export default function DashboardPage() {
   const [modelId, setModelId] = useState<ModelId>("gpt-5.4-nano")
   const sidebarDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const composerDragRef = useRef<{ startX: number; startW: number } | null>(
-    null,
+    null
   )
   const abortRefs = useRef<Record<string, AbortController>>({})
 
@@ -2216,7 +2213,7 @@ export default function DashboardPage() {
         prev.map((p) => {
           const upd = updates.find((u) => u.panel.id === p.id)
           return upd ? upd.panel : p
-        }),
+        })
       )
       setPanelData((prev) => {
         const next = { ...prev }
@@ -2226,7 +2223,7 @@ export default function DashboardPage() {
         return next
       })
     },
-    [],
+    []
   )
 
   // Called by AiComposer when createPanel tool calls complete
@@ -2259,12 +2256,12 @@ export default function DashboardPage() {
                 y: Infinity,
                 w: 1,
                 h: 4,
-              }) as LayoutItem,
+              }) as LayoutItem
           )
         return [...prev, ...newItems]
       })
     },
-    [],
+    []
   )
 
   const refreshAll = () => {
@@ -2280,7 +2277,7 @@ export default function DashboardPage() {
       setWidth: (w: number) => void,
       min: number,
       max: number,
-      direction: "left" | "right",
+      direction: "left" | "right"
     ) =>
     (e: ReactMouseEvent) => {
       e.preventDefault()
@@ -2315,13 +2312,13 @@ export default function DashboardPage() {
     : null
   const heroMetrics = useMemo(() => {
     const opportunityRows = resultToRows(
-      panelData["cross-company-opportunity"]?.result ?? null,
+      panelData["cross-company-opportunity"]?.result ?? null
     )
     const whitespaceRows = resultToRows(
-      panelData["untapped-whitespace"]?.result ?? null,
+      panelData["untapped-whitespace"]?.result ?? null
     )
     const recoveryRows = resultToRows(
-      panelData["recovery-risk"]?.result ?? null,
+      panelData["recovery-risk"]?.result ?? null
     )
 
     const topOpportunity = opportunityRows[0]
@@ -2337,7 +2334,7 @@ export default function DashboardPage() {
         title: "Opportunity generated",
         value: formatCompactNumber(
           getNumberValue(topOpportunity, "total_signal_value"),
-          " VND",
+          " VND"
         ),
         detail:
           topOpportunity == null
@@ -2356,7 +2353,7 @@ export default function DashboardPage() {
         title: "Revenue at risk",
         value: formatCompactNumber(
           getNumberValue(topRecovery, "revenue_at_risk"),
-          " VND",
+          " VND"
         ),
         detail:
           topRecovery == null
@@ -2434,7 +2431,7 @@ export default function DashboardPage() {
               selectedPanelIds={selectedIds}
               onRemoveSelectedPanel={(id) =>
                 setSelectedIds((prev) =>
-                  prev.filter((selectedId) => selectedId !== id),
+                  prev.filter((selectedId) => selectedId !== id)
                 )
               }
               onClearSelectedPanels={() => setSelectedIds([])}
@@ -2451,7 +2448,7 @@ export default function DashboardPage() {
               setComposerWidth,
               COMPOSER_MIN,
               COMPOSER_MAX,
-              "left",
+              "left"
             )}
           />
         </div>
@@ -2502,12 +2499,12 @@ export default function DashboardPage() {
                         setSelectedIds((prev) =>
                           prev.includes(panel.id)
                             ? prev.filter((id) => id !== panel.id)
-                            : [...prev, panel.id],
+                            : [...prev, panel.id]
                         )
                       }
                       onConfigure={() => {
                         setSelectedIds((prev) =>
-                          prev.includes(panel.id) ? prev : [...prev, panel.id],
+                          prev.includes(panel.id) ? prev : [...prev, panel.id]
                         )
                         setConfigPanelId(panel.id)
                       }}
@@ -2530,7 +2527,7 @@ export default function DashboardPage() {
                 setSidebarWidth,
                 SIDEBAR_MIN,
                 SIDEBAR_MAX,
-                "right",
+                "right"
               )}
             />
             <div className="flex flex-col flex-1 min-w-0 overflow-auto border-l bg-background">

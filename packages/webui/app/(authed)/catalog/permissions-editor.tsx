@@ -88,7 +88,7 @@ type PermissionsEditorProps = {
 }
 
 function normalizePrivileges(
-  assignments: PermissionAssignment[] | undefined,
+  assignments: PermissionAssignment[] | undefined
 ): PermissionAssignment[] {
   const normalizedAssignments = (assignments ?? []).map((assignment) => ({
     principal: assignment.principal,
@@ -98,7 +98,7 @@ function normalizePrivileges(
     normalizedAssignments.map((assignment) => [
       assignment.principal.toLowerCase(),
       assignment,
-    ]),
+    ])
   )
 
   for (const principal of HARDCODED_PRINCIPALS) {
@@ -111,7 +111,7 @@ function normalizePrivileges(
   }
 
   return normalizedAssignments.sort((left, right) =>
-    PRINCIPAL_NAME_COLLATOR.compare(left.principal, right.principal),
+    PRINCIPAL_NAME_COLLATOR.compare(left.principal, right.principal)
   )
 }
 
@@ -169,30 +169,30 @@ export function PermissionsEditor({
     () =>
       assignments.find(
         (assignment) =>
-          assignment.principal.toLowerCase() === principal.trim().toLowerCase(),
+          assignment.principal.toLowerCase() === principal.trim().toLowerCase()
       ),
-    [assignments, principal],
+    [assignments, principal]
   )
 
   const originalPrivileges = useMemo(
     () => new Set(currentAssignment?.privileges ?? []),
-    [currentAssignment],
+    [currentAssignment]
   )
 
   const add = useMemo(
     () =>
       Array.from(selected).filter(
-        (privilege) => !originalPrivileges.has(privilege),
+        (privilege) => !originalPrivileges.has(privilege)
       ),
-    [selected, originalPrivileges],
+    [selected, originalPrivileges]
   )
 
   const remove = useMemo(
     () =>
       Array.from(originalPrivileges).filter(
-        (privilege) => !selected.has(privilege),
+        (privilege) => !selected.has(privilege)
       ),
-    [selected, originalPrivileges],
+    [selected, originalPrivileges]
   )
 
   function loadAssignment(next: PermissionAssignment) {
@@ -249,7 +249,7 @@ export function PermissionsEditor({
 
       const refreshed = nextAssignments.find(
         (assignment) =>
-          assignment.principal.toLowerCase() === nextPrincipal.toLowerCase(),
+          assignment.principal.toLowerCase() === nextPrincipal.toLowerCase()
       ) ?? {
         principal: nextPrincipal,
         privileges: [],
@@ -295,7 +295,7 @@ export function PermissionsEditor({
                         "w-full rounded border px-2.5 py-2 text-left transition-colors",
                         isActive
                           ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent/40",
+                          : "border-border hover:bg-accent/40"
                       )}
                     >
                       <p className="truncate text-xs font-medium">
@@ -394,7 +394,7 @@ export function PermissionsEditor({
                             "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                             checked
                               ? "border-primary bg-primary/5 text-foreground"
-                              : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                              : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                           )}
                         >
                           <span
@@ -403,7 +403,7 @@ export function PermissionsEditor({
                               "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
                               checked
                                 ? "border-primary bg-primary text-primary-foreground"
-                                : "border-input bg-background text-transparent dark:bg-input/30",
+                                : "border-input bg-background text-transparent dark:bg-input/30"
                             )}
                           >
                             <IconCheck size={12} stroke={2} />

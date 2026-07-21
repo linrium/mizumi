@@ -70,14 +70,14 @@ export function DataGrid<TData>({
     (event: React.MouseEvent<HTMLDivElement>) => {
       onRowAddRef.current?.(event)
     },
-    [onRowAddRef],
+    [onRowAddRef]
   )
 
   const onDataGridContextMenu = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       event.preventDefault()
     },
-    [],
+    []
   )
 
   const onFooterCellKeyDown = React.useCallback(
@@ -89,7 +89,7 @@ export function DataGrid<TData>({
         onRowAddRef.current()
       }
     },
-    [onRowAddRef],
+    [onRowAddRef]
   )
 
   return (
@@ -139,7 +139,7 @@ export function DataGrid<TData>({
               {headerGroup.headers.map((header, colIndex) => {
                 const sorting = table.getState().sorting
                 const currentSort = sorting.find(
-                  (sort) => sort.id === header.column.id,
+                  (sort) => sort.id === header.column.id
                 )
                 const isSortable = header.column.getCanSort()
 
@@ -186,7 +186,7 @@ export function DataGrid<TData>({
                       <div className="size-full px-3 py-1.5">
                         {flexRender(
                           header.column.columnDef.header,
-                          header.getContext(),
+                          header.getContext()
                         )}
                       </div>
                     ) : (

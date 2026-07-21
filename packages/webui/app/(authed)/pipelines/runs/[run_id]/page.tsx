@@ -16,13 +16,13 @@ dayjs.extend(relativeTime)
 
 const StepGraph = dynamic(
   () => import("./StepGraph").then((m) => m.StepGraph),
-  { ssr: false },
+  { ssr: false }
 )
 
 const LineageGraph = dynamic(
   () =>
     import("../../assets/[...path]/LineageGraph").then((m) => m.LineageGraph),
-  { ssr: false },
+  { ssr: false }
 )
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ function EventRow({
     <tr
       className={cn(
         "align-top border-b border-border/50 text-xs",
-        highlight && "bg-muted/40",
+        highlight && "bg-muted/40"
       )}
     >
       <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap tabular-nums">
@@ -265,7 +265,7 @@ function ReExecutions({
       .then((r) => r.json())
       .then((d: { runs: Run[] }) => {
         const related = d.runs.filter(
-          (r) => r.root_run_id === rootRunId || r.run_id === rootRunId,
+          (r) => r.root_run_id === rootRunId || r.run_id === rootRunId
         )
         setRuns(related)
       })
@@ -291,7 +291,7 @@ function ReExecutions({
               href={`/pipelines/runs/${r.run_id}`}
               className={cn(
                 "flex items-center justify-between px-4 py-2.5 hover:bg-muted/30 transition-colors",
-                isThis && "bg-muted/50",
+                isThis && "bg-muted/50"
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -384,7 +384,7 @@ export default function RunDetailPage() {
   const { run, events, loading, error } = useRunDetail(runId)
   const [selectedStep, setSelectedStep] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"events" | "config" | "lineage">(
-    "events",
+    "events"
   )
   const [graphHeight, setGraphHeight] = useState(500)
   const dragRef = useRef<{ startY: number; startH: number } | null>(null)
@@ -396,7 +396,7 @@ export default function RunDetailPage() {
       if (!dragRef.current) return
       const delta = ev.clientY - dragRef.current.startY
       setGraphHeight(
-        Math.max(80, Math.min(600, dragRef.current.startH + delta)),
+        Math.max(80, Math.min(600, dragRef.current.startH + delta))
       )
     }
     function onUp() {
@@ -412,7 +412,7 @@ export default function RunDetailPage() {
     if (!selectedStep) return undefined
     const e = events.find(
       (ev) =>
-        ev.step_key === selectedStep && ev.asset_key && ev.asset_key.length > 0,
+        ev.step_key === selectedStep && ev.asset_key && ev.asset_key.length > 0
     )
     return e?.asset_key ?? undefined
   }, [selectedStep, events])
@@ -506,7 +506,7 @@ export default function RunDetailPage() {
                   "text-xs py-2 capitalize border-b-2 transition-colors",
                   activeTab === t
                     ? "border-foreground text-foreground font-medium"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t === "events"

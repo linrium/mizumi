@@ -20,7 +20,7 @@ const openai = createOpenAI({
 
 async function ensureSession(
   sessionId: string | null,
-  token?: string,
+  token?: string
 ): Promise<string> {
   if (sessionId) {
     return sessionId
@@ -138,7 +138,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
                 : "  top_rows=(unavailable)",
             ]
               .filter(Boolean)
-              .join("\n"),
+              .join("\n")
           )
           .join("\n")
       : "  (none)"
@@ -167,10 +167,10 @@ export async function handleDashboardGenerate(req: NextRequest) {
         sql: z
           .string()
           .describe(
-            "SQL query. Always use fully qualified names: <catalog>.<schema>.<table>",
+            "SQL query. Always use fully qualified names: <catalog>.<schema>.<table>"
           ),
         chartType: chartTypeEnum.describe(
-          "bar -> categories, line/area -> time-series, pie -> proportions <=8 slices, scatter -> correlation/bubble matrix, sankey -> flows, funnel -> journey steps, heatmap -> two-dimensional intensity",
+          "bar -> categories, line/area -> time-series, pie -> proportions <=8 slices, scatter -> correlation/bubble matrix, sankey -> flows, funnel -> journey steps, heatmap -> two-dimensional intensity"
         ),
         xCol: z
           .string()
@@ -236,7 +236,7 @@ export async function handleDashboardGenerate(req: NextRequest) {
           .string()
           .optional()
           .describe(
-            "New SQL query (omit to keep existing). Always use fully qualified names: <catalog>.<schema>.<table>",
+            "New SQL query (omit to keep existing). Always use fully qualified names: <catalog>.<schema>.<table>"
           ),
         chartType: chartTypeEnum.optional(),
         xCol: z.string().optional(),
@@ -345,7 +345,7 @@ ${schema}
 If a tool returns an error field, quote it briefly and stop.`,
     messages: await convertToModelMessages(
       messages as Parameters<typeof convertToModelMessages>[0],
-      { tools },
+      { tools }
     ),
     tools,
     stopWhen: stepCountIs(15),

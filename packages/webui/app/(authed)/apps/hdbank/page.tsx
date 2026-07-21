@@ -54,7 +54,7 @@ type SendResult =
 async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
   const response = await fetch(
     `/api/synthetic/${dataset}?limit=${batchSize}&random=true`,
-    { cache: "no-store" },
+    { cache: "no-store" }
   )
   if (!response.ok) throw new Error(`Failed to load ${dataset}`)
   const payload = (await response.json()) as PaginatedResponse<T>

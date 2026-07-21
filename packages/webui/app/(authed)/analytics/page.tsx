@@ -167,9 +167,9 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const data = useMemo<Row[]>(
     () =>
       queryResult.rows.map((row) =>
-        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]])),
+        Object.fromEntries(queryResult.columns.map((col, i) => [col, row[i]]))
       ),
-    [queryResult],
+    [queryResult]
   )
 
   const columns = useMemo<ColumnDef<Row>[]>(
@@ -181,7 +181,7 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
         size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
         meta: { cell: { variant: "short-text" as const } },
       })),
-    [queryResult],
+    [queryResult]
   )
 
   const { table, ...dataGridProps } = useDataGrid<Row>({
@@ -222,7 +222,7 @@ function QueryResultCard({ output }: { output: RunQueryOutput }) {
           size={11}
           className={cn(
             "shrink-0 transition-transform",
-            sqlOpen && "rotate-180",
+            sqlOpen && "rotate-180"
           )}
         />
         <IconDatabase size={11} className="shrink-0" />
@@ -285,7 +285,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
 
   const barData = useMemo(
     () => keys.map((k, i) => ({ [output.x]: k, [output.y]: values[i] ?? 0 })),
-    [keys, values, output.x, output.y],
+    [keys, values, output.x, output.y]
   )
 
   const areaData = useMemo(
@@ -299,16 +299,16 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
           [output.y]: values[i] ?? 0,
         }
       }),
-    [keys, values, output.x, output.y],
+    [keys, values, output.x, output.y]
   )
 
   const pieData = useMemo<PieData[]>(
     () => keys.map((k, i) => ({ label: k, value: values[i] ?? 0 })),
-    [keys, values],
+    [keys, values]
   )
   const pieTotal = useMemo(
     () => pieData.reduce((s, d) => s + d.value, 0),
-    [pieData],
+    [pieData]
   )
 
   const sankeyData = useMemo<SankeyData>(() => {
@@ -316,7 +316,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
     const srcIdx = output.columns.indexOf(output.x)
     const tgtIdx = output.columns.indexOf(output.y)
     const valIdx = output.columns.findIndex(
-      (_, i) => i !== srcIdx && i !== tgtIdx,
+      (_, i) => i !== srcIdx && i !== tgtIdx
     )
     const rv = (row: unknown, i: number) => (row as unknown[])[i]
     const nodeNames = new Set<string>()
@@ -351,7 +351,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
             row_count: output.rows.length,
           }
         : null,
-    [output.columns, output.rows],
+    [output.columns, output.rows]
   )
 
   return (
@@ -398,7 +398,7 @@ function VisualizationCard({ output }: { output: VisualizeChartOutput }) {
                   "flex items-center gap-1 px-2 py-1.5 font-medium border-b-2 -mb-px capitalize transition-colors",
                   tab === t
                     ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t === "chart" ? (
@@ -680,7 +680,7 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
         <span
           className={cn(
             "px-1.5 py-0.5 rounded border text-[10px] font-medium capitalize",
-            colorClass,
+            colorClass
           )}
         >
           {output.status}
@@ -713,7 +713,7 @@ function RequestStatusCard({ output }: { output: RequestStatusOutput }) {
                           ? "bg-amber-400"
                           : step.status === "cancelled"
                             ? "bg-muted-foreground/40"
-                            : "bg-muted-foreground/20",
+                            : "bg-muted-foreground/20"
                     )}
                   />
                   <span
@@ -811,7 +811,7 @@ function AccessRequestsListCard({
               type="button"
               onClick={() =>
                 onSendMessage?.(
-                  `Tell me about my access request ${req.code} for \`${req.resource}\`.`,
+                  `Tell me about my access request ${req.code} for \`${req.resource}\`.`
                 )
               }
               className="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-accent/40 transition-colors text-left"
@@ -819,7 +819,7 @@ function AccessRequestsListCard({
               <div
                 className={cn(
                   "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
-                  colors.dot,
+                  colors.dot
                 )}
               />
 
@@ -829,7 +829,7 @@ function AccessRequestsListCard({
                   <span
                     className={cn(
                       "px-1.5 py-px rounded border text-[10px] font-medium capitalize",
-                      colors.badge,
+                      colors.badge
                     )}
                   >
                     {req.status}
@@ -884,13 +884,13 @@ function CatalogTableList({
             <div
               className={cn(
                 "w-1.5 h-1.5 rounded-full shrink-0",
-                locked ? "bg-muted-foreground/40" : "bg-emerald-500",
+                locked ? "bg-muted-foreground/40" : "bg-emerald-500"
               )}
             />
             <span
               className={cn(
                 "font-mono font-semibold text-[11px]",
-                locked && "text-muted-foreground",
+                locked && "text-muted-foreground"
               )}
             >
               {catalog}
@@ -957,7 +957,7 @@ function CatalogTableList({
                         type="button"
                         onClick={() =>
                           onSendMessage(
-                            `Check my access request status for ${existingRequest.code}`,
+                            `Check my access request status for ${existingRequest.code}`
                           )
                         }
                         className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors"
@@ -1305,7 +1305,7 @@ export default function AnalyticsPage() {
           modelId: modelIdRef.current,
         }),
       }),
-    [],
+    []
   )
 
   const { messages, sendMessage, status } = useChat({ transport })

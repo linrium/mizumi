@@ -1,5 +1,5 @@
 export async function readApiResponse<T>(
-  res: Response,
+  res: Response
 ): Promise<T & { error?: string }> {
   const text = await res.text()
   if (!text) {

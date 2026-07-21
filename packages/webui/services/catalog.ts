@@ -20,7 +20,7 @@ function getPermissionsPath(
   resourceType: ResourceType,
   catalog: string,
   schema?: string,
-  table?: string,
+  table?: string
 ) {
   if (resourceType === "catalog") {
     return `/permissions/catalog/${encodeURIComponent(catalog)}`
@@ -70,13 +70,13 @@ export async function getCatalogs() {
 
 export async function getSchemas(catalog: string) {
   return ucFetch<{ schemas: Schema[] }>(
-    `/schemas?catalog_name=${catalog}&max_results=200`,
+    `/schemas?catalog_name=${catalog}&max_results=200`
   )
 }
 
 export async function getTables(catalog: string, schema: string) {
   return ucFetch<{ tables: TableSummary[] }>(
-    `/tables?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+    `/tables?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
@@ -86,21 +86,21 @@ export async function getTable(catalog: string, schema: string, table: string) {
 
 export async function getVolumes(catalog: string, schema: string) {
   return ucFetch<{ volumes: VolumeSummary[] }>(
-    `/volumes?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+    `/volumes?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
 export async function getVolume(
   catalog: string,
   schema: string,
-  volume: string,
+  volume: string
 ) {
   return ucFetch<VolumeDetail>(`/volumes/${catalog}.${schema}.${volume}`)
 }
 
 export async function getModels(catalog: string, schema: string) {
   return ucFetch<{ registered_models: RegisteredModelSummary[] }>(
-    `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`,
+    `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
   )
 }
 
@@ -111,10 +111,10 @@ export async function getModel(catalog: string, schema: string, model: string) {
 export async function getModelVersions(
   catalog: string,
   schema: string,
-  model: string,
+  model: string
 ) {
   return ucFetch<{ model_versions?: ModelVersionSummary[] }>(
-    `/models/${catalog}.${schema}.${model}/versions?max_results=200`,
+    `/models/${catalog}.${schema}.${model}/versions?max_results=200`
   )
 }
 
@@ -122,10 +122,10 @@ export async function getPermissions(
   resourceType: ResourceType,
   catalog: string,
   schema?: string,
-  table?: string,
+  table?: string
 ) {
   return ucFetch<PermissionsResponse>(
-    getPermissionsPath(resourceType, catalog, schema, table),
+    getPermissionsPath(resourceType, catalog, schema, table)
   )
 }
 
@@ -133,11 +133,11 @@ export async function getEffectivePrivileges(
   resourceType: ResourceType,
   catalog: string,
   schema?: string,
-  table?: string,
+  table?: string
 ): Promise<string[]> {
   const path = getPermissionsPath(resourceType, catalog, schema, table).replace(
     "/permissions/",
-    "/effective-permissions/",
+    "/effective-permissions/"
   )
   const data = await ucFetch<{ privileges: string[] }>(path)
   return data.privileges
@@ -157,7 +157,7 @@ export async function patchPermissions(input: {
       input.resourceType,
       input.catalog,
       input.schema,
-      input.table,
+      input.table
     ),
     {
       method: "PATCH",
@@ -170,6 +170,6 @@ export async function patchPermissions(input: {
           },
         ],
       }),
-    },
+    }
   )
 }

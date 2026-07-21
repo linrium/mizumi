@@ -39,7 +39,7 @@ export async function getTeam(id: string): Promise<Team> {
 
 export async function createTeam(
   name: string,
-  workspace: string,
+  workspace: string
 ): Promise<Team> {
   const res = await apiFetch("/api/teams", {
     method: "POST",
@@ -62,7 +62,7 @@ export async function listTeamMembers(teamId: string): Promise<TeamMember[]> {
 
 export async function addTeamMember(
   teamId: string,
-  userId: string,
+  userId: string
 ): Promise<TeamMember> {
   const res = await apiFetch(
     `/api/teams/${encodeURIComponent(teamId)}/members`,
@@ -70,7 +70,7 @@ export async function addTeamMember(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
-    },
+    }
   )
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -81,11 +81,11 @@ export async function addTeamMember(
 
 export async function removeTeamMember(
   teamId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   const res = await apiFetch(
     `/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
-    { method: "DELETE" },
+    { method: "DELETE" }
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }

@@ -45,7 +45,7 @@ export default function PermissionsLayout({
 }) {
   const pathname = usePathname()
   const nestedTabPaths = TABS.filter((tab) => tab.href !== "/permissions").map(
-    (tab) => tab.href,
+    (tab) => tab.href
   )
 
   return (
@@ -59,7 +59,7 @@ export default function PermissionsLayout({
                   !nestedTabPaths.some(
                     (nestedPath) =>
                       pathname === nestedPath ||
-                      pathname.startsWith(`${nestedPath}/`),
+                      pathname.startsWith(`${nestedPath}/`)
                   ))
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
 
@@ -71,7 +71,7 @@ export default function PermissionsLayout({
                 "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                 isActive
                   ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               <tab.icon size={12} />

@@ -29,7 +29,7 @@ function parseCsv(content: string): CustomerRow[] {
   return rows.map((line) => {
     const values = line.split(",").map((value) => value.trim())
     return Object.fromEntries(
-      columns.map((column, index) => [column, values[index] ?? ""]),
+      columns.map((column, index) => [column, values[index] ?? ""])
     ) as CustomerRow
   })
 }
@@ -43,7 +43,7 @@ async function loadCustomers(): Promise<CustomerRow[]> {
       "spark",
       "jobs",
       "data",
-      "co_brand_customers.csv",
+      "co_brand_customers.csv"
     ),
   ]
 

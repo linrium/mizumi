@@ -101,12 +101,12 @@ export function TimeSeriesChartInner({
       const value = d[xDataKey]
       return value instanceof Date ? value : new Date(value as string | number)
     },
-    [xDataKey],
+    [xDataKey]
   )
 
   const bisectDate = useMemo(
     () => bisector<Record<string, unknown>, Date>((d) => xAccessor(d)).left,
-    [xAccessor],
+    [xAccessor]
   )
 
   const xScale = useMemo(() => {
@@ -159,9 +159,9 @@ export function TimeSeriesChartInner({
         xAccessor(d).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
-        }),
+        })
       ),
-    [data, xAccessor],
+    [data, xAccessor]
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature

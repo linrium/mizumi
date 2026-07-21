@@ -26,7 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
   if (!ALLOWED_DATASETS.has(dataset)) {
     return Response.json(
       { error: `Unknown dataset: ${dataset}` },
-      { status: 404 },
+      { status: 404 }
     )
   }
 
@@ -55,7 +55,7 @@ export async function GET(request: Request, context: RouteContext) {
             ? error.message
             : "Synthetic server request failed",
       },
-      { status: 502 },
+      { status: 502 }
     )
   }
 }

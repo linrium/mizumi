@@ -175,7 +175,7 @@ export async function listPermissionRequests(params?: {
 }
 
 export async function createPermissionRequest(
-  body: CreatePermissionRequestBody,
+  body: CreatePermissionRequestBody
 ): Promise<PermissionRequest> {
   const res = await apiFetch("/api/permissions/requests", {
     method: "POST",
@@ -190,10 +190,10 @@ export async function createPermissionRequest(
 }
 
 export async function getPermissionRequest(
-  id: string,
+  id: string
 ): Promise<PermissionRequest> {
   const res = await apiFetch(
-    `/api/permissions/requests/${encodeURIComponent(id)}`,
+    `/api/permissions/requests/${encodeURIComponent(id)}`
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
@@ -203,7 +203,7 @@ export async function updateRequestStatus(
   id: string,
   status: RequestStatus,
   approvalStepId?: string,
-  grantDurationDays?: number,
+  grantDurationDays?: number
 ): Promise<PermissionRequest> {
   const res = await apiFetch(
     `/api/permissions/requests/${encodeURIComponent(id)}`,
@@ -215,14 +215,14 @@ export async function updateRequestStatus(
         approval_step_id: approvalStepId ?? null,
         grant_duration_days: grantDurationDays ?? null,
       }),
-    },
+    }
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
 
 export async function cancelPermissionRequest(
-  id: string,
+  id: string
 ): Promise<PermissionRequest> {
   return updateRequestStatus(id, "cancelled")
 }
@@ -262,10 +262,10 @@ export async function listBlastRadius(): Promise<BlastRadiusPreview[]> {
 }
 
 export async function getBlastRadius(
-  requestId: string,
+  requestId: string
 ): Promise<BlastRadiusPreview> {
   const res = await apiFetch(
-    `/api/permissions/requests/${encodeURIComponent(requestId)}/blast-radius`,
+    `/api/permissions/requests/${encodeURIComponent(requestId)}/blast-radius`
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
@@ -288,7 +288,7 @@ export async function listTimeBoundGrants(params?: {
 
 export async function getTimeBoundGrant(id: string): Promise<TimeBoundGrant> {
   const res = await apiFetch(
-    `/api/permissions/grants/${encodeURIComponent(id)}`,
+    `/api/permissions/grants/${encodeURIComponent(id)}`
   )
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
@@ -296,7 +296,7 @@ export async function getTimeBoundGrant(id: string): Promise<TimeBoundGrant> {
 
 export async function revokeGrant(
   id: string,
-  reason?: string,
+  reason?: string
 ): Promise<TimeBoundGrant> {
   const res = await apiFetch(
     `/api/permissions/grants/${encodeURIComponent(id)}/revoke`,
@@ -304,7 +304,7 @@ export async function revokeGrant(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: reason ?? null }),
-    },
+    }
   )
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -315,7 +315,7 @@ export async function revokeGrant(
 
 export async function adminRenewGrant(
   id: string,
-  expiresAt: string,
+  expiresAt: string
 ): Promise<TimeBoundGrant> {
   const res = await apiFetch(
     `/api/permissions/grants/${encodeURIComponent(id)}/renew`,
@@ -323,7 +323,7 @@ export async function adminRenewGrant(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expires_at: expiresAt }),
-    },
+    }
   )
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

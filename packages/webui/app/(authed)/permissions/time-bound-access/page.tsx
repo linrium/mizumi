@@ -195,7 +195,7 @@ export default function TimeBoundAccessPage() {
       return
     }
     const newExpiry = new Date(
-      Date.now() + days * 24 * 60 * 60 * 1000,
+      Date.now() + days * 24 * 60 * 60 * 1000
     ).toISOString()
     setSubmitting(true)
     try {
@@ -465,7 +465,7 @@ export default function TimeBoundAccessPage() {
               <p className="text-xs text-muted-foreground">
                 New expiry:{" "}
                 {new Date(
-                  Date.now() + Number(renewDays) * 86_400_000,
+                  Date.now() + Number(renewDays) * 86_400_000
                 ).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",

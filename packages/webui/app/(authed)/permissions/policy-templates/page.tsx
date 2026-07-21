@@ -54,7 +54,7 @@ export default function PolicyTemplatesPage() {
   }, [])
 
   const autoApproveCount = templates.filter(
-    (t) => t.approval_mode === "auto",
+    (t) => t.approval_mode === "auto"
   ).length
 
   return (
@@ -115,7 +115,7 @@ export default function PolicyTemplatesPage() {
                         Updated{" "}
                         {formatDistanceToNowStrict(
                           new Date(template.last_updated),
-                          { addSuffix: true },
+                          { addSuffix: true }
                         )}
                       </div>
                     </div>

@@ -64,12 +64,12 @@ export function ScatterChartInner({
       const value = d[xDataKey]
       return value instanceof Date ? value : new Date(value as string | number)
     },
-    [xDataKey],
+    [xDataKey]
   )
 
   const bisectDate = useMemo(
     () => bisector<Record<string, unknown>, Date>((d) => xAccessor(d)).left,
-    [xAccessor],
+    [xAccessor]
   )
 
   const xRangePadding = useMemo(() => {
@@ -127,9 +127,9 @@ export function ScatterChartInner({
         xAccessor(d).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
-        }),
+        })
       ),
-    [data, xAccessor],
+    [data, xAccessor]
   )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: revealSignature

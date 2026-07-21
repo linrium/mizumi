@@ -80,14 +80,14 @@ export default function TeamsPage() {
     try {
       const team = await createTeam(name, workspace)
       setTeams((prev) =>
-        [...prev, team].sort((a, b) => a.name.localeCompare(b.name)),
+        [...prev, team].sort((a, b) => a.name.localeCompare(b.name))
       )
       setCreateOpen(false)
       setNewName("")
       setNewWorkspace("")
     } catch (err) {
       setCreateError(
-        err instanceof Error ? err.message : "Failed to create team",
+        err instanceof Error ? err.message : "Failed to create team"
       )
     } finally {
       setCreating(false)

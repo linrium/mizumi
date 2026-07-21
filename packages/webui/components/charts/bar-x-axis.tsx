@@ -149,7 +149,7 @@ export function BarXAxis({
         />
       ))}
     </div>,
-    container,
+    container
   )
 }
 

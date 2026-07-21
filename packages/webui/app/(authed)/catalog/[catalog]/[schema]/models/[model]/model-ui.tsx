@@ -43,7 +43,7 @@ export function Field({
           className={cn(
             "text-xs truncate",
             mono && "font-mono",
-            !value && "text-muted-foreground",
+            !value && "text-muted-foreground"
           )}
         >
           {value || "—"}
@@ -79,7 +79,7 @@ export function StatusBadge({ status }: { status?: string | null }) {
     <span
       className={cn(
         "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-        colors[status] ?? "bg-muted text-muted-foreground",
+        colors[status] ?? "bg-muted text-muted-foreground"
       )}
     >
       {status}

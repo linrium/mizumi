@@ -27,7 +27,7 @@ function mlflowModelName(model: string) {
 
 function getRegisteredVersions(
   loggedModel: MlflowLoggedModel,
-  modelName: string,
+  modelName: string
 ) {
   const tag = getTag(loggedModel, "mlflow.modelVersions")
   if (!tag) return []
@@ -65,9 +65,9 @@ export default function ModelsPage() {
         setModels(
           (data.models ?? []).filter(
             (loggedModel) =>
-              getRegisteredVersions(loggedModel, modelName).length > 0,
-          ),
-        ),
+              getRegisteredVersions(loggedModel, modelName).length > 0
+          )
+        )
       )
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -97,7 +97,7 @@ export default function ModelsPage() {
             models.map((loggedModel, i) => {
               const versions = getRegisteredVersions(
                 loggedModel,
-                mlflowModelName(model),
+                mlflowModelName(model)
               )
 
               return (
@@ -105,7 +105,7 @@ export default function ModelsPage() {
                   key={loggedModel.info.model_id}
                   className={cn(
                     "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
-                    i % 2 === 0 ? "bg-background" : "bg-muted/20",
+                    i % 2 === 0 ? "bg-background" : "bg-muted/20"
                   )}
                 >
                   <td className="px-4 py-2 font-medium">

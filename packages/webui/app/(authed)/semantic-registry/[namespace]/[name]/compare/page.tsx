@@ -124,7 +124,7 @@ export default function SemanticComparePage() {
       } catch (err) {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to compare versions",
+            err instanceof Error ? err.message : "Failed to compare versions"
           )
         }
       } finally {

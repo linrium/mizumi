@@ -36,9 +36,9 @@ import {
 const LineageGraph = dynamic(
   () =>
     import("@/app/(authed)/pipelines/assets/[...path]/LineageGraph").then(
-      (m) => m.LineageGraph,
+      (m) => m.LineageGraph
     ),
-  { ssr: false },
+  { ssr: false }
 )
 
 const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"]
@@ -214,13 +214,13 @@ export default function PermissionRequestDetailPage() {
   const requestId = typeof params.id === "string" ? params.id : ""
   const [request, setRequest] = useState<PermissionRequest | null>(null)
   const [blastRadius, setBlastRadius] = useState<BlastRadiusPreview | null>(
-    null,
+    null
   )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actioningKey, setActioningKey] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"guardrail" | "components">(
-    "guardrail",
+    "guardrail"
   )
 
   // Approval confirmation dialog for time-bounded requests
@@ -263,7 +263,7 @@ export default function PermissionRequestDetailPage() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load permission request",
+            : "Failed to load permission request"
         )
       } finally {
         if (!cancelled) {
@@ -281,13 +281,13 @@ export default function PermissionRequestDetailPage() {
 
   const currentSteps = useMemo(
     () => request?.approval_steps.filter((step) => step.is_current) ?? [],
-    [request],
+    [request]
   )
 
   async function handleStatusUpdate(
     status: RequestStatus,
     approvalStepId?: string,
-    grantDurationDays?: number,
+    grantDurationDays?: number
   ) {
     if (!request) return
 
@@ -300,14 +300,14 @@ export default function PermissionRequestDetailPage() {
         request.id,
         status,
         approvalStepId,
-        grantDurationDays,
+        grantDurationDays
       )
       setRequest(updated)
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to update permission request",
+          : "Failed to update permission request"
       )
     } finally {
       setActioningKey(null)
@@ -517,7 +517,7 @@ export default function PermissionRequestDetailPage() {
                         new Date(request.submitted_at),
                         {
                           addSuffix: true,
-                        },
+                        }
                       )}
                     </p>
                   </div>
@@ -601,8 +601,8 @@ export default function PermissionRequestDetailPage() {
                           "rounded-lg border px-3 py-2 transition-colors",
                           getApprovalStepPanelClass(
                             step.status,
-                            step.is_current,
-                          ),
+                            step.is_current
+                          )
                         )}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -617,7 +617,7 @@ export default function PermissionRequestDetailPage() {
                               <Status
                                 variant={getApprovalStepVariant(
                                   step.status,
-                                  step.is_current,
+                                  step.is_current
                                 )}
                               >
                                 <StatusIndicator />
@@ -638,7 +638,7 @@ export default function PermissionRequestDetailPage() {
                             <p className="text-[11px] text-muted-foreground">
                               {getApprovalStepDescription(
                                 step.status,
-                                step.is_current,
+                                step.is_current
                               )}
                             </p>
                           </div>
@@ -657,7 +657,7 @@ export default function PermissionRequestDetailPage() {
                                     new Date(step.acted_at),
                                     {
                                       addSuffix: true,
-                                    },
+                                    }
                                   )
                                 : step.is_current
                                   ? "Action needed now"
@@ -801,7 +801,7 @@ export default function PermissionRequestDetailPage() {
                           "py-2.5 text-xs font-medium border-b-2 -mb-px mr-4 capitalize transition-colors",
                           activeTab === tab
                             ? "border-foreground text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground",
+                            : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                         onClick={() => setActiveTab(tab)}
                       >
@@ -880,7 +880,7 @@ export default function PermissionRequestDetailPage() {
                                 ))}
                               </ul>
                             </div>
-                          ),
+                          )
                         )}
                         {blastRadius.affected_nodes.length === 0 && (
                           <p className="text-xs text-muted-foreground">
@@ -970,7 +970,7 @@ export default function PermissionRequestDetailPage() {
               value={approvalDialog?.durationDays ?? ""}
               onChange={(e) =>
                 setApprovalDialog((prev) =>
-                  prev ? { ...prev, durationDays: e.target.value } : prev,
+                  prev ? { ...prev, durationDays: e.target.value } : prev
                 )
               }
               className="h-8 text-sm"
@@ -980,7 +980,7 @@ export default function PermissionRequestDetailPage() {
               <p className="text-xs text-muted-foreground">
                 Access expires on{" "}
                 {new Date(
-                  Date.now() + Number(approvalDialog.durationDays) * 86_400_000,
+                  Date.now() + Number(approvalDialog.durationDays) * 86_400_000
                 ).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",

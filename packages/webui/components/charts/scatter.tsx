@@ -251,7 +251,7 @@ export function Scatter({
       const value = d[dataKey]
       return typeof value === "number" ? (yScale(value) ?? 0) : null
     },
-    [dataKey, yScale],
+    [dataKey, yScale]
   )
 
   const isHovering = tooltipData !== null
@@ -282,7 +282,7 @@ export function Scatter({
       isRevealing,
       revealDurationSec,
       visualExtent,
-    ],
+    ]
   )
 
   return (

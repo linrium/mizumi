@@ -138,7 +138,7 @@ export function BarYAxis({
         />
       ))}
     </div>,
-    container,
+    container
   )
 }
 

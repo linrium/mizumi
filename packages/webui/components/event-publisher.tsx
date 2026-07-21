@@ -27,7 +27,7 @@ export type EventOption = {
   endpoint: string
   createSample?: () => Record<string, unknown>
   createBatch?: (
-    batchSize: number,
+    batchSize: number
   ) => Promise<Record<string, unknown>[]> | Record<string, unknown>[]
 }
 
@@ -57,8 +57,8 @@ export function EventPublisher({
       options.map((option) => [
         option.id,
         option.createSample ? prettyJson(option.createSample()) : "[]",
-      ]),
-    ),
+      ])
+    )
   )
   const [sending, setSending] = useState<Record<string, boolean>>({})
   const [results, setResults] = useState<Record<string, SendResult | null>>({})

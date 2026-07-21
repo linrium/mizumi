@@ -116,7 +116,7 @@ export default function ExperimentsPage() {
                         "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                         experiment.lifecycle_stage === "active"
                           ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                          : "bg-muted text-muted-foreground",
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {experiment.lifecycle_stage}

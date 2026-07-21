@@ -48,7 +48,7 @@ export function useSessions() {
       setSessions((prev) => {
         const next = prev.filter((s) => s.session_id !== id)
         setActiveId((curr) =>
-          curr === id ? (next[0]?.session_id ?? null) : curr,
+          curr === id ? (next[0]?.session_id ?? null) : curr
         )
         return next
       })

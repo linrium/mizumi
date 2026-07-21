@@ -84,7 +84,7 @@ export default function RunsPage() {
                   key={run.info.run_id}
                   className={cn(
                     "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
-                    i % 2 === 0 ? "bg-background" : "bg-muted/20",
+                    i % 2 === 0 ? "bg-background" : "bg-muted/20"
                   )}
                 >
                   <td className="px-4 py-2 font-medium truncate max-w-[140px]">

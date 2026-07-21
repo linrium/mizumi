@@ -1,7 +1,7 @@
 export function localPointFromSvg(
   svg: SVGSVGElement | null,
   clientX: number,
-  clientY: number,
+  clientY: number
 ): { x: number; y: number } | null {
   if (!svg) {
     return null

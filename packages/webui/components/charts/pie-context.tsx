@@ -103,7 +103,7 @@ export function usePie(): PieContextValue {
   if (!context) {
     throw new Error(
       "usePie must be used within a PieProvider. " +
-        "Make sure your component is wrapped in <PieChart>.",
+        "Make sure your component is wrapped in <PieChart>."
     )
   }
   return context

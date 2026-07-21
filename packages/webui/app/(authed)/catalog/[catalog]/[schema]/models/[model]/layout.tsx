@@ -106,7 +106,7 @@ export default function ModelLayout({
                 "px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors",
                 activeTab === tab.key
                   ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
               <span className="flex items-center gap-1.5">

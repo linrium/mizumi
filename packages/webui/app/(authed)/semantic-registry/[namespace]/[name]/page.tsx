@@ -140,12 +140,12 @@ function NewVersionDialog({
   const [description, setDescription] = useState(base.description)
   const [specJson, setSpecJson] = useState(JSON.stringify(base.spec, null, 2))
   const [dependencies, setDependencies] = useState(
-    current.dependencies.map(semanticLabel).join("\n"),
+    current.dependencies.map(semanticLabel).join("\n")
   )
   const [physical, setPhysical] = useState(
     current.physical_dependencies
       .map((item) => `${item.catalog}.${item.schema_name}.${item.object_name}`)
-      .join("\n"),
+      .join("\n")
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -159,9 +159,9 @@ function NewVersionDialog({
     setPhysical(
       current.physical_dependencies
         .map(
-          (item) => `${item.catalog}.${item.schema_name}.${item.object_name}`,
+          (item) => `${item.catalog}.${item.schema_name}.${item.object_name}`
         )
-        .join("\n"),
+        .join("\n")
     )
   }, [base, current.dependencies, current.physical_dependencies])
 
@@ -306,7 +306,7 @@ export default function SemanticDefinitionDetailPage() {
   const [versionParam, setVersionParam] = useState(() => {
     if (typeof window === "undefined") return 0
     return Number(
-      new URLSearchParams(window.location.search).get("version") ?? 0,
+      new URLSearchParams(window.location.search).get("version") ?? 0
     )
   })
   const selectedVersion =
@@ -324,7 +324,7 @@ export default function SemanticDefinitionDetailPage() {
         const loadedDetail = await getSemanticDefinition(
           namespace,
           name,
-          version,
+          version
         )
         if (!cancelled) {
           setVersions(loadedVersions)
@@ -335,7 +335,7 @@ export default function SemanticDefinitionDetailPage() {
           setError(
             err instanceof Error
               ? err.message
-              : "Failed to load semantic definition",
+              : "Failed to load semantic definition"
           )
         }
       } finally {
@@ -350,7 +350,7 @@ export default function SemanticDefinitionDetailPage() {
 
   const nextStatuses = useMemo(
     () => (detail ? (NEXT_STATUS[detail.definition.status] ?? []) : []),
-    [detail],
+    [detail]
   )
 
   async function transition(status: SemanticStatus) {
@@ -362,7 +362,7 @@ export default function SemanticDefinitionDetailPage() {
         name,
         detail.definition.version,
         status,
-        `Transitioned to ${status} from Semantic Registry UI`,
+        `Transitioned to ${status} from Semantic Registry UI`
       )
       setDetail(updated)
       const loadedVersions = await listSemanticVersions(namespace, name)
@@ -436,7 +436,7 @@ export default function SemanticDefinitionDetailPage() {
               onValueChange={(value) => {
                 setVersionParam(Number(value))
                 router.push(
-                  `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${value}`,
+                  `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${value}`
                 )
               }}
             >
@@ -643,7 +643,7 @@ export default function SemanticDefinitionDetailPage() {
         current={detail}
         onCreated={(version) =>
           router.push(
-            `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${version}`,
+            `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${version}`
           )
         }
       />

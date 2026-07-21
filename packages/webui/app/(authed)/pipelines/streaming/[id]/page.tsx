@@ -117,7 +117,7 @@ function ConfirmButton({
       className={cn(
         "text-xs px-3 py-1 border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap",
         stage === "confirming" ? "bg-muted" : "hover:bg-muted",
-        className,
+        className
       )}
     >
       {stage === "pending"

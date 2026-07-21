@@ -113,9 +113,7 @@ export default function TeamDetailPage({
     try {
       const member = await addTeamMember(id, selectedUserId)
       setMembers((prev) =>
-        [...prev, member].sort((a, b) =>
-          a.full_name.localeCompare(b.full_name),
-        ),
+        [...prev, member].sort((a, b) => a.full_name.localeCompare(b.full_name))
       )
       setAddOpen(false)
     } catch (err) {
