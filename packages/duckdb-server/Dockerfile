@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS duckdb-build
+FROM rust:1.88-slim-bookworm AS duckdb-build
 
 ENV PYTHONUNBUFFERED=1
 
@@ -15,21 +15,20 @@ RUN apt-get update \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-ENV RUSTUP_HOME=/usr/local/rustup
-ENV CARGO_HOME=/usr/local/cargo
-ENV PATH=/usr/local/cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --profile minimal --default-toolchain 1.88.0
-
 WORKDIR /src/duckdb-uc-extension
 COPY packages/duckdb-uc-extension/ ./
 RUN git submodule update --init --recursive
 RUN make release
 
-FROM python:3.12-slim
+FROM rust:1.88-slim-bookworm AS server-build
 
-ENV PYTHONUNBUFFERED=1
+WORKDIR /src/duckdb-server
+COPY packages/duckdb-server/Cargo.toml packages/duckdb-server/Cargo.lock ./
+COPY packages/duckdb-server/src ./src
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
 ENV DUCKDB_BIN=/usr/local/bin/duckdb
 
 RUN apt-get update \
@@ -39,11 +38,9 @@ RUN apt-get update \
         libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir "fastapi" "uvicorn[standard]"
-
 COPY --from=duckdb-build /src/duckdb-uc-extension/build/release/duckdb /usr/local/bin/duckdb
-COPY packages/duckdb-server/server.py /opt/duckdb-server/server.py
+COPY --from=server-build /src/duckdb-server/target/release/duckdb-server /usr/local/bin/duckdb-server
 
 WORKDIR /opt/duckdb-server
 EXPOSE 8080
-CMD ["python", "server.py"]
+CMD ["duckdb-server"]
