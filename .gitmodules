@@ -1,3 +1,3 @@
-[submodule "packages/packages/duckdb-uc-extension"]
-	path = packages/packages/duckdb-uc-extension
+[submodule "packages/duckdb-uc-extension"]
+	path = packages/duckdb-uc-extension
 	url = git@github.com:linrium/unity_catalog.git
