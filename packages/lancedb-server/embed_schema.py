@@ -1,7 +1,7 @@
 """
 Embeds the STATIC_CATALOGS schema into LanceDB via the OpenAI embeddings API.
 One document per table; text includes catalog/schema comments and enriched column descriptions.
-Run once after `just lancedb-deploy` to populate the schema_embeddings table.
+Run once after deploying LanceDB to populate the schema_embeddings table.
 """
 
 import asyncio

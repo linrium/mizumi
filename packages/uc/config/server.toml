@@ -85,7 +85,7 @@ max_connections = 20
 # session_token = ""   # test-only: skips downscoping when set
 # endpoint      = ""   # S3-compatible endpoint (e.g. http://rustfs-svc.rustfs.svc.cluster.local:9000)
 
-# RustFS (port-forwarded locally via `just forward`)
+# RustFS (port-forwarded locally via `scripts/forward.sh`)
 [[s3]]
 bucket_path = "s3://unitycatalog/"
 region = "us-east-1"

@@ -13,9 +13,6 @@ NC='\033[0m'
 #─── service definitions: "label|namespace|service|port-pairs..." ───────────────
 # port-pairs is one or more space-separated local:remote pairs passed directly
 # to kubectl port-forward.
-#
-# Justfile had two separate port-forwards for keycloak (8080 + 8083) and dagster
-# (8088:80 duplicate) — combined into single commands here.
 FORWARD_ADDRESS="${MIZUMI_FORWARD_ADDRESS:-0.0.0.0}"
 SIGNOZ_NAMESPACE="${SIGNOZ_NAMESPACE:-signoz}"
 SIGNOZ_UI_PORT="${SIGNOZ_UI_PORT:-8084}"

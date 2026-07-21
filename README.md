@@ -71,14 +71,14 @@ flowchart LR
 │   ├── duckdb/               # DuckDB query jobs and image
 │   ├── spark/                # Spark jobs and pipeline specs
 │   └── unitycatalog/         # Unity Catalog image context
-├── Justfile                  # Main operator command surface
+├── scripts/                 # Operator shell scripts (deploy, destroy, forward, redeploy, ...)
 ├── pyproject.toml            # Python dependencies for Dagster and data tooling
 └── uv.lock                   # Locked Python environment
 ```
 
 ## Main Commands
 
-Most operational commands live in `Justfile`.
+Most operational commands live in `scripts/`.
 
 ### Environment Setup
 
@@ -91,7 +91,7 @@ Installs the Python environment used for Dagster and the data packages declared 
 ### Platform Lifecycle
 
 ```bash
-just deploy
+scripts/deploy.sh
 ```
 
 Deploys the core platform stack:
@@ -105,7 +105,7 @@ Deploys the core platform stack:
 - Controlplane
 
 ```bash
-just destroy
+scripts/destroy.sh
 ```
 
 Tears down the core stack namespaces and workloads.
@@ -113,7 +113,7 @@ Tears down the core stack namespaces and workloads.
 ### Access Local UIs
 
 ```bash
-just forward
+scripts/forward.sh
 ```
 
 Starts the common port-forwards and prints local endpoints for:
@@ -176,76 +176,7 @@ the Java auto-instrumentation annotation and OTEL resource attributes for each
 ephemeral Spark pod, including the Dagster op name, selected asset keys, run id,
 and Spark job path.
 
-You can also forward individual services:
-
-```bash
-just rustfs-forward
-just redpanda-forward
-just dagster-forward
-just spark-forward
-just spark-pipeline-forward
-just unitycatalog-forward
-just unitycatalog-ui-forward
-just forward
-just forward
-just daft-distributed-forward
-just ballista-forward
-```
-
-`redpanda-deploy` also runs a bootstrap job that creates the default `mizumi-orders` topic.
-
-### HTTPS S3 Endpoint Alias
-
-If you need clients to talk to RustFS through `https://s3.ap-southeast-1.amazonaws.com`, this repo includes a local Caddy config at `infra/caddy/Caddyfile` that terminates TLS for that hostname and proxies to `http://127.0.0.1:9000`.
-
-Required local machine steps:
-
-```bash
-# 1. Start RustFS locally first
-just forward
-
-# 2. Map the AWS hostname to localhost
-echo '127.0.0.1 s3.ap-southeast-1.amazonaws.com' | sudo tee -a /etc/hosts
-
-# 3. Trust Caddy's local CA for the generated certificate
-just caddy-s3-trust
-
-# 4. Run the HTTPS proxy
-just caddy-s3-proxy
-```
-
-### Cluster Service Aliases
-
-If you need local clients to talk to in-cluster HTTP service URLs during dev, this repo includes a local Caddy config at `infra/caddy/ClusterServices.Caddyfile` with these mappings:
-
-- `http://keycloak-svc.keycloak.svc.cluster.local` -> `http://127.0.0.1:8083`
-- `http://controlplane-svc.controlplane.svc.cluster.local` -> `http://127.0.0.1:4000`
-
-Required local machine steps:
-
-```bash
-# 1. Start the local forwards first
-just forward
-
-# 2. Map the in-cluster hostnames to localhost
-echo '127.0.0.1 keycloak-svc.keycloak.svc.cluster.local controlplane-svc.controlplane.svc.cluster.local' | sudo tee -a /etc/hosts
-
-# 3. Run the HTTP proxy on port 80
-just caddy-cluster-services-proxy
-```
-
-To create the example Spark streaming job through `controlplane` after `just forward`:
-
-```bash
-just jobs-submit-all
-```
-
-To rebuild the Spark image and recreate those streaming jobs cleanly, rebuild Spark and resubmit them:
-
-```bash
-just spark-image-build
-just jobs-submit-all
-```
+`scripts/deploy.sh` also runs a Redpanda bootstrap job that creates the default `mizumi-orders` topic.
 
 Controlplane-created Spark streaming jobs are also instrumented for SigNoz.
 Their SparkApplication driver and executor pods get the Java
@@ -256,87 +187,27 @@ pods with the new telemetry template.
 
 ### Spark and Pipeline Workloads
 
-```bash
-just spark-deploy
-```
-
-Builds the Spark image, seeds source data, submits the Spark application, and runs the Spark Declarative Pipeline job.
+Spark image build, source data seed, Spark application submission, and Spark Declarative Pipeline execution are all driven by `scripts/deploy.sh` as part of the full platform bring-up. To rebuild and redeploy just the Dagster-launched Spark assets after a code change:
 
 ```bash
-just spark-destroy
+scripts/redeploy-dagster-spark-jobs.sh
 ```
-
-Removes the Spark application, pipeline jobs, and Spark-related namespaces.
 
 ### Dagster
 
 ```bash
-just dagster-deploy
-just dagster-image-build
-just dagster-destroy
+scripts/redeploy-dagster.sh
 ```
 
-Use these to build the Dagster image, deploy the Dagster release, or remove it.
+Rebuilds the Dagster image and redeploys the Dagster release in the `dagster` namespace.
 
 ### Unity Catalog
 
 ```bash
-just unitycatalog-deploy
-just unitycatalog-bootstrap
-just unitycatalog-destroy
+scripts/redeploy-unitycatalog.sh
 ```
 
-`unitycatalog-deploy` reuses Dagster's shared Postgres instance, deploys the catalog server and UI, and runs bootstrap initialization.
-
-### Keycloak
-
-```bash
-just keycloak-deploy
-just keycloak-bootstrap
-just keycloak-destroy
-```
-
-`keycloak-deploy` installs Keycloak with an in-cluster PostgreSQL database using plain Kubernetes manifests, then runs a bootstrap job that seeds the `mizumi` realm, creates the users `rikki@gmail.com`, `linh@gmail.com`, `khaosoi@gmail.com`, and `khaopad@gmail.com`, and provisions the confidential client `mizumi-client` with direct access grants and service accounts enabled. When `just forward` is running, the admin console is available at `http://127.0.0.1:8083` with the default credentials `admin` / `admin`.
-
-### Query Engines
-
-```bash
-just duckdb-query
-just datafusion-query
-```
-
-These build the relevant images, submit Kubernetes jobs, wait for completion, and stream logs.
-
-Useful follow-up commands:
-
-```bash
-just duckdb-query-logs
-just duckdb-query-destroy
-just datafusion-query-logs
-just datafusion-query-destroy
-```
-
-### Daft
-
-```bash
-just daft-simple-deploy
-just daft-distributed-deploy
-just daft-destroy
-```
-
-Runs either the single-node or distributed Daft quickstart workloads.
-
-### Ballista
-
-```bash
-just ballista-deploy
-just ballista-status
-just ballista-scheduler-logs
-just ballista-executor-logs
-just ballista-destroy
-```
-
-Manages the Ballista cluster manifests under `infra/k8s/ballista`.
+Rebuilds the Unity Catalog image and redeploys the catalog server and UI. The deploy reuses Dagster's shared Postgres instance and re-runs bootstrap initialization.
 
 ### Frontend
 

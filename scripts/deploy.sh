@@ -10,7 +10,7 @@ CYN='\033[0;36m'
 BLD='\033[1m'
 NC='\033[0m'
 
-#─── config (mirrored from Justfile) ───────────────────────────────────────────
+#─── config ───────────────────────────────────────────────────────────────────
 CONTROLPLANE_NS=controlplane
 CONTROLPLANE_MANIFESTS=infra/k8s/controlplane
 CONTROLPLANE_IMAGE=mizumi-controlplane:0.1.0
@@ -612,7 +612,7 @@ step_done
 printf "\n${GRN}${BLD}════════════════════════════════════════${NC}\n"
 printf "${GRN}${BLD}  Deploy complete in %ds${NC}\n" "$((SECONDS - DEPLOY_START))"
 printf "${GRN}${BLD}════════════════════════════════════════${NC}\n\n"
-printf "  Controlplane API  http://127.0.0.1:4000   (just forward)\n"
+printf "  Controlplane API  http://127.0.0.1:4000   (scripts/forward.sh)\n"
 printf "  WebUI             http://127.0.0.1:3000\n"
 printf "  Dagster UI        http://127.0.0.1:8088\n"
 printf "  RustFS console    http://127.0.0.1:9001\n"
