@@ -1,3 +1,0 @@
-[submodule "packages/duckdb-uc-extension"]
-	path = packages/duckdb-uc-extension
-	url = https://github.com/duckdb/unity_catalog.git
