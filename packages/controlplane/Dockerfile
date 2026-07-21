@@ -15,5 +15,5 @@ COPY packages/controlplane/config.toml /app/config.toml
 COPY packages/spark/jobs /app/packages/spark/jobs
 COPY packages/daft/jobs /app/packages/daft/jobs
 COPY packages/dagster/defs_pkg/assets /app/packages/dagster/defs_pkg/assets
-EXPOSE 6000
+EXPOSE 4000
 CMD ["controlplane"]

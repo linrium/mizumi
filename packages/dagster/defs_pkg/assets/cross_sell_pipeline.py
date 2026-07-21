@@ -7,12 +7,38 @@ from ..config import (
     DAFT_IMAGE,
     MLFLOW_EXPERIMENT_NAME,
     MLFLOW_TRACKING_URI,
+    OTEL_CLUSTER_NAME,
+    OTEL_DEPLOYMENT_ENVIRONMENT,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_EXPORTER_OTLP_PROTOCOL,
     S3A_ACCESS_KEY,
     S3A_CONF,
     S3A_ENDPOINT,
     S3A_SECRET_KEY,
+    SIGNOZ_INSTRUMENTATION,
     SPARK_IMAGE,
 )
+
+
+def _otel_resource_attributes(
+    context: dg.AssetExecutionContext,
+    service_name: str,
+    job_path: str,
+) -> str:
+    asset_keys = ";".join(
+        sorted(asset_key.to_user_string() for asset_key in context.selected_asset_keys)
+    )
+    return ",".join(
+        [
+            f"service.name={service_name}",
+            f"deployment.environment.name={OTEL_DEPLOYMENT_ENVIRONMENT}",
+            f"k8s.cluster.name={OTEL_CLUSTER_NAME}",
+            f"dagster.op={context.op.name}",
+            f"dagster.assets={asset_keys}",
+            f"dagster.run_id={context.run_id}",
+            f"spark.job_path={job_path}",
+        ]
+    )
 
 
 def _run_spark_job(
@@ -20,14 +46,45 @@ def _run_spark_job(
     pipes_k8s_client: PipesK8sClient,
     job_path: str,
 ):
+    service_name = f"mizumi-dagster-spark-{context.op.name}"
+
     return pipes_k8s_client.run(
         context=context,
         image=SPARK_IMAGE,
+        base_pod_meta={
+            "annotations": {
+                "instrumentation.opentelemetry.io/inject-java": SIGNOZ_INSTRUMENTATION,
+            },
+            "labels": {
+                "app.kubernetes.io/name": "mizumi-dagster-spark-job",
+                "app.kubernetes.io/component": "spark-job",
+                "app.kubernetes.io/part-of": "mizumi",
+            },
+        },
         base_pod_spec={
             "containers": [
                 {
                     "name": "dagster-pipes-execution",
                     "imagePullPolicy": "Always",
+                    "env": [
+                        {"name": "OTEL_SERVICE_NAME", "value": service_name},
+                        {
+                            "name": "OTEL_RESOURCE_ATTRIBUTES",
+                            "value": _otel_resource_attributes(
+                                context,
+                                service_name,
+                                job_path,
+                            ),
+                        },
+                        {
+                            "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                            "value": OTEL_EXPORTER_OTLP_ENDPOINT,
+                        },
+                        {
+                            "name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                            "value": OTEL_EXPORTER_OTLP_PROTOCOL,
+                        },
+                    ],
                 }
             ]
         },

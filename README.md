@@ -128,7 +128,7 @@ Starts the common port-forwards and prints local endpoints for:
 - Unity Catalog API on `http://127.0.0.1:8082`
 - Unity Catalog UI on `http://127.0.0.1:3001`
 - Web UI on `http://127.0.0.1:3002` when deployed
-- Controlplane on `http://127.0.0.1:6000` when deployed
+- Controlplane on `http://127.0.0.1:4000` when deployed
 
 ### Observability with SigNoz and OpenTelemetry Operator
 
@@ -159,6 +159,12 @@ instrumentation.opentelemetry.io/inject-java: "signoz-infra/signoz-instrumentati
 
 Python auto-instrumentation exports OTLP over HTTP/protobuf to the in-cluster
 SigNoz ingester at `http://signoz-ingester.signoz.svc.cluster.local:4318`.
+
+Dagster-launched Spark assets opt into SigNoz automatically. The shared Spark
+job launcher in `packages/dagster/defs_pkg/assets/cross_sell_pipeline.py` adds
+the Java auto-instrumentation annotation and OTEL resource attributes for each
+ephemeral Spark pod, including the Dagster op name, selected asset keys, run id,
+and Spark job path.
 
 You can also forward individual services:
 
@@ -230,6 +236,13 @@ To rebuild the Spark image and recreate those streaming jobs cleanly, rebuild Sp
 just spark-image-build
 just jobs-submit-all
 ```
+
+Controlplane-created Spark streaming jobs are also instrumented for SigNoz.
+Their SparkApplication driver and executor pods get the Java
+auto-instrumentation annotation plus OTEL resource attributes for the streaming
+job name, job id, and Spark application file. Restart existing streaming jobs
+from the Pipelines UI after redeploying controlplane so Kubernetes recreates the
+pods with the new telemetry template.
 
 ### Spark and Pipeline Workloads
 
@@ -344,7 +357,7 @@ cd controlplane
 cargo run
 ```
 
-It listens on `0.0.0.0:6000` and exposes:
+It listens on `0.0.0.0:4000` and exposes:
 
 - `GET /livez`
 - `GET /readyz`

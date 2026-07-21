@@ -10,6 +10,11 @@ use crate::domain::{
 
 const STREAMING_DRIVER_CORE_REQUEST: &str = "100m";
 const STREAMING_EXECUTOR_CORE_REQUEST: &str = "50m";
+const SIGNOZ_INSTRUMENTATION: &str = "signoz-infra/signoz-instrumentation";
+const OTEL_EXPORTER_OTLP_ENDPOINT: &str = "http://signoz-ingester.signoz.svc.cluster.local:4318";
+const OTEL_EXPORTER_OTLP_PROTOCOL: &str = "http/protobuf";
+const OTEL_DEPLOYMENT_ENVIRONMENT: &str = "development";
+const OTEL_CLUSTER_NAME: &str = "mizumi";
 
 pub async fn client() -> Result<Client, kube::Error> {
     Client::try_default().await
@@ -100,6 +105,17 @@ pub async fn driver_logs(
 }
 
 fn build_spark_application(job: &StreamingJob) -> Value {
+    let service_name = format!("mizumi-spark-streaming-{}", job.name);
+    let resource_attributes = [
+        format!("service.name={service_name}"),
+        format!("deployment.environment.name={OTEL_DEPLOYMENT_ENVIRONMENT}"),
+        format!("k8s.cluster.name={OTEL_CLUSTER_NAME}"),
+        format!("streaming.job.name={}", job.name),
+        format!("streaming.job.id={}", job.id),
+        format!("spark.main_application_file={}", job.main_application_file),
+    ]
+    .join(",");
+
     let mut spark_conf = json!({
         "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
         "spark.hadoop.fs.s3a.endpoint": "http://rustfs-svc.rustfs.svc.cluster.local:9000",
@@ -149,17 +165,38 @@ fn build_spark_application(job: &StreamingJob) -> Value {
                 "cores": job.driver_cores,
                 "coreRequest": STREAMING_DRIVER_CORE_REQUEST,
                 "memory": job.driver_memory,
+                "annotations": {
+                    "instrumentation.opentelemetry.io/inject-java": SIGNOZ_INSTRUMENTATION
+                },
                 "labels": {
                     "app": job.name,
                     "mizumi.io/streaming": "true"
-                }
+                },
+                "env": [
+                    { "name": "OTEL_SERVICE_NAME", "value": service_name },
+                    { "name": "OTEL_RESOURCE_ATTRIBUTES", "value": resource_attributes },
+                    { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": OTEL_EXPORTER_OTLP_ENDPOINT },
+                    { "name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": OTEL_EXPORTER_OTLP_PROTOCOL }
+                ]
             },
             "executor": {
                 "instances": job.executor_instances,
                 "cores": job.executor_cores,
                 "coreRequest": STREAMING_EXECUTOR_CORE_REQUEST,
                 "memory": job.executor_memory,
-                "labels": { "app": job.name }
+                "annotations": {
+                    "instrumentation.opentelemetry.io/inject-java": SIGNOZ_INSTRUMENTATION
+                },
+                "labels": {
+                    "app": job.name,
+                    "mizumi.io/streaming": "true"
+                },
+                "env": [
+                    { "name": "OTEL_SERVICE_NAME", "value": service_name },
+                    { "name": "OTEL_RESOURCE_ATTRIBUTES", "value": resource_attributes },
+                    { "name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": OTEL_EXPORTER_OTLP_ENDPOINT },
+                    { "name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": OTEL_EXPORTER_OTLP_PROTOCOL }
+                ]
             }
         }
     })
