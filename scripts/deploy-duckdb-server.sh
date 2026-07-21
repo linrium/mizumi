@@ -93,6 +93,14 @@ v() {
   ok "$desc"
 }
 
+v_pipe() {
+  local desc="$1"
+  shift
+  info "$desc"
+  bash -o pipefail -c "$*"
+  ok "$desc"
+}
+
 upsert_unitycatalog_auth_secret() {
   local token_b64
   token_b64=$(kubectl get secret unitycatalog-auth \
@@ -126,7 +134,8 @@ q_pipe "Apply ${SPARK_NS} namespace" \
 
 q "Copy Unity Catalog token secret into ${SPARK_NS}" upsert_unitycatalog_auth_secret
 
-q "Build ${DUCKDB_SERVER_IMAGE}" docker build -f packages/duckdb-server/Dockerfile -t "$DUCKDB_SERVER_IMAGE" .
+v_pipe "Build ${DUCKDB_SERVER_IMAGE}" \
+  "DOCKER_BUILDKIT=1 docker build --progress=plain -f packages/duckdb-server/Dockerfile -t '$DUCKDB_SERVER_IMAGE' ."
 q "Apply DuckDB server manifest" kubectl apply -f "$DUCKDB_SERVER_MANIFEST"
 q "Restart DuckDB server deployment" kubectl rollout restart deployment/duckdb-server -n "$SPARK_NS"
 v "Wait for DuckDB server rollout" \
