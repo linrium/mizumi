@@ -11,7 +11,7 @@ The repository is organized as infrastructure plus a small application layer:
 - `controlplane`: Rust API that launches ad hoc DuckDB query jobs in Kubernetes.
 - `webui`: Next.js UI.
 - `infra/k8s`: Kubernetes manifests and Helm values.
-- `Justfile`: operational entrypoint for deploy, destroy, forward, and query commands.
+- `scripts/`: operational entrypoints for deploy, destroy, forward, and per-service redeploy commands.
 
 ## Architecture
 

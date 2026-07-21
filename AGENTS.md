@@ -17,53 +17,32 @@ uv add <package>     # add a dependency
 
 Python version is pinned in `.python-version` (3.13).
 
-### Docker image builds
-
-```bash
-just spark-image-build      # mizumi-spark-rustfs:4.1.1
-just dagster-image-build    # mizumi-dagster:1.13.4
-just daft-image-build       # mizumi-daft:0.7.10
-just datafusion-image-build # mizumi-datafusion:50.1.0
-```
-
 ### Full stack deploy / destroy
 
 ```bash
-just deploy    # RustFS + Unity Catalog + Spark + Dagster
-just destroy   # tear down all of the above
-just forward   # port-forward all UIs simultaneously
+scripts/deploy.sh    # RustFS + Unity Catalog + Spark + Dagster
+scripts/destroy.sh   # tear down all of the above
+scripts/forward.sh   # port-forward all UIs simultaneously
 ```
 
-### Per-service commands
+### Per-service redeploy / helpers
 
 ```bash
-# RustFS (S3 storage)
-just rustfs-deploy / rustfs-destroy / rustfs-forward   # 9000 S3 API, 9001 console
-
-# Spark (medallion jobs + SDP pipelines)
-just spark-deploy        # operator + image build + seed data + app + pipeline
-just spark-destroy
-just spark-forward       # Spark UI on :4040
-
-# Dagster (orchestrator)
-just dagster-deploy / dagster-destroy / dagster-forward   # UI on :8080
-
-# Unity Catalog
-just unitycatalog-deploy / unitycatalog-destroy
-just unitycatalog-forward        # UC API on :8082
-just unitycatalog-ui-forward     # UC UI on :3001
-
-# Daft
-just daft-simple-deploy          # single-node Daft job
-just daft-distributed-deploy     # Ray-backed distributed Daft job
-just daft-distributed-forward    # Ray dashboard :8265, Grafana :3000
-just daft-destroy
-
-# Ballista (DataFusion distributed)
-just ballista-deploy / ballista-destroy / ballista-forward   # gRPC on :50050
-
-# DataFusion (standalone query)
-just datafusion-query            # build image → run K8s job → print logs
+scripts/redeploy-rustfs.sh             # rebuild + redeploy RustFS
+scripts/redeploy-shared-postgres.sh    # rebuild + redeploy shared Postgres
+scripts/redeploy-unitycatalog.sh       # rebuild + redeploy Unity Catalog
+scripts/redeploy-keycloak.sh           # rebuild + redeploy Keycloak
+scripts/redeploy-dagster.sh            # rebuild + redeploy Dagster release
+scripts/redeploy-dagster-spark-jobs.sh # rebuild + redeploy Dagster-launched Spark jobs
+scripts/redeploy-controlplane.sh       # rebuild + redeploy controlplane
+scripts/redeploy-duckdb-server.sh      # rebuild + redeploy DuckDB server
+scripts/restart-streaming-pipelines.sh # restart controlplane-created Spark streaming jobs
+scripts/bootstrap-shared-postgres.sh   # seed shared Postgres
+scripts/deploy-ml.sh / destroy-ml.sh   # ML stack (MLflow) lifecycle
+scripts/deploy-duckdb-server.sh        # standalone DuckDB server deploy
+scripts/signoz.sh deploy               # SigNoz + OTel operator
+scripts/forward-signoz.sh              # port-forward SigNOz UIs
+scripts/setup-metrics-server.sh        # install metrics-server (minikube)
 ```
 
 ## Architecture
