@@ -67,6 +67,15 @@ presets:
     enabled: true
   k8sEvents:
     enabled: true
+  prometheus:
+    enabled: true
+    annotationsPrefix: signoz.io
+    scrapeInterval: 30s
+    namespaceScoped: false
+    namespaces:
+      - shared-postgres
+    includePodLabel: true
+    includeContainerName: true
   otlpExporter:
     enabled: false
   otlphttpExporter:
