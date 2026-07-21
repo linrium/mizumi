@@ -12,6 +12,11 @@ dagster-user-deployments:
         - "--python-file"
         - "/app/definitions.py"
       port: 3030
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "signoz-infra/signoz-instrumentation"
+      env:
+        - name: OTEL_SERVICE_NAME
+          value: dagster-user-deployments-mizumi
       resources:
         requests:
           cpu: 75m
@@ -22,6 +27,11 @@ dagster-user-deployments:
 
 dagsterWebserver:
   replicaCount: 1
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "signoz-infra/signoz-instrumentation"
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: dagster-webserver
   resources:
     requests:
       cpu: 75m
@@ -32,6 +42,11 @@ dagsterWebserver:
 
 dagsterDaemon:
   enabled: true
+  annotations:
+    instrumentation.opentelemetry.io/inject-python: "signoz-infra/signoz-instrumentation"
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: dagster-daemon
   resources:
     requests:
       cpu: 250m
@@ -44,6 +59,14 @@ runLauncher:
   type: K8sRunLauncher
   config:
     k8sRunLauncher:
+      runK8sConfig:
+        podTemplateSpecMetadata:
+          annotations:
+            instrumentation.opentelemetry.io/inject-python: "signoz-infra/signoz-instrumentation"
+        containerConfig:
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: dagster-run
       resources:
         requests:
           cpu: 125m
