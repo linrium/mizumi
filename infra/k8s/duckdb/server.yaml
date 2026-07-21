@@ -23,7 +23,7 @@ spec:
             - |
               cp /etc/rustfs-s3-proxy/tls.crt /usr/local/share/ca-certificates/rustfs-s3-proxy.crt
               update-ca-certificates
-              python /opt/duckdb-server/server.py
+              exec duckdb-server
           ports:
             - containerPort: 8080
               name: http
@@ -40,8 +40,6 @@ spec:
               value: http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080
             - name: DUCKDB_CA_CERT_PATH
               value: /etc/rustfs-s3-proxy/tls.crt
-            - name: IDLE_TIMEOUT_SECS
-              value: "86400"
           volumeMounts:
             - name: rustfs-s3-proxy-tls
               mountPath: /etc/rustfs-s3-proxy
