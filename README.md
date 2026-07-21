@@ -160,6 +160,16 @@ instrumentation.opentelemetry.io/inject-java: "signoz-infra/signoz-instrumentati
 Python auto-instrumentation exports OTLP over HTTP/protobuf to the in-cluster
 SigNoz ingester at `http://signoz-ingester.signoz.svc.cluster.local:4318`.
 
+RustFS exports its native OpenTelemetry signals directly to the same in-cluster
+SigNoz ingester through `infra/k8s/rustfs/helm/values.yaml`. The Helm values set
+`RUSTFS_OBS_ENDPOINT` plus signal-specific `/v1/metrics`, `/v1/traces`, and
+`/v1/logs` endpoints, and identify the service as `rustfs` with Mizumi resource
+attributes. Redeploy RustFS after changing these values:
+
+```bash
+scripts/redeploy-rustfs.sh
+```
+
 Dagster-launched Spark assets opt into SigNoz automatically. The shared Spark
 job launcher in `packages/dagster/defs_pkg/assets/cross_sell_pipeline.py` adds
 the Java auto-instrumentation annotation and OTEL resource attributes for each

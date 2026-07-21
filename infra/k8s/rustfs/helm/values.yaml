@@ -19,6 +19,19 @@ config:
     log_level: "info"
     region: "us-east-1"
     obs_environment: "development"
+    obs_endpoint:
+      enabled: true
+      base_endpoint: "http://signoz-ingester.signoz.svc.cluster.local:4318"
+      use_stdout: false
+      metrics:
+        enabled: true
+        endpoint: "http://signoz-ingester.signoz.svc.cluster.local:4318/v1/metrics"
+      trace:
+        enabled: true
+        endpoint: "http://signoz-ingester.signoz.svc.cluster.local:4318/v1/traces"
+      logs:
+        enabled: true
+        endpoint: "http://signoz-ingester.signoz.svc.cluster.local:4318/v1/logs"
 
 service:
   type: ClusterIP
@@ -42,3 +55,11 @@ resources:
   limits:
     cpu: 500m
     memory: 1Gi
+
+extraEnv:
+  - name: OTEL_SERVICE_NAME
+    value: "rustfs"
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: "deployment.environment.name=development,k8s.cluster.name=mizumi,service.namespace=rustfs"
+  - name: OTEL_EXPORTER_OTLP_PROTOCOL
+    value: "http/protobuf"
