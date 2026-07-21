@@ -9,10 +9,10 @@ export interface TooltipRow {
 }
 
 export interface TooltipContentProps {
-  title?: string
-  rows: TooltipRow[]
   /** Optional additional content (e.g., markers) */
   children?: ReactNode
+  rows: TooltipRow[]
+  title?: string
 }
 
 export function TooltipContent({ title, rows, children }: TooltipContentProps) {

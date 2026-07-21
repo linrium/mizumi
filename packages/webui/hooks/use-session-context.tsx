@@ -1,7 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, type ReactNode } from "react"
-import { useSessions, type Session } from "@/hooks/use-sessions"
+import { createContext, type ReactNode, useContext, useEffect } from "react"
+import { type Session, useSessions } from "@/hooks/use-sessions"
 
 type SessionContextValue = {
   sessions: Session[]
@@ -30,7 +30,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 export function useSessionContext(): SessionContextValue {
   const ctx = useContext(SessionContext)
-  if (!ctx)
+  if (!ctx) {
     throw new Error("useSessionContext must be used inside SessionProvider")
+  }
   return ctx
 }

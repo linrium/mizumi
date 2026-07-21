@@ -3,8 +3,8 @@
 import { Add01Icon, UserMultiple02Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { formatDistanceToNowStrict } from "date-fns"
-import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -47,12 +47,17 @@ export default function TeamsPage() {
       setError(null)
       try {
         const data = await listTeams()
-        if (!cancelled) setTeams(data)
+        if (!cancelled) {
+          setTeams(data)
+        }
       } catch (err) {
-        if (!cancelled)
+        if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load teams")
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
@@ -63,7 +68,9 @@ export default function TeamsPage() {
   }, [])
 
   async function handleCreate() {
-    if (creating) return
+    if (creating) {
+      return
+    }
     const name = newName.trim()
     const workspace = newWorkspace.trim()
     if (!name) {
@@ -103,23 +110,23 @@ export default function TeamsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b shrink-0">
+      <div className="shrink-0 border-b">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold">Teams</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="font-semibold text-sm">Teams</h1>
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Manage teams and their access to platform resources.
             </p>
-            {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+            {error && <p className="mt-1 text-destructive text-xs">{error}</p>}
           </div>
-          <Button type="button" size="sm" onClick={openCreate}>
+          <Button onClick={openCreate} size="sm" type="button">
             <HugeiconsIcon icon={Add01Icon} size={14} />
             New team
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -132,19 +139,19 @@ export default function TeamsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={3}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={3}
                 >
                   Loading…
                 </TableCell>
               </TableRow>
             ) : teams.length > 0 ? (
               teams.map((team) => (
-                <TableRow key={team.id} className="cursor-pointer">
+                <TableRow className="cursor-pointer" key={team.id}>
                   <TableCell className="font-medium">
                     <Link
-                      href={`/teams/${team.id}`}
                       className="hover:underline"
+                      href={`/teams/${team.id}`}
                     >
                       {team.name}
                     </Link>
@@ -162,8 +169,8 @@ export default function TeamsPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={3}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={3}
                 >
                   No teams yet
                 </TableCell>
@@ -173,7 +180,7 @@ export default function TeamsPage() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2 text-muted-foreground text-xs">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={UserMultiple02Icon} size={14} />
           Teams group users for permission assignment and policy templates.
@@ -182,10 +189,12 @@ export default function TeamsPage() {
       </div>
 
       <Dialog
-        open={createOpen}
         onOpenChange={(open) => {
-          if (!open && !creating) setCreateOpen(false)
+          if (!(open || creating)) {
+            setCreateOpen(false)
+          }
         }}
+        open={createOpen}
       >
         <DialogContent>
           <DialogHeader>
@@ -197,41 +206,45 @@ export default function TeamsPage() {
           <div className="space-y-2">
             <Label htmlFor="team-name">Name</Label>
             <Input
+              disabled={creating}
               id="team-name"
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  void handleCreate()
+                }
+              }}
+              placeholder="e.g. Data Engineering"
               ref={nameInputRef}
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Data Engineering"
-              disabled={creating}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreate()
-              }}
             />
             <Label htmlFor="team-workspace">Workspace</Label>
             <Input
-              id="team-workspace"
-              value={newWorkspace}
-              onChange={(e) => setNewWorkspace(e.target.value)}
-              placeholder="e.g. vietjetair"
               disabled={creating}
+              id="team-workspace"
+              onChange={(e) => setNewWorkspace(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCreate()
+                if (e.key === "Enter") {
+                  void handleCreate()
+                }
               }}
+              placeholder="e.g. vietjetair"
+              value={newWorkspace}
             />
             {createError && (
-              <p className="text-xs text-destructive">{createError}</p>
+              <p className="text-destructive text-xs">{createError}</p>
             )}
           </div>
           <DialogFooter>
             <Button
-              type="button"
-              variant="outline"
               disabled={creating}
               onClick={() => setCreateOpen(false)}
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
-            <Button type="button" disabled={creating} onClick={handleCreate}>
+            <Button disabled={creating} onClick={handleCreate} type="button">
               {creating ? "Creating…" : "Create team"}
             </Button>
           </DialogFooter>

@@ -9,8 +9,8 @@ export default function CatalogIndexPage() {
           <IconBinaryTree2 size={14} />
           <IconTable size={14} />
         </div>
-        <h1 className="text-sm font-semibold">Browse the catalog tree</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="font-semibold text-sm">Browse the catalog tree</h1>
+        <p className="mt-2 text-muted-foreground text-sm">
           Select a catalog, schema, or table from the left sidebar to inspect
           structure, preview metadata, or manage access.
         </p>

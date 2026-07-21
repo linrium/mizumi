@@ -16,29 +16,29 @@ import { PatternArea } from "./pattern-area"
 import { TimeSeriesChartInner } from "./time-series-chart-shell"
 
 export interface AreaChartProps {
-  /** Data array - each item should have a date field and numeric values */
-  data: Record<string, unknown>[]
-  /** Key in data for the x-axis (date). Default: "date" */
-  xDataKey?: string
-  /** Chart margins */
-  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
   animationDuration?: number
   /** CSS easing for clip-reveal. Default: cubic-bezier(0.85, 0, 0.15, 1) */
   animationEasing?: string
-  /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition
-  /** Signature of motion URL state — triggers reveal replay when it changes. */
-  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
   aspectRatio?: string
-  /** Additional class name for the container */
-  className?: string
   /** Child components (Area, Grid, ChartTooltip, etc.) */
   children: ReactNode
+  /** Additional class name for the container */
+  className?: string
+  /** Data array - each item should have a date field and numeric values */
+  data: Record<string, unknown>[]
+  /** Motion enter transition (spring or cubic-bezier tween). */
+  enterTransition?: Transition
+  /** Chart margins */
+  margin?: Partial<Margin>
+  /** Signature of motion URL state — triggers reveal replay when it changes. */
+  revealSignature?: string
+  /** Key in data for the x-axis (date). Default: "date" */
+  xDataKey?: string
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 }
+const DEFAULT_MARGIN: Margin = { bottom: 40, left: 40, right: 40, top: 40 }
 
 function extractAreaConfigs(children: ReactNode): LineConfig[] {
   const configs: LineConfig[] = []
@@ -81,17 +81,17 @@ function extractAreaConfigs(children: ReactNode): LineConfig[] {
 }
 
 interface ChartInnerProps {
-  width: number
-  height: number
-  data: Record<string, unknown>[]
-  xDataKey: string
-  margin: Margin
   animationDuration: number
   animationEasing?: string
-  enterTransition?: Transition
-  revealSignature?: string
   children: ReactNode
   containerRef: React.RefObject<HTMLDivElement | null>
+  data: Record<string, unknown>[]
+  enterTransition?: Transition
+  height: number
+  margin: Margin
+  revealSignature?: string
+  width: number
+  xDataKey: string
 }
 
 function ChartInner({

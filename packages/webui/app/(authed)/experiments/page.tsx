@@ -17,7 +17,9 @@ import { searchMlflowExperimentsAction } from "../catalog/actions"
 const COLS = ["ID", "Name", "Lifecycle", "Created", "Updated", "Tags"]
 
 function formatTimestamp(value?: number | null) {
-  if (!value) return "-"
+  if (!value) {
+    return "-"
+  }
   return new Date(value).toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -38,22 +40,112 @@ export default function ExperimentsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  function renderExperimentsBody() {
+    if (loading) {
+      return (
+        <TableRow>
+          <TableCell
+            className="h-24 text-center text-muted-foreground"
+            colSpan={COLS.length}
+          >
+            Loading...
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (error) {
+      return (
+        <TableRow>
+          <TableCell
+            className="h-24 text-center font-mono text-destructive"
+            colSpan={COLS.length}
+          >
+            {error}
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (experiments.length === 0) {
+      return (
+        <TableRow>
+          <TableCell
+            className="h-24 text-center text-muted-foreground"
+            colSpan={COLS.length}
+          >
+            No MLflow experiments found
+          </TableCell>
+        </TableRow>
+      )
+    }
+    return experiments.map((experiment) => (
+      <TableRow key={experiment.experiment_id}>
+        <TableCell className="font-mono text-muted-foreground">
+          {experiment.experiment_id}
+        </TableCell>
+        <TableCell className="max-w-[240px] truncate font-medium">
+          <span className="flex items-center gap-1.5">
+            <IconFlask
+              className="shrink-0 text-muted-foreground"
+              size={13}
+            />
+            {experiment.name}
+          </span>
+        </TableCell>
+        <TableCell>
+          <span
+            className={cn(
+              "inline-flex items-center rounded px-1.5 py-0.5 font-medium text-[10px] uppercase tracking-wide",
+              experiment.lifecycle_stage === "active"
+                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            {experiment.lifecycle_stage}
+          </span>
+        </TableCell>
+        <TableCell className="text-muted-foreground">
+          {formatTimestamp(experiment.creation_time)}
+        </TableCell>
+        <TableCell className="text-muted-foreground">
+          {formatTimestamp(experiment.last_update_time)}
+        </TableCell>
+        <TableCell>
+          {(experiment.tags ?? []).length === 0 ? (
+            <span className="text-muted-foreground">-</span>
+          ) : (
+            <span className="flex flex-wrap gap-1">
+              {(experiment.tags ?? []).slice(0, 3).map((tag) => (
+                <span
+                  className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                  key={tag.key}
+                >
+                  <IconTag className="shrink-0" size={9} />
+                  {tag.key}={tag.value}
+                </span>
+              ))}
+            </span>
+          )}
+        </TableCell>
+      </TableRow>
+    ))
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b">
         <div className="px-3 py-2.5">
           <div className="flex items-center gap-2">
-            <IconFlask size={16} className="text-muted-foreground" />
-            <h1 className="text-sm font-semibold">Experiments</h1>
+            <IconFlask className="text-muted-foreground" size={16} />
+            <h1 className="font-semibold text-sm">Experiments</h1>
           </div>
-          {!loading && !error ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
+          {loading || error ? null : (
+            <p className="mt-0.5 text-muted-foreground text-xs">
               {experiments.length} experiment
-              {experiments.length !== 1 ? "s" : ""}
+              {experiments.length === 1 ? "" : "s"}
             </p>
-          ) : null}
+          )}
           {error ? (
-            <p className="mt-1 text-xs text-destructive">{error}</p>
+            <p className="mt-1 text-destructive text-xs">{error}</p>
           ) : null}
         </div>
       </div>
@@ -67,88 +159,7 @@ export default function ExperimentsPage() {
               ))}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={COLS.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : error ? (
-              <TableRow>
-                <TableCell
-                  colSpan={COLS.length}
-                  className="h-24 text-center font-mono text-destructive"
-                >
-                  {error}
-                </TableCell>
-              </TableRow>
-            ) : experiments.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={COLS.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No MLflow experiments found
-                </TableCell>
-              </TableRow>
-            ) : (
-              experiments.map((experiment) => (
-                <TableRow key={experiment.experiment_id}>
-                  <TableCell className="font-mono text-muted-foreground">
-                    {experiment.experiment_id}
-                  </TableCell>
-                  <TableCell className="max-w-[240px] truncate font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <IconFlask
-                        size={13}
-                        className="shrink-0 text-muted-foreground"
-                      />
-                      {experiment.name}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                        experiment.lifecycle_stage === "active"
-                          ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {experiment.lifecycle_stage}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatTimestamp(experiment.creation_time)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatTimestamp(experiment.last_update_time)}
-                  </TableCell>
-                  <TableCell>
-                    {(experiment.tags ?? []).length === 0 ? (
-                      <span className="text-muted-foreground">-</span>
-                    ) : (
-                      <span className="flex flex-wrap gap-1">
-                        {(experiment.tags ?? []).slice(0, 3).map((tag) => (
-                          <span
-                            key={tag.key}
-                            className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
-                          >
-                            <IconTag size={9} className="shrink-0" />
-                            {tag.key}={tag.value}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
+          <TableBody>{renderExperimentsBody()}</TableBody>
         </Table>
       </div>
     </div>

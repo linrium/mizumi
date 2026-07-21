@@ -39,30 +39,30 @@ export function isPostOverlayComponent(child: ReactElement): boolean {
 }
 
 export interface TimeSeriesChartInnerProps {
-  width: number
-  height: number
-  data: Record<string, unknown>[]
-  xDataKey: string
-  margin: Margin
   animationDuration: number
   animationEasing?: string
-  enterTransition?: Transition
-  /** Signature of motion URL state — triggers reveal replay when it changes. */
-  revealSignature?: string
   children: ReactNode
-  containerRef: React.RefObject<HTMLDivElement | null>
-  /** Series keys driving y-domain and tooltip (Line / Area / SeriesBar configs). */
-  lines: LineConfig[]
   /** SVG clipPath id for grow animation. */
   clipPathId: string
   /** Optional ComposedChart bar layout (forwarded into context). */
   composedBarDataKeys?: string[]
+  composedBarGap?: number
   composedBarSize?: number
   composedMaxBarSize?: number
-  composedBarGap?: number
   composedStacked?: boolean
-  composedStackOffsets?: Map<number, Map<string, number>>
   composedStackGap?: number
+  composedStackOffsets?: Map<number, Map<string, number>>
+  containerRef: React.RefObject<HTMLDivElement | null>
+  data: Record<string, unknown>[]
+  enterTransition?: Transition
+  height: number
+  /** Series keys driving y-domain and tooltip (Line / Area / SeriesBar configs). */
+  lines: LineConfig[]
+  margin: Margin
+  /** Signature of motion URL state — triggers reveal replay when it changes. */
+  revealSignature?: string
+  width: number
+  xDataKey: string
   /** When set, drives the y-axis max instead of scanning `lines` (e.g. stacked bar totals). */
   yScaleDomainMax?: number
 }
@@ -115,8 +115,8 @@ export function TimeSeriesChartInner({
     const maxTime = Math.max(...dates.map((d) => d.getTime()))
 
     return scaleTime({
-      range: [0, innerWidth],
       domain: [minTime, maxTime],
+      range: [0, innerWidth],
     })
   }, [innerWidth, data, xAccessor])
 
@@ -147,9 +147,9 @@ export function TimeSeriesChartInner({
     }
 
     return scaleLinear({
-      range: [innerHeight, 0],
       domain: [0, maxValue * 1.1],
       nice: true,
+      range: [innerHeight, 0],
     })
   }, [innerHeight, data, lines, yScaleDomainMax])
 
@@ -157,8 +157,8 @@ export function TimeSeriesChartInner({
     () =>
       data.map((d) =>
         xAccessor(d).toLocaleDateString("en-US", {
-          month: "short",
           day: "numeric",
+          month: "short",
         })
       ),
     [data, xAccessor]
@@ -184,14 +184,14 @@ export function TimeSeriesChartInner({
     interactionHandlers,
     interactionStyle,
   } = useChartInteraction({
-    xScale,
-    yScale,
+    bisectDate,
+    canInteract,
     data,
     lines,
     margin,
     xAccessor,
-    bisectDate,
-    canInteract,
+    xScale,
+    yScale,
   })
 
   if (width < 10 || height < 10) {
@@ -220,35 +220,35 @@ export function TimeSeriesChartInner({
   })
 
   const contextValue = {
-    data,
-    xScale,
-    yScale,
-    width,
-    height,
-    innerWidth,
-    innerHeight,
-    margin,
-    columnWidth,
-    tooltipData,
-    setTooltipData,
-    containerRef,
-    lines,
-    isLoaded,
     animationDuration,
     animationEasing,
-    enterTransition,
-    revealEpoch,
-    xAccessor,
-    dateLabels,
-    selection,
     clearSelection,
+    columnWidth,
     composedBarDataKeys,
+    composedBarGap,
     composedBarSize,
     composedMaxBarSize,
-    composedBarGap,
     composedStacked,
-    composedStackOffsets,
     composedStackGap,
+    composedStackOffsets,
+    containerRef,
+    data,
+    dateLabels,
+    enterTransition,
+    height,
+    innerHeight,
+    innerWidth,
+    isLoaded,
+    lines,
+    margin,
+    revealEpoch,
+    selection,
+    setTooltipData,
+    tooltipData,
+    width,
+    xAccessor,
+    xScale,
+    yScale,
   }
 
   return (

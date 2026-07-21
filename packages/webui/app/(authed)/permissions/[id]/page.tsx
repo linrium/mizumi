@@ -141,10 +141,18 @@ function getApprovalStepDescription(status: string, isCurrent: boolean) {
 }
 
 function getApprovalStepVariant(status: string, isCurrent: boolean) {
-  if (status === "approved") return "success"
-  if (status === "needs-info") return "warning"
-  if (status === "cancelled") return "error"
-  if (isCurrent || status === "pending") return "info"
+  if (status === "approved") {
+    return "success"
+  }
+  if (status === "needs-info") {
+    return "warning"
+  }
+  if (status === "cancelled") {
+    return "error"
+  }
+  if (isCurrent || status === "pending") {
+    return "info"
+  }
   return "default"
 }
 
@@ -167,7 +175,7 @@ function getApprovalStepPanelClass(status: string, isCurrent: boolean) {
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "processing") {
     return (
-      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+      <Badge className="animate-pulse text-muted-foreground" variant="outline">
         LLM analysing…
       </Badge>
     )
@@ -175,8 +183,8 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "failed") {
     return (
       <Badge
+        className="border-destructive/40 text-destructive"
         variant="outline"
-        className="text-destructive border-destructive/40"
       >
         LLM failed
       </Badge>
@@ -199,13 +207,26 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
 }
 
 function nodeTypeToCategory(type: string): string {
-  if (type === "table" || type === "topic") return "Datasets"
-  if (type === "dagster_asset") return "Assets"
-  if (["spark_job", "streaming_job", "daft_job", "dagster_job"].includes(type))
+  if (type === "table" || type === "topic") {
+    return "Datasets"
+  }
+  if (type === "dagster_asset") {
+    return "Assets"
+  }
+  if (
+    ["spark_job", "streaming_job", "daft_job", "dagster_job"].includes(type)
+  ) {
     return "Jobs"
-  if (type === "schedule") return "Schedules"
-  if (type === "dashboard") return "Dashboards"
-  if (type === "consumer") return "Consumers"
+  }
+  if (type === "schedule") {
+    return "Schedules"
+  }
+  if (type === "dashboard") {
+    return "Dashboards"
+  }
+  if (type === "consumer") {
+    return "Consumers"
+  }
   return "Other"
 }
 
@@ -230,11 +251,15 @@ export default function PermissionRequestDetailPage() {
   } | null>(null)
 
   const groupedComponents = useMemo(() => {
-    if (!blastRadius) return {} as Record<string, string[]>
+    if (!blastRadius) {
+      return {} as Record<string, string[]>
+    }
     const map: Record<string, string[]> = {}
     for (const node of blastRadius.affected_nodes) {
       const cat = nodeTypeToCategory(node.node_type)
-      if (!map[cat]) map[cat] = []
+      if (!map[cat]) {
+        map[cat] = []
+      }
       map[cat].push(node.display_name)
     }
     return map
@@ -244,7 +269,9 @@ export default function PermissionRequestDetailPage() {
     let cancelled = false
 
     async function load() {
-      if (!requestId) return
+      if (!requestId) {
+        return
+      }
       setLoading(true)
       setError(null)
 
@@ -254,12 +281,16 @@ export default function PermissionRequestDetailPage() {
           getBlastRadius(requestId),
         ])
 
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
 
         setRequest(requestData)
         setBlastRadius(blastRadiusData)
       } catch (err) {
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
         setError(
           err instanceof Error
             ? err.message
@@ -289,7 +320,9 @@ export default function PermissionRequestDetailPage() {
     approvalStepId?: string,
     grantDurationDays?: number
   ) {
-    if (!request) return
+    if (!request) {
+      return
+    }
 
     const key = `${status}:${approvalStepId ?? "request"}`
     setActioningKey(key)
@@ -316,14 +349,16 @@ export default function PermissionRequestDetailPage() {
 
   function openApprovalDialog(stepId: string) {
     setApprovalDialog({
-      stepId,
       durationDays: String(Math.max(request?.expires_in_days ?? 30, 1)),
+      stepId,
     })
   }
 
   async function handleApprovalDialogConfirm() {
-    if (!approvalDialog || !request) return
-    const days = parseInt(approvalDialog.durationDays, 10)
+    if (!(approvalDialog && request)) {
+      return
+    }
+    const days = Number.parseInt(approvalDialog.durationDays, 10)
     if (!days || days < 1) {
       setError("Grant duration must be at least 1 day")
       return
@@ -333,13 +368,15 @@ export default function PermissionRequestDetailPage() {
   }
 
   function handleApprove(stepId: string) {
-    if (!request) return
+    if (!request) {
+      return
+    }
     openApprovalDialog(stepId)
   }
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading request…
       </div>
     )
@@ -349,12 +386,12 @@ export default function PermissionRequestDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div>
-          <p className="text-sm font-semibold">Request unavailable</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="font-semibold text-sm">Request unavailable</p>
+          <p className="mt-1 text-muted-foreground text-xs">
             {error ?? "The permission request could not be found."}
           </p>
         </div>
-        <Button asChild variant="outline" size="sm">
+        <Button asChild size="sm" variant="outline">
           <Link href="/permissions">Back to queue</Link>
         </Button>
       </div>
@@ -365,17 +402,17 @@ export default function PermissionRequestDetailPage() {
     <>
       <div className="flex h-full flex-col overflow-hidden">
         {/* Page header */}
-        <div className="border-b px-6 py-3 shrink-0">
+        <div className="shrink-0 border-b px-6 py-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <Link
+                className="text-muted-foreground text-xs hover:underline"
                 href="/permissions"
-                className="text-xs text-muted-foreground hover:underline"
               >
                 Back to request queue
               </Link>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <h1 className="text-sm font-semibold">{request.code}</h1>
+                <h1 className="font-semibold text-sm">{request.code}</h1>
                 <Status variant={getStatusVariant(request.status)}>
                   <StatusIndicator />
                   <StatusLabel>{formatStatusLabel(request.status)}</StatusLabel>
@@ -384,21 +421,21 @@ export default function PermissionRequestDetailPage() {
                   {formatScopeLabel(request.scope)}
                 </Badge>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-muted-foreground text-xs">
                 {request.requester} submitted this as {formatSubmitter(request)}{" "}
                 for <span className="font-mono">{request.resource}</span>.
               </p>
               {error && (
-                <p className="mt-1 text-xs text-destructive">{error}</p>
+                <p className="mt-1 text-destructive text-xs">{error}</p>
               )}
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-1.5">
               {currentSteps.length <= 1 && currentSteps[0] ? (
                 <Button
-                  size="sm"
                   disabled={actioningKey != null}
                   onClick={() => handleApprove(currentSteps[0]?.id ?? "")}
+                  size="sm"
                 >
                   {actioningKey === `approved:${currentSteps[0]?.id}`
                     ? "Approving…"
@@ -407,10 +444,10 @@ export default function PermissionRequestDetailPage() {
               ) : (
                 currentSteps.map((step) => (
                   <Button
-                    key={step.id}
-                    size="sm"
                     disabled={actioningKey != null}
+                    key={step.id}
                     onClick={() => handleApprove(step.id)}
+                    size="sm"
                   >
                     {actioningKey === `approved:${step.id}`
                       ? "Approving…"
@@ -420,12 +457,12 @@ export default function PermissionRequestDetailPage() {
               )}
               {currentSteps[0] && (
                 <Button
-                  size="sm"
-                  variant="outline"
                   disabled={actioningKey != null}
                   onClick={() =>
                     handleStatusUpdate("needs-info", currentSteps[0]?.id)
                   }
+                  size="sm"
+                  variant="outline"
                 >
                   {actioningKey === `needs-info:${currentSteps[0]?.id}`
                     ? "Updating…"
@@ -434,10 +471,10 @@ export default function PermissionRequestDetailPage() {
               )}
               {CANCELLABLE.includes(request.status) && (
                 <Button
-                  size="sm"
-                  variant="outline"
                   disabled={actioningKey != null}
                   onClick={() => handleStatusUpdate("cancelled")}
+                  size="sm"
+                  variant="outline"
                 >
                   {actioningKey === "cancelled:request"
                     ? "Cancelling…"
@@ -449,12 +486,12 @@ export default function PermissionRequestDetailPage() {
         </div>
 
         {/* Body: sidebar + main content */}
-        <div className="flex-1 min-h-0 flex overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Left sidebar */}
-          <div className="w-[360px] shrink-0 border-r overflow-y-auto divide-y">
+          <div className="w-[360px] shrink-0 divide-y overflow-y-auto border-r">
             <section>
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Request summary</h2>
+                <h2 className="font-semibold text-sm">Request summary</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Request details, access scope, and routing context.
                 </p>
@@ -463,26 +500,26 @@ export default function PermissionRequestDetailPage() {
               <div className="grid gap-x-4 gap-y-3 px-4 py-4 md:grid-cols-2">
                 <div className="space-y-2.5">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Requester
                     </p>
-                    <p className="mt-0.5 text-sm font-medium">
+                    <p className="mt-0.5 font-medium text-sm">
                       {request.requester}
                     </p>
                     {request.requester_email && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground text-xs">
                         {request.requester_email}
                       </p>
                     )}
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Submission target
                     </p>
                     <p className="mt-0.5 text-sm">{formatSubmitter(request)}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Queue decision
                     </p>
                     <p className="mt-0.5 text-sm">
@@ -491,12 +528,12 @@ export default function PermissionRequestDetailPage() {
                   </div>
                   {request.renewal_of && (
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                         Renewal of grant
                       </p>
                       <Link
+                        className="mt-0.5 block truncate font-mono text-muted-foreground text-xs hover:underline"
                         href={`/permissions/grants/${request.renewal_of}`}
-                        className="mt-0.5 block font-mono text-xs text-muted-foreground hover:underline truncate"
                       >
                         {request.renewal_of}
                       </Link>
@@ -506,13 +543,13 @@ export default function PermissionRequestDetailPage() {
 
                 <div className="space-y-2.5">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Submitted
                     </p>
                     <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(request.submitted_at)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       {formatDistanceToNowStrict(
                         new Date(request.submitted_at),
                         {
@@ -522,20 +559,20 @@ export default function PermissionRequestDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Expires
                     </p>
                     <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(request.expires_at)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       {request.expires_in_days <= 0
                         ? "Expired"
                         : `${request.expires_in_days} day${request.expires_in_days === 1 ? "" : "s"} remaining`}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Current reviewer
                     </p>
                     <p className="mt-0.5 text-sm">{request.reviewer}</p>
@@ -546,21 +583,21 @@ export default function PermissionRequestDetailPage() {
 
             <section>
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Access requested</h2>
+                <h2 className="font-semibold text-sm">Access requested</h2>
               </div>
               <Separator />
               <div className="space-y-3 px-4 py-4">
                 <div className="grid gap-3">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Resource
                     </p>
-                    <p className="mt-0.5 font-mono text-sm break-all">
+                    <p className="mt-0.5 break-all font-mono text-sm">
                       {request.resource}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Privileges
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -573,10 +610,10 @@ export default function PermissionRequestDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                     Rationale
                   </p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
+                  <p className="mt-0.5 text-muted-foreground text-sm">
                     {request.rationale || "No rationale provided."}
                   </p>
                 </div>
@@ -585,7 +622,7 @@ export default function PermissionRequestDetailPage() {
 
             <section>
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Approval flow</h2>
+                <h2 className="font-semibold text-sm">Approval flow</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Stage-by-stage approver routing for this request.
                 </p>
@@ -596,7 +633,6 @@ export default function PermissionRequestDetailPage() {
                   <div className="space-y-1.5">
                     {request.approval_steps.map((step, index) => (
                       <div
-                        key={step.id}
                         className={cn(
                           "rounded-lg border px-3 py-2 transition-colors",
                           getApprovalStepPanelClass(
@@ -604,6 +640,7 @@ export default function PermissionRequestDetailPage() {
                             step.is_current
                           )
                         )}
+                        key={step.id}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0 space-y-0.5">
@@ -627,10 +664,10 @@ export default function PermissionRequestDetailPage() {
                               </Status>
                             </div>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <h3 className="text-sm font-semibold">
+                              <h3 className="font-semibold text-sm">
                                 {step.approver_team}
                               </h3>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-muted-foreground text-xs">
                                 {step.approver_label ||
                                   `Stage ${step.stage_order} approval`}
                               </span>
@@ -671,13 +708,13 @@ export default function PermissionRequestDetailPage() {
                 ) : (
                   <div className="rounded-lg border border-green-500/20 bg-green-500/[0.06] px-3 py-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold">Direct handling</h3>
+                      <h3 className="font-semibold text-sm">Direct handling</h3>
                       <Status variant="success">
                         <StatusIndicator />
                         <StatusLabel>Completed</StatusLabel>
                       </Status>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-muted-foreground text-xs">
                       No explicit approval chain. This request was handled
                       directly.
                     </p>
@@ -689,7 +726,7 @@ export default function PermissionRequestDetailPage() {
             {/* Policy template */}
             <section>
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Policy template</h2>
+                <h2 className="font-semibold text-sm">Policy template</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Template match and routing configuration for this request.
                 </p>
@@ -699,15 +736,15 @@ export default function PermissionRequestDetailPage() {
                 {request.policy_template_name ? (
                   <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                         Matched template
                       </p>
-                      <p className="mt-0.5 text-sm font-medium">
+                      <p className="mt-0.5 font-medium text-sm">
                         {request.policy_template_name}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                         Approval mode
                       </p>
                       <p className="mt-0.5 text-sm capitalize">
@@ -715,7 +752,7 @@ export default function PermissionRequestDetailPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                         Template owner
                       </p>
                       <p className="mt-0.5 text-sm">
@@ -723,16 +760,16 @@ export default function PermissionRequestDetailPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                         Template resource
                       </p>
-                      <p className="mt-0.5 break-all font-mono text-xs text-muted-foreground">
+                      <p className="mt-0.5 break-all font-mono text-muted-foreground text-xs">
                         {request.policy_template_resource ?? "Any resource"}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     This request did not match a policy template and is
                     following a manual review path.
                   </p>
@@ -742,10 +779,10 @@ export default function PermissionRequestDetailPage() {
           </div>
 
           {/* Right panel: Impact & lineage */}
-          <section className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-3 shrink-0">
-              <h2 className="text-sm font-semibold">Impact & lineage</h2>
+            <div className="shrink-0 px-6 py-3">
+              <h2 className="font-semibold text-sm">Impact & lineage</h2>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 Downstream blast radius and data lineage for the requested
                 resource.
@@ -754,40 +791,40 @@ export default function PermissionRequestDetailPage() {
             <Separator />
 
             {/* Lineage graph + right sidebar */}
-            <div className="flex-1 min-h-0 flex overflow-hidden">
+            <div className="flex min-h-0 flex-1 overflow-hidden">
               {/* Lineage graph */}
-              <div className="flex-1 min-w-0 relative">
+              <div className="relative min-w-0 flex-1">
                 <LineageGraph
                   currentPath={
                     request.scope === "table"
                       ? request.resource.split(".")
                       : undefined
                   }
+                  enableNeighborhoodSelection
+                  initialDepth={1}
+                  neighborhoodOnly
+                  selectRoot
                   selectRootHint={
-                    request.scope !== "table"
-                      ? {
+                    request.scope === "table"
+                      ? undefined
+                      : {
                           displayName:
                             request.resource.split(".").at(-1) ??
                             request.resource,
                           nodeType: request.scope,
                         }
-                      : undefined
                   }
-                  neighborhoodOnly
-                  enableNeighborhoodSelection
-                  selectRoot
-                  initialDepth={1}
                 />
               </div>
 
               {/* Right sidebar: Guardrail / Components */}
               {blastRadius && (
-                <div className="w-64 shrink-0 border-l flex flex-col overflow-hidden">
+                <div className="flex w-64 shrink-0 flex-col overflow-hidden border-l">
                   {/* Risk + root resource */}
-                  <div className="px-4 py-3 flex flex-wrap items-center gap-1.5 shrink-0 border-b">
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-3">
                     <LlmRiskBadge status={blastRadius.llm_risk} />
                     {blastRadius.lineage_root_display_name && (
-                      <span className="text-[11px] text-muted-foreground font-mono break-all">
+                      <span className="break-all font-mono text-[11px] text-muted-foreground">
                         {blastRadius.lineage_root_display_name}
                       </span>
                     )}
@@ -796,13 +833,13 @@ export default function PermissionRequestDetailPage() {
                   <div className="flex border-b px-4">
                     {(["guardrail", "components"] as const).map((tab) => (
                       <button
-                        key={tab}
                         className={cn(
-                          "py-2.5 text-xs font-medium border-b-2 -mb-px mr-4 capitalize transition-colors",
+                          "mr-4 -mb-px border-b-2 py-2.5 font-medium text-xs capitalize transition-colors",
                           activeTab === tab
                             ? "border-foreground text-foreground"
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
+                        key={tab}
                         onClick={() => setActiveTab(tab)}
                       >
                         {tab}
@@ -814,50 +851,52 @@ export default function PermissionRequestDetailPage() {
                     {activeTab === "guardrail" && (
                       <div className="space-y-4">
                         {blastRadius.recommended_guardrail ? (
-                          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
                             <div className="flex items-center gap-2">
-                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-background border">
+                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border bg-background">
                                 <HugeiconsIcon
-                                  icon={Shield01Icon}
                                   className="h-3.5 w-3.5 text-foreground"
+                                  icon={Shield01Icon}
                                 />
                               </div>
-                              <p className="text-xs font-semibold">
+                              <p className="font-semibold text-xs">
                                 Recommended
                               </p>
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
+                            <p className="text-muted-foreground text-xs leading-relaxed">
                               {blastRadius.recommended_guardrail}
                             </p>
                           </div>
                         ) : null}
                         {blastRadius.llm_recommendation ? (
                           <div className="space-y-2">
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                               LLM recommendation
                             </p>
-                            <p className="text-sm text-foreground/90 leading-relaxed">
+                            <p className="text-foreground/90 text-sm leading-relaxed">
                               {blastRadius.llm_recommendation}
                             </p>
                             {blastRadius.llm_explanation && (
-                              <p className="text-sm text-muted-foreground italic leading-relaxed">
+                              <p className="text-muted-foreground text-sm italic leading-relaxed">
                                 {blastRadius.llm_explanation}
                               </p>
                             )}
                           </div>
                         ) : null}
-                        {!blastRadius.recommended_guardrail &&
-                          !blastRadius.llm_recommendation && (
-                            <div className="flex flex-col items-center gap-2 py-6 text-center">
-                              <HugeiconsIcon
-                                icon={Shield01Icon}
-                                className="h-8 w-8 text-muted-foreground/30"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                No guardrail recommendations.
-                              </p>
-                            </div>
-                          )}
+                        {!(
+                          blastRadius.recommended_guardrail ||
+                          blastRadius.llm_recommendation
+                        ) && (
+                          <div className="flex flex-col items-center gap-2 py-6 text-center">
+                            <HugeiconsIcon
+                              className="h-8 w-8 text-muted-foreground/30"
+                              icon={Shield01Icon}
+                            />
+                            <p className="text-muted-foreground text-xs">
+                              No guardrail recommendations.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -866,14 +905,14 @@ export default function PermissionRequestDetailPage() {
                         {Object.entries(groupedComponents).map(
                           ([category, names]) => (
                             <div key={category}>
-                              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                              <p className="mb-1 font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                                 {category}
                               </p>
                               <ul className="space-y-0.5">
                                 {names.map((name) => (
                                   <li
-                                    key={name}
                                     className="break-all font-mono text-xs"
+                                    key={name}
                                   >
                                     {name}
                                   </li>
@@ -883,7 +922,7 @@ export default function PermissionRequestDetailPage() {
                           )
                         )}
                         {blastRadius.affected_nodes.length === 0 && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-muted-foreground text-xs">
                             No affected components.
                           </p>
                         )}
@@ -899,10 +938,12 @@ export default function PermissionRequestDetailPage() {
 
       {/* Time-bound approval dialog */}
       <Dialog
-        open={approvalDialog !== null}
         onOpenChange={(open) => {
-          if (!open && actioningKey == null) setApprovalDialog(null)
+          if (!open && actioningKey == null) {
+            setApprovalDialog(null)
+          }
         }}
+        open={approvalDialog !== null}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -920,20 +961,20 @@ export default function PermissionRequestDetailPage() {
 
           {/* Request summary */}
           {request && (
-            <div className="rounded-md border bg-muted/40 px-3 py-2.5 text-xs space-y-1.5">
+            <div className="space-y-1.5 rounded-md border bg-muted/40 px-3 py-2.5 text-xs">
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Requester</span>
                 <span className="font-medium">{request.requester}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Resource</span>
-                <span className="font-mono text-right break-all">
+                <span className="break-all text-right font-mono">
                   {request.resource}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Scope</span>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge className="text-[10px]" variant="outline">
                   {request.scope}
                 </Badge>
               </div>
@@ -941,7 +982,7 @@ export default function PermissionRequestDetailPage() {
                 <span className="text-muted-foreground">Privileges</span>
                 <div className="flex flex-wrap justify-end gap-1">
                   {request.privileges.map((p) => (
-                    <Badge key={p} variant="outline" className="text-[10px]">
+                    <Badge className="text-[10px]" key={p} variant="outline">
                       {p}
                     </Badge>
                   ))}
@@ -959,25 +1000,25 @@ export default function PermissionRequestDetailPage() {
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="grant-duration-days" className="text-xs">
+            <Label className="text-xs" htmlFor="grant-duration-days">
               Grant duration (days)
             </Label>
             <Input
+              className="h-8 text-sm"
               id="grant-duration-days"
-              type="number"
-              min={1}
               max={request?.expires_in_days ?? 365}
-              value={approvalDialog?.durationDays ?? ""}
+              min={1}
               onChange={(e) =>
                 setApprovalDialog((prev) =>
                   prev ? { ...prev, durationDays: e.target.value } : prev
                 )
               }
-              className="h-8 text-sm"
               placeholder="e.g. 30"
+              type="number"
+              value={approvalDialog?.durationDays ?? ""}
             />
             {approvalDialog && Number(approvalDialog.durationDays) >= 1 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Access expires on{" "}
                 {new Date(
                   Date.now() + Number(approvalDialog.durationDays) * 86_400_000
@@ -992,21 +1033,21 @@ export default function PermissionRequestDetailPage() {
 
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setApprovalDialog(null)}
               disabled={actioningKey != null}
+              onClick={() => setApprovalDialog(null)}
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              onClick={handleApprovalDialogConfirm}
               disabled={
                 actioningKey != null ||
                 !approvalDialog ||
                 !(Number(approvalDialog.durationDays) >= 1)
               }
+              onClick={handleApprovalDialogConfirm}
             >
-              {actioningKey != null ? "Approving…" : "Confirm & grant access"}
+              {actioningKey == null ? "Confirm & grant access" : "Approving…"}
             </Button>
           </DialogFooter>
         </DialogContent>

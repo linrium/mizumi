@@ -11,15 +11,15 @@ import {
 } from "react"
 
 export interface Margin {
-  top: number
-  right: number
   bottom: number
   left: number
+  right: number
+  top: number
 }
 
 export interface SankeyNodeDatum {
-  name: string
   category?: "source" | "landing" | "outcome"
+  name: string
   [key: string]: unknown
 }
 
@@ -31,51 +31,51 @@ export interface SankeyLinkDatum {
 }
 
 export interface SankeyTooltipData {
-  type: "node" | "link"
-  nodeIndex?: number
+  data: SankeyNodeDatum | SankeyLinkDatum
   linkIndex?: number
+  nodeIndex?: number
+  type: "node" | "link"
   x: number
   y: number
-  data: SankeyNodeDatum | SankeyLinkDatum
 }
 
 export interface SankeyContextValue {
-  // Layout data
-  graph: SankeyGraph<SankeyNodeDatum, SankeyLinkDatum>
-  nodes: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>[]
-  links: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>[]
-
-  // Dimensions
-  width: number
-  height: number
-  innerWidth: number
-  innerHeight: number
-  margin: Margin
-
-  // Hover state
-  hoveredNodeIndex: number | null
-  hoveredLinkIndex: number | null
-  setHoveredNodeIndex: (index: number | null) => void
-  setHoveredLinkIndex: (index: number | null) => void
-
-  // Tooltip
-  tooltipData: SankeyTooltipData | null
-  setTooltipData: Dispatch<SetStateAction<SankeyTooltipData | null>>
-  containerRef: RefObject<HTMLDivElement | null>
-
-  // Animation
-  isLoaded: boolean
   animationDuration: number
-  /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition
-  /** Increments when enter animation should replay. */
-  revealEpoch: number
-
-  // Mouse position for dynamic tooltips
-  mousePos: { x: number; y: number } | null
+  containerRef: RefObject<HTMLDivElement | null>
 
   // Link path generator
   createPath: (link: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>) => string
+  /** Motion enter transition (spring or cubic-bezier tween). */
+  enterTransition?: Transition
+  // Layout data
+  graph: SankeyGraph<SankeyNodeDatum, SankeyLinkDatum>
+  height: number
+  hoveredLinkIndex: number | null
+
+  // Hover state
+  hoveredNodeIndex: number | null
+  innerHeight: number
+  innerWidth: number
+
+  // Animation
+  isLoaded: boolean
+  links: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>[]
+  margin: Margin
+
+  // Mouse position for dynamic tooltips
+  mousePos: { x: number; y: number } | null
+  nodes: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>[]
+  /** Increments when enter animation should replay. */
+  revealEpoch: number
+  setHoveredLinkIndex: (index: number | null) => void
+  setHoveredNodeIndex: (index: number | null) => void
+  setTooltipData: Dispatch<SetStateAction<SankeyTooltipData | null>>
+
+  // Tooltip
+  tooltipData: SankeyTooltipData | null
+
+  // Dimensions
+  width: number
 }
 
 const SankeyContext = createContext<SankeyContextValue | null>(null)
@@ -104,7 +104,7 @@ export function useSankey(): SankeyContextValue {
 export const sankeyCssVars = {
   background: "var(--chart-background)",
   foreground: "var(--chart-foreground)",
+  linkColor: "var(--chart-foreground-muted, hsl(0, 0%, 50%))",
   nodePrimary: "var(--chart-line-primary)",
   nodeSecondary: "var(--chart-line-secondary)",
-  linkColor: "var(--chart-foreground-muted, hsl(0, 0%, 50%))",
 }

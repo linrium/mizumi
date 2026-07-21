@@ -80,9 +80,9 @@ const PRIVILEGE_GROUPS: ReadonlyArray<{
   { label: "Model", privileges: ["CREATE_MODEL"] },
 ]
 
-type PermissionsEditorProps = {
-  resourceType: ResourceType
+interface PermissionsEditorProps {
   catalog: string
+  resourceType: ResourceType
   schema?: string
   table?: string
 }
@@ -236,13 +236,13 @@ export function PermissionsEditor({
     setError(null)
     try {
       const data = await patchPermissionsAction({
-        resourceType,
+        add,
         catalog,
+        principal: nextPrincipal,
+        remove,
+        resourceType,
         schema,
         table,
-        principal: nextPrincipal,
-        add,
-        remove,
       })
       const nextAssignments = normalizePrivileges(data.privilege_assignments)
       setAssignments(nextAssignments)
@@ -265,121 +265,129 @@ export function PermissionsEditor({
     }
   }
 
+  function renderAssignments() {
+    if (loading) {
+      return <p className="text-muted-foreground text-sm">Loading…</p>
+    }
+    if (assignments.length === 0) {
+      return (
+        <p className="text-muted-foreground text-sm">
+          No principals with permissions found.
+        </p>
+      )
+    }
+    return (
+      <div className="space-y-1.5">
+        {assignments.map((assignment) => {
+          const isActive =
+            assignment.principal.toLowerCase() ===
+            principal.trim().toLowerCase()
+
+          return (
+            <button
+              className={cn(
+                "w-full rounded border px-2.5 py-2 text-left transition-colors",
+                isActive
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-accent/40"
+              )}
+              key={assignment.principal}
+              onClick={() => loadAssignment(assignment)}
+              type="button"
+            >
+              <p className="truncate font-medium text-xs">
+                {assignment.principal}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {(assignment.privileges ?? []).length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    No privileges assigned.
+                  </span>
+                ) : (
+                  assignment.privileges?.map((privilege) => (
+                    <Badge
+                      className="text-[11px]"
+                      key={privilege}
+                      variant="secondary"
+                    >
+                      {privilege}
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
-    <div className="mx-auto flex w-full h-full flex-col">
+    <div className="mx-auto flex h-full w-full flex-col">
       <div className="grid h-full lg:grid-cols-[350px_minmax(0,1fr)]">
-        <div className="space-y-4 h-full border-r bg-card p-4">
+        <div className="h-full space-y-4 border-r bg-card p-4">
           <div className="space-y-2">
-            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
               Principals
             </Label>
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : assignments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No principals with permissions found.
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {assignments.map((assignment) => {
-                  const isActive =
-                    assignment.principal.toLowerCase() ===
-                    principal.trim().toLowerCase()
-
-                  return (
-                    <button
-                      key={assignment.principal}
-                      type="button"
-                      onClick={() => loadAssignment(assignment)}
-                      className={cn(
-                        "w-full rounded border px-2.5 py-2 text-left transition-colors",
-                        isActive
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-accent/40"
-                      )}
-                    >
-                      <p className="truncate text-xs font-medium">
-                        {assignment.principal}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {(assignment.privileges ?? []).length === 0 ? (
-                          <span className="text-[11px] text-muted-foreground">
-                            No privileges assigned.
-                          </span>
-                        ) : (
-                          assignment.privileges?.map((privilege) => (
-                            <Badge
-                              key={privilege}
-                              variant="secondary"
-                              className="text-[11px]"
-                            >
-                              {privilege}
-                            </Badge>
-                          ))
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            {renderAssignments()}
           </div>
         </div>
 
         <div className="space-y-4 bg-card p-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold">Privileges</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-semibold text-sm">Privileges</h2>
+            <p className="text-muted-foreground text-sm">
               Select the privileges to assign to the chosen principal.
             </p>
           </div>
 
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 Editing principal
               </Label>
               {currentAssignment ? (
                 <p className="text-sm">{currentAssignment.principal}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   Select a principal to edit permissions.
                 </p>
               )}
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={resetEditor}>
+              <Button onClick={resetEditor} size="sm" variant="outline">
                 Reset
               </Button>
               <Button
-                size="sm"
-                onClick={saveChanges}
                 disabled={saving || loading}
+                onClick={saveChanges}
+                size="sm"
               >
                 {saving ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </div>
 
-          {error && (
-            <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {error ? (
+            <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-sm">
               {error}
             </p>
-          )}
-          {forbidden && (
-            <p className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-700">
+          ) : null}
+          {forbidden ? (
+            <p className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-amber-700 text-sm">
               You do not have permission to edit this resource.
             </p>
-          )}
+          ) : null}
 
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-muted-foreground text-sm">Loading…</p>
           ) : (
             <div className="space-y-4">
               {PRIVILEGE_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-2">
-                  <p className="text-[11px] font-medium text-muted-foreground">
+                <div className="space-y-2" key={group.label}>
+                  <p className="font-medium text-[11px] text-muted-foreground">
                     {group.label}
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -387,15 +395,15 @@ export function PermissionsEditor({
                       const checked = selected.has(privilege)
                       return (
                         <button
-                          key={privilege}
-                          type="button"
-                          onClick={() => togglePrivilege(privilege, !checked)}
                           className={cn(
-                            "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                            "flex min-w-0 cursor-pointer items-center gap-2 rounded border px-2.5 py-1.5 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
                             checked
                               ? "border-primary bg-primary/5 text-foreground"
                               : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                           )}
+                          key={privilege}
+                          onClick={() => togglePrivilege(privilege, !checked)}
+                          type="button"
                         >
                           <span
                             aria-hidden="true"

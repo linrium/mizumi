@@ -6,20 +6,20 @@ import { cn } from "@/lib/utils"
 import { useChart } from "./chart-context"
 
 export interface BarXAxisProps {
-  /** Width of the date ticker box for fade calculation. Default: 50 */
-  tickerHalfWidth?: number
-  /** Whether to show all labels or skip some for dense data. Default: false */
-  showAllLabels?: boolean
   /** Maximum number of labels to show. Default: 12 */
   maxLabels?: number
+  /** Whether to show all labels or skip some for dense data. Default: false */
+  showAllLabels?: boolean
+  /** Width of the date ticker box for fade calculation. Default: 50 */
+  tickerHalfWidth?: number
 }
 
 interface BarXAxisLabelProps {
-  label: string
-  x: number
   crosshairX: number | null
   isHovering: boolean
+  label: string
   tickerHalfWidth: number
+  x: number
 }
 
 function BarXAxisLabel({
@@ -47,11 +47,11 @@ function BarXAxisLabel({
     <div
       className="absolute"
       style={{
-        left: x,
         bottom: 12,
-        width: 0,
         display: "flex",
         justifyContent: "center",
+        left: x,
+        width: 0,
       }}
     >
       <motion.span

@@ -21,8 +21,8 @@ export default async function AuthedLayout({
       <SessionProvider>
         <SidebarProvider className="h-full">
           <AppSidebar session={session} />
-          <SidebarInset className="flex flex-col h-full overflow-hidden">
-            <main className="flex-1 min-h-0 overflow-auto">{children}</main>
+          <SidebarInset className="flex h-full flex-col overflow-hidden">
+            <main className="min-h-0 flex-1 overflow-auto">{children}</main>
           </SidebarInset>
         </SidebarProvider>
       </SessionProvider>

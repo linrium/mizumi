@@ -19,21 +19,27 @@ export type TeamMember = {
 
 export async function listTeams(): Promise<Team[]> {
   const res = await apiFetch("/api/teams")
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.teams
 }
 
 export async function listMyTeams(): Promise<Team[]> {
   const res = await apiFetch("/api/users/me/teams")
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.teams
 }
 
 export async function getTeam(id: string): Promise<Team> {
   const res = await apiFetch(`/api/teams/${encodeURIComponent(id)}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   return res.json()
 }
 
@@ -42,9 +48,9 @@ export async function createTeam(
   workspace: string
 ): Promise<Team> {
   const res = await apiFetch("/api/teams", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, workspace }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -55,7 +61,9 @@ export async function createTeam(
 
 export async function listTeamMembers(teamId: string): Promise<TeamMember[]> {
   const res = await apiFetch(`/api/teams/${encodeURIComponent(teamId)}/members`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.members
 }
@@ -67,9 +75,9 @@ export async function addTeamMember(
   const res = await apiFetch(
     `/api/teams/${encodeURIComponent(teamId)}/members`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     }
   )
   if (!res.ok) {
@@ -87,5 +95,7 @@ export async function removeTeamMember(
     `/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
     { method: "DELETE" }
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
 }

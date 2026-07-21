@@ -1,12 +1,12 @@
 "use client"
 
 import {
-  IconTriangleSquareCircle,
   IconBrain,
   IconChevronRight,
   IconDatabase,
   IconFolder,
   IconTable,
+  IconTriangleSquareCircle,
 } from "@tabler/icons-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
@@ -46,7 +46,7 @@ export default function CatalogLayout({
   const [loading, setLoading] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(360)
   const parts = pathname.split("/").filter(Boolean)
-  const activeCat = parts[1]
+  const [, activeCat] = parts
   const resourceParts = parts.slice(2)
   const activeSch =
     resourceParts[0] &&
@@ -82,29 +82,41 @@ export default function CatalogLayout({
   }, [])
 
   useEffect(() => {
-    if (!activeCat) return
+    if (!activeCat) {
+      return
+    }
 
     setExpanded((prev) => {
       const next = new Set(prev)
       next.add(activeCat)
-      if (activeSch) next.add(`${activeCat}.${activeSch}`)
+      if (activeSch) {
+        next.add(`${activeCat}.${activeSch}`)
+      }
       return next
     })
 
     if (!schemas[activeCat]) {
-      void getSchemasAction(activeCat).then((data) => {
-        setSchemas((prev) => ({ ...prev, [activeCat]: data.schemas ?? [] }))
-      })
+      getSchemasAction(activeCat)
+        .then((data) => {
+          setSchemas((prev) => ({ ...prev, [activeCat]: data.schemas ?? [] }))
+        })
+        .catch(() => {
+          // best-effort schema prefetch; errors surface on explicit navigation
+        })
     }
   }, [activeCat, activeSch, schemas])
 
   useEffect(() => {
-    if (!activeCat || !activeSch) return
+    if (!(activeCat && activeSch)) {
+      return
+    }
 
     const key = `${activeCat}.${activeSch}`
-    if (tables[key]) return
+    if (tables[key]) {
+      return
+    }
 
-    void Promise.all([
+    Promise.all([
       getTablesAction(activeCat, activeSch),
       getVolumesAction(activeCat, activeSch).catch(() => ({
         volumes: [] as VolumeSummary[],
@@ -112,20 +124,28 @@ export default function CatalogLayout({
       getModelsAction(activeCat, activeSch).catch(() => ({
         registered_models: [] as RegisteredModelSummary[],
       })),
-    ]).then(([tablesData, volumesData, modelsData]) => {
-      setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
-      setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
-      setModels((prev) => ({
-        ...prev,
-        [key]: modelsData.registered_models ?? [],
-      }))
-    })
+    ])
+      .then(([tablesData, volumesData, modelsData]) => {
+        setTables((prev) => ({ ...prev, [key]: tablesData.tables ?? [] }))
+        setVolumes((prev) => ({ ...prev, [key]: volumesData.volumes ?? [] }))
+        setModels((prev) => ({
+          ...prev,
+          [key]: modelsData.registered_models ?? [],
+        }))
+      })
+      .catch(() => {
+        // best-effort table/volume/model prefetch; partial failures use fallbacks above
+      })
   }, [activeCat, activeSch, tables])
 
   function toggle(key: string) {
     setExpanded((prev) => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
       return next
     })
   }
@@ -207,14 +227,14 @@ export default function CatalogLayout({
   return (
     <div className="flex h-full overflow-hidden">
       <div
+        className="relative flex shrink-0 select-none flex-col overflow-hidden border-r"
         ref={sidebarRef}
-        className="relative shrink-0 border-r flex flex-col overflow-hidden select-none"
         style={{ width: sidebarWidth }}
       >
         <div className="flex-1 overflow-y-auto py-1">
-          {loading && (
-            <p className="px-4 py-3 text-xs text-muted-foreground">Loading…</p>
-          )}
+          {loading ? (
+            <p className="px-4 py-3 text-muted-foreground text-xs">Loading…</p>
+          ) : null}
 
           {catalogs.map((cat) => {
             const catOpen = expanded.has(cat.name)
@@ -223,29 +243,29 @@ export default function CatalogLayout({
             return (
               <div key={cat.name}>
                 <button
-                  type="button"
-                  onClick={() => handleCatalog(cat.name)}
                   className={cn(
-                    "flex w-full items-center gap-1.5 pl-2 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
+                    "flex w-full items-center gap-1.5 py-1 pr-3 pl-2 text-left text-sm transition-colors hover:bg-accent/50",
                     catActive && activeItemClass
                   )}
+                  onClick={() => handleCatalog(cat.name)}
+                  type="button"
                 >
                   <IconChevronRight
                     aria-hidden="true"
-                    size={14}
                     className={cn(
                       "shrink-0 text-muted-foreground transition-transform",
                       catOpen && "rotate-90"
                     )}
+                    size={14}
                   />
                   <IconTriangleSquareCircle
-                    size={15}
                     className={cn(
                       "shrink-0 text-muted-foreground",
                       catActive && activeIconClass
                     )}
+                    size={15}
                   />
-                  <span className="truncate flex-1">{cat.name}</span>
+                  <span className="flex-1 truncate">{cat.name}</span>
                 </button>
 
                 {catOpen &&
@@ -262,29 +282,29 @@ export default function CatalogLayout({
                     return (
                       <div key={schKey}>
                         <button
-                          type="button"
-                          onClick={() => handleSchema(cat.name, sch.name)}
                           className={cn(
-                            "flex w-full items-center gap-1.5 pl-6 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
+                            "flex w-full items-center gap-1.5 py-1 pr-3 pl-6 text-left text-sm transition-colors hover:bg-accent/50",
                             schActive && activeItemClass
                           )}
+                          onClick={() => handleSchema(cat.name, sch.name)}
+                          type="button"
                         >
                           <IconChevronRight
                             aria-hidden="true"
-                            size={14}
                             className={cn(
                               "shrink-0 text-muted-foreground transition-transform",
                               schOpen && "rotate-90"
                             )}
+                            size={14}
                           />
                           <IconDatabase
-                            size={15}
                             className={cn(
                               "shrink-0 text-muted-foreground",
                               schActive && activeIconClass
                             )}
+                            size={15}
                           />
-                          <span className="truncate flex-1">{sch.name}</span>
+                          <span className="flex-1 truncate">{sch.name}</span>
                         </button>
 
                         {schOpen && (
@@ -297,22 +317,22 @@ export default function CatalogLayout({
 
                               return (
                                 <button
+                                  className={cn(
+                                    "flex w-full items-center gap-1.5 py-1 pr-3 pl-11 text-left text-sm transition-colors hover:bg-accent/50",
+                                    tblActive && activeItemClass
+                                  )}
                                   key={tbl.name}
-                                  type="button"
                                   onClick={() =>
                                     handleTable(cat.name, sch.name, tbl.name)
                                   }
-                                  className={cn(
-                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    tblActive && activeItemClass
-                                  )}
+                                  type="button"
                                 >
                                   <IconTable
-                                    size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
                                       tblActive && activeIconClass
                                     )}
+                                    size={15}
                                   />
                                   <span className="truncate">{tbl.name}</span>
                                 </button>
@@ -327,22 +347,22 @@ export default function CatalogLayout({
 
                               return (
                                 <button
+                                  className={cn(
+                                    "flex w-full items-center gap-1.5 py-1 pr-3 pl-11 text-left text-sm transition-colors hover:bg-accent/50",
+                                    volActive && activeItemClass
+                                  )}
                                   key={`vol:${vol.name}`}
-                                  type="button"
                                   onClick={() =>
                                     handleVolume(cat.name, sch.name, vol.name)
                                   }
-                                  className={cn(
-                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    volActive && activeItemClass
-                                  )}
+                                  type="button"
                                 >
                                   <IconFolder
-                                    size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
                                       volActive && activeIconClass
                                     )}
+                                    size={15}
                                   />
                                   <span className="truncate">{vol.name}</span>
                                 </button>
@@ -357,22 +377,22 @@ export default function CatalogLayout({
 
                               return (
                                 <button
+                                  className={cn(
+                                    "flex w-full items-center gap-1.5 py-1 pr-3 pl-11 text-left text-sm transition-colors hover:bg-accent/50",
+                                    modActive && activeItemClass
+                                  )}
                                   key={`mod:${mod.name}`}
-                                  type="button"
                                   onClick={() =>
                                     handleModel(cat.name, sch.name, mod.name)
                                   }
-                                  className={cn(
-                                    "flex w-full items-center gap-1.5 pl-11 pr-3 py-1 text-sm hover:bg-accent/50 transition-colors text-left",
-                                    modActive && activeItemClass
-                                  )}
+                                  type="button"
                                 >
                                   <IconBrain
-                                    size={15}
                                     className={cn(
                                       "shrink-0 text-muted-foreground",
                                       modActive && activeIconClass
                                     )}
+                                    size={15}
                                   />
                                   <span className="truncate">{mod.name}</span>
                                 </button>
@@ -388,9 +408,8 @@ export default function CatalogLayout({
           })}
         </div>
         <button
-          type="button"
           aria-label="Resize catalog sidebar"
-          onMouseDown={startResize}
+          className="absolute top-0 right-0 h-full w-1 translate-x-1/2 cursor-col-resize bg-transparent outline-none hover:bg-border/40 focus:bg-border/60"
           onKeyDown={(event) => {
             if (event.key === "ArrowLeft") {
               event.preventDefault()
@@ -401,7 +420,8 @@ export default function CatalogLayout({
               resizeBy(16)
             }
           }}
-          className="absolute right-0 top-0 h-full w-1 translate-x-1/2 cursor-col-resize bg-transparent outline-none focus:bg-border/60 hover:bg-border/40"
+          onMouseDown={startResize}
+          type="button"
         />
       </div>
       <div className="min-w-0 flex-1 overflow-hidden">{children}</div>

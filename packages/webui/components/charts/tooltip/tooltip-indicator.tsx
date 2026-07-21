@@ -4,7 +4,7 @@ import { motion, useSpring } from "motion/react"
 import { chartCssVars } from "../chart-context"
 
 // Faster spring for crosshair - responsive to mouse movement
-const crosshairSpringConfig = { stiffness: 300, damping: 30 }
+const crosshairSpringConfig = { damping: 30, stiffness: 300 }
 
 export type IndicatorWidth =
   | number // Pixel width
@@ -14,10 +14,23 @@ export type IndicatorWidth =
   | "thick" // 8px
 
 export interface TooltipIndicatorProps {
-  /** X position in pixels (center of the indicator) */
-  x: number
+  /** Primary color at edges (10% and 90%) */
+  colorEdge?: string
+  /** Secondary color at center (50%) */
+  colorMid?: string
+  /** Width of a single column/day in pixels. Required when using `span`. */
+  columnWidth?: number
+  /** Whether to fade to transparent at 0% and 100% */
+  fadeEdges?: boolean
+  /** Unique ID for the gradient */
+  gradientId?: string
   /** Height of the indicator */
   height: number
+  /**
+   * Number of columns/days to span, with current point centered.
+   * Requires `columnWidth` to be set.
+   */
+  span?: number
   /** Whether the indicator is visible */
   visible: boolean
   /**
@@ -25,21 +38,8 @@ export interface TooltipIndicatorProps {
    * Ignored if `span` is provided.
    */
   width?: IndicatorWidth
-  /**
-   * Number of columns/days to span, with current point centered.
-   * Requires `columnWidth` to be set.
-   */
-  span?: number
-  /** Width of a single column/day in pixels. Required when using `span`. */
-  columnWidth?: number
-  /** Primary color at edges (10% and 90%) */
-  colorEdge?: string
-  /** Secondary color at center (50%) */
-  colorMid?: string
-  /** Whether to fade to transparent at 0% and 100% */
-  fadeEdges?: boolean
-  /** Unique ID for the gradient */
-  gradientId?: string
+  /** X position in pixels (center of the indicator) */
+  x: number
 }
 
 function resolveWidth(width: IndicatorWidth): number {

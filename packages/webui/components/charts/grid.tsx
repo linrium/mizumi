@@ -5,28 +5,28 @@ import { useId } from "react"
 import { chartCssVars, useChart } from "./chart-context"
 
 export interface GridProps {
-  /** Show horizontal grid lines. Default: true */
-  horizontal?: boolean
-  /** Show vertical grid lines. Default: false */
-  vertical?: boolean
-  /** Number of horizontal grid lines. Default: 5 */
-  numTicksRows?: number
-  /** Number of vertical grid lines. Default: 10 */
-  numTicksColumns?: number
-  /** Explicit tick values for horizontal grid lines. Overrides numTicksRows. */
-  rowTickValues?: number[]
-  /** Grid line stroke color. Default: var(--chart-grid) */
-  stroke?: string
-  /** Grid line stroke opacity. Default: 1 */
-  strokeOpacity?: number
-  /** Grid line stroke width. Default: 1 */
-  strokeWidth?: number
-  /** Grid line dash array. Default: "4,4" for dashed lines */
-  strokeDasharray?: string
   /** Enable horizontal fade effect on grid rows (fades at left/right). Default: true */
   fadeHorizontal?: boolean
   /** Enable vertical fade effect on grid columns (fades at top/bottom). Default: false */
   fadeVertical?: boolean
+  /** Show horizontal grid lines. Default: true */
+  horizontal?: boolean
+  /** Number of vertical grid lines. Default: 10 */
+  numTicksColumns?: number
+  /** Number of horizontal grid lines. Default: 5 */
+  numTicksRows?: number
+  /** Explicit tick values for horizontal grid lines. Overrides numTicksRows. */
+  rowTickValues?: number[]
+  /** Grid line stroke color. Default: var(--chart-grid) */
+  stroke?: string
+  /** Grid line dash array. Default: "4,4" for dashed lines */
+  strokeDasharray?: string
+  /** Grid line stroke opacity. Default: 1 */
+  strokeOpacity?: number
+  /** Grid line stroke width. Default: 1 */
+  strokeWidth?: number
+  /** Show vertical grid lines. Default: false */
+  vertical?: boolean
 }
 
 export function Grid({

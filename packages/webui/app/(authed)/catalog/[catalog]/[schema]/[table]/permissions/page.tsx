@@ -6,12 +6,14 @@ import { useTableDetail } from "../table-context"
 export default function TablePermissionsPage() {
   const detail = useTableDetail()
 
-  if (!detail) return null
+  if (!detail) {
+    return null
+  }
 
   return (
     <PermissionsEditor
-      resourceType="table"
       catalog={detail.catalog_name}
+      resourceType="table"
       schema={detail.schema_name}
       table={detail.name}
     />

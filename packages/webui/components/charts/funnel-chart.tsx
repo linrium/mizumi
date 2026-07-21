@@ -16,16 +16,14 @@ import { useMountProgress } from "./use-mount-progress"
 // ─── Public types ───────────────────────────────────────────────────
 
 export interface FunnelGradientStop {
-  offset: string | number
   color: string
+  offset: string | number
 }
 
 export interface FunnelStage {
-  label: string
-  value: number
-  displayValue?: string
   /** Override the chart-level color for this segment */
   color?: string
+  displayValue?: string
   /**
    * Apply a linear gradient to this segment.
    * Provide an array of color stops, e.g. `[{ offset: "0%", color: "#8B5CF6" }, { offset: "100%", color: "#3B82F6" }]`.
@@ -33,61 +31,22 @@ export interface FunnelStage {
    * Outer halo rings use the first stop color as their solid color.
    */
   gradient?: FunnelGradientStop[]
+  label: string
+  value: number
 }
 
 export interface FunnelChartProps {
-  data: FunnelStage[]
-  orientation?: "horizontal" | "vertical"
-  color?: string
-  layers?: number
   className?: string
-  style?: CSSProperties
-  showPercentage?: boolean
-  showValues?: boolean
-  showLabels?: boolean
-  /** Controlled hover state — index of the hovered segment */
-  hoveredIndex?: number | null
-  /** Callback when hover state changes */
-  onHoverChange?: (index: number | null) => void
-  formatPercentage?: (pct: number) => string
-  formatValue?: (value: number) => string
-  /** Stagger delay between segments in seconds. Default 0.12 */
-  staggerDelay?: number
-  /** Framer Motion transition for segment enter animation */
-  enterTransition?: Transition
-  /** Gap between segments in pixels. Default 4 */
-  gap?: number
-  /**
-   * Render a visx pattern definition. Receives a unique `id` string per segment
-   * and the resolved `color`. Return a `<PatternLines>` (or any visx pattern)
-   * inside an SVG `<defs>`. The component will use `fill="url(#id)"` on the
-   * innermost ring while keeping outer halo rings as solid color.
-   */
-  renderPattern?: (id: string, color: string) => ReactNode
+  color?: string
+  data: FunnelStage[]
   /** Edge style for the funnel segments. Default "curved" */
   edges?: "curved" | "straight"
-  /**
-   * Controls how segment labels (value, percentage, stage name) are arranged.
-   * - "spread": Value/percentage/label are spread apart (top/center/bottom for horizontal,
-   *   left/center/right for vertical). This is the default.
-   * - "grouped": All label items stack together in a tight group.
-   *
-   * When "grouped", use `labelOrientation` and `labelAlign` for full control.
-   */
-  labelLayout?: "spread" | "grouped"
-  /**
-   * Stack direction of the label group. Only applies when `labelLayout="grouped"`.
-   * - "vertical": Items stack top-to-bottom. Default for horizontal funnels.
-   * - "horizontal": Items stack left-to-right. Default for vertical funnels.
-   */
-  labelOrientation?: "vertical" | "horizontal"
-  /**
-   * Where the label group sits within the segment cell.
-   * - "center" (default), "start", "end"
-   * For horizontal funnel: start=top, end=bottom.
-   * For vertical funnel: start=left, end=right.
-   */
-  labelAlign?: "center" | "start" | "end"
+  /** Framer Motion transition for segment enter animation */
+  enterTransition?: Transition
+  formatPercentage?: (pct: number) => string
+  formatValue?: (value: number) => string
+  /** Gap between segments in pixels. Default 4 */
+  gap?: number
   /** Grid configuration. Pass `true` for default bands + lines, or an object for fine control. */
   grid?:
     | boolean
@@ -105,6 +64,47 @@ export interface FunnelChartProps {
         /** Width of the grid lines in pixels. Default 1 */
         lineWidth?: number
       }
+  /** Controlled hover state — index of the hovered segment */
+  hoveredIndex?: number | null
+  /**
+   * Where the label group sits within the segment cell.
+   * - "center" (default), "start", "end"
+   * For horizontal funnel: start=top, end=bottom.
+   * For vertical funnel: start=left, end=right.
+   */
+  labelAlign?: "center" | "start" | "end"
+  /**
+   * Controls how segment labels (value, percentage, stage name) are arranged.
+   * - "spread": Value/percentage/label are spread apart (top/center/bottom for horizontal,
+   *   left/center/right for vertical). This is the default.
+   * - "grouped": All label items stack together in a tight group.
+   *
+   * When "grouped", use `labelOrientation` and `labelAlign` for full control.
+   */
+  labelLayout?: "spread" | "grouped"
+  /**
+   * Stack direction of the label group. Only applies when `labelLayout="grouped"`.
+   * - "vertical": Items stack top-to-bottom. Default for horizontal funnels.
+   * - "horizontal": Items stack left-to-right. Default for vertical funnels.
+   */
+  labelOrientation?: "vertical" | "horizontal"
+  layers?: number
+  /** Callback when hover state changes */
+  onHoverChange?: (index: number | null) => void
+  orientation?: "horizontal" | "vertical"
+  /**
+   * Render a visx pattern definition. Receives a unique `id` string per segment
+   * and the resolved `color`. Return a `<PatternLines>` (or any visx pattern)
+   * inside an SVG `<defs>`. The component will use `fill="url(#id)"` on the
+   * innermost ring while keeping outer halo rings as solid color.
+   */
+  renderPattern?: (id: string, color: string) => ReactNode
+  showLabels?: boolean
+  showPercentage?: boolean
+  showValues?: boolean
+  /** Stagger delay between segments in seconds. Default 0.12 */
+  staggerDelay?: number
+  style?: CSSProperties
 }
 
 // ─── Defaults ───────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export interface FunnelChartProps {
 const fmtPct = (p: number) => `${Math.round(p)}%`
 const fmtVal = (v: number) => v.toLocaleString("en-US")
 
-const hoverSpring = { stiffness: 300, damping: 24 }
+const hoverSpring = { damping: 24, stiffness: 300 }
 
 // ─── SVG helpers ────────────────────────────────────────────────────
 
@@ -187,8 +187,8 @@ function HRing({
   // Outer rings get progressively more hover expansion and a softer spring
   const extraScale = 1 + (ringIndex / Math.max(totalRings - 1, 1)) * 0.12
   const ringSpring = {
-    stiffness: 300 - ringIndex * 60,
     damping: 24 - ringIndex * 3,
+    stiffness: 300 - ringIndex * 60,
   }
   const scaleY = useSpring(1, ringSpring)
 
@@ -267,10 +267,10 @@ function HSegment({
     <motion.div
       className="pointer-events-none relative shrink-0 overflow-visible"
       style={{
-        width: segW,
         height: fullH,
-        zIndex: hovered ? 10 : 1,
         opacity: dimOpacity,
+        width: segW,
+        zIndex: hovered ? 10 : 1,
       }}
     >
       {/* Entrance animation wrapper: grows from left-center */}
@@ -355,8 +355,8 @@ function VRing({
   // Outer rings get progressively more hover expansion and a softer spring
   const extraScale = 1 + (ringIndex / Math.max(totalRings - 1, 1)) * 0.12
   const ringSpring = {
-    stiffness: 300 - ringIndex * 60,
     damping: 24 - ringIndex * 3,
+    stiffness: 300 - ringIndex * 60,
   }
   const scaleX = useSpring(1, ringSpring)
 
@@ -435,18 +435,18 @@ function VSegment({
     <motion.div
       className="pointer-events-none relative shrink-0 overflow-visible"
       style={{
-        width: fullW,
         height: segH,
-        zIndex: hovered ? 10 : 1,
         opacity: dimOpacity,
+        width: fullW,
+        zIndex: hovered ? 10 : 1,
       }}
     >
       {/* Entrance animation wrapper: grows from top-center */}
       <motion.div
         className="absolute inset-0 overflow-visible"
         style={{
-          scaleY: entranceScaleY,
           scaleX: entranceScaleX,
+          scaleY: entranceScaleY,
           transformOrigin: "center top",
         }}
       >
@@ -604,14 +604,14 @@ function SegmentLabel({
 
   // Map align to flexbox alignment on the cross axes
   const justifyMap = {
-    start: "justify-start",
     center: "justify-center",
     end: "justify-end",
+    start: "justify-start",
   } as const
   const itemsMap = {
-    start: "items-start",
     center: "items-center",
     end: "items-end",
+    start: "items-start",
   } as const
 
   // The outer container uses the chart orientation to position the group,
@@ -680,7 +680,7 @@ export function FunnelChart({
   grid: gridProp = false,
 }: FunnelChartProps) {
   const ref = useRef<HTMLDivElement>(null)
-  const [sz, setSz] = useState({ w: 0, h: 0 })
+  const [sz, setSz] = useState({ h: 0, w: 0 })
   const [internalHoveredIndex, setInternalHoveredIndex] = useState<
     number | null
   >(null)
@@ -704,7 +704,7 @@ export function FunnelChart({
     }
     const { width: w, height: h } = ref.current.getBoundingClientRect()
     if (w > 0 && h > 0) {
-      setSz({ w, h })
+      setSz({ h, w })
     }
   }, [])
 
@@ -905,15 +905,15 @@ export function FunnelChart({
             const pct = (stage.value / max) * 100
             const posStyle: CSSProperties = horiz
               ? {
-                  left: (segW + gap) * i,
-                  width: segW,
-                  top: 0,
                   height: H,
+                  left: (segW + gap) * i,
+                  top: 0,
+                  width: segW,
                 }
               : {
-                  top: (segH + gap) * i,
                   height: segH,
                   left: 0,
+                  top: (segH + gap) * i,
                   width: W,
                 }
 
@@ -927,7 +927,7 @@ export function FunnelChart({
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
                 style={{ ...posStyle, zIndex: 20 }}
-                transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                transition={{ damping: 24, stiffness: 300, type: "spring" }}
               >
                 <SegmentLabel
                   align={labelAlign}

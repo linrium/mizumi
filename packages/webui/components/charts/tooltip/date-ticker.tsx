@@ -13,14 +13,16 @@ export interface DateTickerProps {
 
 export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
   // Parse labels into month and day parts
-  const parsedLabels = useMemo(() => {
-    return labels.map((label, index) => {
-      const parts = label.split(" ")
-      const month = parts[0] || ""
-      const day = parts[1] || ""
-      return { month, day, full: label, key: `${label}::${index}` }
-    })
-  }, [labels])
+  const parsedLabels = useMemo(
+    () =>
+      labels.map((label, index) => {
+        const parts = label.split(" ")
+        const month = parts[0] || ""
+        const day = parts[1] || ""
+        return { day, full: label, key: `${label}::${index}`, month }
+      }),
+    [labels]
+  )
 
   // Month segments: one entry per consecutive run (Jan → Feb → …), keyed by start index
   const monthSegments = useMemo(() => {
@@ -30,8 +32,8 @@ export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
       const prev = segments.at(-1)
       if (!prev || prev.month !== label.month) {
         segments.push({
-          month: label.month,
           key: `${label.month}-${index}`,
+          month: label.month,
           startIndex: index,
         })
       }
@@ -58,8 +60,8 @@ export function DateTicker({ currentIndex, labels, visible }: DateTickerProps) {
   const prevMonthIndexRef = useRef(-1)
 
   // Animated Y offsets
-  const dayY = useSpring(0, { stiffness: 400, damping: 35 })
-  const monthY = useSpring(0, { stiffness: 400, damping: 35 })
+  const dayY = useSpring(0, { damping: 35, stiffness: 400 })
+  const monthY = useSpring(0, { damping: 35, stiffness: 400 })
 
   dayY.set(-currentIndex * TICKER_ITEM_HEIGHT)
 

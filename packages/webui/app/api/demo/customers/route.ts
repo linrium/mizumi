@@ -53,8 +53,7 @@ async function loadCustomers(): Promise<CustomerRow[]> {
       return parseCsv(csvContent)
     } catch (error) {
       if (
-        !(error instanceof Error) ||
-        !("code" in error) ||
+        !(error instanceof Error && "code" in error) ||
         error.code !== "ENOENT"
       ) {
         throw error
@@ -72,13 +71,17 @@ export async function GET(request: Request) {
   const allCustomers = await loadCustomers()
 
   const filteredCustomers = allCustomers.filter((customer) => {
-    if (company === "hdbank") return customer.has_hdbank === "true"
-    if (company === "vietjetair") return customer.has_vietjetair === "true"
+    if (company === "hdbank") {
+      return customer.has_hdbank === "true"
+    }
+    if (company === "vietjetair") {
+      return customer.has_vietjetair === "true"
+    }
     return true
   })
 
   return Response.json({
-    customers: filteredCustomers,
     count: filteredCustomers.length,
+    customers: filteredCustomers,
   })
 }

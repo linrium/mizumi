@@ -10,34 +10,34 @@ import {
 import { defaultScatterColors, useChart } from "./chart-context"
 
 export interface ScatterProps {
+  /** Whether to animate points with clip reveal. Default: true */
+  animate?: boolean
   /** Key in data to use for y values */
   dataKey: string
+  /** Initial blur in px during enter animation. Default: 2 */
+  enterBlur?: number
+  /** Dim non-active points while hovering. Default: true */
+  fadeOnHover?: boolean
   /** Fill color. Default: series color from chart palette (`--chart-1`, etc.) */
   fill?: string
+  /** Blur in px for non-hovered points when `fadeOnHover` is true. Default: 2 */
+  inactiveBlur?: number
+  /** Opacity for non-hovered points when `fadeOnHover` is true. Default: 0.5 */
+  inactiveOpacity?: number
+  /** Outer outline color. Default: same as `stroke` */
+  outlineColor?: string
+  /** Optional outer outline beyond the ring. Default: 0 */
+  outlineWidth?: number
+  /** Point radius in px. Default: 5 */
+  radius?: number
+  /** Gap between the inner fill and outer ring in px. Default: 2 */
+  ringGap?: number
+  /** Enlarge the active point while hovering. Default: true */
+  showActiveHighlight?: boolean
   /** Outer ring stroke color. Default: same as `fill` */
   stroke?: string
   /** Outer ring stroke width in px. Default: 2. Set to 0 to disable. */
   strokeWidth?: number
-  /** Gap between the inner fill and outer ring in px. Default: 2 */
-  ringGap?: number
-  /** Optional outer outline beyond the ring. Default: 0 */
-  outlineWidth?: number
-  /** Outer outline color. Default: same as `stroke` */
-  outlineColor?: string
-  /** Point radius in px. Default: 5 */
-  radius?: number
-  /** Whether to animate points with clip reveal. Default: true */
-  animate?: boolean
-  /** Dim non-active points while hovering. Default: true */
-  fadeOnHover?: boolean
-  /** Opacity for non-hovered points when `fadeOnHover` is true. Default: 0.5 */
-  inactiveOpacity?: number
-  /** Blur in px for non-hovered points when `fadeOnHover` is true. Default: 2 */
-  inactiveBlur?: number
-  /** Initial blur in px during enter animation. Default: 2 */
-  enterBlur?: number
-  /** Enlarge the active point while hovering. Default: true */
-  showActiveHighlight?: boolean
   /**
    * Color each dot by its vertical position using a chart-space linear gradient.
    * Lower values use `from`; higher values use `to`. Default stops: red (bottom) → green (top).
@@ -49,28 +49,28 @@ const DEFAULT_Y_GRADIENT_FROM = "var(--color-red-500)"
 const DEFAULT_Y_GRADIENT_TO = "var(--color-emerald-500)"
 
 interface ScatterPointNodeProps {
-  dataKey: string
-  index: number
   cx: number
   cy: number
+  dataKey: string
+  enterBlur: number
+  enterDuration: number
+  fadeOnHover: boolean
+  fill: string
+  hoverEase: typeof DEFAULT_CHART_ENTER_TRANSITION.ease
+  inactiveBlur: number
+  inactiveOpacity: number
+  index: number
   isActive: boolean
   isHovering: boolean
-  fadeOnHover: boolean
-  inactiveOpacity: number
-  inactiveBlur: number
-  enterBlur: number
+  outlineColor: string
+  outlineWidth: number
+  radius: number
   revealDelay: number
   revealEpoch: number
-  enterDuration: number
-  fill: string
+  ringGap: number
+  showActiveHighlight: boolean
   stroke: string
   strokeWidth: number
-  ringGap: number
-  outlineWidth: number
-  outlineColor: string
-  radius: number
-  showActiveHighlight: boolean
-  hoverEase: typeof DEFAULT_CHART_ENTER_TRANSITION.ease
 }
 
 function ScatterPointNode({
@@ -105,32 +105,32 @@ function ScatterPointNode({
   })()
 
   const variants: Variants = {
+    active: {
+      filter: "blur(0px)",
+      opacity: 1,
+      scale: showActiveHighlight ? 1.35 : 1,
+      transition: { duration: 0.4, ease: hoverEase },
+    },
+    dimmed: {
+      filter: `blur(${inactiveBlur}px)`,
+      opacity: inactiveOpacity,
+      scale: 1,
+      transition: { duration: 0.4, ease: hoverEase },
+    },
     hidden: {
-      opacity: 0,
       filter: `blur(${enterBlur}px)`,
+      opacity: 0,
       scale: 1,
     },
     visible: {
-      opacity: 1,
       filter: "blur(0px)",
+      opacity: 1,
       scale: 1,
       transition: {
         delay: revealDelay,
         duration: enterDuration,
         ease: DEFAULT_CHART_ENTER_TRANSITION.ease,
       },
-    },
-    dimmed: {
-      opacity: inactiveOpacity,
-      filter: `blur(${inactiveBlur}px)`,
-      scale: 1,
-      transition: { duration: 0.4, ease: hoverEase },
-    },
-    active: {
-      opacity: 1,
-      filter: "blur(0px)",
-      scale: showActiveHighlight ? 1.35 : 1,
-      transition: { duration: 0.4, ease: hoverEase },
     },
   }
 
@@ -271,7 +271,7 @@ export function Scatter({
             ? (leadingEdge / innerWidth) * revealDurationSec
             : 0
 
-        return [{ index, cx, cy, revealDelay }]
+        return [{ cx, cy, index, revealDelay }]
       }),
     [
       data,

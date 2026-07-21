@@ -1,5 +1,6 @@
 "use client"
 
+import Editor from "@monaco-editor/react"
 import {
   IconAlertHexagon,
   IconLoader2,
@@ -7,66 +8,65 @@ import {
   IconSend,
   IconWaveSine,
 } from "@tabler/icons-react"
-import Editor from "@monaco-editor/react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiFetch } from "@/lib/api-client"
 
-type PaginatedResponse<T> = {
+interface PaginatedResponse<T> {
   data: T[]
-  total: number
+  hasMore: boolean
   limit: number
   offset: number
-  hasMore: boolean
+  total: number
 }
 
-type FlightTicket = {
-  ticketId: string
-  userId: string
-  bookingReference: string
+interface FlightTicket {
   airline: string
-  flightNumber: string
-  tripType: string
-  originAirport: string
-  destinationAirport: string
+  baggageKg: number
+  baseFare: string
   bookingAt: string
-  departureAt: string
-  returnDepartureAt: string
+  bookingReference: string
   cabinClass: string
-  passengerCount: number
+  city: string
+  currency: string
+  departureAt: string
+  destinationAirport: string
   distanceKm: number
   flightDurationMinutes: number
-  baseFare: string
-  taxes: string
-  totalPrice: string
-  currency: string
-  baggageKg: number
+  flightNumber: string
+  originAirport: string
+  passengerCount: number
+  returnDepartureAt: string
   status: string
-  city: string
+  taxes: string
+  ticketId: string
+  totalPrice: string
+  tripType: string
+  userId: string
 }
 
-type FlightIncident = {
-  reportId: string
-  vietjetCustomerId: string
-  ticketId: string
-  bookingReference: string
+interface FlightIncident {
   airline: string
-  reportChannel: string
-  incidentType: string
-  severity: string
-  issueAirport: string
-  originAirport: string
+  baggageTag: string
+  bookingReference: string
+  city: string
+  currency: string
+  delayedMinutes: number
+  departureDate: string
   destinationAirport: string
   flightNumber: string
-  departureDate: string
-  reportedAt: string
-  status: string
-  baggageTag: string
-  delayedMinutes: number
-  currency: string
-  city: string
   imagePath: string
+  incidentType: string
+  issueAirport: string
+  originAirport: string
+  reportChannel: string
+  reportedAt: string
+  reportId: string
+  severity: string
+  status: string
+  ticketId: string
+  vietjetCustomerId: string
 }
 
 type SendResult =
@@ -82,6 +82,13 @@ type SendResult =
     }
   | { ok: false; status?: number; error: string }
 
+function formatResultBadge(result: SendResult): string {
+  if (result.ok) {
+    return `${result.status} Accepted`
+  }
+  return result.status ? `${result.status} Error` : "Error"
+}
+
 function toInt(value: number | string): number {
   return typeof value === "number" ? value : Number.parseInt(value, 10)
 }
@@ -89,10 +96,10 @@ function toInt(value: number | string): number {
 function normalizeFlightTicket(ticket: FlightTicket): Record<string, unknown> {
   return {
     ...ticket,
-    passengerCount: toInt(ticket.passengerCount),
+    baggageKg: toInt(ticket.baggageKg),
     distanceKm: toInt(ticket.distanceKm),
     flightDurationMinutes: toInt(ticket.flightDurationMinutes),
-    baggageKg: toInt(ticket.baggageKg),
+    passengerCount: toInt(ticket.passengerCount),
     returnDepartureAt: ticket.returnDepartureAt || null,
   }
 }
@@ -111,24 +118,26 @@ async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
     `/api/synthetic/${dataset}?limit=${batchSize}&random=true`,
     { cache: "no-store" }
   )
-  if (!response.ok) throw new Error(`Failed to load ${dataset}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load ${dataset}`)
+  }
   const payload = (await response.json()) as PaginatedResponse<T>
   return payload.data
 }
 
-type EventPanelProps = {
+interface EventPanelProps {
+  batchSize?: number
+  className?: string
+  dataset: string
+  endpoint: string
   icon: React.ComponentType<{
     size?: number
     className?: string
     stroke?: number
   }>
-  label: string
-  dataset: string
-  endpoint: string
-  normalize: (item: unknown) => Record<string, unknown>
-  batchSize?: number
   isFirst?: boolean
-  className?: string
+  label: string
+  normalize: (item: unknown) => Record<string, unknown>
 }
 
 function EventPanel({
@@ -155,33 +164,33 @@ function EventPanel({
       setEditorValue(JSON.stringify(batch, null, 2))
 
       const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(batch),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       })
       const body = await response.json().catch(() => null)
 
       if (response.ok) {
         const accepted = Array.isArray(body) ? body.length : batch.length
         setResult({
-          ok: true,
-          status: response.status,
           data: {
-            sent: batch.length,
             accepted,
             failed: Math.max(0, batch.length - accepted),
             sample: Array.isArray(body) ? body.slice(0, 5) : [body],
+            sent: batch.length,
           },
+          ok: true,
+          status: response.status,
         })
       } else {
         setResult({
+          error: (body as { error?: string } | null)?.error ?? "Request failed",
           ok: false,
           status: response.status,
-          error: (body as { error?: string } | null)?.error ?? "Request failed",
         })
       }
     } catch (error) {
-      setResult({ ok: false, error: (error as Error).message })
+      setResult({ error: (error as Error).message, ok: false })
     } finally {
       setSending(false)
     }
@@ -189,20 +198,20 @@ function EventPanel({
 
   return (
     <div
-      className={`flex min-h-0 flex-col overflow-hidden ${!isFirst ? "border-l" : ""} ${className}`}
+      className={`flex min-h-0 flex-col overflow-hidden ${isFirst ? "" : "border-l"} ${className}`}
     >
       <div className="flex shrink-0 items-center gap-2.5 border-b bg-muted/20 px-4 py-2.5">
-        <Icon size={15} className="text-muted-foreground" stroke={1.5} />
-        <span className="text-sm font-medium">{label}</span>
+        <Icon className="text-muted-foreground" size={15} stroke={1.5} />
+        <span className="font-medium text-sm">{label}</span>
         <div className="ml-auto flex items-center gap-2">
           <Button
-            size="sm"
+            className="h-7 gap-1.5 px-3 text-[11px]"
             disabled={sending}
             onClick={handleSend}
-            className="h-7 gap-1.5 px-3 text-[11px]"
+            size="sm"
           >
             {sending ? (
-              <IconLoader2 size={11} className="animate-spin" />
+              <IconLoader2 className="animate-spin" size={11} />
             ) : (
               <IconSend size={11} />
             )}
@@ -215,53 +224,45 @@ function EventPanel({
         <Editor
           height="100%"
           language="json"
-          theme="vs"
-          value={editorValue}
           onChange={(v) => {
             setEditorValue(v ?? "")
             setResult(null)
           }}
           options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            lineNumbers: "on",
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            overviewRulerLanes: 0,
-            renderLineHighlight: "line",
-            padding: { top: 10, bottom: 10 },
             fontFamily: "var(--font-geist-mono)",
-            lineHeight: 1.55,
+            fontSize: 12,
             formatOnPaste: true,
             formatOnType: true,
+            lineHeight: 1.55,
+            lineNumbers: "on",
+            minimap: { enabled: false },
+            overviewRulerLanes: 0,
+            padding: { bottom: 10, top: 10 },
+            renderLineHighlight: "line",
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
           }}
+          theme="vs"
+          value={editorValue}
         />
       </div>
 
       <div className="h-52 shrink-0 border-t">
         <div className="flex h-8 shrink-0 items-center gap-3 border-b bg-muted/10 px-3">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
             Response
           </span>
-          {result && (
+          {result ? (
             <Badge
-              variant={result.ok ? "default" : "destructive"}
               className="rounded px-1.5 font-mono text-[10px]"
+              variant={result.ok ? "default" : "destructive"}
             >
-              {result.ok
-                ? `${result.status} Accepted`
-                : result.status
-                  ? `${result.status} Error`
-                  : "Error"}
+              {formatResultBadge(result)}
             </Badge>
-          )}
+          ) : null}
         </div>
         <div className="h-[calc(100%-32px)] overflow-auto px-4 py-2">
-          {!result ? (
-            <span className="text-xs text-muted-foreground">
-              Send {batchSize} events to see the batch response.
-            </span>
-          ) : (
+          {result ? (
             <pre
               className={`whitespace-pre-wrap font-mono text-xs ${
                 result.ok ? "text-foreground" : "text-destructive"
@@ -269,6 +270,10 @@ function EventPanel({
             >
               {result.ok ? JSON.stringify(result.data, null, 2) : result.error}
             </pre>
+          ) : (
+            <span className="text-muted-foreground text-xs">
+              Send {batchSize} events to see the batch response.
+            </span>
           )}
         </div>
       </div>
@@ -281,13 +286,13 @@ export default function VietjetairBookingPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b bg-muted/30 px-4 py-3">
         <IconWaveSine
-          size={15}
           className="text-muted-foreground"
+          size={15}
           stroke={1.5}
         />
         <div className="min-w-0">
-          <div className="text-sm font-medium">VietJet Air Events</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="font-medium text-sm">VietJet Air Events</div>
+          <div className="text-muted-foreground text-xs">
             Flight tickets and incidents are fetched from the synthetic server
             and sent to the batch APIs.
           </div>
@@ -299,20 +304,20 @@ export default function VietjetairBookingPage() {
         style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}
       >
         <EventPanel
-          icon={IconPlaneTilt}
-          label="Flight Ticket Events"
           dataset="flight-tickets"
           endpoint="/api/tests/vietjetair/flight-tickets/batch"
+          icon={IconPlaneTilt}
+          isFirst
+          label="Flight Ticket Events"
           normalize={
             normalizeFlightTicket as (item: unknown) => Record<string, unknown>
           }
-          isFirst
         />
         <EventPanel
-          icon={IconAlertHexagon}
-          label="Flight Incident Events"
           dataset="flight-incidents"
           endpoint="/api/tests/vietjetair/flight-incidents/batch"
+          icon={IconAlertHexagon}
+          label="Flight Incident Events"
           normalize={
             normalizeFlightIncident as (
               item: unknown

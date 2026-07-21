@@ -6,17 +6,17 @@ import { cn } from "@/lib/utils"
 import { useChart } from "./chart-context"
 
 export interface BarYAxisProps {
-  /** Whether to show all labels or skip some for dense data. Default: true */
-  showAllLabels?: boolean
   /** Maximum number of labels to show. Default: 20 */
   maxLabels?: number
+  /** Whether to show all labels or skip some for dense data. Default: true */
+  showAllLabels?: boolean
 }
 
 interface BarYAxisLabelProps {
-  label: string
-  y: number
   bandHeight: number
   isHovered: boolean
+  label: string
+  y: number
 }
 
 function BarYAxisLabel({
@@ -29,21 +29,21 @@ function BarYAxisLabel({
     <div
       className="absolute right-0 flex items-center justify-end pr-2"
       style={{
-        top: y,
         height: bandHeight,
+        top: y,
       }}
     >
       <motion.span
         animate={{
-          opacity: isHovered ? 1 : 0.7,
           color: isHovered
             ? "var(--foreground)"
             : "var(--chart-label, var(--color-zinc-500))",
+          opacity: isHovered ? 1 : 0.7,
         }}
         className={cn("truncate whitespace-nowrap text-right text-xs")}
         initial={{
-          opacity: 0.7,
           color: "var(--chart-label, var(--color-zinc-500))",
+          opacity: 0.7,
         }}
         style={{ maxWidth: 70 }}
         transition={{ duration: 0.15 }}
@@ -85,7 +85,7 @@ export function BarYAxis({
       const bandY = barScale(label) ?? 0
       // Center the label vertically within the band
       const y = bandY + margin.top
-      return { label, y, bandHeight: bandWidth, index: i }
+      return { bandHeight: bandWidth, index: i, label, y }
     })
 
     // If showAllLabels is true or we have fewer than maxLabels, show all

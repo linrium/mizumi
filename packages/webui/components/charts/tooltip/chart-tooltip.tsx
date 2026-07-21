@@ -10,31 +10,31 @@ import { TooltipDot } from "./tooltip-dot"
 import { TooltipIndicator } from "./tooltip-indicator"
 
 // Spring config for crosshair
-const crosshairSpringConfig = { stiffness: 300, damping: 30 }
+const crosshairSpringConfig = { damping: 30, stiffness: 300 }
 
 export interface ChartTooltipProps {
-  /** Whether to show the date pill at bottom. Default: true */
-  showDatePill?: boolean
-  /** Whether to show the vertical crosshair line. Default: true */
-  showCrosshair?: boolean
-  /** Whether to show dots on the lines. Default: true */
-  showDots?: boolean
-  /**
-   * Color for the crosshair/indicator line. When a function, receives the hovered point
-   * (e.g. for candlestick: match candle color from close vs open). Default: --chart-crosshair.
-   */
-  indicatorColor?: string | ((point: Record<string, unknown>) => string)
+  /** Additional content to show below rows (e.g., markers) */
+  children?: React.ReactNode
+  /** Custom class name */
+  className?: string
   /** Custom content renderer for the tooltip box */
   content?: (props: {
     point: Record<string, unknown>
     index: number
   }) => React.ReactNode
+  /**
+   * Color for the crosshair/indicator line. When a function, receives the hovered point
+   * (e.g. for candlestick: match candle color from close vs open). Default: --chart-crosshair.
+   */
+  indicatorColor?: string | ((point: Record<string, unknown>) => string)
   /** Custom row renderer - return array of TooltipRow */
   rows?: (point: Record<string, unknown>) => TooltipRow[]
-  /** Additional content to show below rows (e.g., markers) */
-  children?: React.ReactNode
-  /** Custom class name */
-  className?: string
+  /** Whether to show the vertical crosshair line. Default: true */
+  showCrosshair?: boolean
+  /** Whether to show the date pill at bottom. Default: true */
+  showDatePill?: boolean
+  /** Whether to show dots on the lines. Default: true */
+  showDots?: boolean
 }
 
 export function ChartTooltip({
@@ -121,7 +121,7 @@ export function ChartTooltip({
   // Title from date or category
   const title = useMemo(() => {
     if (!tooltipData) {
-      return undefined
+      return
     }
     // For bar charts (horizontal or vertical), use the category name
     if (barXAccessor) {
@@ -129,9 +129,9 @@ export function ChartTooltip({
     }
     // For line/area charts, use the date
     return xAccessor(tooltipData.point).toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
       day: "numeric",
+      month: "short",
+      weekday: "short",
     })
   }, [tooltipData, barXAccessor, xAccessor])
 
@@ -206,8 +206,8 @@ export function ChartTooltip({
       >
         {content && tooltipData
           ? content({
-              point: tooltipData.point,
               index: tooltipData.index,
+              point: tooltipData.point,
             })
           : !content && (
               <TooltipContent rows={tooltipRows} title={title}>
@@ -221,9 +221,9 @@ export function ChartTooltip({
         <motion.div
           className="pointer-events-none absolute z-50"
           style={{
+            bottom: 4,
             left: animatedX,
             transform: "translateX(-50%)",
-            bottom: 4,
           }}
         >
           <DateTicker

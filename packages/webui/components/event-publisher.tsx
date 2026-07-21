@@ -75,9 +75,9 @@ export function EventPublisher({
 
     try {
       const response = await apiFetch(option.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(batch),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       })
       const body = await response.json().catch(() => null)
 
@@ -87,31 +87,31 @@ export function EventPublisher({
         setResults((current) => ({
           ...current,
           [option.id]: {
-            ok: true,
-            status: response.status,
             data: {
-              sent: batch.length,
               accepted,
               failed,
               sample: Array.isArray(body) ? body.slice(0, 5) : [body],
+              sent: batch.length,
             },
+            ok: true,
+            status: response.status,
           },
         }))
       } else {
         setResults((current) => ({
           ...current,
           [option.id]: {
-            ok: false,
-            status: response.status,
             error:
               (body as { error?: string } | null)?.error ?? "Request failed",
+            ok: false,
+            status: response.status,
           },
         }))
       }
     } catch (error) {
       setResults((current) => ({
         ...current,
-        [option.id]: { ok: false, error: (error as Error).message },
+        [option.id]: { error: (error as Error).message, ok: false },
       }))
     } finally {
       setSending((current) => ({ ...current, [option.id]: false }))
@@ -120,27 +120,27 @@ export function EventPublisher({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3 shrink-0">
+      <div className="flex shrink-0 items-center gap-3 border-b bg-muted/30 px-4 py-3">
         {logoSrc ? (
           <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border bg-background">
             <Image
-              src={logoSrc}
               alt={logoAlt ?? `${title} logo`}
+              className="object-contain p-1"
               fill
               sizes="32px"
-              className="object-contain p-1"
+              src={logoSrc}
             />
           </div>
         ) : (
           <HugeiconsIcon
+            className="text-muted-foreground"
             icon={LiveStreaming01Icon}
             size={15}
-            className="text-muted-foreground"
           />
         )}
         <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground">{title}</div>
-          <div className="text-xs text-muted-foreground">{subtitle}</div>
+          <div className="font-medium text-foreground text-sm">{title}</div>
+          <div className="text-muted-foreground text-xs">{subtitle}</div>
         </div>
       </div>
 
@@ -157,26 +157,26 @@ export function EventPublisher({
 
             return (
               <section
-                key={option.id}
                 className={`flex min-h-0 flex-col overflow-hidden bg-background ${
                   index === 0 ? "" : "border-l"
                 }`}
+                key={option.id}
               >
-                <div className="flex items-center gap-2 border-b bg-muted/20 px-4 py-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-2 border-b bg-muted/20 px-4 py-2">
                   <HugeiconsIcon
+                    className="text-muted-foreground"
                     icon={LiveStreaming01Icon}
                     size={14}
-                    className="text-muted-foreground"
                   />
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="font-medium text-foreground text-sm">
                     {option.label}
                   </div>
                   <div className="ml-auto flex items-center gap-2">
                     <Button
-                      size="sm"
+                      className="h-7 gap-1.5 px-2.5 text-[11px]"
                       disabled={isSending}
                       onClick={() => handleSend(option)}
-                      className="h-7 gap-1.5 px-2.5 text-[11px]"
+                      size="sm"
                     >
                       <HugeiconsIcon icon={MailSend02Icon} size={11} />
                       {isSending
@@ -190,8 +190,6 @@ export function EventPublisher({
                   <Editor
                     height="100%"
                     language="json"
-                    theme="vs"
-                    value={values[option.id] ?? ""}
                     onChange={(nextValue) => {
                       setValues((current) => ({
                         ...current,
@@ -203,25 +201,27 @@ export function EventPublisher({
                       }))
                     }}
                     options={{
-                      minimap: { enabled: false },
-                      fontSize: 12,
-                      lineNumbers: "on",
-                      scrollBeyondLastLine: false,
-                      wordWrap: "on",
-                      overviewRulerLanes: 0,
-                      renderLineHighlight: "line",
-                      padding: { top: 10, bottom: 10 },
                       fontFamily: "var(--font-geist-mono)",
-                      lineHeight: 1.55,
+                      fontSize: 12,
                       formatOnPaste: true,
                       formatOnType: true,
+                      lineHeight: 1.55,
+                      lineNumbers: "on",
+                      minimap: { enabled: false },
+                      overviewRulerLanes: 0,
+                      padding: { bottom: 10, top: 10 },
+                      renderLineHighlight: "line",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
                     }}
+                    theme="vs"
+                    value={values[option.id] ?? ""}
                   />
                 </div>
 
                 <div className="h-52 shrink-0 border-t">
-                  <div className="flex h-8 items-center gap-3 border-b bg-muted/10 px-3 shrink-0">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="flex h-8 shrink-0 items-center gap-3 border-b bg-muted/10 px-3">
+                    <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Response
                     </span>
                     {result && (
@@ -242,7 +242,7 @@ export function EventPublisher({
                   </div>
                   <div className="h-[calc(100%-32px)] overflow-auto px-4 py-2">
                     {!result && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         Send {batchSize} generated events to see the batch
                         response.
                       </span>

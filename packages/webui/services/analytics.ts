@@ -25,8 +25,8 @@ const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",
 })
 const openai = createOpenAI({
-  baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL,
 })
 
 const LANCEDB_BASE =
@@ -61,7 +61,9 @@ function localEmbed(text: string): number[] {
   }
 
   const norm = Math.hypot(...vector)
-  if (norm === 0) return vector
+  if (norm === 0) {
+    return vector
+  }
   return vector.map((value) => value / norm)
 }
 
@@ -82,18 +84,20 @@ async function hybridSearchSchema(
     const res = await fetch(
       `${LANCEDB_BASE}/tables/schema_embeddings/search?rerank=true`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          limit,
           query_type: "hybrid",
           text: query,
           vector: embedding,
-          limit,
         }),
         cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       }
     )
-    if (!res.ok) return []
+    if (!res.ok) {
+      return []
+    }
     const data = await res.json()
     return (data.results ?? []) as SchemaHit[]
   } catch {
@@ -103,13 +107,19 @@ async function hybridSearchSchema(
 
 async function fetchMyPermissionRequests(status?: string, token?: string) {
   const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
 
   const url = new URL(`${API_BASE}/api/permissions/requests`)
-  if (status && status !== "all") url.searchParams.set("status", status)
+  if (status && status !== "all") {
+    url.searchParams.set("status", status)
+  }
 
   const res = await fetch(url.toString(), { headers })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const data = await res.json()
   return data.requests as Array<{
     id: string
@@ -127,7 +137,9 @@ async function fetchMyPermissionRequests(status?: string, token?: string) {
 
 async function fetchPermissionRequest(idOrCode: string, token?: string) {
   const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
 
   const code = idOrCode.trim()
 
@@ -139,7 +151,9 @@ async function fetchPermissionRequest(idOrCode: string, token?: string) {
       `${API_BASE}/api/permissions/requests/${encodeURIComponent(code)}`,
       { headers }
     )
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`)
+    }
     return res.json()
   }
 
@@ -151,7 +165,9 @@ async function fetchPermissionRequest(idOrCode: string, token?: string) {
     `${API_BASE}/api/permissions/requests?search=${encodeURIComponent(suffix)}`,
     { headers }
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const data = (await res.json()) as { requests: Array<{ code: string }> }
   const requests = data.requests ?? []
   const normalized = code.toUpperCase().startsWith("PR-")
@@ -159,7 +175,9 @@ async function fetchPermissionRequest(idOrCode: string, token?: string) {
     : `PR-${code.toUpperCase()}`
   const match = requests.find((r) => r.code.toUpperCase() === normalized)
   if (!match) {
-    if (requests.length > 0) return requests[0]
+    if (requests.length > 0) {
+      return requests[0]
+    }
     throw new Error(`Request "${code}" not found`)
   }
   return match
@@ -171,11 +189,13 @@ async function runSql(sessionId: string | null, sql: string, token?: string) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   }
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
   const res = await fetch(url, {
-    method: "POST",
+    body: JSON.stringify({ idToken: token, sql }),
     headers,
-    body: JSON.stringify({ sql, idToken: token }),
+    method: "POST",
   })
   const data = await res.json()
   if (!res.ok) {
@@ -194,15 +214,17 @@ type AccessibleTableRef = {
 function parseAccessibleTables(schema: string): AccessibleTableRef[] {
   return schema.split(/\n\s*\n/).flatMap((block) => {
     const match = block.match(/^TABLE\s+([^.]+)\.([^.]+)\.([^:\n]+):/m)
-    if (!match) return []
+    if (!match) {
+      return []
+    }
 
     const [, catalog, schemaName, tableName] = match
     return [
       {
         catalog,
         schemaName,
-        tableName,
         searchText: block.toLowerCase(),
+        tableName,
       },
     ]
   })
@@ -245,29 +267,23 @@ export async function handleAnalyticsChat(req: NextRequest) {
   const schema = await fetchSchema(idToken).catch(() => "(schema unavailable)")
 
   const tools = {
-    runQuery: tool({
+    checkAccessRequestStatus: tool({
       description:
-        "Execute a SQL query and display the results in a data grid. Call this whenever the user asks to see, list, fetch, or query data.",
-      inputSchema: z.object({
-        sql: z.string().describe("The SQL query to execute"),
-        explanation: z
-          .string()
-          .describe("One sentence describing what this query returns"),
-      }),
-      execute: async ({ sql, explanation }) => {
+        "Check the current status of a permission request by its ID or code (e.g. PR-ABCD1234). Use when the user asks about the status, approval, or outcome of an access request.",
+      execute: async ({ request_id }) => {
         try {
-          const data = await runSql(sessionId, sql, idToken)
-          return {
-            sql,
-            explanation,
-            columns: data.columns,
-            rows: data.rows,
-            row_count: data.row_count,
-          }
+          return await fetchPermissionRequest(request_id, idToken)
         } catch (error) {
-          return { sql, explanation, error: (error as Error).message }
+          return { error: (error as Error).message }
         }
       },
+      inputSchema: z.object({
+        request_id: z
+          .string()
+          .describe(
+            "The request UUID or short code, e.g. PR-ABCD1234 or a full UUID like 123e4567-e89b-12d3-a456-426614174000"
+          ),
+      }),
     }),
     exploreCatalog: tool({
       description: [
@@ -282,22 +298,14 @@ export async function handleAnalyticsChat(req: NextRequest) {
         "Returns only the catalogs the current user can already access.",
         "For `search`: extract the main subject keywords from the user's message (e.g. 'I want to access hdbank customers' → search='hdbank customer'; 'interesting data in hdbank' → search='hdbank').",
       ].join(" "),
-      inputSchema: z.object({
-        search: z
-          .string()
-          .optional()
-          .describe(
-            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all accessible catalogs."
-          ),
-      }),
       execute: async ({ search }) => {
         if (schema === "(schema unavailable)" || schema === FALLBACK_SCHEMA) {
           return {
-            search: search ?? null,
             catalogs: [],
-            tables: [],
             overview:
               "I could not load your access-scoped catalog right now, so I’m not returning any catalogs. Try again when your Unity Catalog access list is available.",
+            search: search ?? null,
+            tables: [],
           }
         }
 
@@ -306,12 +314,12 @@ export async function handleAnalyticsChat(req: NextRequest) {
         if (!search) {
           const catalogs = getAccessibleCatalogs(schema)
           return {
-            search: null,
             catalogs,
-            tables: [],
             overview: `You have access to the following catalogs: ${catalogs.join(
               ", "
             )}. You can ask about specific catalogs or tables to see more details.`,
+            search: null,
+            tables: [],
           }
         }
 
@@ -320,11 +328,11 @@ export async function handleAnalyticsChat(req: NextRequest) {
         const accessibleCatalogs = new Set(getAccessibleCatalogs(schema))
 
         const toTableEntry = (h: SchemaHit) => ({
-          fqn: h.fqn,
           catalog: h.catalog,
+          description: h.text,
+          fqn: h.fqn,
           schema: h.schema_name,
           table: h.table_name,
-          description: h.text,
         })
 
         if (hits.length > 0) {
@@ -348,12 +356,12 @@ export async function handleAnalyticsChat(req: NextRequest) {
               : `No accessible catalogs matched "${search}".`
 
           return {
-            search,
             catalogs,
-            tables,
             inaccessible_catalogs,
             inaccessible_tables,
             overview,
+            search,
+            tables,
           }
         }
 
@@ -362,77 +370,45 @@ export async function handleAnalyticsChat(req: NextRequest) {
         const fallbackTables = parseAccessibleTables(schema)
           .filter((t) => fallbackCatalogs.includes(t.catalog))
           .map((t) => ({
-            fqn: `${t.catalog}.${t.schemaName}.${t.tableName}`,
             catalog: t.catalog,
+            description: t.searchText,
+            fqn: `${t.catalog}.${t.schemaName}.${t.tableName}`,
             schema: t.schemaName,
             table: t.tableName,
-            description: t.searchText,
           }))
         const overview =
           fallbackCatalogs.length > 0
             ? `Found ${fallbackTables.length} table(s) across ${fallbackCatalogs.length} catalog(s) matching "${search}".`
             : `No accessible catalogs matched "${search}".`
         return {
-          search,
           catalogs: fallbackCatalogs,
-          tables: fallbackTables,
           inaccessible_catalogs: [],
           inaccessible_tables: [],
           overview,
+          search,
+          tables: fallbackTables,
         }
       },
-    }),
-    prepareAccessRequest: tool({
-      description:
-        "Prepare (but do not submit) an access request for a resource the user cannot query. Shows a confirmation card in the chat — the user must click 'Request Access' to actually submit it.",
       inputSchema: z.object({
-        resource: z
+        search: z
           .string()
+          .optional()
           .describe(
-            "Fully qualified resource path, e.g. vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1"
+            "Keywords extracted from the user's message. For 'I want to access hdbank customers' → 'hdbank customer'. For 'interesting data in hdbank' → 'hdbank'. Omit only to list all accessible catalogs."
           ),
-        scope: z
-          .enum(["catalog", "schema", "table"])
-          .describe("Granularity of the access being requested"),
-        privileges: z
-          .array(z.string())
-          .describe(
-            "Privileges to request — SELECT for tables, USE SCHEMA for schemas, USE CATALOG for catalogs"
-          ),
-        rationale: z
-          .string()
-          .describe(
-            "Pre-filled rationale explaining why the user needs this data"
-          ),
-        suggested_duration_days: z
-          .number()
-          .default(30)
-          .describe("Suggested duration in days (default 30)"),
-        explanation: z
-          .string()
-          .describe(
-            "Short explanation shown to the user about what this data is and why they might want it"
-          ),
-      }),
-      execute: async ({
-        resource,
-        scope,
-        privileges,
-        rationale,
-        suggested_duration_days,
-        explanation,
-      }) => ({
-        resource,
-        scope,
-        privileges,
-        rationale,
-        suggested_duration_days,
-        explanation,
       }),
     }),
     listMyAccessRequests: tool({
       description:
         "List all of the current user's own permission requests. Use when the user asks 'show my requests', 'what access have I requested', 'my pending requests', 'show me my access requests', etc.",
+      execute: async ({ status }) => {
+        try {
+          const requests = await fetchMyPermissionRequests(status, idToken)
+          return { requests }
+        } catch (error) {
+          return { error: (error as Error).message, requests: [] }
+        }
+      },
       inputSchema: z.object({
         status: z
           .enum([
@@ -446,80 +422,128 @@ export async function handleAnalyticsChat(req: NextRequest) {
           .optional()
           .describe("Filter by status. Omit to return all statuses."),
       }),
-      execute: async ({ status }) => {
-        try {
-          const requests = await fetchMyPermissionRequests(status, idToken)
-          return { requests }
-        } catch (error) {
-          return { requests: [], error: (error as Error).message }
-        }
-      },
     }),
-    checkAccessRequestStatus: tool({
+    prepareAccessRequest: tool({
       description:
-        "Check the current status of a permission request by its ID or code (e.g. PR-ABCD1234). Use when the user asks about the status, approval, or outcome of an access request.",
+        "Prepare (but do not submit) an access request for a resource the user cannot query. Shows a confirmation card in the chat — the user must click 'Request Access' to actually submit it.",
+      execute: async ({
+        resource,
+        scope,
+        privileges,
+        rationale,
+        suggested_duration_days,
+        explanation,
+      }) => ({
+        explanation,
+        privileges,
+        rationale,
+        resource,
+        scope,
+        suggested_duration_days,
+      }),
       inputSchema: z.object({
-        request_id: z
+        explanation: z
           .string()
           .describe(
-            "The request UUID or short code, e.g. PR-ABCD1234 or a full UUID like 123e4567-e89b-12d3-a456-426614174000"
+            "Short explanation shown to the user about what this data is and why they might want it"
           ),
+        privileges: z
+          .array(z.string())
+          .describe(
+            "Privileges to request — SELECT for tables, USE SCHEMA for schemas, USE CATALOG for catalogs"
+          ),
+        rationale: z
+          .string()
+          .describe(
+            "Pre-filled rationale explaining why the user needs this data"
+          ),
+        resource: z
+          .string()
+          .describe(
+            "Fully qualified resource path, e.g. vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1"
+          ),
+        scope: z
+          .enum(["catalog", "schema", "table"])
+          .describe("Granularity of the access being requested"),
+        suggested_duration_days: z
+          .number()
+          .default(30)
+          .describe("Suggested duration in days (default 30)"),
       }),
-      execute: async ({ request_id }) => {
+    }),
+    runQuery: tool({
+      description:
+        "Execute a SQL query and display the results in a data grid. Call this whenever the user asks to see, list, fetch, or query data.",
+      execute: async ({ sql, explanation }) => {
         try {
-          return await fetchPermissionRequest(request_id, idToken)
+          const data = await runSql(sessionId, sql, idToken)
+          return {
+            columns: data.columns,
+            explanation,
+            row_count: data.row_count,
+            rows: data.rows,
+            sql,
+          }
         } catch (error) {
-          return { error: (error as Error).message }
+          return { error: (error as Error).message, explanation, sql }
         }
       },
+      inputSchema: z.object({
+        explanation: z
+          .string()
+          .describe("One sentence describing what this query returns"),
+        sql: z.string().describe("The SQL query to execute"),
+      }),
     }),
     visualizeChart: tool({
       description:
         "Run a SQL query and render the result as a chart. Call this when the user asks to visualize, plot, or chart data, or when a chart would better communicate the answer than a table.",
+      execute: async ({ sql, title, chartType, x, y, explanation }) => {
+        try {
+          const data = await runSql(sessionId, sql, idToken)
+          return {
+            chartType,
+            columns: data.columns,
+            explanation,
+            rows: data.rows,
+            sql,
+            title,
+            x,
+            y,
+          }
+        } catch (error) {
+          return {
+            chartType,
+            error: (error as Error).message,
+            explanation,
+            sql,
+            title,
+            x,
+            y,
+          }
+        }
+      },
       inputSchema: z.object({
-        sql: z.string().describe("SQL query whose result will be charted"),
-        title: z.string().describe("Short chart title"),
         chartType: z
           .enum(["bar", "line", "area", "pie", "scatter"])
           .describe(
             "bar → categories, line → time-series, area → cumulative/trends, pie → proportions ≤8 slices, scatter → correlation between two numeric columns"
           ),
-        x: z.string().describe("Column name for x-axis labels"),
-        y: z.string().describe("Column name for numeric values"),
         explanation: z
           .string()
           .describe("One sentence describing what this chart shows"),
+        sql: z.string().describe("SQL query whose result will be charted"),
+        title: z.string().describe("Short chart title"),
+        x: z.string().describe("Column name for x-axis labels"),
+        y: z.string().describe("Column name for numeric values"),
       }),
-      execute: async ({ sql, title, chartType, x, y, explanation }) => {
-        try {
-          const data = await runSql(sessionId, sql, idToken)
-          return {
-            sql,
-            title,
-            chartType,
-            x,
-            y,
-            explanation,
-            columns: data.columns,
-            rows: data.rows,
-          }
-        } catch (error) {
-          return {
-            sql,
-            title,
-            chartType,
-            x,
-            y,
-            explanation,
-            error: (error as Error).message,
-          }
-        }
-      },
     }),
   }
 
   const result = streamText({
+    messages: await convertToModelMessages(messages, { tools }),
     model,
+    stopWhen: stepCountIs(10),
     system: `You are a data analyst for the Mizumi lakehouse platform. You have six tools: runQuery, visualizeChart, exploreCatalog, listMyAccessRequests, prepareAccessRequest, and checkAccessRequestStatus.
 
 ## HARD RULES — follow these exactly, no exceptions:
@@ -582,9 +606,7 @@ ${schema}
 ## After a successful tool call:
 - NEVER render data as a markdown table or list — the UI renders results automatically.
 - Write 1–2 sentences interpreting the results only.`,
-    messages: await convertToModelMessages(messages, { tools }),
     tools,
-    stopWhen: stepCountIs(10),
   })
 
   return result.toUIMessageStreamResponse()

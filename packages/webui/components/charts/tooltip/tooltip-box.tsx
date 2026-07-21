@@ -6,33 +6,33 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 // Spring config for smooth tooltip movement
-const springConfig = { stiffness: 100, damping: 20 }
+const springConfig = { damping: 20, stiffness: 100 }
 
 export interface TooltipBoxProps {
-  /** X position in pixels (relative to container) */
-  x: number
-  /** Y position in pixels (relative to container) */
-  y: number
-  /** Whether the tooltip is visible */
-  visible: boolean
+  /** Tooltip content */
+  children: React.ReactNode
+  /** Custom class name */
+  className?: string
+  /** Container height for bounds clamping */
+  containerHeight: number
   /** Container ref for portal rendering */
   containerRef: RefObject<HTMLDivElement | null>
   /** Container width for flip detection */
   containerWidth: number
-  /** Container height for bounds clamping */
-  containerHeight: number
-  /** Offset from the target position */
-  offset?: number
-  /** Custom class name */
-  className?: string
-  /** Tooltip content */
-  children: React.ReactNode
-  /** Override left position (bypasses internal calculation) */
-  left?: number | ReturnType<typeof useSpring>
-  /** Override top position (bypasses internal calculation) */
-  top?: number | ReturnType<typeof useSpring>
   /** Force flip direction (for custom positioning) */
   flipped?: boolean
+  /** Override left position (bypasses internal calculation) */
+  left?: number | ReturnType<typeof useSpring>
+  /** Offset from the target position */
+  offset?: number
+  /** Override top position (bypasses internal calculation) */
+  top?: number | ReturnType<typeof useSpring>
+  /** Whether the tooltip is visible */
+  visible: boolean
+  /** X position in pixels (relative to container) */
+  x: number
+  /** Y position in pixels (relative to container) */
+  y: number
 }
 
 export function TooltipBox({
@@ -154,12 +154,12 @@ export function TooltipBox({
       transition={{ duration: 0.1 }}
     >
       <motion.div
-        animate={{ scale: 1, opacity: 1, x: 0 }}
+        animate={{ opacity: 1, scale: 1, x: 0 }}
         className="min-w-[140px] overflow-hidden rounded-lg bg-chart-tooltip-background text-chart-tooltip-foreground shadow-lg backdrop-blur-md"
-        initial={{ scale: 0.85, opacity: 0, x: isFlipped ? 20 : -20 }}
+        initial={{ opacity: 0, scale: 0.85, x: isFlipped ? 20 : -20 }}
         key={flipKey}
         style={{ transformOrigin }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        transition={{ damping: 25, stiffness: 300, type: "spring" }}
       >
         {children}
       </motion.div>

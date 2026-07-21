@@ -82,7 +82,9 @@ export function DataGrid<TData>({
 
   const onFooterCellKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!onRowAddRef.current) return
+      if (!onRowAddRef.current) {
+        return
+      }
 
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault()
@@ -101,40 +103,40 @@ export function DataGrid<TData>({
     >
       {searchState && <DataGridSearch {...searchState} />}
       <DataGridContextMenu
-        tableMeta={tableMeta}
         columns={columns}
         contextMenu={contextMenu}
+        tableMeta={tableMeta}
       />
-      <DataGridPasteDialog tableMeta={tableMeta} pasteDialog={pasteDialog} />
+      <DataGridPasteDialog pasteDialog={pasteDialog} tableMeta={tableMeta} />
       <div
-        role="grid"
+        aria-colcount={columns.length}
         aria-label="Data grid"
         aria-rowcount={rows.length + (onRowAddProp ? 1 : 0)}
-        aria-colcount={columns.length}
-        data-slot="grid"
-        tabIndex={0}
-        ref={dataGridRef}
         className="relative grid select-none overflow-auto focus:outline-none"
+        data-slot="grid"
+        onContextMenu={onDataGridContextMenu}
+        ref={dataGridRef}
+        role="grid"
         style={{
           ...columnSizeVars,
           maxHeight: `${height}px`,
         }}
-        onContextMenu={onDataGridContextMenu}
+        tabIndex={0}
       >
         <div
-          role="rowgroup"
+          className="sticky top-0 z-10 grid border-b bg-background"
           data-slot="grid-header"
           ref={headerRef}
-          className="sticky top-0 z-10 grid border-b bg-background"
+          role="rowgroup"
         >
           {table.getHeaderGroups().map((headerGroup, rowIndex) => (
             <div
+              aria-rowindex={rowIndex + 1}
+              className="flex w-full"
+              data-slot="grid-header-row"
               key={headerGroup.id}
               role="row"
-              aria-rowindex={rowIndex + 1}
-              data-slot="grid-header-row"
               tabIndex={-1}
-              className="flex w-full"
             >
               {headerGroup.headers.map((header, colIndex) => {
                 const sorting = table.getState().sorting
@@ -149,14 +151,12 @@ export function DataGrid<TData>({
                 const { showEndBorder, showStartBorder } =
                   getColumnBorderVisibility({
                     column: header.column,
-                    nextColumn: nextHeader?.column,
                     isLastColumn,
+                    nextColumn: nextHeader?.column,
                   })
 
                 return (
                   <div
-                    key={header.id}
-                    role="columnheader"
                     aria-colindex={colIndex + 1}
                     aria-sort={
                       currentSort?.desc === false
@@ -167,19 +167,21 @@ export function DataGrid<TData>({
                             ? "none"
                             : undefined
                     }
-                    data-slot="grid-header-cell"
-                    tabIndex={-1}
                     className={cn("relative", {
-                      grow: stretchColumns && header.column.id !== "select",
                       "border-e":
                         showEndBorder && header.column.id !== "select",
                       "border-s":
                         showStartBorder && header.column.id !== "select",
+                      grow: stretchColumns && header.column.id !== "select",
                     })}
+                    data-slot="grid-header-cell"
+                    key={header.id}
+                    role="columnheader"
                     style={{
                       ...getColumnPinningStyle({ column: header.column, dir }),
                       width: `calc(var(--header-${header.id}-size) * 1px)`,
                     }}
+                    tabIndex={-1}
                   >
                     {header.isPlaceholder ? null : typeof header.column
                         .columnDef.header === "function" ? (
@@ -199,17 +201,19 @@ export function DataGrid<TData>({
           ))}
         </div>
         <div
-          role="rowgroup"
-          data-slot="grid-body"
           className="relative grid"
+          data-slot="grid-body"
+          role="rowgroup"
           style={{
-            height: `${virtualTotalSize}px`,
             contain: adjustLayout ? "layout paint" : "strict",
+            height: `${virtualTotalSize}px`,
           }}
         >
           {virtualItems.map((virtualItem) => {
             const row = rows[virtualItem.index]
-            if (!row) return null
+            if (!row) {
+              return null
+            }
 
             const cellSelectionKeys =
               cellSelectionMap?.get(virtualItem.index) ??
@@ -222,52 +226,52 @@ export function DataGrid<TData>({
 
             return (
               <DataGridRow
-                key={row.id}
-                row={row}
-                tableMeta={tableMeta}
-                rowMapRef={rowMapRef}
-                virtualItem={virtualItem}
-                measureElement={measureElement}
-                rowHeight={rowHeight}
-                columnVisibility={columnVisibility}
-                columnPinning={columnPinning}
-                focusedCell={focusedCell}
-                editingCell={editingCell}
-                cellSelectionKeys={cellSelectionKeys}
-                searchMatchColumns={searchMatchColumns}
                 activeSearchMatch={isActiveSearchRow ? activeSearchMatch : null}
-                dir={dir}
                 adjustLayout={adjustLayout}
-                stretchColumns={stretchColumns}
+                cellSelectionKeys={cellSelectionKeys}
+                columnPinning={columnPinning}
+                columnVisibility={columnVisibility}
+                dir={dir}
+                editingCell={editingCell}
+                focusedCell={focusedCell}
+                key={row.id}
+                measureElement={measureElement}
                 readOnly={readOnly}
+                row={row}
+                rowHeight={rowHeight}
+                rowMapRef={rowMapRef}
+                searchMatchColumns={searchMatchColumns}
+                stretchColumns={stretchColumns}
+                tableMeta={tableMeta}
+                virtualItem={virtualItem}
               />
             )
           })}
         </div>
         {!readOnly && onRowAdd && (
           <div
-            role="rowgroup"
+            className="sticky bottom-0 z-10 grid border-t bg-background"
             data-slot="grid-footer"
             ref={footerRef}
-            className="sticky bottom-0 z-10 grid border-t bg-background"
+            role="rowgroup"
           >
             <div
-              role="row"
               aria-rowindex={rows.length + 2}
-              data-slot="grid-add-row"
-              tabIndex={-1}
               className="flex w-full"
+              data-slot="grid-add-row"
+              role="row"
+              tabIndex={-1}
             >
               <div
-                role="gridcell"
-                tabIndex={0}
                 className="relative flex h-9 grow items-center bg-muted/30 transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none"
-                style={{
-                  width: table.getTotalSize(),
-                  minWidth: table.getTotalSize(),
-                }}
                 onClick={onRowAdd}
                 onKeyDown={onFooterCellKeyDown}
+                role="gridcell"
+                style={{
+                  minWidth: table.getTotalSize(),
+                  width: table.getTotalSize(),
+                }}
+                tabIndex={0}
               >
                 <div className="sticky start-0 flex items-center gap-2 px-3 text-muted-foreground">
                   <Plus className="size-3.5" />

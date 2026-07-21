@@ -13,28 +13,28 @@ import { chartCssVars, useChart } from "./chart-context"
 import { ChartRevealClip } from "./chart-reveal-clip"
 
 export interface AreaProps {
+  /** Whether to animate the area. Default: true */
+  animate?: boolean
+  /** Curve function. Default: curveMonotoneX */
+  curve?: CurveFactory
   /** Key in data to use for y values */
   dataKey: string
+  /** Whether to fade the area fill at left/right edges. Default: false */
+  fadeEdges?: boolean
   /** Fill color for the area gradient start. Default: var(--chart-line-primary) */
   fill?: string
   /** Fill opacity at the top of the area. Default: 0.4 */
   fillOpacity?: number
+  /** Gradient opacity at bottom (0 = fully transparent). Default: 0 */
+  gradientToOpacity?: number
+  /** Whether to show highlight segment on hover. Default: true */
+  showHighlight?: boolean
+  /** Whether to show the stroke line. Default: true */
+  showLine?: boolean
   /** Stroke color for the line. Default: same as fill */
   stroke?: string
   /** Stroke width. Default: 2 */
   strokeWidth?: number
-  /** Curve function. Default: curveMonotoneX */
-  curve?: CurveFactory
-  /** Whether to animate the area. Default: true */
-  animate?: boolean
-  /** Whether to show the stroke line. Default: true */
-  showLine?: boolean
-  /** Whether to show highlight segment on hover. Default: true */
-  showHighlight?: boolean
-  /** Gradient opacity at bottom (0 = fully transparent). Default: 0 */
-  gradientToOpacity?: number
-  /** Whether to fade the area fill at left/right edges. Default: false */
-  fadeEdges?: boolean
 }
 
 export function Area({
@@ -153,21 +153,21 @@ export function Area({
   // Calculate segment bounds for highlight from either selection or hover
   const segmentBounds = useMemo(() => {
     if (data.length < 2 || chordMetrics.total <= 0) {
-      return { startLength: 0, segmentLength: 0, isActive: false }
+      return { isActive: false, segmentLength: 0, startLength: 0 }
     }
 
     if (selection?.active) {
       const startLength = approximateLengthAtX(selection.startX)
       const endLength = approximateLengthAtX(selection.endX)
       return {
-        startLength,
-        segmentLength: Math.max(0, endLength - startLength),
         isActive: true,
+        segmentLength: Math.max(0, endLength - startLength),
+        startLength,
       }
     }
 
     if (!tooltipData) {
-      return { startLength: 0, segmentLength: 0, isActive: false }
+      return { isActive: false, segmentLength: 0, startLength: 0 }
     }
 
     const idx = tooltipData.index
@@ -177,7 +177,7 @@ export function Area({
     const startPoint = data[startIdx]
     const endPoint = data[endIdx]
     if (!(startPoint && endPoint)) {
-      return { startLength: 0, segmentLength: 0, isActive: false }
+      return { isActive: false, segmentLength: 0, startLength: 0 }
     }
 
     const startX = xScale(xAccessor(startPoint)) ?? 0
@@ -187,9 +187,9 @@ export function Area({
     const endLength = approximateLengthAtX(endX)
 
     return {
-      startLength,
-      segmentLength: Math.max(0, endLength - startLength),
       isActive: true,
+      segmentLength: Math.max(0, endLength - startLength),
+      startLength,
     }
   }, [
     tooltipData,
@@ -202,7 +202,7 @@ export function Area({
   ])
 
   // Springs for smooth highlight animation (both offset AND segment length)
-  const springConfig = { stiffness: 180, damping: 28 }
+  const springConfig = { damping: 28, stiffness: 180 }
   const offsetSpring = useSpring(0, springConfig)
   const segmentLengthSpring = useSpring(0, springConfig)
 

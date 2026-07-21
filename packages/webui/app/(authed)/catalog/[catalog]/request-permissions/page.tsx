@@ -10,35 +10,35 @@ export default function CatalogRequestPermissionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="px-6 pt-4 shrink-0">
-        <h1 className="text-sm font-semibold">{catalog}</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
+      <div className="shrink-0 px-6 pt-4">
+        <h1 className="font-semibold text-sm">{catalog}</h1>
+        <p className="mt-0.5 text-muted-foreground text-xs">
           Request access to this catalog
         </p>
         <CatalogTabs
           tabs={[
             {
+              active: false,
               href: `/catalog/${catalog}`,
-              label: "schemas",
-              active: false,
               icon: IconDatabase,
+              label: "schemas",
             },
             {
-              href: `/catalog/${catalog}/permissions`,
-              label: "permissions",
               active: false,
+              href: `/catalog/${catalog}/permissions`,
               icon: IconShieldLock,
+              label: "permissions",
             },
             {
-              href: `/catalog/${catalog}/request-permissions`,
-              label: "request access",
               active: true,
+              href: `/catalog/${catalog}/request-permissions`,
               icon: IconKey,
+              label: "request access",
             },
           ]}
         />
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <RequestPermissionsPanel resource={catalog} scope="catalog" />
       </div>
     </div>

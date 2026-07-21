@@ -106,7 +106,9 @@ type LineageFlowNode =
   | Node<LineageGroupData, "lineageGroup">
 
 function toDayjs(ts: string | null | undefined) {
-  if (!ts) return null
+  if (!ts) {
+    return null
+  }
   const d = dayjs(ts)
   return d.isValid() ? d : null
 }
@@ -206,7 +208,9 @@ function typeLabel(node: ApiLineageNode) {
   if (node.node_type === "table") {
     const catalog = String(node.properties.catalog_name ?? "")
     const schema = String(node.properties.schema_name ?? "")
-    if (catalog && schema) return `${catalog}.${schema}`
+    if (catalog && schema) {
+      return `${catalog}.${schema}`
+    }
   }
   return node.platform
 }
@@ -221,65 +225,65 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
   const body = (
     <div
       className={cn(
-        "rounded-lg overflow-hidden text-xs shadow-sm border-2 select-none bg-white",
+        "select-none overflow-hidden rounded-lg border-2 bg-white text-xs shadow-sm",
         nodeAccent(data.nodeType),
-        data.isCurrent ? "ring-2 ring-blue-500 border-blue-500" : ""
+        data.isCurrent ? "border-blue-500 ring-2 ring-blue-500" : ""
       )}
     >
       <Handle
-        type="target"
-        position={Position.Left}
         className="!w-2 !h-2 !bg-zinc-300 !border-0"
+        position={Position.Left}
+        type="target"
       />
       <Handle
-        type="source"
-        position={Position.Right}
         className="!w-2 !h-2 !bg-zinc-300 !border-0"
+        position={Position.Right}
+        type="source"
       />
 
-      <div className="flex items-start gap-2 px-3 py-2 border-b border-zinc-200/80">
-        <span className="text-zinc-500 mt-0.5 shrink-0">
+      <div className="flex items-start gap-2 border-zinc-200/80 border-b px-3 py-2">
+        <span className="mt-0.5 shrink-0 text-zinc-500">
           {nodeIcon(data.nodeType)}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="font-mono font-semibold break-words whitespace-normal leading-snug">
+          <div className="whitespace-normal break-words font-mono font-semibold leading-snug">
             {data.displayName}
           </div>
-          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">
+          <div className="mt-0.5 text-[10px] text-zinc-500 uppercase tracking-wide">
             {data.nodeType.replaceAll("_", " ")}
           </div>
         </div>
       </div>
 
       <div className="divide-y divide-zinc-200/70">
-        <div className="flex justify-between items-center px-3 py-1.5">
+        <div className="flex items-center justify-between px-3 py-1.5">
           <span className="text-zinc-500">Platform</span>
           <span className="text-zinc-700 capitalize">{data.platform}</span>
         </div>
-        <div className="flex justify-between items-start px-3 py-1.5 gap-2">
-          <span className="text-zinc-500 shrink-0">Scope</span>
-          <span className="text-zinc-700 break-words text-right">
+        <div className="flex items-start justify-between gap-2 px-3 py-1.5">
+          <span className="shrink-0 text-zinc-500">Scope</span>
+          <span className="break-words text-right text-zinc-700">
             {typeLabel({
+              display_name: data.displayName,
               id: data.id,
+              name: "",
+              namespace: "",
               node_type: data.nodeType,
               platform: data.platform,
-              namespace: "",
-              name: "",
-              display_name: data.displayName,
               properties: data.properties,
               runtime: data.runtime,
             } as ApiLineageNode)}
           </span>
         </div>
-        <div className="flex justify-between items-center px-3 py-1.5">
+        <div className="flex items-center justify-between px-3 py-1.5">
           <span className="text-zinc-500">Latest event</span>
           <span
-            className={latest ? "text-blue-600 font-medium" : "text-zinc-400"}
+            className={latest ? "font-medium text-blue-600" : "text-zinc-400"}
           >
             {fmtRelTime(latest)}
           </span>
         </div>
-        <div className="flex justify-between items-center px-3 py-1.5">
+        <div className="flex items-center justify-between px-3 py-1.5">
           <span className="text-zinc-500">Run state</span>
           <span
             className={cn(
@@ -298,12 +302,12 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
         </div>
         <div
           className={cn(
-            "flex justify-between items-center px-3 py-1.5",
+            "flex items-center justify-between px-3 py-1.5",
             latest ? "bg-green-50/70" : ""
           )}
         >
           <span
-            className={latest ? "text-green-700 font-medium" : "text-zinc-500"}
+            className={latest ? "font-medium text-green-700" : "text-zinc-500"}
           >
             {latest ? "Observed" : "No runtime"}
           </span>
@@ -312,11 +316,10 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
           </span>
         </div>
         {data.canExpand && (
-          <div className="px-3 py-2 flex justify-end bg-white/80">
+          <div className="flex justify-end bg-white/80 px-3 py-2">
             <button
-              type="button"
               className={cn(
-                "rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-wide transition-colors",
+                "rounded-md border px-2 py-1 font-medium text-[10px] uppercase tracking-wide transition-colors",
                 data.isExpanded
                   ? "border-blue-300 bg-blue-50 text-blue-700"
                   : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900"
@@ -325,6 +328,7 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
                 event.stopPropagation()
                 data.onExpand?.(data.id)
               }}
+              type="button"
             >
               {data.isExpanded ? "Expanded" : "Expand"}
             </button>
@@ -334,12 +338,14 @@ function LineageNodeCard({ data }: { data: LineageNodeData }) {
     </div>
   )
 
-  if (!data.href) return body
+  if (!data.href) {
+    return body
+  }
 
   return (
     <Link
+      className="block transition-opacity hover:opacity-90"
       href={data.href}
-      className="block hover:opacity-90 transition-opacity"
     >
       {body}
     </Link>
@@ -350,12 +356,12 @@ function groupAccent(nodeType: "catalog" | "schema", isCurrent: boolean) {
   if (nodeType === "catalog") {
     return cn(
       "border-amber-400/80 bg-amber-100/70",
-      isCurrent ? "ring-2 ring-amber-500 border-amber-500" : ""
+      isCurrent ? "border-amber-500 ring-2 ring-amber-500" : ""
     )
   }
   return cn(
     "border-sky-400/75 bg-sky-100/70",
-    isCurrent ? "ring-2 ring-sky-500 border-sky-500" : ""
+    isCurrent ? "border-sky-500 ring-2 ring-sky-500" : ""
   )
 }
 
@@ -370,10 +376,10 @@ function LineageGroupNode({ data }: { data: LineageGroupData }) {
       <div className="flex items-center gap-2 text-zinc-700">
         <span className="text-sm">{nodeIcon(data.nodeType)}</span>
         <div className="min-w-0">
-          <div className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.16em]">
+          <div className="truncate font-mono font-semibold text-[11px] uppercase tracking-[0.16em]">
             {data.displayName}
           </div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-[0.2em]">
             {data.nodeType}
           </div>
         </div>
@@ -412,10 +418,10 @@ function boundsFromRects(
   const maxX = Math.max(...rects.map((rect) => rect.x + rect.width))
   const maxY = Math.max(...rects.map((rect) => rect.y + rect.height))
   return {
+    height: maxY - minY,
+    width: maxX - minX,
     x: minX,
     y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
   }
 }
 
@@ -439,7 +445,9 @@ function buildLayout(
   for (const edge of containsEdges) {
     const sourceNode = nodesById.get(edge.source)
     const targetNode = nodesById.get(edge.target)
-    if (!sourceNode || !targetNode) continue
+    if (!(sourceNode && targetNode)) {
+      continue
+    }
 
     if (
       sourceNode.node_type === "schema" &&
@@ -482,7 +490,7 @@ function buildLayout(
   // where standalone leaves landed inside a schema's bounding box.
   const g = new dagre.graphlib.Graph({ compound: true })
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 90 })
+  g.setGraph({ nodesep: 30, rankdir: "LR", ranksep: 90 })
 
   // Dagre's compound layout sizes each cluster from a tight bound around its
   // children plus a small auto-margin (~25px). Our visual schema/catalog rects
@@ -512,10 +520,12 @@ function buildLayout(
     leafExtraTop.set(node.id, extraTop)
     leafExtraBottom.set(node.id, extraBottom)
     g.setNode(node.id, {
-      width: CARD_W,
       height: cardHeight(node) + extraTop + extraBottom,
+      width: CARD_W,
     })
-    if (schemaId) g.setParent(node.id, schemaId)
+    if (schemaId) {
+      g.setParent(node.id, schemaId)
+    }
   }
 
   for (const schemaNode of groupedNodes.filter(
@@ -527,10 +537,12 @@ function buildLayout(
       g.setNode(schemaNode.id, {})
     } else {
       // Fallback standalone group with explicit size.
-      g.setNode(schemaNode.id, { width: GROUP_MIN_W, height: GROUP_MIN_H })
+      g.setNode(schemaNode.id, { height: GROUP_MIN_H, width: GROUP_MIN_W })
     }
     const catalogId = catalogForSchema.get(schemaNode.id)
-    if (catalogId) g.setParent(schemaNode.id, catalogId)
+    if (catalogId) {
+      g.setParent(schemaNode.id, catalogId)
+    }
   }
 
   for (const catalogNode of groupedNodes.filter(
@@ -542,17 +554,25 @@ function buildLayout(
       g.setNode(catalogNode.id, {})
     } else {
       g.setNode(catalogNode.id, {
-        width: GROUP_MIN_W + 40,
         height: GROUP_MIN_H,
+        width: GROUP_MIN_W + 40,
       })
     }
   }
 
   for (const edge of graph.edges) {
-    if (edge.edge_type === "contains") continue
-    if (!nodesById.has(edge.source) || !nodesById.has(edge.target)) continue
-    if (isGroupNodeType(nodesById.get(edge.source)?.node_type ?? "")) continue
-    if (isGroupNodeType(nodesById.get(edge.target)?.node_type ?? "")) continue
+    if (edge.edge_type === "contains") {
+      continue
+    }
+    if (!(nodesById.has(edge.source) && nodesById.has(edge.target))) {
+      continue
+    }
+    if (isGroupNodeType(nodesById.get(edge.source)?.node_type ?? "")) {
+      continue
+    }
+    if (isGroupNodeType(nodesById.get(edge.target)?.node_type ?? "")) {
+      continue
+    }
     g.setEdge(edge.source, edge.target)
   }
 
@@ -572,10 +592,10 @@ function buildLayout(
     const extraBottom = leafExtraBottom.get(node.id) ?? 0
     const centerY = (pos?.y ?? 0) + (extraTop - extraBottom) / 2
     leafAbsRects.set(node.id, {
+      height,
+      width: CARD_W,
       x: (pos?.x ?? 0) - CARD_W / 2,
       y: centerY - height / 2,
-      width: CARD_W,
-      height,
     })
   }
 
@@ -604,23 +624,23 @@ function buildLayout(
       const width = pos?.width ?? GROUP_MIN_W
       const height = pos?.height ?? GROUP_MIN_H
       schemaRects.set(schemaNode.id, {
+        height,
+        width,
         x: (pos?.x ?? 0) - width / 2,
         y: (pos?.y ?? 0) - height / 2,
-        width,
-        height,
       })
       continue
     }
 
     const bounds = boundsFromRects(childRects)
     schemaRects.set(schemaNode.id, {
-      x: bounds.x - GROUP_PAD_X,
-      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
-      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W),
       height: Math.max(
         bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
         GROUP_MIN_H
       ),
+      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W),
+      x: bounds.x - GROUP_PAD_X,
+      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
     })
   }
 
@@ -647,23 +667,23 @@ function buildLayout(
       const width = pos?.width ?? GROUP_MIN_W + 40
       const height = pos?.height ?? GROUP_MIN_H
       catalogRects.set(catalogNode.id, {
+        height,
+        width,
         x: (pos?.x ?? 0) - width / 2,
         y: (pos?.y ?? 0) - height / 2,
-        width,
-        height,
       })
       continue
     }
 
     const bounds = boundsFromRects(childRects)
     catalogRects.set(catalogNode.id, {
-      x: bounds.x - GROUP_PAD_X,
-      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
-      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W + 40),
       height: Math.max(
         bounds.height + GROUP_HEADER_H + GROUP_PAD_Y * 2,
         GROUP_MIN_H + 20
       ),
+      width: Math.max(bounds.width + GROUP_PAD_X * 2, GROUP_MIN_W + 40),
+      x: bounds.x - GROUP_PAD_X,
+      y: bounds.y - GROUP_HEADER_H - GROUP_PAD_Y,
     })
   }
 
@@ -676,20 +696,22 @@ function buildLayout(
     (node) => node.node_type === "catalog"
   )) {
     const rect = catalogRects.get(catalogNode.id)
-    if (!rect) continue
+    if (!rect) {
+      continue
+    }
     rfNodes.push({
-      id: catalogNode.id,
-      type: "lineageGroup",
-      position: { x: rect.x, y: rect.y },
-      style: { width: rect.width, height: rect.height, zIndex: -2 },
       data: {
-        id: catalogNode.id,
         displayName: catalogNode.display_name,
-        nodeType: "catalog",
+        id: catalogNode.id,
         isCurrent: catalogNode.id === currentId,
+        nodeType: "catalog",
       },
       draggable: false,
+      id: catalogNode.id,
+      position: { x: rect.x, y: rect.y },
       selectable: true,
+      style: { height: rect.height, width: rect.width, zIndex: -2 },
+      type: "lineageGroup",
     })
   }
 
@@ -697,24 +719,26 @@ function buildLayout(
     (node) => node.node_type === "schema"
   )) {
     const rect = schemaRects.get(schemaNode.id)
-    if (!rect) continue
+    if (!rect) {
+      continue
+    }
     const catalogId = catalogForSchema.get(schemaNode.id)
     const catalogRect = catalogId ? catalogRects.get(catalogId) : undefined
     const schemaFlow: Node<LineageGroupData, "lineageGroup"> = {
+      data: {
+        displayName: schemaNode.display_name,
+        id: schemaNode.id,
+        isCurrent: schemaNode.id === currentId,
+        nodeType: "schema",
+      },
+      draggable: false,
       id: schemaNode.id,
-      type: "lineageGroup",
       position: catalogRect
         ? { x: rect.x - catalogRect.x, y: rect.y - catalogRect.y }
         : { x: rect.x, y: rect.y },
-      style: { width: rect.width, height: rect.height, zIndex: -1 },
-      data: {
-        id: schemaNode.id,
-        displayName: schemaNode.display_name,
-        nodeType: "schema",
-        isCurrent: schemaNode.id === currentId,
-      },
-      draggable: false,
       selectable: true,
+      style: { height: rect.height, width: rect.width, zIndex: -1 },
+      type: "lineageGroup",
     }
     if (catalogRect) {
       schemaFlow.parentId = catalogId
@@ -725,30 +749,32 @@ function buildLayout(
 
   for (const node of leafNodes) {
     const absRect = leafAbsRects.get(node.id)
-    if (!absRect) continue
+    if (!absRect) {
+      continue
+    }
     const schemaId = schemaForLeaf.get(node.id)
     const schemaRect = schemaId ? schemaRects.get(schemaId) : undefined
     const leafFlow: Node<LineageNodeData, "lineageCard"> = {
-      id: node.id,
-      type: "lineageCard",
-      position: schemaRect
-        ? { x: absRect.x - schemaRect.x, y: absRect.y - schemaRect.y }
-        : { x: absRect.x, y: absRect.y },
-      style: { width: CARD_W, height: absRect.height },
       data: {
-        id: node.id,
+        canExpand: false,
         displayName: node.display_name,
+        href: nodeHref(node),
+        id: node.id,
+        isCurrent: node.id === currentId,
+        isExpanded: false,
         nodeType: node.node_type,
+        onExpand: null,
         platform: node.platform,
         properties: node.properties,
         runtime: node.runtime,
-        isCurrent: node.id === currentId,
-        href: nodeHref(node),
-        canExpand: false,
-        isExpanded: false,
-        onExpand: null,
       } satisfies LineageNodeData,
       draggable: false,
+      id: node.id,
+      position: schemaRect
+        ? { x: absRect.x - schemaRect.x, y: absRect.y - schemaRect.y }
+        : { x: absRect.x, y: absRect.y },
+      style: { height: absRect.height, width: CARD_W },
+      type: "lineageCard",
     }
     if (schemaRect) {
       leafFlow.parentId = schemaId
@@ -759,31 +785,31 @@ function buildLayout(
 
   const rfEdges: Edge[] = graph.edges.map((edge) => ({
     id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      width: 14,
-      height: 14,
-      color: "#94a3b8",
-    },
-    style: {
-      stroke: "#94a3b8",
-      strokeWidth: edge.edge_type === "contains" ? 1 : 1.6,
-      strokeDasharray: edge.edge_type === "contains" ? "4 4" : undefined,
-    },
     label: edge.edge_type.replaceAll("_", " "),
+    labelBgBorderRadius: 4,
+    labelBgPadding: [4, 2],
+    labelBgStyle: { fill: "rgba(255,255,255,0.9)" },
     labelStyle: {
-      fontSize: 10,
       fill: "#64748b",
+      fontSize: 10,
       textTransform: "capitalize",
     },
-    labelBgStyle: { fill: "rgba(255,255,255,0.9)" },
-    labelBgPadding: [4, 2],
-    labelBgBorderRadius: 4,
+    markerEnd: {
+      color: "#94a3b8",
+      height: 14,
+      type: MarkerType.ArrowClosed,
+      width: 14,
+    },
+    source: edge.source,
+    style: {
+      stroke: "#94a3b8",
+      strokeDasharray: edge.edge_type === "contains" ? "4 4" : undefined,
+      strokeWidth: edge.edge_type === "contains" ? 1 : 1.6,
+    },
+    target: edge.target,
   }))
 
-  return { rfNodes, rfEdges }
+  return { rfEdges, rfNodes }
 }
 
 export function LineageGraph({
@@ -829,7 +855,9 @@ export function LineageGraph({
     })
       .then(async (res) => {
         const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+        if (!res.ok) {
+          throw new Error(json.error ?? `HTTP ${res.status}`)
+        }
         return json as ApiLineageGraph
       })
       .then((data) => {
@@ -845,16 +873,22 @@ export function LineageGraph({
                   (n.display_name === selectRootHint.displayName ||
                     n.name === selectRootHint.displayName)
               )
-              if (match) setSelectedNodeId(match.id)
+              if (match) {
+                setSelectedNodeId(match.id)
+              }
             }
           }
         }
       })
       .catch((e: Error) => {
-        if (!cancelled) setError(e.message)
+        if (!cancelled) {
+          setError(e.message)
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       })
 
     return () => {
@@ -863,7 +897,9 @@ export function LineageGraph({
   }, [rootToken, neighborhoodOnly, selectRoot, selectRootHint, initialDepth])
 
   const filteredGraph = useMemo<LineageGraphView | null>(() => {
-    if (!graph) return null
+    if (!graph) {
+      return null
+    }
 
     const query = filters?.query?.trim().toLowerCase() ?? ""
     const allowedNodeTypes = new Set(filters?.nodeTypes ?? [])
@@ -904,7 +940,9 @@ export function LineageGraph({
         visibleIds.has(edge.target)
     )
     const visibleEdges = graph.edges.filter((edge) => {
-      if (!includeContains && edge.edge_type === "contains") return false
+      if (!includeContains && edge.edge_type === "contains") {
+        return false
+      }
       return visibleIds.has(edge.source) && visibleIds.has(edge.target)
     })
 
@@ -922,17 +960,19 @@ export function LineageGraph({
       while (changed) {
         changed = false
         for (const edge of graph.edges) {
-          if (edge.edge_type !== "contains") continue
-          if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target))
+          if (edge.edge_type !== "contains") {
             continue
+          }
+          if (!(visibleIds.has(edge.source) && visibleIds.has(edge.target))) {
+            continue
+          }
           if (
-            visibleIds.has(edge.target) ||
-            keptContainmentAncestors.has(edge.target)
+            (visibleIds.has(edge.target) ||
+              keptContainmentAncestors.has(edge.target)) &&
+            !keptContainmentAncestors.has(edge.source)
           ) {
-            if (!keptContainmentAncestors.has(edge.source)) {
-              keptContainmentAncestors.add(edge.source)
-              changed = true
-            }
+            keptContainmentAncestors.add(edge.source)
+            changed = true
           }
         }
       }
@@ -942,7 +982,9 @@ export function LineageGraph({
         connectedIds.add(edge.source)
         connectedIds.add(edge.target)
       }
-      if (graph.root?.id) connectedIds.add(graph.root.id)
+      if (graph.root?.id) {
+        connectedIds.add(graph.root.id)
+      }
 
       finalNodes =
         visibleEdges.length === 0
@@ -956,9 +998,9 @@ export function LineageGraph({
 
     return {
       ...graph,
-      nodes: finalNodes,
-      edges: visibleEdges,
       containmentEdges,
+      edges: visibleEdges,
+      nodes: finalNodes,
       root:
         graph.root && finalNodes.some((node) => node.id === graph.root?.id)
           ? graph.root
@@ -967,14 +1009,16 @@ export function LineageGraph({
   }, [filters, graph])
 
   const focusedGraph = useMemo<LineageGraphView | null>(() => {
-    if (!filteredGraph || !enableNeighborhoodSelection || !selectedNodeId) {
+    if (!(filteredGraph && enableNeighborhoodSelection && selectedNodeId)) {
       return filteredGraph
     }
 
     const selectedExists = filteredGraph.nodes.some(
       (node) => node.id === selectedNodeId
     )
-    if (!selectedExists) return filteredGraph
+    if (!selectedExists) {
+      return filteredGraph
+    }
 
     const expansionSeeds = new Set<string>([
       selectedNodeId,
@@ -1003,11 +1047,11 @@ export function LineageGraph({
 
     return {
       ...filteredGraph,
-      nodes: focusedNodes,
-      edges: focusedEdges,
       containmentEdges: filteredGraph.containmentEdges.filter(
         (edge) => focusedIds.has(edge.source) && focusedIds.has(edge.target)
       ),
+      edges: focusedEdges,
+      nodes: focusedNodes,
       root: focusedRoot,
     }
   }, [
@@ -1023,7 +1067,7 @@ export function LineageGraph({
       : (focusedGraph?.root?.id ?? null)
   const { rfNodes, rfEdges } = useMemo(() => {
     if (!focusedGraph) {
-      return { rfNodes: [] as LineageFlowNode[], rfEdges: [] as Edge[] }
+      return { rfEdges: [] as Edge[], rfNodes: [] as LineageFlowNode[] }
     }
 
     const expandedIds = new Set(expandedNodeIds)
@@ -1033,11 +1077,11 @@ export function LineageGraph({
         ...node,
         properties: {
           ...node.properties,
-          __disableLink: enableNeighborhoodSelection,
           __canExpand:
             enableNeighborhoodSelection &&
             !!selectedNodeId &&
             node.id !== selectedNodeId,
+          __disableLink: enableNeighborhoodSelection,
         },
       })),
     } satisfies ApiLineageGraph
@@ -1048,6 +1092,7 @@ export function LineageGraph({
     )
 
     return {
+      rfEdges: layout.rfEdges,
       rfNodes: layout.rfNodes.map((node): LineageFlowNode => {
         if (node.type !== "lineageCard") {
           return node
@@ -1076,7 +1121,6 @@ export function LineageGraph({
           data,
         }
       }),
-      rfEdges: layout.rfEdges,
     }
   }, [
     currentId,
@@ -1097,7 +1141,7 @@ export function LineageGraph({
   useEffect(() => {
     setNodes(rfNodes)
     if (rfInstance && rfNodes.length > 0) {
-      setTimeout(() => rfInstance.fitView({ padding: 0.08, minZoom: 0.5 }), 0)
+      setTimeout(() => rfInstance.fitView({ minZoom: 0.5, padding: 0.08 }), 0)
     }
   }, [rfNodes, setNodes, rfInstance])
   useEffect(() => {
@@ -1106,7 +1150,7 @@ export function LineageGraph({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading lineage…
       </div>
     )
@@ -1114,7 +1158,7 @@ export function LineageGraph({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex h-full items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error}
       </div>
     )
@@ -1122,7 +1166,7 @@ export function LineageGraph({
 
   if (!focusedGraph || focusedGraph.nodes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         No lineage matches the current filters
       </div>
     )
@@ -1130,36 +1174,40 @@ export function LineageGraph({
 
   return (
     <ReactFlow<LineageFlowNode, Edge>
-      nodes={nodes}
       edges={edges}
-      onNodesChange={onNodesChange}
+      elementsSelectable
+      maxZoom={2}
+      minZoom={0.1}
+      nodes={nodes}
+      nodesConnectable={false}
+      nodesDraggable={false}
+      nodeTypes={nodeTypes}
       onEdgesChange={onEdgesChange}
+      onInit={setRfInstance}
       onNodeClick={(_, node) => {
-        if (!enableNeighborhoodSelection) return
+        if (!enableNeighborhoodSelection) {
+          return
+        }
         setSelectedNodeId((current) => {
           const nextId = current === node.id ? null : node.id
           setExpandedNodeIds([])
           return nextId
         })
       }}
+      onNodesChange={onNodesChange}
       onPaneClick={() => {
-        if (!enableNeighborhoodSelection) return
+        if (!enableNeighborhoodSelection) {
+          return
+        }
         setSelectedNodeId(null)
         setExpandedNodeIds([])
       }}
-      nodeTypes={nodeTypes}
-      onInit={setRfInstance}
-      minZoom={0.1}
-      maxZoom={2}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable
     >
       <Background
-        variant={BackgroundVariant.Dots}
+        color="rgba(0,0,0,0.07)"
         gap={20}
         size={1}
-        color="rgba(0,0,0,0.07)"
+        variant={BackgroundVariant.Dots}
       />
       <Controls showInteractive={false} />
     </ReactFlow>

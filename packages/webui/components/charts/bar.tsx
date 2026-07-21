@@ -10,45 +10,45 @@ export type BarLineCap = "round" | "butt" | number
 export type BarAnimationType = "grow" | "fade"
 
 export interface BarProps {
-  /** Key in data to use for y values */
-  dataKey: string
-  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--chart-line-primary) */
-  fill?: string
-  /** Color for tooltip dot. Use when fill is a gradient/pattern. Default: uses fill value */
-  stroke?: string
-  /** Line cap style for bar ends: "round", "butt", or a number for custom radius. Default: "round" */
-  lineCap?: BarLineCap
   /** Whether to animate the bars. Default: true */
   animate?: boolean
   /** Animation type: "grow" (height) or "fade" (opacity + blur). Default: "grow" */
   animationType?: BarAnimationType
+  /** Key in data to use for y values */
+  dataKey: string
   /** Opacity when not hovered (when another bar is hovered). Default: 0.3 */
   fadedOpacity?: number
-  /** Stagger delay between bars in seconds. Auto-calculated if not provided. */
-  staggerDelay?: number
-  /** Gap between stacked bars in pixels. Default: 0 */
-  stackGap?: number
+  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--chart-line-primary) */
+  fill?: string
   /** Gap between grouped bars in pixels. Default: 4 */
   groupGap?: number
+  /** Line cap style for bar ends: "round", "butt", or a number for custom radius. Default: "round" */
+  lineCap?: BarLineCap
+  /** Gap between stacked bars in pixels. Default: 0 */
+  stackGap?: number
+  /** Stagger delay between bars in seconds. Auto-calculated if not provided. */
+  staggerDelay?: number
+  /** Color for tooltip dot. Use when fill is a gradient/pattern. Default: uses fill value */
+  stroke?: string
 }
 
 interface AnimatedBarProps {
-  x: number
-  y: number
-  width: number
-  height: number
+  animationType: BarAnimationType
+  enterTransition?: Transition
+  fadedOpacity: number
   fill: string
+  height: number
+  index: number
+  innerHeight: number
+  isFaded: boolean
+  isHorizontal: boolean
+  revealEpoch: number
   rx: number
   ry: number
-  index: number
-  isFaded: boolean
-  animationType: BarAnimationType
-  innerHeight: number
-  fadedOpacity: number
   staggerDelay: number
-  enterTransition?: Transition
-  revealEpoch: number
-  isHorizontal: boolean
+  width: number
+  x: number
+  y: number
 }
 
 function AnimatedBar({
@@ -75,12 +75,12 @@ function AnimatedBar({
     return (
       <motion.rect
         animate={{
-          opacity: isFaded ? fadedOpacity : 1,
           filter: "blur(0px)",
+          opacity: isFaded ? fadedOpacity : 1,
         }}
         fill={fill}
         height={height}
-        initial={{ opacity: 0, filter: "blur(2px)" }}
+        initial={{ filter: "blur(2px)", opacity: 0 }}
         key={`fade-${index}-${revealEpoch}`}
         rx={rx}
         ry={ry}
@@ -93,11 +93,11 @@ function AnimatedBar({
   }
 
   const initial = isHorizontal
-    ? { width: 0, height, x: 0, y }
-    : { width, height: 0, x, y: innerHeight }
+    ? { height, width: 0, x: 0, y }
+    : { height: 0, width, x, y: innerHeight }
   const target = isHorizontal
-    ? { width, height, x: 0, y }
-    : { width, height, x, y }
+    ? { height, width, x: 0, y }
+    : { height, width, x, y }
 
   return (
     <motion.rect

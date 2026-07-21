@@ -3,6 +3,7 @@ pub mod dagster;
 pub mod k8s;
 pub mod lineage;
 pub mod mlflow;
+pub mod openapi;
 pub mod permissions;
 pub mod streaming;
 pub mod teams;
@@ -232,6 +233,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         Router::new()
             .route("/livez", get(|| async { StatusCode::OK }))
             .route("/readyz", get(|| async { StatusCode::OK }))
+            .route("/openapi.json", get(openapi::openapi_json))
+            .route("/docs", get(openapi::scalar_docs))
             .merge(protected),
     )
     .layer(CorsLayer::permissive())

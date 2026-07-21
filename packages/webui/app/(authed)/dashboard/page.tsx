@@ -173,7 +173,7 @@ function toBarChartData(result: QueryResult, xCol: string, yCol: string) {
     const r = row as unknown[]
     return {
       [xCol]: String(r[xi] ?? ""),
-      [yCol]: parseFloat(String(r[yi] ?? "0")) || 0,
+      [yCol]: Number.parseFloat(String(r[yi] ?? "0")) || 0,
     }
   })
 }
@@ -185,7 +185,7 @@ function toPieData(result: QueryResult, xCol: string, yCol: string): PieData[] {
     const r = row as unknown[]
     return {
       label: String(r[xi] ?? ""),
-      value: parseFloat(String(r[yi] ?? "0")) || 0,
+      value: Number.parseFloat(String(r[yi] ?? "0")) || 0,
     }
   })
 }
@@ -201,7 +201,7 @@ function toFunnelData(
     const r = row as unknown[]
     return {
       label: String(r[xi] ?? ""),
-      value: parseFloat(String(r[yi] ?? "0")) || 0,
+      value: Number.parseFloat(String(r[yi] ?? "0")) || 0,
     }
   })
 }
@@ -213,7 +213,7 @@ function toStackedBarData(result: QueryResult, xCol: string, yCols: string[]) {
     const obj: Record<string, unknown> = { [xCol]: String(r[xi] ?? "") }
     for (const col of yCols) {
       const ci = result.columns.indexOf(col)
-      obj[col] = ci >= 0 ? parseFloat(String(r[ci] ?? "0")) || 0 : 0
+      obj[col] = ci >= 0 ? Number.parseFloat(String(r[ci] ?? "0")) || 0 : 0
     }
     return obj
   })
@@ -264,7 +264,9 @@ function toSankeyData(
     const tgtLabel = String(
       rowValue(row, tgtLabelIdx >= 0 ? tgtLabelIdx : tgtIdx) ?? tgt
     )
-    const val = parseFloat(String(rowValue(row, Math.max(0, valIdx)) ?? "0"))
+    const val = Number.parseFloat(
+      String(rowValue(row, Math.max(0, valIdx)) ?? "0")
+    )
     if (src && tgt && src !== tgt && Number.isFinite(val) && val > 0) {
       nodeIds.add(src)
       nodeIds.add(tgt)
@@ -277,20 +279,22 @@ function toSankeyData(
   const nodeArray = [...nodeIds]
   const nodeIndexById = new Map(nodeArray.map((id, index) => [id, index]))
   return {
-    nodes: nodeArray.map((id) => ({
-      name: nodeLabels.get(id) ?? id,
-      nodeKey: id,
-    })),
     links: rawLinks.map((l) => ({
       source: nodeIndexById.get(l.source) ?? 0,
       target: nodeIndexById.get(l.target) ?? 0,
       value: l.value,
     })),
+    nodes: nodeArray.map((id) => ({
+      name: nodeLabels.get(id) ?? id,
+      nodeKey: id,
+    })),
   }
 }
 
 function resultToRows(result: QueryResult | null | undefined): ResultRow[] {
-  if (!result) return []
+  if (!result) {
+    return []
+  }
   return result.rows.map((row) =>
     Object.fromEntries(
       result.columns.map((column, index) => [column, (row as unknown[])[index]])
@@ -311,10 +315,12 @@ function getTextValue(row: ResultRow | undefined, key: string) {
 }
 
 function formatCompactNumber(value: number | null, suffix = "") {
-  if (value == null) return "Loading"
+  if (value == null) {
+    return "Loading"
+  }
   return `${new Intl.NumberFormat("en", {
-    notation: "compact",
     maximumFractionDigits: 1,
+    notation: "compact",
   }).format(value)}${suffix}`
 }
 
@@ -330,32 +336,35 @@ function ScatterPlot({
   yCol: string
 }) {
   const [ref, { width, height }] = useMeasure({ debounce: 10 })
-  const m = { top: 16, right: 18, bottom: 40, left: 48 }
+  const m = { bottom: 40, left: 48, right: 18, top: 16 }
   const textColor = "#71717a"
   const gridColor = "#e4e4e7"
   const xi = result.columns.indexOf(xCol)
   const yi = result.columns.indexOf(yCol)
 
-  const points = useMemo(() => {
-    return result.rows.flatMap((row) => {
-      const r = row as unknown[]
-      const x = parseFloat(String(r[xi] ?? ""))
-      const y = parseFloat(String(r[yi] ?? ""))
-      return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : []
-    })
-  }, [result, xi, yi])
+  const points = useMemo(
+    () =>
+      result.rows.flatMap((row) => {
+        const r = row as unknown[]
+        const x = Number.parseFloat(String(r[xi] ?? ""))
+        const y = Number.parseFloat(String(r[yi] ?? ""))
+        return Number.isFinite(x) && Number.isFinite(y) ? [{ x, y }] : []
+      }),
+    [result, xi, yi]
+  )
 
   const iw = Math.max(0, width - m.left - m.right)
   const ih = Math.max(0, height - m.top - m.bottom)
 
   const { xScale, yScale, xTicks, yTicks } = useMemo(() => {
-    if (!points.length || !iw || !ih)
+    if (!(points.length && iw && ih)) {
       return {
         xScale: (_: number) => 0,
-        yScale: (_: number) => ih,
         xTicks: [] as number[],
+        yScale: (_: number) => ih,
         yTicks: [] as number[],
       }
+    }
     const xs = points.map((p) => p.x)
     const ys = points.map((p) => p.y)
     const xMin = Math.min(...xs),
@@ -373,7 +382,7 @@ function ScatterPlot({
     const n = 4
     const xTicks = Array.from({ length: n + 1 }, (_, i) => xD[0] + (i / n) * xR)
     const yTicks = Array.from({ length: n + 1 }, (_, i) => yD[0] + (i / n) * yR)
-    return { xScale, yScale, xTicks, yTicks }
+    return { xScale, xTicks, yScale, yTicks }
   }, [points, iw, ih])
 
   const fmt = (n: number) =>
@@ -386,63 +395,63 @@ function ScatterPlot({
           : n.toFixed(1)
 
   return (
-    <div ref={ref} className="h-full w-full">
+    <div className="h-full w-full" ref={ref}>
       {width > 0 && height > 0 && (
-        <svg width={width} height={height}>
+        <svg height={height} width={width}>
           <g transform={`translate(${m.left},${m.top})`}>
             {yTicks.map((t) => (
               <line
                 key={t}
+                stroke={gridColor}
+                strokeWidth={1}
                 x1={0}
                 x2={iw}
                 y1={yScale(t)}
                 y2={yScale(t)}
-                stroke={gridColor}
-                strokeWidth={1}
               />
             ))}
             {yTicks.map((t) => (
               <text
+                dominantBaseline="middle"
+                fill={textColor}
+                fontSize={10}
                 key={t}
+                textAnchor="end"
                 x={-6}
                 y={yScale(t)}
-                textAnchor="end"
-                dominantBaseline="middle"
-                fontSize={10}
-                fill={textColor}
               >
                 {fmt(t)}
               </text>
             ))}
             {xTicks.map((t) => (
               <text
+                fill={textColor}
+                fontSize={10}
                 key={t}
+                textAnchor="middle"
                 x={xScale(t)}
                 y={ih + 14}
-                textAnchor="middle"
-                fontSize={10}
-                fill={textColor}
               >
                 {fmt(t)}
               </text>
             ))}
             <text
+              fill={textColor}
+              fontSize={10}
+              textAnchor="middle"
               x={iw / 2}
               y={ih + 30}
-              textAnchor="middle"
-              fontSize={10}
-              fill={textColor}
             >
               {xCol}
             </text>
             {points.map((p, i) => (
               <circle
-                key={i}
                 cx={xScale(p.x)}
                 cy={yScale(p.y)}
-                r={5}
                 fill="var(--chart-1)"
+                key={i}
                 opacity={0.72}
+                r={5}
               />
             ))}
           </g>
@@ -464,14 +473,16 @@ function HeatmapChart({
   yCol: string
 }) {
   const [ref, { width, height }] = useMeasure({ debounce: 10 })
-  const m = { top: 16, right: 24, bottom: 56, left: 88 }
+  const m = { bottom: 56, left: 88, right: 24, top: 16 }
   const textColor = "#71717a"
   const xi = result.columns.indexOf(xCol)
   const yi = result.columns.indexOf(yCol)
   const valIdx = result.columns.findIndex((_, i) => {
-    if (i === xi || i === yi) return false
+    if (i === xi || i === yi) {
+      return false
+    }
     return result.rows.some((row) =>
-      Number.isFinite(parseFloat(String((row as unknown[])[i] ?? "")))
+      Number.isFinite(Number.parseFloat(String((row as unknown[])[i] ?? "")))
     )
   })
 
@@ -486,13 +497,13 @@ function HeatmapChart({
     const cells = result.rows.flatMap((row) => {
       const x = xSet.indexOf(String(rv(row, xi) ?? ""))
       const y = ySet.indexOf(String(rv(row, yi) ?? ""))
-      const v = parseFloat(String(rv(row, safeValIdx) ?? ""))
+      const v = Number.parseFloat(String(rv(row, safeValIdx) ?? ""))
       return x >= 0 && y >= 0 && Number.isFinite(v) && v > 0
-        ? [{ x, y, v }]
+        ? [{ v, x, y }]
         : []
     })
     const maxVal = Math.max(...cells.map((c) => c.v), 1)
-    return { xLabels: xSet, yLabels: ySet, cells, maxVal }
+    return { cells, maxVal, xLabels: xSet, yLabels: ySet }
   }, [result, xi, yi, valIdx])
 
   const iw = Math.max(0, width - m.left - m.right)
@@ -506,9 +517,9 @@ function HeatmapChart({
   }
 
   return (
-    <div ref={ref} className="h-full w-full">
+    <div className="h-full w-full" ref={ref}>
       {width > 0 && height > 0 && (
-        <svg width={width} height={height}>
+        <svg height={height} width={width}>
           <g transform={`translate(${m.left},${m.top})`}>
             {cells.map((cell, i) => {
               const cx = cell.x * cw + cw / 2
@@ -516,21 +527,21 @@ function HeatmapChart({
               return (
                 <g key={i}>
                   <rect
+                    fill={cellColor(cell.v)}
+                    height={Math.max(0, ch - 2)}
+                    rx={2}
+                    width={Math.max(0, cw - 2)}
                     x={cell.x * cw}
                     y={cell.y * ch}
-                    width={Math.max(0, cw - 2)}
-                    height={Math.max(0, ch - 2)}
-                    fill={cellColor(cell.v)}
-                    rx={2}
                   />
                   {cw > 30 && ch > 16 && (
                     <text
+                      dominantBaseline="middle"
+                      fill="#18181b"
+                      fontSize={10}
+                      textAnchor="middle"
                       x={cx}
                       y={cy}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fontSize={10}
-                      fill="#18181b"
                     >
                       {cell.v.toLocaleString()}
                     </text>
@@ -540,26 +551,26 @@ function HeatmapChart({
             })}
             {xLabels.map((label, i) => (
               <text
-                key={label}
-                x={i * cw + cw / 2}
-                y={ih + 12}
-                fontSize={10}
                 fill={textColor}
+                fontSize={10}
+                key={label}
                 textAnchor="end"
                 transform={`rotate(-30, ${i * cw + cw / 2}, ${ih + 12})`}
+                x={i * cw + cw / 2}
+                y={ih + 12}
               >
                 {label.length > 12 ? `${label.slice(0, 11)}…` : label}
               </text>
             ))}
             {yLabels.map((label, i) => (
               <text
+                dominantBaseline="middle"
+                fill={textColor}
+                fontSize={10}
                 key={label}
+                textAnchor="end"
                 x={-6}
                 y={i * ch + ch / 2}
-                textAnchor="end"
-                dominantBaseline="middle"
-                fontSize={10}
-                fill={textColor}
               >
                 {label.length > 12 ? `${label.slice(0, 11)}…` : label}
               </text>
@@ -594,7 +605,7 @@ function PanelChart({
   yCol: string
   yCols?: string[]
 }) {
-  const smallMargin = { top: 16, right: 16, bottom: 36, left: 44 }
+  const smallMargin = { bottom: 36, left: 44, right: 16, top: 16 }
 
   if (chartType === "bar") {
     const isMultiSeries = yCols && yCols.length > 1
@@ -602,21 +613,21 @@ function PanelChart({
       const data = toStackedBarData(result, xCol, yCols)
       return (
         <BarChart
-          data={data}
-          xDataKey={xCol}
-          className="h-full"
-          aspectRatio="auto"
-          margin={{ top: 16, right: 24, bottom: 16, left: 100 }}
           animationDuration={600}
+          aspectRatio="auto"
+          className="h-full"
+          data={data}
+          margin={{ bottom: 16, left: 100, right: 24, top: 16 }}
           orientation="horizontal"
           stacked
+          xDataKey={xCol}
         >
           <Grid horizontal={false} vertical />
           {yCols.map((col, i) => (
             <Bar
-              key={col}
               dataKey={col}
               fill={STACK_COLORS[i % STACK_COLORS.length]}
+              key={col}
             />
           ))}
           <ChartTooltip showDatePill={false} />
@@ -627,12 +638,12 @@ function PanelChart({
     const data = toBarChartData(result, xCol, yCol)
     return (
       <BarChart
-        data={data}
-        xDataKey={xCol}
-        className="h-full"
-        aspectRatio="auto"
-        margin={smallMargin}
         animationDuration={600}
+        aspectRatio="auto"
+        className="h-full"
+        data={data}
+        margin={smallMargin}
+        xDataKey={xCol}
       >
         <Grid />
         <Bar dataKey={yCol} />
@@ -652,12 +663,12 @@ function PanelChart({
     }))
     return (
       <AreaChart
-        data={data}
-        xDataKey={xCol}
-        className="h-full"
-        aspectRatio="auto"
-        margin={smallMargin}
         animationDuration={600}
+        aspectRatio="auto"
+        className="h-full"
+        data={data}
+        margin={smallMargin}
+        xDataKey={xCol}
       >
         <Grid />
         <Area dataKey={yCol} fillOpacity={chartType === "line" ? 0 : 0.4} />
@@ -670,36 +681,36 @@ function PanelChart({
     const data = toPieData(result, xCol, yCol)
     const total = data.reduce((sum, d) => sum + d.value, 0)
     return (
-      <div className="h-full flex items-center gap-6 px-2">
-        <div className="h-full aspect-square shrink-0">
+      <div className="flex h-full items-center gap-6 px-2">
+        <div className="aspect-square h-full shrink-0">
           <PieChart
+            cornerRadius={4}
             data={data}
             innerRadius={60}
             padAngle={0.02}
-            cornerRadius={4}
           >
             {data.map((_, i) => (
-              <PieSlice key={i} index={i} />
+              <PieSlice index={i} key={i} />
             ))}
           </PieChart>
         </div>
-        <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
           {data.map((item, i) => {
             const pct =
               total > 0 ? ((item.value / total) * 100).toFixed(1) : "0.0"
             return (
               <div
-                key={item.label}
                 className="flex items-center gap-2 text-[11px]"
+                key={item.label}
               >
                 <span
-                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
                   style={{ background: STACK_COLORS[i % STACK_COLORS.length] }}
                 />
                 <span className="truncate text-foreground/75">
                   {item.label}
                 </span>
-                <span className="ml-auto shrink-0 tabular-nums text-muted-foreground pl-3">
+                <span className="ml-auto shrink-0 pl-3 text-muted-foreground tabular-nums">
                   {pct}%
                 </span>
               </div>
@@ -714,8 +725,8 @@ function PanelChart({
     const data = toFunnelData(result, xCol, yCol)
     return (
       <FunnelChart
-        data={data}
         className="h-full"
+        data={data}
         orientation="horizontal"
         showPercentage
       />
@@ -726,11 +737,11 @@ function PanelChart({
     const data = toSankeyData(result, xCol, yCol)
     return (
       <SankeyChart
-        data={data}
-        className="h-full"
-        aspectRatio="auto"
         animationDuration={600}
-        margin={{ top: 24, right: 160, bottom: 24, left: 160 }}
+        aspectRatio="auto"
+        className="h-full"
+        data={data}
+        margin={{ bottom: 24, left: 160, right: 160, top: 24 }}
       >
         <SankeyNode />
         <SankeyLink />
@@ -755,11 +766,10 @@ const HEADLINE_CARD_ID = "dashboard-headline"
 
 const DEFAULT_PANELS: Panel[] = [
   {
-    id: "cross-company-opportunity",
-    title: "Cross-company Opportunity Generated",
+    chartType: "bar",
     description:
       "Quantifies the economic value one company creates for another. This is the executive headline: partner demand, total signal value, and audience quality by source-to-target edge.",
-    chartType: "bar",
+    id: "cross-company-opportunity",
     sql: `SELECT
   source_company || ' → ' || target_company AS opportunity_edge,
   source_company,
@@ -770,15 +780,15 @@ const DEFAULT_PANELS: Panel[] = [
 FROM partnership.co_brand_gold.co_brand_offer_audience_v1
 GROUP BY 1, 2, 3
 ORDER BY total_signal_value DESC`,
+    title: "Cross-company Opportunity Generated",
     xCol: "opportunity_edge",
     yCol: "total_signal_value",
   },
   {
-    id: "journey-edge-value",
-    title: "Journey Edge Value",
+    chartType: "sankey",
     description:
       "Shows which cross-company journey transitions create value, not just volume. The flow surfaces the monetization edges inside the journey graph.",
-    chartType: "sankey",
+    id: "journey-edge-value",
     sql: `SELECT
   'source:' || source_company AS from_key,
   source_company AS from_label,
@@ -796,15 +806,15 @@ SELECT
   ROUND(SUM(signal_value), 0) AS value
 FROM partnership.co_brand_gold.co_brand_offer_audience_v1
 GROUP BY use_case, target_company`,
+    title: "Journey Edge Value",
     xCol: "from_key",
     yCol: "to_key",
   },
   {
-    id: "untapped-whitespace",
-    title: "Untapped Cross-sell Whitespace",
+    chartType: "bar",
     description:
       "Replaces simple relationship split with unrealized value. This surfaces where partner demand exists but the destination relationship has not been activated yet.",
-    chartType: "bar",
+    id: "untapped-whitespace",
     sql: `SELECT
   'HDBank → VietJet whitespace' AS whitespace_edge,
   COUNT(*) AS customers,
@@ -822,15 +832,15 @@ FROM partnership.co_brand_silver.customer_360_v1
 WHERE has_vietjetair_relationship = true
   AND has_hdbank_relationship = false
 ORDER BY whitespace_value DESC`,
+    title: "Untapped Cross-sell Whitespace",
     xCol: "whitespace_edge",
     yCol: "whitespace_value",
   },
   {
-    id: "journey-funnel",
-    title: "Journey Funnel - HDBank Travel Customers to VietJet Activation",
+    chartType: "funnel",
     description:
       "Tracks the travel audience from bank relationship to actual activation. Step 3 now correctly nests airline or OTA behavior inside overall travel spend, and the query includes conversion from the first stage.",
-    chartType: "funnel",
+    id: "journey-funnel",
     sql: `SELECT
   step_order,
   journey_step,
@@ -868,15 +878,15 @@ FROM (
   FROM hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1
 ) funnel
 ORDER BY step_order`,
+    title: "Journey Funnel - HDBank Travel Customers to VietJet Activation",
     xCol: "journey_step",
     yCol: "customers",
   },
   {
-    id: "activation-segments",
-    title: "Activation Segments",
+    chartType: "bar",
     description:
       "Keeps the prioritization view, but adds the economic lens behind the thresholds. Prime Targets are high-readiness and high-flyer customers; the other bands reveal where the next-best activation should start.",
-    chartType: "bar",
+    id: "activation-segments",
     sql: `SELECT
   CASE
     WHEN cross_sell_readiness_score >= 0.6 AND frequent_flyer_score >= 0.6 THEN 'Prime Targets'
@@ -893,15 +903,15 @@ WHERE has_hdbank_relationship = true
    OR has_vietjetair_relationship = true
 GROUP BY segment
 ORDER BY customers DESC`,
+    title: "Activation Segments",
     xCol: "segment",
     yCol: "customers",
   },
   {
-    id: "next-best-journey",
-    title: "Next Best Journey",
+    chartType: "sankey",
     description:
       "Demonstrates orchestration rather than reporting. It maps each use case into the recommended offer and channel so the journey engine answers what should happen next.",
-    chartType: "sankey",
+    id: "next-best-journey",
     sql: `SELECT
   'use_case:' || use_case AS from_key,
   use_case AS from_label,
@@ -919,15 +929,15 @@ SELECT
   COUNT(*) AS customers
 FROM partnership.co_brand_gold.co_brand_offer_audience_v1
 GROUP BY offer_name, recommended_channel`,
+    title: "Next Best Journey",
     xCol: "from_key",
     yCol: "to_key",
   },
   {
-    id: "offer-routing",
-    title: "Offer Routing",
+    chartType: "sankey",
     description:
       "Operational lineage from source signal to execution path. The routing uses explicit from/to nodes and adds signal value so campaign activation can be evaluated as a production flow.",
-    chartType: "sankey",
+    id: "offer-routing",
     sql: `SELECT
   'source:' || source_company AS from_key,
   source_company AS from_label,
@@ -945,15 +955,15 @@ SELECT
   ROUND(SUM(signal_value), 0) AS signal_value
 FROM partnership.co_brand_gold.co_brand_offer_audience_v1
 GROUP BY use_case, recommended_channel`,
+    title: "Offer Routing",
     xCol: "from_key",
     yCol: "to_key",
   },
   {
-    id: "recovery-risk",
-    title: "Recovery Risk to Revenue",
+    chartType: "bar",
     description:
       "Prioritizes recovery by pain and value rather than raw volume. High-value customers with poor service experiences create economic risk, so bands are sorted by recovery score instead of customer count.",
-    chartType: "bar",
+    id: "recovery-risk",
     sql: `SELECT
   vietjet_priority_band,
   COUNT(*) AS customers,
@@ -965,21 +975,22 @@ FROM partnership.co_brand_silver.customer_360_v1
 WHERE incident_count > 0
 GROUP BY vietjet_priority_band
 ORDER BY recovery_score DESC`,
+    title: "Recovery Risk to Revenue",
     xCol: "vietjet_priority_band",
     yCol: "revenue_at_risk",
   },
 ]
 
 const DEFAULT_LAYOUT: Layout = [
-  { i: HEADLINE_CARD_ID, x: 0, y: 0, w: 2, h: 5 },
-  { i: "cross-company-opportunity", x: 0, y: 5, w: 1, h: 6 },
-  { i: "untapped-whitespace", x: 1, y: 5, w: 1, h: 6 },
-  { i: "journey-edge-value", x: 0, y: 11, w: 2, h: 9 },
-  { i: "journey-funnel", x: 0, y: 20, w: 2, h: 7 },
-  { i: "activation-segments", x: 0, y: 27, w: 1, h: 7 },
-  { i: "recovery-risk", x: 1, y: 27, w: 1, h: 7 },
-  { i: "next-best-journey", x: 0, y: 34, w: 2, h: 9 },
-  { i: "offer-routing", x: 0, y: 43, w: 2, h: 9 },
+  { h: 5, i: HEADLINE_CARD_ID, w: 2, x: 0, y: 0 },
+  { h: 6, i: "cross-company-opportunity", w: 1, x: 0, y: 5 },
+  { h: 6, i: "untapped-whitespace", w: 1, x: 1, y: 5 },
+  { h: 9, i: "journey-edge-value", w: 2, x: 0, y: 11 },
+  { h: 7, i: "journey-funnel", w: 2, x: 0, y: 20 },
+  { h: 7, i: "activation-segments", w: 1, x: 0, y: 27 },
+  { h: 7, i: "recovery-risk", w: 1, x: 1, y: 27 },
+  { h: 9, i: "next-best-journey", w: 2, x: 0, y: 34 },
+  { h: 9, i: "offer-routing", w: 2, x: 0, y: 43 },
 ]
 
 // ── PreviewGrid ───────────────────────────────────────────────────────────────
@@ -992,7 +1003,9 @@ function PreviewGrid({ result }: { result: QueryResult }) {
 
   useEffect(() => {
     const el = containerRef.current
-    if (!el) return
+    if (!el) {
+      return
+    }
     const ro = new ResizeObserver((e) => setHeight(e[0].contentRect.height))
     ro.observe(el)
     return () => ro.disconnect()
@@ -1010,21 +1023,21 @@ function PreviewGrid({ result }: { result: QueryResult }) {
   const columns = useMemo<ColumnDef<Row>[]>(
     () =>
       result.columns.map((col) => ({
-        id: col,
         accessorKey: col,
         header: col,
-        size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
+        id: col,
         meta: { cell: { variant: "short-text" as const } },
+        size: Math.max(80, Math.ceil(col.length * 7.5 + 48)),
       })),
     [result]
   )
   const { table, ...gridProps } = useDataGrid<Row>({
-    data,
     columns,
+    data,
     readOnly: true,
   })
   return (
-    <div ref={containerRef} className="h-full overflow-hidden">
+    <div className="h-full overflow-hidden" ref={containerRef}>
       <DataGrid table={table} {...gridProps} height={height} />
     </div>
   )
@@ -1055,47 +1068,47 @@ function PanelCard({
   return (
     <div
       className={cn(
-        "h-full flex flex-col rounded-lg border bg-card overflow-hidden transition-all",
-        selected && "ring-2 ring-primary border-primary",
+        "flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-all",
+        selected && "border-primary ring-2 ring-primary",
         editing && !selected && "border-dashed"
       )}
       onClick={onClick}
     >
       <div
         className={cn(
-          "panel-drag-handle flex items-center gap-1.5 px-3 py-2 border-b bg-muted/20 shrink-0 select-none",
+          "panel-drag-handle flex shrink-0 select-none items-center gap-1.5 border-b bg-muted/20 px-3 py-2",
           editing && "cursor-grab active:cursor-grabbing"
         )}
       >
         {editing && (
           <IconGripVertical
+            className="shrink-0 text-muted-foreground"
             size={12}
-            className="text-muted-foreground shrink-0"
           />
         )}
-        <span className="text-xs font-medium flex-1 truncate">
+        <span className="flex-1 truncate font-medium text-xs">
           {panel.title}
         </span>
         {data.status === "running" && (
           <IconLoader2
+            className="shrink-0 animate-spin text-muted-foreground"
             size={12}
-            className="text-muted-foreground animate-spin shrink-0"
           />
         )}
         {data.status === "error" && (
-          <IconAlertCircle size={12} className="text-destructive shrink-0" />
+          <IconAlertCircle className="shrink-0 text-destructive" size={12} />
         )}
         {data.status === "ok" && (
-          <span className="text-[10px] text-muted-foreground shrink-0">
+          <span className="shrink-0 text-[10px] text-muted-foreground">
             {data.result?.row_count} rows
           </span>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
               onClick={(e) => e.stopPropagation()}
+              type="button"
             >
               <IconDotsVertical size={13} />
             </button>
@@ -1107,34 +1120,34 @@ function PanelCard({
                 onConfigure()
               }}
             >
-              <IconPencil size={12} className="mr-2" />
+              <IconPencil className="mr-2" size={12} />
               Configure
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete()
               }}
-              className="text-destructive focus:text-destructive"
             >
-              <IconTrash size={12} className="mr-2" />
+              <IconTrash className="mr-2" size={12} />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex-1 min-h-0 p-1">
+      <div className="min-h-0 flex-1 p-1">
         {data.status === "idle" && (
-          <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
             <IconChartHistogram size={22} />
             <p className="text-[11px]">Use menu to configure</p>
           </div>
         )}
         {data.status === "running" && <Skeleton className="h-full w-full" />}
         {data.status === "error" && (
-          <div className="h-full flex items-center justify-center p-3">
-            <p className="text-[11px] text-destructive text-center whitespace-pre-wrap">
+          <div className="flex h-full items-center justify-center p-3">
+            <p className="whitespace-pre-wrap text-center text-[11px] text-destructive">
               {data.error}
             </p>
           </div>
@@ -1149,7 +1162,7 @@ function PanelCard({
           />
         )}
         {data.status === "ok" && !canRenderChart && (
-          <div className="h-full flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 text-muted-foreground">
             <IconCheck size={22} />
             <p className="text-[11px]">
               {data.result?.row_count} rows — configure X/Y columns
@@ -1158,7 +1171,7 @@ function PanelCard({
         )}
       </div>
       {panel.description && (
-        <p className="px-3 py-2 text-xs text-muted-foreground border-t leading-relaxed shrink-0 min-h-[2.5rem] max-h-[5rem] overflow-y-auto">
+        <p className="max-h-[5rem] min-h-[2.5rem] shrink-0 overflow-y-auto border-t px-3 py-2 text-muted-foreground text-xs leading-relaxed">
           {panel.description}
         </p>
       )}
@@ -1177,17 +1190,17 @@ function HeadlineCard({
     <div className="h-full overflow-hidden rounded-lg border bg-card">
       <div
         className={cn(
-          "panel-drag-handle flex items-center gap-1.5 border-b bg-muted/20 px-3 py-2 select-none",
+          "panel-drag-handle flex select-none items-center gap-1.5 border-b bg-muted/20 px-3 py-2",
           editing && "cursor-grab active:cursor-grabbing"
         )}
       >
         {editing && (
           <IconGripVertical
+            className="shrink-0 text-muted-foreground"
             size={12}
-            className="text-muted-foreground shrink-0"
           />
         )}
-        <span className="text-xs font-medium">Headline</span>
+        <span className="font-medium text-xs">Headline</span>
         <div className="ml-auto flex items-center gap-1.5">
           <Badge variant="outline">Journey engine</Badge>
           <Badge variant="outline">Activation platform</Badge>
@@ -1196,14 +1209,14 @@ function HeadlineCard({
       <div className="grid h-[calc(100%-37px)] gap-4 p-4 lg:grid-cols-[1.35fr_1fr]">
         <div className="flex min-w-0 flex-col justify-between gap-3">
           <div className="space-y-2">
-            <p className="text-[10px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
+            <p className="font-medium text-[10px] text-muted-foreground uppercase tracking-[0.24em]">
               Cross-company lakehouse
             </p>
-            <h1 className="max-w-2xl text-lg font-semibold tracking-tight">
+            <h1 className="max-w-2xl font-semibold text-lg tracking-tight">
               Customer signals become partner revenue.
             </h1>
           </div>
-          <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+          <p className="max-w-2xl text-muted-foreground text-xs leading-5">
             Track opportunity created across companies, the journey edges that
             convert, and the routing needed to operationalize those signals.
           </p>
@@ -1211,16 +1224,16 @@ function HeadlineCard({
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-3">
           {metrics.map((metric) => (
             <div
-              key={metric.title}
               className="rounded-xl border bg-background/70 p-3"
+              key={metric.title}
             >
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-[0.18em]">
                 {metric.title}
               </p>
-              <p className="mt-1 text-lg font-semibold tracking-tight">
+              <p className="mt-1 font-semibold text-lg tracking-tight">
                 {metric.value}
               </p>
-              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+              <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground leading-4">
                 {metric.detail}
               </p>
             </div>
@@ -1237,14 +1250,14 @@ const CHART_TYPE_CONFIG: Record<
   ChartType,
   { label: string; icon: TablerIcon }
 > = {
-  bar: { label: "Bar", icon: IconChartHistogram },
-  line: { label: "Line", icon: IconChartBar },
-  area: { label: "Area", icon: IconChartArea },
-  pie: { label: "Pie / Donut", icon: IconChartPie },
-  scatter: { label: "Scatter", icon: IconChartScatter },
-  sankey: { label: "Sankey / Flow", icon: IconChartSankey },
-  funnel: { label: "Funnel", icon: IconChartDots },
-  heatmap: { label: "Heatmap", icon: IconChartDots },
+  area: { icon: IconChartArea, label: "Area" },
+  bar: { icon: IconChartHistogram, label: "Bar" },
+  funnel: { icon: IconChartDots, label: "Funnel" },
+  heatmap: { icon: IconChartDots, label: "Heatmap" },
+  line: { icon: IconChartBar, label: "Line" },
+  pie: { icon: IconChartPie, label: "Pie / Donut" },
+  sankey: { icon: IconChartSankey, label: "Sankey / Flow" },
+  scatter: { icon: IconChartScatter, label: "Scatter" },
 }
 
 // ── PanelSidebar ──────────────────────────────────────────────────────────────
@@ -1265,38 +1278,38 @@ function PanelSidebar({
   const isRunning = data.status === "running"
 
   return (
-    <div className="flex flex-col h-full text-xs">
-      <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
+    <div className="flex h-full flex-col text-xs">
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
           Panel
         </p>
         <Input
-          value={panel.title}
-          onChange={(e) => onChange({ ...panel, title: e.target.value })}
           className="h-7 text-xs"
+          onChange={(e) => onChange({ ...panel, title: e.target.value })}
           placeholder="Panel title"
+          value={panel.title}
         />
         <Textarea
-          value={panel.description ?? ""}
-          onChange={(e) => onChange({ ...panel, description: e.target.value })}
-          rows={4}
-          placeholder="Description (shown below the chart)"
           className="min-h-24 text-xs"
+          onChange={(e) => onChange({ ...panel, description: e.target.value })}
+          placeholder="Description (shown below the chart)"
+          rows={4}
+          value={panel.description ?? ""}
         />
       </div>
-      <div className="px-4 py-3 border-b shrink-0 flex flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
         <div className="flex items-center justify-between">
-          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">
             SQL Query
           </Label>
           <Button
-            size="sm"
-            className="h-6 gap-1 text-[11px] px-2"
+            className="h-6 gap-1 px-2 text-[11px]"
             disabled={isRunning || !panel.sql.trim()}
             onClick={() => onRun(panel)}
+            size="sm"
           >
             {isRunning ? (
-              <IconLoader2 size={11} className="animate-spin" />
+              <IconLoader2 className="animate-spin" size={11} />
             ) : (
               <IconPlayerPlay size={11} />
             )}
@@ -1304,22 +1317,24 @@ function PanelSidebar({
           </Button>
         </div>
         <div
-          id={`${uid}-sql`}
           className="min-h-[160px] overflow-hidden rounded-md border bg-background"
+          id={`${uid}-sql`}
         >
           <SqlCodeEditor
-            value={panel.sql}
-            onChange={(value) => onChange({ ...panel, sql: value })}
-            onSubmit={() => {
-              if (!isRunning && panel.sql.trim()) onRun(panel)
-            }}
-            lineNumbers="off"
             className="h-full"
             editorClassName="min-h-[160px]"
+            lineNumbers="off"
+            onChange={(value) => onChange({ ...panel, sql: value })}
+            onSubmit={() => {
+              if (!isRunning && panel.sql.trim()) {
+                onRun(panel)
+              }
+            }}
+            value={panel.sql}
           />
         </div>
         {data.status === "error" && (
-          <p className="text-[10px] text-destructive whitespace-pre-wrap">
+          <p className="whitespace-pre-wrap text-[10px] text-destructive">
             {data.error}
           </p>
         )}
@@ -1329,24 +1344,24 @@ function PanelSidebar({
           </p>
         )}
       </div>
-      <div className="px-4 py-3 flex flex-col gap-3 shrink-0">
-        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+      <div className="flex shrink-0 flex-col gap-3 px-4 py-3">
+        <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">
           Visualization
         </Label>
         <div className="grid gap-1.5">
           <Label
+            className="text-muted-foreground text-xs"
             htmlFor={`${uid}-type`}
-            className="text-xs text-muted-foreground"
           >
             Chart Type
           </Label>
           <Select
-            value={panel.chartType}
             onValueChange={(v) =>
               onChange({ ...panel, chartType: v as ChartType })
             }
+            value={panel.chartType}
           >
-            <SelectTrigger id={`${uid}-type`} className="h-7 text-xs w-full">
+            <SelectTrigger className="h-7 w-full text-xs" id={`${uid}-type`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1355,11 +1370,11 @@ function PanelSidebar({
                 return (
                   <SelectItem
                     key={type}
-                    value={type}
                     textValue={CHART_TYPE_CONFIG[type].label}
+                    value={type}
                   >
                     <div className="flex items-center gap-1.5">
-                      <ChartTypeIcon size={12} className="shrink-0" />
+                      <ChartTypeIcon className="shrink-0" size={12} />
                       {CHART_TYPE_CONFIG[type].label}
                     </div>
                   </SelectItem>
@@ -1370,17 +1385,17 @@ function PanelSidebar({
         </div>
         <div className="grid gap-1.5">
           <Label
+            className="text-muted-foreground text-xs"
             htmlFor={`${uid}-xcol`}
-            className="text-xs text-muted-foreground"
           >
             X Column
           </Label>
           {columns.length > 0 ? (
             <Select
-              value={panel.xCol}
               onValueChange={(v) => onChange({ ...panel, xCol: v })}
+              value={panel.xCol}
             >
-              <SelectTrigger id={`${uid}-xcol`} className="h-7 text-xs w-full">
+              <SelectTrigger className="h-7 w-full text-xs" id={`${uid}-xcol`}>
                 <SelectValue placeholder="Select column" />
               </SelectTrigger>
               <SelectContent>
@@ -1393,27 +1408,27 @@ function PanelSidebar({
             </Select>
           ) : (
             <Input
+              className="h-7 w-full font-mono text-xs"
               id={`${uid}-xcol`}
-              value={panel.xCol}
               onChange={(e) => onChange({ ...panel, xCol: e.target.value })}
               placeholder="column name"
-              className="h-7 text-xs font-mono w-full"
+              value={panel.xCol}
             />
           )}
         </div>
         <div className="grid gap-1.5">
           <Label
+            className="text-muted-foreground text-xs"
             htmlFor={`${uid}-ycol`}
-            className="text-xs text-muted-foreground"
           >
             Y Column
           </Label>
           {columns.length > 0 ? (
             <Select
-              value={panel.yCol}
               onValueChange={(v) => onChange({ ...panel, yCol: v })}
+              value={panel.yCol}
             >
-              <SelectTrigger id={`${uid}-ycol`} className="h-7 text-xs w-full">
+              <SelectTrigger className="h-7 w-full text-xs" id={`${uid}-ycol`}>
                 <SelectValue placeholder="Select column" />
               </SelectTrigger>
               <SelectContent>
@@ -1426,11 +1441,11 @@ function PanelSidebar({
             </Select>
           ) : (
             <Input
+              className="h-7 w-full font-mono text-xs"
               id={`${uid}-ycol`}
-              value={panel.yCol}
               onChange={(e) => onChange({ ...panel, yCol: e.target.value })}
               placeholder="column name"
-              className="h-7 text-xs font-mono w-full"
+              value={panel.yCol}
             />
           )}
         </div>
@@ -1438,12 +1453,12 @@ function PanelSidebar({
       {data.status === "ok" && data.result && (
         <>
           <Separator />
-          <div className="px-4 pt-3 pb-1 shrink-0">
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="shrink-0 px-4 pt-3 pb-1">
+            <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">
               Preview
             </Label>
           </div>
-          <div className="flex-1 min-h-0">
+          <div className="min-h-0 flex-1">
             <PreviewGrid result={data.result} />
           </div>
         </>
@@ -1468,7 +1483,9 @@ function extractMentionedPanelIds(text: string) {
   const ids: string[] = []
   for (const match of text.matchAll(PANEL_MENTION_RE)) {
     const id = match[2]
-    if (id && !ids.includes(id)) ids.push(id)
+    if (id && !ids.includes(id)) {
+      ids.push(id)
+    }
   }
   return ids
 }
@@ -1480,17 +1497,25 @@ function stripPanelMentionMarkup(text: string) {
 function getActiveMention(text: string, caret: number) {
   const uptoCaret = text.slice(0, caret)
   const at = uptoCaret.lastIndexOf("@")
-  if (at === -1) return null
+  if (at === -1) {
+    return null
+  }
 
   const fragment = uptoCaret.slice(at)
-  if (fragment.startsWith("@[")) return null
-  if (fragment.includes("\n")) return null
-  if (/\s/.test(fragment.slice(1))) return null
+  if (fragment.startsWith("@[")) {
+    return null
+  }
+  if (fragment.includes("\n")) {
+    return null
+  }
+  if (/\s/.test(fragment.slice(1))) {
+    return null
+  }
 
   return {
-    start: at,
     end: caret,
     query: fragment.slice(1),
+    start: at,
   }
 }
 
@@ -1574,10 +1599,14 @@ function AiComposer({
   )
 
   const mentionPanels = useMemo(() => {
-    if (!activeMention) return []
+    if (!activeMention) {
+      return []
+    }
     const query = activeMention.query.trim().toLowerCase()
     return panels.filter((panel) => {
-      if (!query) return true
+      if (!query) {
+        return true
+      }
       return (
         panel.title.toLowerCase().includes(query) ||
         (panel.description ?? "").toLowerCase().includes(query)
@@ -1594,36 +1623,36 @@ function AiComposer({
       new DefaultChatTransport({
         api: "/api/dashboard/generate",
         body: () => ({
-          sessionId: sessionIdRef.current,
+          lastCreatedIds: lastCreatedIdsRef.current,
+          mentionedPanelIds: mentionedPanelIdsRef.current,
           modelId: modelIdRef.current,
           panels: panelsRef.current.map<PanelSummary>((p) => ({
-            id: p.id,
-            title: p.title,
-            description: p.description,
             chartType: p.chartType,
-            sql: p.sql,
-            xCol: p.xCol,
-            yCol: p.yCol,
+            description: p.description,
+            id: p.id,
             resultPreview:
               panelDataRef.current[p.id]?.status === "ok" &&
               panelDataRef.current[p.id]?.result
                 ? {
                     columns: panelDataRef.current[p.id]?.result?.columns ?? [],
+                    rowCount:
+                      panelDataRef.current[p.id]?.result?.row_count ?? 0,
                     rows:
                       panelDataRef.current[p.id]?.result?.rows.slice(0, 10) ??
                       [],
-                    rowCount:
-                      panelDataRef.current[p.id]?.result?.row_count ?? 0,
                   }
                 : undefined,
+            sql: p.sql,
+            title: p.title,
+            xCol: p.xCol,
+            yCol: p.yCol,
           })),
-          selectedPanelIds: selectedPanelIdsRef.current,
           selectedPanelId:
             selectedPanelIdsRef.current[
               selectedPanelIdsRef.current.length - 1
             ] ?? null,
-          mentionedPanelIds: mentionedPanelIdsRef.current,
-          lastCreatedIds: lastCreatedIdsRef.current,
+          selectedPanelIds: selectedPanelIdsRef.current,
+          sessionId: sessionIdRef.current,
         }),
         fetch: async (input, init) => {
           const res = await fetch(input, init)
@@ -1644,53 +1673,63 @@ function AiComposer({
   // When tool calls land, apply creates and edits to the dashboard
   useEffect(() => {
     const last = messages.at(-1)
-    if (!last || last.role !== "assistant") return
+    if (!last || last.role !== "assistant") {
+      return
+    }
 
     const newPanels: Panel[] = []
     const newResults: Record<string, QueryResult> = {}
     const editedUpdates: Array<{ panel: Panel; result: QueryResult }> = []
 
     for (const part of last.parts) {
-      if (!isToolUIPart(part)) continue
-      if (part.state !== "output-available") continue
+      if (!isToolUIPart(part)) {
+        continue
+      }
+      if (part.state !== "output-available") {
+        continue
+      }
 
       const toolName = getToolName(part)
 
       if (toolName === "createPanel") {
         const out = part.output as CreatePanelOutput
-        if (out.error || !out.columns || !out.rows) continue
+        if (out.error || !out.columns || !out.rows) {
+          continue
+        }
         const id = `ai-${part.toolCallId}`
         newPanels.push({
-          id,
-          title: out.title,
           chartType: out.chartType,
+          id,
           sql: out.sql,
+          title: out.title,
           xCol: out.xCol,
           yCol: out.yCol,
         })
         newResults[id] = {
           columns: out.columns,
-          rows: out.rows,
           row_count: out.row_count ?? out.rows.length,
+          rows: out.rows,
         }
       }
 
       if (toolName === "editPanel") {
         const out = part.output as EditPanelOutput
-        if (out.error || !out.columns || !out.rows) continue
+        if (out.error || !out.columns || !out.rows) {
+          continue
+        }
         editedUpdates.push({
           panel: {
-            id: out.panelId,
-            title: out.title,
             chartType: out.chartType,
+            id: out.panelId,
             sql: out.sql,
+            title: out.title,
             xCol: out.xCol,
             yCol: out.yCol,
           },
           result: {
             columns: out.columns,
-            rows: out.rows,
             row_count: out.row_count ?? out.rows.length,
+            rows: out.rows,
           },
         })
       }
@@ -1713,7 +1752,9 @@ function AiComposer({
 
   const insertPanelMention = useCallback(
     (panel: Panel) => {
-      if (!activeMention) return
+      if (!activeMention) {
+        return
+      }
       const token = `@[${panel.title}](panel:${panel.id}) `
       const next =
         input.slice(0, activeMention.start) + token + input.slice(caretPos)
@@ -1730,7 +1771,9 @@ function AiComposer({
 
   const handleSend = () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading) {
+      return
+    }
     mentionedPanelIdsRef.current = extractMentionedPanelIds(text)
     setInput("")
     setCaretPos(0)
@@ -1779,24 +1822,24 @@ function AiComposer({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="p-3 flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">
+          <div className="flex flex-col gap-2 p-3">
+            <p className="text-muted-foreground text-xs">
               Ask about your data or what an existing panel means.
             </p>
-            <div className="flex flex-col gap-1.5 mt-1">
+            <div className="mt-1 flex flex-col gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
+                  className="rounded border px-2.5 py-1.5 text-left text-foreground/80 text-xs transition-colors hover:bg-accent"
                   key={s}
-                  type="button"
                   onClick={() => {
                     setInput(s)
                     textareaRef.current?.focus()
                   }}
-                  className="text-left text-xs px-2.5 py-1.5 rounded border hover:bg-accent transition-colors text-foreground/80"
+                  type="button"
                 >
                   {s}
                 </button>
@@ -1804,17 +1847,17 @@ function AiComposer({
             </div>
           </div>
         ) : (
-          <div className="py-2 space-y-0.5">
+          <div className="space-y-0.5 py-2">
             {messages.map((msg) => (
               <ComposerMessage
+                isAnimating={isLoading && msg === messages.at(-1)}
                 key={msg.id}
                 message={msg}
-                isAnimating={isLoading && msg === messages.at(-1)}
               />
             ))}
             {isLoading && messages.at(-1)?.role === "user" && (
-              <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                <IconLoader2 size={12} className="animate-spin" />
+              <div className="flex items-center gap-2 px-3 py-2 text-muted-foreground text-xs">
+                <IconLoader2 className="animate-spin" size={12} />
                 Generating panels…
               </div>
             )}
@@ -1824,29 +1867,29 @@ function AiComposer({
       </div>
 
       {/* Input */}
-      <div className="shrink-0 min-w-0 overflow-x-hidden border-t p-2.5 flex flex-col gap-2">
+      <div className="flex min-w-0 shrink-0 flex-col gap-2 overflow-x-hidden border-t p-2.5">
         {selectedPanels.length > 0 ? (
           <div className="flex min-w-0 items-stretch gap-2">
             <button
-              type="button"
+              aria-label="Clear selected panels"
               className="flex shrink-0 items-center justify-center self-stretch rounded-md border bg-background px-2 text-muted-foreground hover:text-foreground"
               onClick={onClearSelectedPanels}
               title="Clear selected panels"
-              aria-label="Clear selected panels"
+              type="button"
             >
               <IconX size={12} />
             </button>
             <div className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto whitespace-nowrap">
               {selectedPanels.map((panel) => (
                 <button
-                  key={panel.id}
-                  type="button"
-                  onClick={() => onRemoveSelectedPanel(panel.id)}
                   className="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] text-foreground/85 hover:bg-accent"
+                  key={panel.id}
+                  onClick={() => onRemoveSelectedPanel(panel.id)}
                   title={panel.title}
+                  type="button"
                 >
                   <span>{panel.title}</span>
-                  <IconX size={10} className="shrink-0 text-muted-foreground" />
+                  <IconX className="shrink-0 text-muted-foreground" size={10} />
                 </button>
               ))}
             </div>
@@ -1856,8 +1899,7 @@ function AiComposer({
           <PopoverAnchor asChild>
             <InputGroup className="min-h-[132px] min-w-0 items-stretch overflow-x-hidden rounded-xl bg-background">
               <InputGroupTextarea
-                ref={textareaRef}
-                value={input}
+                className="min-h-[84px] w-full max-w-full overflow-x-hidden px-3 pt-3 text-xs [field-sizing:fixed]"
                 onChange={(e) => {
                   setInput(e.target.value)
                   setCaretPos(e.target.selectionStart ?? e.target.value.length)
@@ -1870,18 +1912,19 @@ function AiComposer({
                   setCaretPos(e.currentTarget.selectionStart ?? 0)
                 }
                 placeholder="Ask about revenue, trends, customers… Use @ to mention a panel."
+                ref={textareaRef}
                 rows={3}
-                className="min-h-[84px] w-full max-w-full overflow-x-hidden px-3 pt-3 text-xs [field-sizing:fixed]"
+                value={input}
               />
               <InputGroupAddon
                 align="block-end"
                 className="items-center justify-between gap-2 border-t px-3 py-2"
               >
-                <div className="flex items-center gap-2 w-full">
-                  <div className="flex-1 w-full">
+                <div className="flex w-full items-center gap-2">
+                  <div className="w-full flex-1">
                     <Select
-                      value={modelId}
                       onValueChange={(v) => onModelChange(v as ModelId)}
+                      value={modelId}
                     >
                       <SelectTrigger className="h-7 w-full bg-transparent px-1 text-xs shadow-none">
                         <SelectValue />
@@ -1896,13 +1939,13 @@ function AiComposer({
                     </Select>
                   </div>
                   <Button
-                    size="sm"
                     className="h-7 shrink-0 gap-1.5 text-xs"
                     disabled={!input.trim() || isLoading}
                     onClick={handleSend}
+                    size="sm"
                   >
                     {isLoading ? (
-                      <IconLoader2 size={12} className="animate-spin" />
+                      <IconLoader2 className="animate-spin" size={12} />
                     ) : (
                       <IconSend2 size={12} />
                     )}
@@ -1914,27 +1957,27 @@ function AiComposer({
           </PopoverAnchor>
           <PopoverContent
             align="start"
-            side="top"
             className="w-[320px] p-1.5"
             onOpenAutoFocus={(e) => e.preventDefault()}
+            side="top"
           >
-            <div className="px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+            <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-widest">
               Mention Panel
             </div>
             <div className="max-h-56 overflow-y-auto">
               {mentionPanels.length > 0 ? (
                 mentionPanels.map((panel, idx) => (
                   <button
-                    key={panel.id}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => insertPanelMention(panel)}
                     className={cn(
                       "flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                       idx === mentionIndex
                         ? "bg-muted text-foreground"
                         : "text-foreground/85 hover:bg-muted/70"
                     )}
+                    key={panel.id}
+                    onClick={() => insertPanelMention(panel)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    type="button"
                   >
                     <span className="font-medium">{panel.title}</span>
                     {panel.description ? (
@@ -1945,7 +1988,7 @@ function AiComposer({
                   </button>
                 ))
               ) : (
-                <div className="px-2 py-3 text-xs text-muted-foreground">
+                <div className="px-2 py-3 text-muted-foreground text-xs">
                   No matching panels
                 </div>
               )}
@@ -1969,8 +2012,8 @@ function ComposerMessage({
   if (isUser) {
     const text = message.parts.find((p) => p.type === "text")?.text ?? ""
     return (
-      <div className="px-3 py-1.5 flex justify-end">
-        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs whitespace-pre-wrap">
+      <div className="flex justify-end px-3 py-1.5">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-xl rounded-br-sm bg-primary px-3 py-1.5 text-primary-foreground text-xs">
           {text}
         </div>
       </div>
@@ -1981,7 +2024,7 @@ function ComposerMessage({
     <div className="px-3 py-1.5">
       <div className="space-y-1">
         {message.parts.map((part, i) => (
-          <ComposerMessagePart key={i} part={part} isAnimating={isAnimating} />
+          <ComposerMessagePart isAnimating={isAnimating} key={i} part={part} />
         ))}
       </div>
     </div>
@@ -1996,12 +2039,14 @@ function ComposerMessagePart({
   isAnimating: boolean
 }) {
   if (part.type === "text") {
-    if (!part.text.trim()) return null
+    if (!part.text.trim()) {
+      return null
+    }
     return (
       <Streamdown
         animated
-        isAnimating={isAnimating}
         className="text-xs leading-relaxed"
+        isAnimating={isAnimating}
       >
         {part.text}
       </Streamdown>
@@ -2018,23 +2063,24 @@ function ComposerMessagePart({
       ) {
         const inp = part.input as { title?: string } | undefined
         return (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <IconLoader2 size={11} className="animate-spin shrink-0" />
+          <div className="flex items-center gap-1.5 py-0.5 text-muted-foreground text-xs">
+            <IconLoader2 className="shrink-0 animate-spin" size={11} />
             {inp?.title ? `Creating: ${inp.title}` : "Creating panel…"}
           </div>
         )
       }
       if (part.state === "output-available") {
         const out = part.output as CreatePanelOutput
-        if (out.error)
+        if (out.error) {
           return (
-            <div className="text-xs text-destructive py-0.5">
+            <div className="py-0.5 text-destructive text-xs">
               Failed to create "{out.title}": {out.error}
             </div>
           )
+        }
         return (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <IconChartDots size={11} className="text-primary shrink-0" />
+          <div className="flex items-center gap-1.5 py-0.5 text-muted-foreground text-xs">
+            <IconChartDots className="shrink-0 text-primary" size={11} />
             <span>
               Added <strong className="text-foreground">{out.title}</strong>
             </span>
@@ -2051,23 +2097,24 @@ function ComposerMessagePart({
       ) {
         const inp = part.input as { title?: string } | undefined
         return (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <IconLoader2 size={11} className="animate-spin shrink-0" />
+          <div className="flex items-center gap-1.5 py-0.5 text-muted-foreground text-xs">
+            <IconLoader2 className="shrink-0 animate-spin" size={11} />
             {inp?.title ? `Editing: ${inp.title}` : "Editing panel…"}
           </div>
         )
       }
       if (part.state === "output-available") {
         const out = part.output as EditPanelOutput
-        if (out.error)
+        if (out.error) {
           return (
-            <div className="text-xs text-destructive py-0.5">
+            <div className="py-0.5 text-destructive text-xs">
               Failed to edit "{out.title}": {out.error}
             </div>
           )
+        }
         return (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-0.5">
-            <IconPencil size={11} className="text-primary shrink-0" />
+          <div className="flex items-center gap-1.5 py-0.5 text-muted-foreground text-xs">
+            <IconPencil className="shrink-0 text-primary" size={11} />
             <span>
               Updated <strong className="text-foreground">{out.title}</strong>
             </span>
@@ -2099,7 +2146,7 @@ export default function DashboardPage() {
     Object.fromEntries(
       DEFAULT_PANELS.map((p) => [
         p.id,
-        { status: "idle", result: null, error: null },
+        { error: null, result: null, status: "idle" },
       ])
     )
   )
@@ -2119,37 +2166,42 @@ export default function DashboardPage() {
   const { activeId } = useSessionContext()
 
   const runQuery = useCallback(async (panel: Panel) => {
-    if (!panel.sql.trim()) return
+    if (!panel.sql.trim()) {
+      return
+    }
     abortRefs.current[panel.id]?.abort()
     const ctrl = new AbortController()
     abortRefs.current[panel.id] = ctrl
     setPanelData((prev) => ({
       ...prev,
-      [panel.id]: { status: "running", result: null, error: null },
+      [panel.id]: { error: null, result: null, status: "running" },
     }))
     try {
       const idToken = await getToken()
       const res = await apiFetch("/api/sessions/default/query", {
-        method: "POST",
+        body: JSON.stringify({ idToken, sql: panel.sql }),
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: panel.sql, idToken }),
+        method: "POST",
         signal: ctrl.signal,
       })
       const json = await res.json()
-      if (!res.ok)
+      if (!res.ok) {
         throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`)
+      }
       setPanelData((prev) => ({
         ...prev,
-        [panel.id]: { status: "ok", result: json, error: null },
+        [panel.id]: { error: null, result: json, status: "ok" },
       }))
     } catch (err) {
-      if ((err as Error).name === "AbortError") return
+      if ((err as Error).name === "AbortError") {
+        return
+      }
       setPanelData((prev) => ({
         ...prev,
         [panel.id]: {
-          status: "error",
-          result: null,
           error: (err as Error).message,
+          result: null,
+          status: "error",
         },
       }))
     }
@@ -2157,10 +2209,14 @@ export default function DashboardPage() {
 
   const hasAutoRun = useRef(false)
   useEffect(() => {
-    if (hasAutoRun.current) return
+    if (hasAutoRun.current) {
+      return
+    }
     hasAutoRun.current = true
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel)
+      if (panel.sql.trim()) {
+        runQuery(panel)
+      }
     }
     // panels intentionally excluded — only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2173,21 +2229,21 @@ export default function DashboardPage() {
   const handleAddPanel = () => {
     const id = `p${Date.now()}`
     const panel: Panel = {
-      id,
-      title: "New Panel",
       chartType: "bar",
+      id,
       sql: "",
+      title: "New Panel",
       xCol: "",
       yCol: "",
     }
     setPanels((prev) => [...prev, panel])
     setPanelData((prev) => ({
       ...prev,
-      [id]: { status: "idle", result: null, error: null },
+      [id]: { error: null, result: null, status: "idle" },
     }))
     setLayout((prev) => [
       ...prev,
-      { i: id, x: 0, y: Infinity, w: 1, h: 4 } as LayoutItem,
+      { h: 4, i: id, w: 1, x: 0, y: Number.POSITIVE_INFINITY } as LayoutItem,
     ])
     setSelectedIds([id])
     setConfigPanelId(id)
@@ -2203,7 +2259,9 @@ export default function DashboardPage() {
     })
     setLayout((prev) => prev.filter((l) => l.i !== id))
     setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id))
-    if (configPanelId === id) setConfigPanelId(null)
+    if (configPanelId === id) {
+      setConfigPanelId(null)
+    }
   }
 
   // Called by AiComposer when editPanel tool calls complete
@@ -2218,7 +2276,7 @@ export default function DashboardPage() {
       setPanelData((prev) => {
         const next = { ...prev }
         for (const { panel, result } of updates) {
-          next[panel.id] = { status: "ok", result, error: null }
+          next[panel.id] = { error: null, result, status: "ok" }
         }
         return next
       })
@@ -2239,7 +2297,7 @@ export default function DashboardPage() {
         const updates: Record<string, PanelData> = {}
         for (const [id, result] of Object.entries(results)) {
           if (!prev[id] || prev[id].status === "idle") {
-            updates[id] = { status: "ok", result, error: null }
+            updates[id] = { error: null, result, status: "ok" }
           }
         }
         return { ...prev, ...updates }
@@ -2251,11 +2309,11 @@ export default function DashboardPage() {
           .map(
             (p, i) =>
               ({
-                i: p.id,
-                x: i % 2,
-                y: Infinity,
-                w: 1,
                 h: 4,
+                i: p.id,
+                w: 1,
+                x: i % 2,
+                y: Number.POSITIVE_INFINITY,
               }) as LayoutItem
           )
         return [...prev, ...newItems]
@@ -2266,7 +2324,9 @@ export default function DashboardPage() {
 
   const refreshAll = () => {
     for (const panel of panels) {
-      if (panel.sql.trim()) runQuery(panel)
+      if (panel.sql.trim()) {
+        runQuery(panel)
+      }
     }
   }
 
@@ -2282,11 +2342,13 @@ export default function DashboardPage() {
     (e: ReactMouseEvent) => {
       e.preventDefault()
       dragRef.current = {
-        startX: e.clientX,
         startW: direction === "left" ? composerWidth : sidebarWidth,
+        startX: e.clientX,
       }
       const onMove = (ev: MouseEvent) => {
-        if (!dragRef.current) return
+        if (!dragRef.current) {
+          return
+        }
         const delta =
           direction === "left"
             ? ev.clientX - dragRef.current.startX
@@ -2305,9 +2367,9 @@ export default function DashboardPage() {
   const configPanel = panels.find((p) => p.id === configPanelId) ?? null
   const configPanelData = configPanelId
     ? (panelData[configPanelId] ?? {
-        status: "idle",
-        result: null,
         error: null,
+        result: null,
+        status: "idle",
       })
     : null
   const heroMetrics = useMemo(() => {
@@ -2331,77 +2393,79 @@ export default function DashboardPage() {
 
     return [
       {
+        detail:
+          topOpportunity == null
+            ? "Waiting for query"
+            : `${getTextValue(topOpportunity, "source_company")} → ${getTextValue(topOpportunity, "target_company")} from ${formatCompactNumber(getNumberValue(topOpportunity, "customers"))} customers`,
         title: "Opportunity generated",
         value: formatCompactNumber(
           getNumberValue(topOpportunity, "total_signal_value"),
           " VND"
         ),
-        detail:
-          topOpportunity == null
-            ? "Waiting for query"
-            : `${getTextValue(topOpportunity, "source_company")} → ${getTextValue(topOpportunity, "target_company")} from ${formatCompactNumber(getNumberValue(topOpportunity, "customers"))} customers`,
       },
       {
-        title: "Untapped whitespace",
-        value: formatCompactNumber(whitespaceValue, " VND"),
         detail:
           topWhitespace == null
             ? "Waiting for query"
             : `${getTextValue(topWhitespace, "whitespace_edge")} is the largest open pool`,
+        title: "Untapped whitespace",
+        value: formatCompactNumber(whitespaceValue, " VND"),
       },
       {
+        detail:
+          topRecovery == null
+            ? "Waiting for query"
+            : `${getTextValue(topRecovery, "vietjet_priority_band")} band recovery score ${getNumberValue(topRecovery, "recovery_score") ?? "n/a"}`,
         title: "Revenue at risk",
         value: formatCompactNumber(
           getNumberValue(topRecovery, "revenue_at_risk"),
           " VND"
         ),
-        detail:
-          topRecovery == null
-            ? "Waiting for query"
-            : `${getTextValue(topRecovery, "vietjet_priority_band")} band recovery score ${getNumberValue(topRecovery, "recovery_score") ?? "n/a"}`,
       },
     ]
   }, [panelData])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Full-width toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b shrink-0 gap-4">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b px-4 py-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">
+          <p className="font-semibold text-sm">
             Cross-company journey dashboard
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Journey engine, activation platform, and operational lakehouse
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Button
-            variant="ghost"
-            size="sm"
             className="h-7 gap-1.5 text-xs"
             onClick={refreshAll}
+            size="sm"
             title="Re-run all panels"
+            variant="ghost"
           >
             <IconRefresh size={13} />
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
             className="h-7 gap-1.5 text-xs"
             onClick={handleAddPanel}
+            size="sm"
+            variant="ghost"
           >
             <IconPlus size={13} />
             Add Panel
           </Button>
           <Button
-            variant={editing ? "default" : "outline"}
-            size="sm"
             className="h-7 gap-1.5 text-xs"
             onClick={() => {
               setEditing((v) => !v)
-              if (editing) setSelectedIds([])
+              if (editing) {
+                setSelectedIds([])
+              }
             }}
+            size="sm"
+            variant={editing ? "default" : "outline"}
           >
             {editing ? (
               <>
@@ -2419,30 +2483,30 @@ export default function DashboardPage() {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left: AI Composer */}
-        <div className="flex shrink-0 h-full" style={{ width: composerWidth }}>
-          <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r bg-background">
+        <div className="flex h-full shrink-0" style={{ width: composerWidth }}>
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r bg-background">
             <AiComposer
-              sessionId={activeId}
               modelId={modelId}
-              panels={panels}
-              panelData={panelData}
-              selectedPanelIds={selectedIds}
+              onClearSelectedPanels={() => setSelectedIds([])}
+              onModelChange={setModelId}
+              onPanelsCreated={handlePanelsCreated}
+              onPanelsEdited={handlePanelsEdited}
               onRemoveSelectedPanel={(id) =>
                 setSelectedIds((prev) =>
                   prev.filter((selectedId) => selectedId !== id)
                 )
               }
-              onClearSelectedPanels={() => setSelectedIds([])}
-              onModelChange={setModelId}
-              onPanelsCreated={handlePanelsCreated}
-              onPanelsEdited={handlePanelsEdited}
+              panelData={panelData}
+              panels={panels}
+              selectedPanelIds={selectedIds}
+              sessionId={activeId}
             />
           </div>
           {/* Composer resize handle (right edge) */}
           <div
-            className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors bg-border"
+            className="w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/40 active:bg-primary/60"
             onMouseDown={makeDragHandler(
               composerDragRef,
               setComposerWidth,
@@ -2455,16 +2519,18 @@ export default function DashboardPage() {
 
         {/* Center: Grid */}
         <div
-          ref={containerRef}
-          className="flex-1 min-w-0 overflow-auto p-3"
+          className="min-w-0 flex-1 overflow-auto p-3"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedIds([])
+            if (e.target === e.currentTarget) {
+              setSelectedIds([])
+            }
           }}
+          ref={containerRef}
         >
           <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 pb-4">
             {panels.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
-                <IconSparkles size={36} className="opacity-20" />
+              <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+                <IconSparkles className="opacity-20" size={36} />
                 <p className="text-sm">
                   Ask the AI composer to generate panels, or click{" "}
                   <strong>Add Panel</strong>.
@@ -2472,12 +2538,12 @@ export default function DashboardPage() {
               </div>
             ) : mounted ? (
               <ReactGridLayout
-                width={width}
-                layout={layout}
-                gridConfig={{ cols: 2, rowHeight: 60, margin: [8, 8] }}
                 dragConfig={{ enabled: editing, handle: ".panel-drag-handle" }}
-                resizeConfig={{ enabled: editing, handles: ["se"] }}
+                gridConfig={{ cols: 2, margin: [8, 8], rowHeight: 60 }}
+                layout={layout}
                 onLayoutChange={setLayout}
+                resizeConfig={{ enabled: editing, handles: ["se"] }}
+                width={width}
               >
                 <div key={HEADLINE_CARD_ID}>
                   <HeadlineCard editing={editing} metrics={heroMetrics} />
@@ -2485,16 +2551,14 @@ export default function DashboardPage() {
                 {panels.map((panel) => (
                   <div key={panel.id}>
                     <PanelCard
-                      panel={panel}
                       data={
                         panelData[panel.id] ?? {
-                          status: "idle",
-                          result: null,
                           error: null,
+                          result: null,
+                          status: "idle",
                         }
                       }
                       editing={editing}
-                      selected={selectedIds.includes(panel.id)}
                       onClick={() =>
                         setSelectedIds((prev) =>
                           prev.includes(panel.id)
@@ -2509,6 +2573,8 @@ export default function DashboardPage() {
                         setConfigPanelId(panel.id)
                       }}
                       onDelete={() => handleDeletePanel(panel.id)}
+                      panel={panel}
+                      selected={selectedIds.includes(panel.id)}
                     />
                   </div>
                 ))}
@@ -2519,9 +2585,9 @@ export default function DashboardPage() {
 
         {/* Right: Panel config sidebar */}
         {configPanel && configPanelData && (
-          <div className="flex shrink-0 h-full" style={{ width: sidebarWidth }}>
+          <div className="flex h-full shrink-0" style={{ width: sidebarWidth }}>
             <div
-              className="w-1 shrink-0 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors bg-border"
+              className="w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/40 active:bg-primary/60"
               onMouseDown={makeDragHandler(
                 sidebarDragRef,
                 setSidebarWidth,
@@ -2530,22 +2596,22 @@ export default function DashboardPage() {
                 "right"
               )}
             />
-            <div className="flex flex-col flex-1 min-w-0 overflow-auto border-l bg-background">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0">
-                <span className="text-xs font-semibold">Panel Config</span>
+            <div className="flex min-w-0 flex-1 flex-col overflow-auto border-l bg-background">
+              <div className="flex shrink-0 items-center justify-between border-b px-4 py-2.5">
+                <span className="font-semibold text-xs">Panel Config</span>
                 <button
-                  type="button"
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => setConfigPanelId(null)}
+                  type="button"
                 >
                   <IconX size={13} />
                 </button>
               </div>
               <PanelSidebar
-                panel={configPanel}
                 data={configPanelData}
                 onChange={handlePanelChange}
                 onRun={runQuery}
+                panel={configPanel}
               />
             </div>
           </div>

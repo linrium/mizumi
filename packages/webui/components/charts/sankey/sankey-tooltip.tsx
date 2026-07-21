@@ -20,20 +20,20 @@ function getNodeName(nodeOrIndex: NodeOrIndex, fallbackIndex: number): string {
 }
 
 export interface SankeyTooltipProps {
-  /** Custom content renderer for node tooltips */
-  nodeContent?: (props: {
-    node: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>
-    index: number
-  }) => React.ReactNode
+  /** Custom class name */
+  className?: string
+  /** Value formatter function */
+  formatValue?: (value: number) => string
   /** Custom content renderer for link tooltips */
   linkContent?: (props: {
     link: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>
     index: number
   }) => React.ReactNode
-  /** Value formatter function */
-  formatValue?: (value: number) => string
-  /** Custom class name */
-  className?: string
+  /** Custom content renderer for node tooltips */
+  nodeContent?: (props: {
+    node: SankeyNode<SankeyNodeDatum, SankeyLinkDatum>
+    index: number
+  }) => React.ReactNode
 }
 
 export function SankeyTooltip({
@@ -83,7 +83,7 @@ export function SankeyTooltip({
           x={x}
           y={y}
         >
-          {nodeContent({ node, index: tooltipData.nodeIndex })}
+          {nodeContent({ index: tooltipData.nodeIndex, node })}
         </TooltipBox>
       )
     }
@@ -141,7 +141,7 @@ export function SankeyTooltip({
           x={x}
           y={y}
         >
-          {linkContent({ link, index: tooltipData.linkIndex })}
+          {linkContent({ index: tooltipData.linkIndex, link })}
         </TooltipBox>
       )
     }

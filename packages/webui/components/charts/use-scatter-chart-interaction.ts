@@ -10,24 +10,21 @@ type XScale = ScaleTime<number, number>
 type YScale = ScaleLinear<number, number>
 
 interface UseScatterChartInteractionParams {
-  xScale: XScale
-  yScale: YScale
-  data: Record<string, unknown>[]
-  lines: LineConfig[]
-  margin: Margin
-  xAccessor: (d: Record<string, unknown>) => Date
   bisectDate: (
     data: Record<string, unknown>[],
     date: Date,
     lo: number
   ) => number
   canInteract: boolean
+  data: Record<string, unknown>[]
+  lines: LineConfig[]
+  margin: Margin
+  xAccessor: (d: Record<string, unknown>) => Date
+  xScale: XScale
+  yScale: YScale
 }
 
 interface ScatterChartInteractionResult {
-  tooltipData: TooltipData | null
-  setTooltipData: React.Dispatch<React.SetStateAction<TooltipData | null>>
-  selection: ChartSelection | null
   clearSelection: () => void
   interactionHandlers: {
     onMouseMove?: (event: React.MouseEvent<SVGGElement>) => void
@@ -39,6 +36,9 @@ interface ScatterChartInteractionResult {
     onTouchEnd?: () => void
   }
   interactionStyle: React.CSSProperties
+  selection: ChartSelection | null
+  setTooltipData: React.Dispatch<React.SetStateAction<TooltipData | null>>
+  tooltipData: TooltipData | null
 }
 
 export function useScatterChartInteraction({
@@ -88,8 +88,8 @@ export function useScatterChartInteraction({
       }
 
       return {
-        point: d,
         index: finalIndex,
+        point: d,
         x: xScale(xAccessor(d)) ?? 0,
         yPositions,
       }
@@ -159,11 +159,11 @@ export function useScatterChartInteraction({
         const startX = Math.min(dragStartXRef.current, chartX)
         const endX = Math.max(dragStartXRef.current, chartX)
         setSelection({
-          startX,
+          active: true,
+          endIndex: resolveIndexFromX(endX),
           endX,
           startIndex: resolveIndexFromX(startX),
-          endIndex: resolveIndexFromX(endX),
-          active: true,
+          startX,
         })
         return
       }
@@ -228,11 +228,11 @@ export function useScatterChartInteraction({
         const startX = Math.min(x0, x1)
         const endX = Math.max(x0, x1)
         setSelection({
-          startX,
+          active: true,
+          endIndex: resolveIndexFromX(endX),
           endX,
           startIndex: resolveIndexFromX(startX),
-          endIndex: resolveIndexFromX(endX),
-          active: true,
+          startX,
         })
       }
     },
@@ -261,11 +261,11 @@ export function useScatterChartInteraction({
         const startX = Math.min(x0, x1)
         const endX = Math.max(x0, x1)
         setSelection({
-          startX,
+          active: true,
+          endIndex: resolveIndexFromX(endX),
           endX,
           startIndex: resolveIndexFromX(startX),
-          endIndex: resolveIndexFromX(endX),
-          active: true,
+          startX,
         })
       }
     },
@@ -283,13 +283,13 @@ export function useScatterChartInteraction({
 
   const interactionHandlers = canInteract
     ? {
-        onMouseMove: handleMouseMove,
-        onMouseLeave: handleMouseLeave,
         onMouseDown: handleMouseDown,
+        onMouseLeave: handleMouseLeave,
+        onMouseMove: handleMouseMove,
         onMouseUp: handleMouseUp,
-        onTouchStart: handleTouchStart,
-        onTouchMove: handleTouchMove,
         onTouchEnd: handleTouchEnd,
+        onTouchMove: handleTouchMove,
+        onTouchStart: handleTouchStart,
       }
     : {}
 
@@ -299,11 +299,11 @@ export function useScatterChartInteraction({
   }
 
   return {
-    tooltipData,
-    setTooltipData,
-    selection,
     clearSelection,
     interactionHandlers,
     interactionStyle,
+    selection,
+    setTooltipData,
+    tooltipData,
   }
 }

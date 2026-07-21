@@ -33,29 +33,29 @@ function VersionPanel({
     <section className="min-w-0 space-y-4">
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="font-mono text-sm font-semibold">{title}</h2>
+          <h2 className="font-mono font-semibold text-sm">{title}</h2>
           <Badge variant="outline">{definition.status}</Badge>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-muted-foreground text-xs">
           Owner {definition.owner_principal}
         </p>
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">Spec</h3>
+        <h3 className="mb-2 font-medium text-muted-foreground text-xs">Spec</h3>
         <JsonBlock value={definition.spec} />
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+        <h3 className="mb-2 font-medium text-muted-foreground text-xs">
           Semantic dependencies
         </h3>
         <div className="rounded-md border">
           {detail.dependencies.length > 0 ? (
             detail.dependencies.map((item) => (
               <div
-                key={item.id}
                 className="border-b px-3 py-2 text-sm last:border-b-0"
+                key={item.id}
               >
                 <span className="font-mono">
                   {item.namespace}.{item.name}@v{item.version}
@@ -63,7 +63,7 @@ function VersionPanel({
               </div>
             ))
           ) : (
-            <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <div className="px-3 py-6 text-center text-muted-foreground text-sm">
               No semantic dependencies
             </div>
           )}
@@ -71,15 +71,15 @@ function VersionPanel({
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+        <h3 className="mb-2 font-medium text-muted-foreground text-xs">
           Physical dependencies
         </h3>
         <div className="rounded-md border">
           {detail.physical_dependencies.length > 0 ? (
             detail.physical_dependencies.map((item) => (
               <div
-                key={item.id}
                 className="border-b px-3 py-2 text-sm last:border-b-0"
+                key={item.id}
               >
                 <span className="font-mono">
                   {item.catalog}.{item.schema_name}.{item.object_name}
@@ -87,7 +87,7 @@ function VersionPanel({
               </div>
             ))
           ) : (
-            <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <div className="px-3 py-6 text-center text-muted-foreground text-sm">
               No physical dependencies
             </div>
           )}
@@ -102,11 +102,15 @@ export default function SemanticComparePage() {
   const namespace = decodeURIComponent(params.namespace)
   const name = decodeURIComponent(params.name)
   const [from] = useState(() => {
-    if (typeof window === "undefined") return 1
+    if (typeof window === "undefined") {
+      return 1
+    }
     return Number(new URLSearchParams(window.location.search).get("from") ?? 1)
   })
   const [to] = useState(() => {
-    if (typeof window === "undefined") return 1
+    if (typeof window === "undefined") {
+      return 1
+    }
     return Number(new URLSearchParams(window.location.search).get("to") ?? 1)
   })
   const [compare, setCompare] = useState<SemanticCompareResponse | null>(null)
@@ -120,7 +124,9 @@ export default function SemanticComparePage() {
       setError(null)
       try {
         const data = await compareSemanticVersions(namespace, name, from, to)
-        if (!cancelled) setCompare(data)
+        if (!cancelled) {
+          setCompare(data)
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -128,7 +134,9 @@ export default function SemanticComparePage() {
           )
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
     void load()
@@ -139,7 +147,7 @@ export default function SemanticComparePage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading comparison...
       </div>
     )
@@ -148,13 +156,13 @@ export default function SemanticComparePage() {
   if (error || !compare) {
     return (
       <div className="p-4">
-        <Button variant="ghost" asChild>
+        <Button asChild variant="ghost">
           <Link href={`/semantic-registry/${namespace}/${name}`}>
             <IconArrowLeft size={14} />
             Definition
           </Link>
         </Button>
-        <p className="mt-4 text-sm text-destructive">
+        <p className="mt-4 text-destructive text-sm">
           {error ?? "Comparison not found"}
         </p>
       </div>
@@ -167,7 +175,7 @@ export default function SemanticComparePage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
-          <Button variant="ghost" size="default" asChild>
+          <Button asChild size="default" variant="ghost">
             <Link
               href={`/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${to}`}
             >
@@ -177,15 +185,15 @@ export default function SemanticComparePage() {
           </Button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <IconGitCompare size={16} className="text-muted-foreground" />
-              <h1 className="font-mono text-sm font-semibold">
+              <IconGitCompare className="text-muted-foreground" size={16} />
+              <h1 className="font-mono font-semibold text-sm">
                 {namespace}.{name}
               </h1>
               <Badge variant="outline">
                 v{from} → v{to}
               </Badge>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Compare definition, dependency, physical reference, and lifecycle
               changes.
             </p>
@@ -206,12 +214,12 @@ export default function SemanticComparePage() {
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="grid gap-4 lg:grid-cols-2">
-          <VersionPanel title={`v${from}`} detail={compare.from} />
-          <VersionPanel title={`v${to}`} detail={compare.to} />
+          <VersionPanel detail={compare.from} title={`v${from}`} />
+          <VersionPanel detail={compare.to} title={`v${to}`} />
         </div>
         <Separator className="my-4" />
         <div>
-          <h2 className="mb-2 text-sm font-semibold">Change flags</h2>
+          <h2 className="mb-2 font-semibold text-sm">Change flags</h2>
           <JsonBlock value={compare.changes} />
         </div>
       </div>

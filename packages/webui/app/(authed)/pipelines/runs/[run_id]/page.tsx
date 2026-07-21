@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
-import dynamic from "next/dynamic"
-import { cn } from "@/lib/utils"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
+import dynamic from "next/dynamic"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import type { RunEvent } from "./StepGraph"
 
 dayjs.extend(relativeTime)
@@ -62,7 +62,9 @@ type EventsResponse = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTs(ts: string | number | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   const v = Number(ts)
   return isFinite(v)
     ? dayjs(v > 1e12 ? v : v * 1000).format("MMM D, h:mm:ss A")
@@ -70,10 +72,16 @@ function fmtTs(ts: string | number | null | undefined): string {
 }
 
 function fmtDuration(start: number | null, end: number | null): string {
-  if (!start) return "—"
+  if (!start) {
+    return "—"
+  }
   const sec = Math.round((end ?? Date.now() / 1000) - start)
-  if (sec < 60) return `${sec}s`
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  if (sec < 60) {
+    return `${sec}s`
+  }
+  if (sec < 3600) {
+    return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  }
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
@@ -83,29 +91,31 @@ type StatusConfig = {
 }
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
-  SUCCESS: { label: "Success", variant: "success" },
+  CANCELED: { label: "Canceled", variant: "default" },
+  CANCELING: { label: "Canceling", variant: "warning" },
   FAILURE: { label: "Failed", variant: "error" },
+  NOT_STARTED: { label: "Not started", variant: "default" },
+  QUEUED: { label: "Queued", variant: "default" },
   STARTED: { label: "Running", variant: "info" },
   STARTING: { label: "Starting", variant: "info" },
-  QUEUED: { label: "Queued", variant: "default" },
-  CANCELING: { label: "Canceling", variant: "warning" },
-  CANCELED: { label: "Canceled", variant: "default" },
-  NOT_STARTED: { label: "Not started", variant: "default" },
+  SUCCESS: { label: "Success", variant: "success" },
 }
 
 const VARIANT_DOT_CLS: Record<string, string> = {
-  success: "bg-green-600 dark:bg-green-400",
+  default: "bg-muted-foreground",
   error: "bg-destructive",
   info: "bg-blue-600 dark:bg-blue-400",
+  success: "bg-green-600 dark:bg-green-400",
   warning: "bg-orange-600 dark:bg-orange-400",
-  default: "bg-muted-foreground",
 }
 
 const ACTIVE_STATUSES = new Set(["QUEUED", "STARTED", "STARTING", "CANCELING"])
 
 function RunStatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status]
-  if (!cfg) return <Badge variant="outline">{status}</Badge>
+  if (!cfg) {
+    return <Badge variant="outline">{status}</Badge>
+  }
   return (
     <Status variant={cfg.variant}>
       <StatusIndicator />
@@ -117,50 +127,54 @@ function RunStatusBadge({ status }: { status: string }) {
 // ── Event log row ─────────────────────────────────────────────────────────────
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  ExecutionStepStartEvent: "text-blue-500",
-  ExecutionStepSuccessEvent: "text-green-500",
+  AssetMaterializationPlannedEvent: "text-emerald-400",
+  EngineEvent: "text-zinc-400",
   ExecutionStepFailureEvent: "text-red-500",
   ExecutionStepSkippedEvent: "text-zinc-400",
+  ExecutionStepStartEvent: "text-blue-500",
+  ExecutionStepSuccessEvent: "text-green-500",
+  LogMessageEvent: "text-zinc-500",
   MaterializationEvent: "text-emerald-500",
-  AssetMaterializationPlannedEvent: "text-emerald-400",
-  StepWorkerStartedEvent: "text-zinc-400",
-  StepWorkerStartingEvent: "text-zinc-400",
+  RunCanceledEvent: "text-zinc-400",
+  RunFailureEvent: "text-red-500",
   RunStartEvent: "text-blue-400",
   RunSuccessEvent: "text-green-500",
-  RunFailureEvent: "text-red-500",
-  RunCanceledEvent: "text-zinc-400",
-  EngineEvent: "text-zinc-400",
-  LogMessageEvent: "text-zinc-500",
+  StepWorkerStartedEvent: "text-zinc-400",
+  StepWorkerStartingEvent: "text-zinc-400",
 }
 
 const SHORT_TYPE: Record<string, string> = {
-  ExecutionStepStartEvent: "STEP_START",
-  ExecutionStepSuccessEvent: "STEP_SUCCESS",
+  AssetMaterializationPlannedEvent: "MAT_PLANNED",
+  EngineEvent: "ENGINE_EVENT",
   ExecutionStepFailureEvent: "STEP_FAILURE",
   ExecutionStepSkippedEvent: "STEP_SKIPPED",
-  MaterializationEvent: "ASSET_MATERIALIZATION",
-  AssetMaterializationPlannedEvent: "MAT_PLANNED",
-  StepWorkerStartedEvent: "WORKER_STARTED",
-  StepWorkerStartingEvent: "WORKER_STARTING",
-  RunStartEvent: "RUN_START",
-  RunSuccessEvent: "RUN_SUCCESS",
-  RunFailureEvent: "RUN_FAILURE",
-  RunCanceledEvent: "RUN_CANCELED",
-  EngineEvent: "ENGINE_EVENT",
-  LogMessageEvent: "LOG",
+  ExecutionStepStartEvent: "STEP_START",
+  ExecutionStepSuccessEvent: "STEP_SUCCESS",
   HandledOutputEvent: "OUTPUT",
   LoadedInputEvent: "INPUT",
+  LogMessageEvent: "LOG",
+  MaterializationEvent: "ASSET_MATERIALIZATION",
   ObjectStoreOperationEvent: "OBJECT_STORE",
   ResourceInitFailureEvent: "RESOURCE_FAIL",
   ResourceInitStartedEvent: "RESOURCE_START",
   ResourceInitSuccessEvent: "RESOURCE_OK",
+  RunCanceledEvent: "RUN_CANCELED",
+  RunFailureEvent: "RUN_FAILURE",
+  RunStartEvent: "RUN_START",
+  RunSuccessEvent: "RUN_SUCCESS",
   StepExpectationResultEvent: "EXPECTATION",
+  StepWorkerStartedEvent: "WORKER_STARTED",
+  StepWorkerStartingEvent: "WORKER_STARTING",
 }
 
 function fmtEventTimestamp(ts: string | null | undefined): string {
-  if (!ts) return ""
+  if (!ts) {
+    return ""
+  }
   const v = Number(ts)
-  if (!isFinite(v)) return ""
+  if (!isFinite(v)) {
+    return ""
+  }
   // Dagster timestamps in events are milliseconds
   return dayjs(v).format("h:mm:ss.SSS A")
 }
@@ -179,35 +193,35 @@ function EventRow({
   return (
     <tr
       className={cn(
-        "align-top border-b border-border/50 text-xs",
+        "border-border/50 border-b align-top text-xs",
         highlight && "bg-muted/40"
       )}
     >
-      <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap tabular-nums">
+      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-muted-foreground tabular-nums">
         {fmtEventTimestamp(event.timestamp)}
       </td>
-      <td className="px-3 py-1.5 font-mono text-muted-foreground whitespace-nowrap">
+      <td className="whitespace-nowrap px-3 py-1.5 font-mono text-muted-foreground">
         {event.step_key ?? <span className="opacity-40">—</span>}
       </td>
-      <td className="px-3 py-1.5 whitespace-nowrap">
+      <td className="whitespace-nowrap px-3 py-1.5">
         <span className={cn("font-semibold text-[11px]", typeColor)}>
           {shortType}
         </span>
       </td>
-      <td className="px-3 py-1.5 text-foreground max-w-[600px]">
+      <td className="max-w-[600px] px-3 py-1.5 text-foreground">
         {isError && event.error ? (
           <details>
-            <summary className="cursor-pointer text-red-500 truncate">
+            <summary className="cursor-pointer truncate text-red-500">
               {event.message ?? event.error}
             </summary>
-            <pre className="mt-1 text-[10px] font-mono whitespace-pre-wrap text-muted-foreground leading-relaxed">
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-[10px] text-muted-foreground leading-relaxed">
               {event.error}
             </pre>
           </details>
         ) : event.asset_key ? (
           <span className="font-mono">{event.asset_key.join("/")}</span>
         ) : (
-          <span className="truncate block max-w-[600px]">
+          <span className="block max-w-[600px] truncate">
             {event.message ?? ""}
           </span>
         )}
@@ -221,23 +235,25 @@ function EventRow({
 type StepSummaryItem = { label: string; count: number; cls: string }
 
 function StepSummary({ stats }: { stats: RunStats | null }) {
-  if (!stats) return null
+  if (!stats) {
+    return null
+  }
   const items: StepSummaryItem[] = [
-    { label: "Preparing", count: 0, cls: "text-muted-foreground" },
-    { label: "Executing", count: 0, cls: "text-blue-500" },
-    { label: "Errored", count: stats.steps_failed ?? 0, cls: "text-red-500" },
+    { cls: "text-muted-foreground", count: 0, label: "Preparing" },
+    { cls: "text-blue-500", count: 0, label: "Executing" },
+    { cls: "text-red-500", count: stats.steps_failed ?? 0, label: "Errored" },
     {
-      label: "Succeeded",
-      count: stats.steps_succeeded ?? 0,
       cls: "text-green-500",
+      count: stats.steps_succeeded ?? 0,
+      label: "Succeeded",
     },
   ]
   return (
     <div className="flex flex-col gap-1">
       {items.map((item) => (
         <div
-          key={item.label}
           className="flex items-center justify-between text-xs"
+          key={item.label}
         >
           <span className={cn("font-medium", item.cls)}>
             {item.label} ({item.count})
@@ -260,8 +276,10 @@ function ReExecutions({
   const [runs, setRuns] = useState<Run[]>([])
 
   useEffect(() => {
-    if (!rootRunId) return
-    fetchWithAuth(`/api/dagster/runs?limit=20`, { cache: "no-store" })
+    if (!rootRunId) {
+      return
+    }
+    fetchWithAuth("/api/dagster/runs?limit=20", { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { runs: Run[] }) => {
         const related = d.runs.filter(
@@ -272,12 +290,14 @@ function ReExecutions({
       .catch(() => {})
   }, [rootRunId])
 
-  if (runs.length <= 1) return null
+  if (runs.length <= 1) {
+    return null
+  }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="px-4 py-2.5 border-b bg-muted/20 flex items-center justify-between">
-        <span className="text-xs font-semibold">
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-2.5">
+        <span className="font-semibold text-xs">
           Re-executions ({runs.length})
         </span>
       </div>
@@ -287,18 +307,18 @@ function ReExecutions({
           const isThis = r.run_id === runId
           return (
             <Link
-              key={r.run_id}
-              href={`/pipelines/runs/${r.run_id}`}
               className={cn(
-                "flex items-center justify-between px-4 py-2.5 hover:bg-muted/30 transition-colors",
+                "flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-muted/30",
                 isThis && "bg-muted/50"
               )}
+              href={`/pipelines/runs/${r.run_id}`}
+              key={r.run_id}
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
                 {cfg && (
                   <StatusIndicator className={VARIANT_DOT_CLS[cfg.variant]} />
                 )}
-                <span className="text-xs font-mono">
+                <span className="font-mono text-xs">
                   {r.run_id.slice(0, 8)}
                 </span>
                 {r.root_run_id === null || r.root_run_id === r.run_id ? (
@@ -307,7 +327,7 @@ function ReExecutions({
                   </span>
                 ) : null}
               </div>
-              <div className="flex flex-col items-end gap-0.5 shrink-0 ml-4">
+              <div className="ml-4 flex shrink-0 flex-col items-end gap-0.5">
                 <span className="text-[10px] text-muted-foreground">
                   {fmtTs(r.start_time ?? r.creation_time)}
                 </span>
@@ -343,7 +363,9 @@ function useRunDetail(runId: string) {
             cache: "no-store",
           }),
         ])
-        if (!runRes.ok) throw new Error(`HTTP ${runRes.status}`)
+        if (!runRes.ok) {
+          throw new Error(`HTTP ${runRes.status}`)
+        }
         const runData = (await runRes.json()) as Run
         const eventsData = (await eventsRes.json()) as EventsResponse
 
@@ -352,7 +374,7 @@ function useRunDetail(runId: string) {
           setEvents(eventsData.events ?? [])
           setLoading(false)
           const active = ACTIVE_STATUSES.has(runData.status)
-          timerRef.current = setTimeout(fetchAll, active ? 3000 : 30000)
+          timerRef.current = setTimeout(fetchAll, active ? 3000 : 30_000)
         }
       } catch (e) {
         if (!cancelled) {
@@ -365,11 +387,13 @@ function useRunDetail(runId: string) {
     fetchAll()
     return () => {
       cancelled = true
-      if (timerRef.current) clearTimeout(timerRef.current)
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
     }
   }, [runId])
 
-  return { run, events, loading, error }
+  return { error, events, loading, run }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -391,9 +415,11 @@ export default function RunDetailPage() {
 
   function onDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault()
-    dragRef.current = { startY: e.clientY, startH: graphHeight }
+    dragRef.current = { startH: graphHeight, startY: e.clientY }
     function onMove(ev: MouseEvent) {
-      if (!dragRef.current) return
+      if (!dragRef.current) {
+        return
+      }
       const delta = ev.clientY - dragRef.current.startY
       setGraphHeight(
         Math.max(80, Math.min(600, dragRef.current.startH + delta))
@@ -409,7 +435,9 @@ export default function RunDetailPage() {
   }
 
   const selectedStepAssetPath = useMemo(() => {
-    if (!selectedStep) return undefined
+    if (!selectedStep) {
+      return
+    }
     const e = events.find(
       (ev) =>
         ev.step_key === selectedStep && ev.asset_key && ev.asset_key.length > 0
@@ -423,14 +451,14 @@ export default function RunDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading run…
       </div>
     )
   }
   if (error || !run) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error ?? "Run not found"}
       </div>
     )
@@ -440,27 +468,27 @@ export default function RunDetailPage() {
     (run.stats?.steps_succeeded ?? 0) + (run.stats?.steps_failed ?? 0)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 border-b shrink-0 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b px-5 py-3">
         <Link
+          className="text-muted-foreground text-xs transition-colors hover:text-foreground"
           href="/pipelines/runs"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Runs
         </Link>
         <span className="text-muted-foreground text-xs">/</span>
-        <span className="text-xs font-mono font-semibold">{runId}</span>
+        <span className="font-mono font-semibold text-xs">{runId}</span>
         <RunStatusBadge status={run.status} />
-        <div className="ml-auto flex items-center gap-3 shrink-0">
-          <span className="text-xs text-muted-foreground">
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <span className="text-muted-foreground text-xs">
             {fmtTs(run.start_time ?? run.creation_time)}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-muted-foreground text-xs">
             {fmtDuration(run.start_time, run.end_time)}
           </span>
           {totalSteps > 0 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {run.stats?.steps_succeeded ?? 0}/{totalSteps} steps
             </span>
           )}
@@ -468,21 +496,21 @@ export default function RunDetailPage() {
       </div>
 
       {/* Main split: graph + right sidebar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left: graph + event log */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Step graph */}
-          <div className="shrink-0 relative" style={{ height: graphHeight }}>
+          <div className="relative shrink-0" style={{ height: graphHeight }}>
             <StepGraph
               events={events}
-              selectedKey={selectedStep}
               onSelectStep={setSelectedStep}
+              selectedKey={selectedStep}
             />
             {selectedStep && (
               <button
-                type="button"
+                className="absolute top-2 right-2 z-10 rounded border bg-background px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted"
                 onClick={() => setSelectedStep(null)}
-                className="absolute top-2 right-2 text-[10px] px-2 py-1 border rounded bg-background hover:bg-muted text-muted-foreground z-10"
+                type="button"
               >
                 Clear filter
               </button>
@@ -491,23 +519,23 @@ export default function RunDetailPage() {
 
           {/* Resize handle */}
           <div
+            className="h-1.5 shrink-0 cursor-row-resize border-b transition-colors hover:bg-muted/60 active:bg-muted"
             onMouseDown={onDividerMouseDown}
-            className="h-1.5 shrink-0 cursor-row-resize border-b hover:bg-muted/60 active:bg-muted transition-colors"
           />
 
           {/* Tabs: Events / Config */}
-          <div className="flex items-center border-b px-4 gap-4 shrink-0">
+          <div className="flex shrink-0 items-center gap-4 border-b px-4">
             {(["events", "config", "lineage"] as const).map((t) => (
               <button
-                key={t}
-                type="button"
-                onClick={() => setActiveTab(t)}
                 className={cn(
-                  "text-xs py-2 capitalize border-b-2 transition-colors",
+                  "border-b-2 py-2 text-xs capitalize transition-colors",
                   activeTab === t
-                    ? "border-foreground text-foreground font-medium"
+                    ? "border-foreground font-medium text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
+                key={t}
+                onClick={() => setActiveTab(t)}
+                type="button"
               >
                 {t === "events"
                   ? `Events (${filteredEvents.length})`
@@ -526,17 +554,17 @@ export default function RunDetailPage() {
 
           {/* Event log */}
           {activeTab === "events" && (
-            <div className="flex-1 overflow-auto min-h-0">
+            <div className="min-h-0 flex-1 overflow-auto">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-background z-10">
-                  <tr className="border-b text-muted-foreground text-left">
-                    <th className="px-3 py-2 font-medium whitespace-nowrap">
+                <thead className="sticky top-0 z-10 bg-background">
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="whitespace-nowrap px-3 py-2 font-medium">
                       Timestamp
                     </th>
-                    <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    <th className="whitespace-nowrap px-3 py-2 font-medium">
                       OP
                     </th>
-                    <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    <th className="whitespace-nowrap px-3 py-2 font-medium">
                       Event Type
                     </th>
                     <th className="px-3 py-2 font-medium">Info</th>
@@ -546,8 +574,8 @@ export default function RunDetailPage() {
                   {filteredEvents.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={4}
                         className="px-3 py-8 text-center text-muted-foreground"
+                        colSpan={4}
                       >
                         No events
                       </td>
@@ -555,11 +583,11 @@ export default function RunDetailPage() {
                   ) : (
                     filteredEvents.map((e, i) => (
                       <EventRow
-                        key={i}
                         event={e}
                         highlight={
                           !!selectedStep && e.step_key === selectedStep
                         }
+                        key={i}
                       />
                     ))
                   )}
@@ -570,20 +598,20 @@ export default function RunDetailPage() {
 
           {/* Config tab */}
           {activeTab === "config" && (
-            <div className="flex-1 overflow-auto min-h-0 p-4">
+            <div className="min-h-0 flex-1 overflow-auto p-4">
               {run.run_config_yaml ? (
-                <pre className="text-xs font-mono whitespace-pre-wrap text-foreground leading-relaxed">
+                <pre className="whitespace-pre-wrap font-mono text-foreground text-xs leading-relaxed">
                   {run.run_config_yaml}
                 </pre>
               ) : (
-                <p className="text-sm text-muted-foreground">No run config</p>
+                <p className="text-muted-foreground text-sm">No run config</p>
               )}
             </div>
           )}
 
           {/* Lineage tab */}
           {activeTab === "lineage" && (
-            <div className="flex-1 min-h-0 relative">
+            <div className="relative min-h-0 flex-1">
               <LineageGraph
                 currentPath={selectedStepAssetPath ?? undefined}
                 neighborhoodOnly={false}
@@ -593,11 +621,11 @@ export default function RunDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <div className="w-64 border-l shrink-0 overflow-y-auto">
+        <div className="w-64 shrink-0 overflow-y-auto border-l">
           <div className="flex flex-col">
             {/* Step counts */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-2">Execution</p>
+              <p className="mb-2 font-semibold text-xs">Execution</p>
               <StepSummary stats={run.stats} />
             </div>
 
@@ -605,39 +633,39 @@ export default function RunDetailPage() {
 
             {/* Run details */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-2">Details</p>
+              <p className="mb-2 font-semibold text-xs">Details</p>
               <div className="flex flex-col gap-2 text-xs">
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">Run ID</span>
-                  <span className="font-mono truncate">
+                  <span className="shrink-0 text-muted-foreground">Run ID</span>
+                  <span className="truncate font-mono">
                     {runId.slice(0, 8)}…
                   </span>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">Job</span>
-                  <span className="font-mono truncate">{run.job_name}</span>
+                  <span className="shrink-0 text-muted-foreground">Job</span>
+                  <span className="truncate font-mono">{run.job_name}</span>
                 </div>
                 {run.parent_run_id && (
                   <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">
+                    <span className="shrink-0 text-muted-foreground">
                       Parent
                     </span>
                     <Link
+                      className="truncate font-mono text-blue-500 hover:underline"
                       href={`/pipelines/runs/${run.parent_run_id}`}
-                      className="font-mono text-blue-500 hover:underline truncate"
                     >
                       {run.parent_run_id.slice(0, 8)}…
                     </Link>
                   </div>
                 )}
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
+                  <span className="shrink-0 text-muted-foreground">
                     Started
                   </span>
                   <span className="text-right">{fmtTs(run.start_time)}</span>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
+                  <span className="shrink-0 text-muted-foreground">
                     Duration
                   </span>
                   <span>{fmtDuration(run.start_time, run.end_time)}</span>
@@ -650,14 +678,14 @@ export default function RunDetailPage() {
               <>
                 <div className="h-px bg-border" />
                 <div className="px-4 py-4">
-                  <p className="text-xs font-semibold mb-2">Tags</p>
+                  <p className="mb-2 font-semibold text-xs">Tags</p>
                   <div className="flex flex-col gap-1">
                     {run.tags
                       .filter((t) => !t.key.startsWith("dagster/"))
                       .map((t, i) => (
                         <div
+                          className="break-all rounded bg-muted px-2 py-1 font-mono text-[10px]"
                           key={i}
-                          className="text-[10px] font-mono bg-muted rounded px-2 py-1 break-all"
                         >
                           {t.key}
                           {t.value ? `=${t.value}` : ""}

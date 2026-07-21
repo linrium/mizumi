@@ -17,6 +17,19 @@ import { TableContext, type TableDetail } from "./table-context"
 
 type Tab = "schema" | "preview" | "permissions" | "request-permissions"
 
+const TAB_FROM_PATH_SUFFIX: Array<{ suffix: string; tab: Tab }> = [
+  { suffix: "/preview", tab: "preview" },
+  { suffix: "/request-permissions", tab: "request-permissions" },
+  { suffix: "/permissions", tab: "permissions" },
+]
+
+const TAB_PATH_SUFFIX: Record<Tab, string> = {
+  permissions: "/permissions",
+  preview: "/preview",
+  "request-permissions": "/request-permissions",
+  schema: "",
+}
+
 export default function TableLayout({
   children,
 }: {
@@ -32,13 +45,9 @@ export default function TableLayout({
   const [detail, setDetail] = useState<TableDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const activeTab: Tab = pathname.endsWith("/preview")
-    ? "preview"
-    : pathname.endsWith("/request-permissions")
-      ? "request-permissions"
-      : pathname.endsWith("/permissions")
-        ? "permissions"
-        : "schema"
+  const activeTab: Tab =
+    TAB_FROM_PATH_SUFFIX.find(({ suffix }) => pathname.endsWith(suffix))?.tab ??
+    "schema"
 
   useEffect(() => {
     setDetail(null)
@@ -49,11 +58,11 @@ export default function TableLayout({
   }, [catalog, schema, table])
 
   if (error) {
-    return <div className="p-4 text-sm text-destructive font-mono">{error}</div>
+    return <div className="p-4 font-mono text-destructive text-sm">{error}</div>
   }
   if (!detail) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     )
@@ -63,64 +72,56 @@ export default function TableLayout({
   const basePath = `/catalog/${catalog}/${schema}/${table}`
 
   function navigate(tab: Tab) {
-    router.push(
-      tab === "schema"
-        ? basePath
-        : tab === "preview"
-          ? `${basePath}/preview`
-          : tab === "permissions"
-            ? `${basePath}/permissions`
-            : `${basePath}/request-permissions`
-    )
+    router.push(`${basePath}${TAB_PATH_SUFFIX[tab]}`)
   }
 
   return (
     <TableContext value={detail}>
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="px-5 py-4 border-b shrink-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <IconTable size={15} className="text-muted-foreground" />
-            <h2 className="text-sm font-semibold">{detail.name}</h2>
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="shrink-0 border-b px-5 py-4">
+          <div className="mb-0.5 flex items-center gap-2">
+            <IconTable className="text-muted-foreground" size={15} />
+            <h2 className="font-semibold text-sm">{detail.name}</h2>
+            <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
               {detail.table_type}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 mt-1 group/path">
-            <p className="text-xs text-muted-foreground font-mono">
+          <div className="group/path mt-1 flex items-center gap-1.5">
+            <p className="font-mono text-muted-foreground text-xs">
               {fullPath}
             </p>
             <button
-              type="button"
+              className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/path:opacity-100"
               onClick={() => {
                 navigator.clipboard.writeText(fullPath)
                 toast.success("Copied to clipboard")
               }}
-              className="opacity-0 group-hover/path:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+              type="button"
             >
               <IconCopy size={12} />
             </button>
           </div>
-          {detail.comment && (
-            <p className="text-xs text-muted-foreground mt-1.5 italic">
+          {detail.comment ? (
+            <p className="mt-1.5 text-muted-foreground text-xs italic">
               {detail.comment}
             </p>
-          )}
+          ) : null}
         </div>
 
-        <div className="flex items-center gap-0 px-5 border-b shrink-0">
+        <div className="flex shrink-0 items-center gap-0 border-b px-5">
           {(
             [
-              { key: "schema", label: "schema", icon: IconSchema },
-              { key: "preview", label: "preview", icon: IconEyeTable },
+              { icon: IconSchema, key: "schema", label: "schema" },
+              { icon: IconEyeTable, key: "preview", label: "preview" },
               {
+                icon: IconShieldLock,
                 key: "permissions",
                 label: "permissions",
-                icon: IconShieldLock,
               },
               {
+                icon: IconKey,
                 key: "request-permissions",
                 label: "request access",
-                icon: IconKey,
               },
             ] satisfies {
               key: Tab
@@ -129,15 +130,15 @@ export default function TableLayout({
             }[]
           ).map((tab) => (
             <button
-              key={tab.key}
-              type="button"
-              onClick={() => navigate(tab.key)}
               className={cn(
-                "px-3 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors",
+                "-mb-px border-b-2 px-3 py-2 font-medium text-xs capitalize transition-colors",
                 activeTab === tab.key
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              key={tab.key}
+              onClick={() => navigate(tab.key)}
+              type="button"
             >
               <span className="flex items-center gap-1.5">
                 <tab.icon size={12} />

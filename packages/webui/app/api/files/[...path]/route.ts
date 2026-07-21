@@ -20,8 +20,8 @@ export async function GET(
     upstream.headers.get("content-type") ?? "application/octet-stream"
   return new Response(upstream.body, {
     headers: {
-      "content-type": contentType,
       "cache-control": "public, max-age=3600",
+      "content-type": contentType,
     },
   })
 }

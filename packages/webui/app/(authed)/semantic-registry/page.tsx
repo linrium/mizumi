@@ -100,10 +100,10 @@ function parseDependencyLines(value: string) {
         throw new Error(`Invalid dependency reference: ${line}`)
       }
       return {
-        namespace: match[1],
-        name: match[2],
-        version: Number(match[3]),
         dependency_type: "semantic",
+        name: match[2],
+        namespace: match[1],
+        version: Number(match[3]),
       }
     })
 }
@@ -121,10 +121,10 @@ function parsePhysicalLines(value: string) {
       const [catalog, schemaName, ...objectParts] = parts
       return {
         catalog,
-        schema_name: schemaName,
+        contract_version: null,
         object_name: objectParts.join("."),
         object_type: "table",
-        contract_version: null,
+        schema_name: schemaName,
       }
     })
 }
@@ -160,12 +160,13 @@ function CreateMetricDialog({
     try {
       const spec = JSON.parse(specJson)
       const body = {
-        namespace,
-        name,
-        object_type: "metric" as const,
-        version: Number(version),
-        owner_principal: owner,
+        dependencies: parseDependencyLines(dependencies),
         description,
+        name,
+        namespace,
+        object_type: "metric" as const,
+        owner_principal: owner,
+        physical_dependencies: parsePhysicalLines(physical),
         spec: {
           ...spec,
           aggregation,
@@ -175,8 +176,7 @@ function CreateMetricDialog({
         time_semantics: timeField.trim()
           ? { field: timeField.trim(), grain: timeGrain }
           : null,
-        dependencies: parseDependencyLines(dependencies),
-        physical_dependencies: parsePhysicalLines(physical),
+        version: Number(version),
       }
       await createSemanticDefinition(body)
       toast.success("Semantic metric created")
@@ -193,7 +193,7 @@ function CreateMetricDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New semantic metric</DialogTitle>
@@ -208,26 +208,26 @@ function CreateMetricDialog({
               <Label htmlFor="namespace">Namespace</Label>
               <Input
                 id="namespace"
-                value={namespace}
                 onChange={(e) => setNamespace(e.target.value)}
+                value={namespace}
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
-                value={name}
-                placeholder="net_spend"
                 onChange={(e) => setName(e.target.value)}
+                placeholder="net_spend"
+                value={name}
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="version">Version</Label>
               <Input
                 id="version"
-                value={version}
                 inputMode="numeric"
                 onChange={(e) => setVersion(e.target.value)}
+                value={version}
               />
             </div>
           </div>
@@ -236,9 +236,9 @@ function CreateMetricDialog({
             <Label htmlFor="owner">Owner</Label>
             <Input
               id="owner"
-              value={owner}
-              placeholder="finance-stewards"
               onChange={(e) => setOwner(e.target.value)}
+              placeholder="finance-stewards"
+              value={owner}
             />
           </div>
 
@@ -246,16 +246,16 @@ function CreateMetricDialog({
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={description}
-              rows={2}
               onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              value={description}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Aggregation</Label>
-              <Select value={aggregation} onValueChange={setAggregation}>
+              <Select onValueChange={setAggregation} value={aggregation}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -272,14 +272,14 @@ function CreateMetricDialog({
               <Label htmlFor="time-field">Time field</Label>
               <Input
                 id="time-field"
-                value={timeField}
-                placeholder="settled_at"
                 onChange={(e) => setTimeField(e.target.value)}
+                placeholder="settled_at"
+                value={timeField}
               />
             </div>
             <div className="grid gap-1.5">
               <Label>Time grain</Label>
-              <Select value={timeGrain} onValueChange={setTimeGrain}>
+              <Select onValueChange={setTimeGrain} value={timeGrain}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -296,25 +296,25 @@ function CreateMetricDialog({
           <div className="grid gap-1.5">
             <Label htmlFor="spec">Metric spec JSON</Label>
             <Textarea
-              id="spec"
-              value={specJson}
-              rows={7}
               className="font-mono text-xs"
+              id="spec"
               onChange={(e) => setSpecJson(e.target.value)}
+              rows={7}
+              value={specJson}
             />
           </div>
 
           <div className="grid gap-1.5">
             <Label htmlFor="dependencies">Semantic dependencies</Label>
             <Textarea
-              id="dependencies"
-              value={dependencies}
-              rows={3}
-              placeholder="finance.settled_amount@v1"
               className="font-mono text-xs"
+              id="dependencies"
               onChange={(e) => setDependencies(e.target.value)}
+              placeholder="finance.settled_amount@v1"
+              rows={3}
+              value={dependencies}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Optional. Each line must reference an existing definition, for
               example finance.net_spend@v1.
             </p>
@@ -323,17 +323,17 @@ function CreateMetricDialog({
           <div className="grid gap-1.5">
             <Label htmlFor="physical">Physical dependencies</Label>
             <Textarea
-              id="physical"
-              value={physical}
-              rows={3}
-              placeholder="hdbank.shared.settled_transaction"
               className="font-mono text-xs"
+              id="physical"
               onChange={(e) => setPhysical(e.target.value)}
+              placeholder="hdbank.shared.settled_transaction"
+              rows={3}
+              value={physical}
             />
           </div>
 
           {error ? (
-            <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <p className="flex items-center gap-1.5 text-destructive text-xs">
               <IconAlertTriangle size={13} />
               {error}
             </p>
@@ -341,10 +341,10 @@ function CreateMetricDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button onClick={() => onOpenChange(false)} variant="outline">
             Cancel
           </Button>
-          <Button onClick={submit} disabled={saving}>
+          <Button disabled={saving} onClick={submit}>
             {saving ? "Creating..." : "Create metric"}
           </Button>
         </DialogFooter>
@@ -369,7 +369,9 @@ export default function SemanticRegistryPage() {
     setError(null)
     try {
       const data = await listSemanticDefinitions()
-      if (!cancelled()) setDefinitions(data)
+      if (!cancelled()) {
+        setDefinitions(data)
+      }
     } catch (err) {
       if (!cancelled()) {
         setError(
@@ -379,7 +381,9 @@ export default function SemanticRegistryPage() {
         )
       }
     } finally {
-      if (!cancelled()) setLoading(false)
+      if (!cancelled()) {
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -414,16 +418,16 @@ export default function SemanticRegistryPage() {
         <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <IconVocabulary size={16} className="text-muted-foreground" />
-              <h1 className="text-sm font-semibold">Semantic Registry</h1>
+              <IconVocabulary className="text-muted-foreground" size={16} />
+              <h1 className="font-semibold text-sm">Semantic Registry</h1>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Shared metric definitions, immutable versions, and dependencies.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Badge variant="outline">{definitions.length} definitions</Badge>
-            <Button size="default" onClick={() => setDialogOpen(true)}>
+            <Button onClick={() => setDialogOpen(true)} size="default">
               <IconPlus size={14} />
               New metric
             </Button>
@@ -432,23 +436,23 @@ export default function SemanticRegistryPage() {
         <div className="flex items-center gap-2 overflow-x-auto px-3 pb-2.5">
           <div className="relative min-w-56 max-w-sm flex-1">
             <IconSearch
+              className="absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground"
               size={14}
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <Input
-              value={query}
+              className="pl-7"
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search semantic definitions"
-              className="pl-7"
+              value={query}
             />
           </div>
           {STATUSES.map((item) => (
             <Button
-              key={item}
-              variant={status === item ? "secondary" : "ghost"}
-              size="default"
               className="shrink-0"
+              key={item}
               onClick={() => setStatus(item)}
+              size="default"
+              variant={status === item ? "secondary" : "ghost"}
             >
               {formatStatus(item)}
             </Button>
@@ -472,15 +476,15 @@ export default function SemanticRegistryPage() {
           <TableBody>
             {error ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell className="h-24 text-center" colSpan={7}>
                   <span className="text-destructive">{error}</span>
                 </TableCell>
               </TableRow>
             ) : loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   Loading semantic definitions...
                 </TableCell>
@@ -490,12 +494,12 @@ export default function SemanticRegistryPage() {
                 <TableRow key={`${item.namespace}.${item.name}`}>
                   <TableCell>
                     <Link
+                      className="font-medium font-mono text-sm hover:underline"
                       href={definitionHref(item)}
-                      className="font-mono text-sm font-medium hover:underline"
                     >
                       {item.namespace}.{item.name}
                     </Link>
-                    <div className="mt-1 max-w-xl truncate text-xs text-muted-foreground">
+                    <div className="mt-1 max-w-xl truncate text-muted-foreground text-xs">
                       {item.description || "No description"}
                     </div>
                   </TableCell>
@@ -510,11 +514,11 @@ export default function SemanticRegistryPage() {
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {item.active_version ? (
-                        <Badge variant="secondary" className="font-mono">
+                        <Badge className="font-mono" variant="secondary">
                           active v{item.active_version}
                         </Badge>
                       ) : null}
-                      <Badge variant="outline" className="font-mono">
+                      <Badge className="font-mono" variant="outline">
                         <IconGitBranch size={11} /> latest v
                         {item.latest_version}
                       </Badge>
@@ -530,7 +534,7 @@ export default function SemanticRegistryPage() {
                     <Badge variant="outline">
                       {item.semantic_dependency_count} upstream
                     </Badge>
-                    <Badge variant="outline" className="ml-1">
+                    <Badge className="ml-1" variant="outline">
                       {item.direct_dependent_count} downstream
                     </Badge>
                   </TableCell>
@@ -550,8 +554,8 @@ export default function SemanticRegistryPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   No semantic definitions found
                 </TableCell>
@@ -562,11 +566,11 @@ export default function SemanticRegistryPage() {
       </div>
 
       <CreateMetricDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
         onCreated={() => {
           void loadDefinitions(() => false)
         }}
+        onOpenChange={setDialogOpen}
+        open={dialogOpen}
       />
     </div>
   )

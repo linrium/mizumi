@@ -43,9 +43,9 @@ export async function runSessionSqlQuery(
 ): Promise<QueryResponse> {
   const idToken = await getToken()
   const res = await apiFetch(`/api/sessions/${sessionId}/query`, {
-    method: "POST",
+    body: JSON.stringify({ idToken, sql }),
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, idToken }),
+    method: "POST",
   })
   const body = await res.json()
   if (!res.ok) {
@@ -57,9 +57,9 @@ export async function runSessionSqlQuery(
 export async function runSqlQuery(sql: string): Promise<QueryResponse> {
   const idToken = await getToken()
   const res = await apiFetch("/api/query", {
-    method: "POST",
+    body: JSON.stringify({ idToken, sql }),
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sql, idToken }),
+    method: "POST",
   })
   const body = await res.json()
   if (!res.ok) {
@@ -83,12 +83,12 @@ export async function executeSessionSqlQuery(input: {
     const data = await runSessionSqlQuery(sessionId, input.sql)
 
     return {
-      ok: true,
       data,
       elapsed: Date.now() - startedAt,
+      ok: true,
     }
   } catch (error) {
-    return { ok: false, error: (error as Error).message }
+    return { error: (error as Error).message, ok: false }
   }
 }
 
@@ -99,12 +99,12 @@ export async function executeSqlQuery(sql: string): Promise<SqlQueryResult> {
     const data = await runSqlQuery(sql)
 
     return {
-      ok: true,
       data,
       elapsed: Date.now() - startedAt,
+      ok: true,
     }
   } catch (error) {
-    return { ok: false, error: (error as Error).message }
+    return { error: (error as Error).message, ok: false }
   }
 }
 

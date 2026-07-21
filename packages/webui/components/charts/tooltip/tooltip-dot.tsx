@@ -4,16 +4,16 @@ import { motion, useSpring } from "motion/react"
 import { chartCssVars } from "../chart-context"
 
 // Faster spring to stay in sync with indicator
-const crosshairSpringConfig = { stiffness: 300, damping: 30 }
+const crosshairSpringConfig = { damping: 30, stiffness: 300 }
 
 export interface TooltipDotProps {
-  x: number
-  y: number
-  visible: boolean
   color: string
   size?: number
   strokeColor?: string
   strokeWidth?: number
+  visible: boolean
+  x: number
+  y: number
 }
 
 export function TooltipDot({

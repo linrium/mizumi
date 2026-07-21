@@ -56,11 +56,11 @@ import {
 } from "@/services/permissions"
 
 const FILTERS = [
-  { key: "all", label: "All", icon: IconListDetails },
-  { key: "pending", label: "Pending", icon: IconClockHour4 },
-  { key: "ready", label: "Grant-ready", icon: IconProgressCheck },
-  { key: "needs-info", label: "Needs info", icon: IconInfoCircle },
-  { key: "approved", label: "Approved", icon: IconCircleCheck },
+  { icon: IconListDetails, key: "all", label: "All" },
+  { icon: IconClockHour4, key: "pending", label: "Pending" },
+  { icon: IconProgressCheck, key: "ready", label: "Grant-ready" },
+  { icon: IconInfoCircle, key: "needs-info", label: "Needs info" },
+  { icon: IconCircleCheck, key: "approved", label: "Approved" },
 ] as const satisfies ReadonlyArray<{
   key: string
   label: string
@@ -136,7 +136,7 @@ function formatSubmitter(request: PermissionRequest) {
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "processing") {
     return (
-      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+      <Badge className="animate-pulse text-muted-foreground" variant="outline">
         LLM analysing…
       </Badge>
     )
@@ -144,8 +144,8 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "failed") {
     return (
       <Badge
+        className="border-destructive/40 text-destructive"
         variant="outline"
-        className="text-destructive border-destructive/40"
       >
         LLM failed
       </Badge>
@@ -262,17 +262,19 @@ export default function PermissionsPage() {
     const matchedTemplates = requests.filter((item) => item.policy_template_id)
 
     return {
-      pending: pending.length,
-      ready: ready.length,
       expiringSoon: expiringSoon.length,
       highRisk: highRisk.length,
       matchedTemplates: matchedTemplates.length,
+      pending: pending.length,
+      ready: ready.length,
     }
   }, [requests])
 
   async function handleApprove() {
-    if (!approveTarget || approving) return
-    const days = parseInt(approveTarget.durationDays, 10)
+    if (!approveTarget || approving) {
+      return
+    }
+    const days = Number.parseInt(approveTarget.durationDays, 10)
     if (!days || days < 1) {
       setError("Grant duration must be at least 1 day")
       return
@@ -328,33 +330,33 @@ export default function PermissionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b shrink-0">
+      <div className="shrink-0 border-b">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold">Permission requests</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="font-semibold text-sm">Permission requests</h1>
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Review access grants, temporary exceptions, and renewals.
             </p>
-            {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+            {error && <p className="mt-1 text-destructive text-xs">{error}</p>}
           </div>
           <div />
         </div>
 
         <div className="flex items-center justify-between gap-4 overflow-x-auto border-t px-3">
-          <div className="flex items-center -mb-px">
+          <div className="-mb-px flex items-center">
             {FILTERS.map((filter) => {
               const count = filterCounts[filter.key] ?? 0
               return (
                 <button
-                  key={filter.key}
-                  type="button"
-                  onClick={() => setActiveFilter(filter.key)}
                   className={cn(
-                    "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors",
+                    "flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 font-medium text-xs transition-colors",
                     activeFilter === filter.key
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
+                  key={filter.key}
+                  onClick={() => setActiveFilter(filter.key)}
+                  type="button"
                 >
                   <filter.icon size={12} />
                   {filter.label}
@@ -374,15 +376,15 @@ export default function PermissionsPage() {
           </div>
 
           <Input
-            value={query}
+            className="my-1.5 h-7 w-48 min-w-0 shrink text-xs"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="my-1.5 h-7 w-48 min-w-0 shrink text-xs"
+            value={query}
           />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -400,8 +402,8 @@ export default function PermissionsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   Loading…
                 </TableCell>
@@ -420,25 +422,25 @@ export default function PermissionsPage() {
 
                 return (
                   <TableRow
-                    key={request.id}
                     className={cn(
                       request.risk === "high" && "bg-destructive/5",
                       request.expires_in_days <= 2 &&
                         "border-l-2 border-l-primary"
                     )}
+                    key={request.id}
                   >
                     <TableCell className="align-top">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/permissions/${request.id}`}
                             className="font-medium hover:underline"
+                            href={`/permissions/${request.id}`}
                           >
                             {request.requester}
                           </Link>
                           <Link
-                            href={`/permissions/${request.id}`}
                             className="font-mono text-muted-foreground hover:underline"
+                            href={`/permissions/${request.id}`}
                           >
                             {request.code}
                           </Link>
@@ -459,7 +461,7 @@ export default function PermissionsPage() {
                           </Badge>
                         </div>
                         {request.rationale && (
-                          <div className="line-clamp-2 max-w-[44ch] text-xs text-muted-foreground">
+                          <div className="line-clamp-2 max-w-[44ch] text-muted-foreground text-xs">
                             {request.rationale}
                           </div>
                         )}
@@ -501,30 +503,30 @@ export default function PermissionsPage() {
                     <TableCell className="align-top">
                       {blastRadius ? (
                         <div className="space-y-1">
-                          {blastRadius.llm_risk !== "unknown" ? (
-                            <LlmRiskBadge status={blastRadius.llm_risk} />
-                          ) : (
+                          {blastRadius.llm_risk === "unknown" ? (
                             <Badge
                               variant={getRiskVariant(blastRadius.derived_risk)}
                             >
                               {formatRiskLabel(blastRadius.derived_risk)}
                             </Badge>
+                          ) : (
+                            <LlmRiskBadge status={blastRadius.llm_risk} />
                           )}
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-muted-foreground text-xs">
                             {[
                               {
-                                v: blastRadius.total_downstream_nodes,
                                 l: "nodes",
+                                v: blastRadius.total_downstream_nodes,
                               },
                               {
-                                v: blastRadius.downstream_tables,
                                 l: "datasets",
+                                v: blastRadius.downstream_tables,
                               },
-                              { v: blastRadius.downstream_assets, l: "assets" },
-                              { v: blastRadius.downstream_jobs, l: "jobs" },
+                              { l: "assets", v: blastRadius.downstream_assets },
+                              { l: "jobs", v: blastRadius.downstream_jobs },
                               {
-                                v: blastRadius.downstream_schedules,
                                 l: "schedules",
+                                v: blastRadius.downstream_schedules,
                               },
                             ]
                               .filter(({ v }) => v > 0)
@@ -532,11 +534,11 @@ export default function PermissionsPage() {
                               .join(" · ")}
                           </div>
                           {blastRadius.lineage_resolved ? (
-                            <div className="line-clamp-1 max-w-[28ch] text-xs text-muted-foreground">
+                            <div className="line-clamp-1 max-w-[28ch] text-muted-foreground text-xs">
                               Root {blastRadius.lineage_root_display_name}
                             </div>
                           ) : (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-muted-foreground text-xs">
                               No lineage root
                             </div>
                           )}
@@ -593,7 +595,7 @@ export default function PermissionsPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button type="button" variant="ghost" size="icon-sm">
+                          <Button size="icon-sm" type="button" variant="ghost">
                             <HugeiconsIcon
                               icon={MoreHorizontalIcon}
                               size={14}
@@ -609,11 +611,11 @@ export default function PermissionsPage() {
                               }
                               onClick={() =>
                                 setApproveTarget({
-                                  request,
-                                  stepId: currentSteps[0]?.id,
                                   durationDays: String(
                                     Math.max(request.expires_in_days, 1)
                                   ),
+                                  request,
+                                  stepId: currentSteps[0]?.id,
                                 })
                               }
                             >
@@ -624,17 +626,17 @@ export default function PermissionsPage() {
                           ) : (
                             currentSteps.map((step) => (
                               <DropdownMenuItem
-                                key={step.id}
                                 disabled={
                                   isActioning || request.status === "approved"
                                 }
+                                key={step.id}
                                 onClick={() =>
                                   setApproveTarget({
-                                    request,
-                                    stepId: step.id,
                                     durationDays: String(
                                       Math.max(request.expires_in_days, 1)
                                     ),
+                                    request,
+                                    stepId: step.id,
                                   })
                                 }
                               >
@@ -668,8 +670,8 @@ export default function PermissionsPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   No permission requests match the current filters
                 </TableCell>
@@ -679,7 +681,7 @@ export default function PermissionsPage() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2 text-muted-foreground text-xs">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} />
           Requests now show the policy template decision that drove queue
@@ -698,12 +700,12 @@ export default function PermissionsPage() {
       </div>
 
       <Dialog
-        open={approveTarget != null}
         onOpenChange={(open) => {
-          if (!open && !approving) {
+          if (!(open || approving)) {
             setApproveTarget(null)
           }
         }}
+        open={approveTarget != null}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -715,33 +717,33 @@ export default function PermissionsPage() {
 
           {approveTarget && (
             <div className="divide-y rounded-md border text-sm">
-              <div className="px-3 py-2.5 space-y-0.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Requester
                 </p>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-medium">
                     {approveTarget.request.requester}
                   </span>
-                  <span className="font-mono text-xs text-muted-foreground shrink-0">
+                  <span className="shrink-0 font-mono text-muted-foreground text-xs">
                     {approveTarget.request.code}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   {formatSubmitter(approveTarget.request)}
                 </p>
                 {approveTarget.request.rationale && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 pt-0.5">
+                  <p className="line-clamp-2 pt-0.5 text-muted-foreground text-xs">
                     {approveTarget.request.rationale}
                   </p>
                 )}
               </div>
 
-              <div className="px-3 py-2.5 space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-1.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Resource
                 </p>
-                <p className="font-mono text-xs break-all leading-relaxed">
+                <p className="break-all font-mono text-xs leading-relaxed">
                   {approveTarget.request.resource}
                 </p>
                 <div className="flex flex-wrap items-center gap-1">
@@ -754,8 +756,8 @@ export default function PermissionsPage() {
                 </div>
               </div>
 
-              <div className="px-3 py-2.5 space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-1.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Privileges to grant
                 </p>
                 <div className="flex flex-wrap gap-1">
@@ -767,8 +769,8 @@ export default function PermissionsPage() {
                 </div>
               </div>
 
-              <div className="px-3 py-2.5 space-y-0.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Reviewer
                 </p>
                 <p className="font-medium">{approveTarget.request.reviewer}</p>
@@ -789,7 +791,7 @@ export default function PermissionsPage() {
                   </div>
                 )}
                 {approveTarget.request.policy_template_name && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Template: {approveTarget.request.policy_template_name}
                     {approveTarget.request.policy_template_owner
                       ? ` · ${approveTarget.request.policy_template_owner}`
@@ -801,25 +803,25 @@ export default function PermissionsPage() {
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="grant-duration-days" className="text-xs">
+            <Label className="text-xs" htmlFor="grant-duration-days">
               Grant duration (days)
             </Label>
             <Input
+              className="h-8 text-sm"
               id="grant-duration-days"
-              type="number"
-              min={1}
               max={approveTarget?.request.expires_in_days ?? 365}
-              value={approveTarget?.durationDays ?? ""}
+              min={1}
               onChange={(e) =>
                 setApproveTarget((prev) =>
                   prev ? { ...prev, durationDays: e.target.value } : prev
                 )
               }
-              className="h-8 text-sm"
               placeholder="e.g. 30"
+              type="number"
+              value={approveTarget?.durationDays ?? ""}
             />
             {approveTarget && Number(approveTarget.durationDays) >= 1 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Access expires on{" "}
                 {new Date(
                   Date.now() + Number(approveTarget.durationDays) * 86_400_000
@@ -834,21 +836,21 @@ export default function PermissionsPage() {
 
           <DialogFooter>
             <Button
-              type="button"
-              variant="outline"
               disabled={approving}
               onClick={() => setApproveTarget(null)}
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              type="button"
               disabled={
                 approving ||
                 !approveTarget ||
                 !(Number(approveTarget.durationDays) >= 1)
               }
               onClick={handleApprove}
+              type="button"
             >
               {approving ? "Approving…" : "Approve"}
             </Button>

@@ -160,16 +160,16 @@ export async function patchPermissions(input: {
       input.table
     ),
     {
-      method: "PATCH",
       body: JSON.stringify({
         changes: [
           {
-            principal: input.principal,
             add: input.add,
+            principal: input.principal,
             remove: input.remove,
           },
         ],
       }),
+      method: "PATCH",
     }
   )
 }

@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 dayjs.extend(relativeTime)
 
@@ -33,12 +33,16 @@ type Schedule = {
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetchWithAuth(`/api/dagster/${path}`, { cache: "no-store" })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as T
 }
 
 function fmtTs(ts: number | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   return dayjs(ts * 1000).fromNow()
 }
 
@@ -46,9 +50,9 @@ const TICK_STATUS_CONFIG: Record<
   string,
   { label: string; variant: "success" | "error" | "warning" | "default" }
 > = {
-  SUCCESS: { label: "Success", variant: "success" },
   FAILURE: { label: "Failed", variant: "error" },
   SKIPPED: { label: "Skipped", variant: "warning" },
+  SUCCESS: { label: "Success", variant: "success" },
 }
 
 const SCHEDULE_STATUS_CONFIG: Record<
@@ -74,29 +78,32 @@ export default function SchedulesPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading schedules…
       </div>
     )
-  if (error)
+  }
+  if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error}
       </div>
     )
-  if (schedules.length === 0)
+  }
+  if (schedules.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         No schedules found
       </div>
     )
+  }
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto">
+    <div className="min-h-0 flex-1 overflow-auto">
       <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-background z-10 border-b">
+        <thead className="sticky top-0 z-10 border-b bg-background">
           <tr className="text-left text-muted-foreground">
             <th className="px-4 py-2.5 font-medium">Name</th>
             <th className="px-4 py-2.5 font-medium">Status</th>
@@ -114,15 +121,15 @@ export default function SchedulesPage() {
               : null
             return (
               <tr
+                className="cursor-pointer border-b transition-colors hover:bg-muted/30"
                 key={s.name}
-                className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
                 onClick={() =>
                   router.push(
                     `/pipelines/schedules/${encodeURIComponent(s.name)}`
                   )
                 }
               >
-                <td className="px-4 py-3 font-mono font-medium">{s.name}</td>
+                <td className="px-4 py-3 font-medium font-mono">{s.name}</td>
                 <td className="px-4 py-3">
                   {statusCfg ? (
                     <Status variant={statusCfg.variant}>
@@ -154,7 +161,7 @@ export default function SchedulesPage() {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
                   {s.description ?? "—"}
                 </td>
               </tr>

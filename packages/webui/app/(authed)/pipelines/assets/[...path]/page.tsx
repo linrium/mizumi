@@ -1,16 +1,17 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
-import dynamic from "next/dynamic"
-import { cn } from "@/lib/utils"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
+import dynamic from "next/dynamic"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+
 dayjs.extend(relativeTime)
 
 const LineageGraph = dynamic(
@@ -81,9 +82,13 @@ type AssetStatus = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toDayjs(ts: string | number | null | undefined) {
-  if (ts === null || ts === undefined || ts === "") return null
+  if (ts === null || ts === undefined || ts === "") {
+    return null
+  }
   const v = Number(ts)
-  if (!isFinite(v)) return null
+  if (!isFinite(v)) {
+    return null
+  }
   return v > 1e12 ? dayjs(v) : dayjs.unix(v)
 }
 
@@ -98,15 +103,23 @@ function fmtRelativeTime(ts: string | number | null | undefined): string {
 }
 
 function fmtDuration(startSec: number | null, endSec: number | null): string {
-  if (!startSec) return "—"
+  if (!startSec) {
+    return "—"
+  }
   const sec = Math.round((endSec ?? Date.now() / 1000) - startSec)
-  if (sec < 60) return `${sec}s`
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  if (sec < 60) {
+    return `${sec}s`
+  }
+  if (sec < 3600) {
+    return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  }
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
 function fmtMetadataValue(entry: MetadataEntry): string {
-  if (entry.value === null || entry.value === undefined) return "—"
+  if (entry.value === null || entry.value === undefined) {
+    return "—"
+  }
   if (entry.type === "json") {
     try {
       return JSON.stringify(JSON.parse(entry.value as string), null, 2)
@@ -132,45 +145,45 @@ type RunStatusConfig = {
 }
 
 const RUN_STATUS_CONFIG: Record<string, RunStatusConfig> = {
-  SUCCESS: {
-    label: "Success",
-    variant: "success",
-    bannerCls:
-      "bg-green-100  text-green-700  dark:bg-green-950  dark:text-green-400",
-  },
-  FAILURE: {
-    label: "Failed",
-    variant: "error",
-    bannerCls:
-      "bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400",
-  },
-  STARTED: {
-    label: "Running",
-    variant: "info",
-    bannerCls:
-      "bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400",
-  },
-  STARTING: {
-    label: "Starting",
-    variant: "info",
-    bannerCls:
-      "bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400",
-  },
-  QUEUED: {
-    label: "Queued",
-    variant: "default",
-    bannerCls: "bg-muted      text-muted-foreground",
-  },
-  CANCELING: {
-    label: "Canceling",
-    variant: "warning",
-    bannerCls:
-      "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
-  },
   CANCELED: {
+    bannerCls: "bg-muted      text-muted-foreground",
     label: "Canceled",
     variant: "default",
+  },
+  CANCELING: {
+    bannerCls:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
+    label: "Canceling",
+    variant: "warning",
+  },
+  FAILURE: {
+    bannerCls:
+      "bg-red-100    text-red-700    dark:bg-red-950    dark:text-red-400",
+    label: "Failed",
+    variant: "error",
+  },
+  QUEUED: {
     bannerCls: "bg-muted      text-muted-foreground",
+    label: "Queued",
+    variant: "default",
+  },
+  STARTED: {
+    bannerCls:
+      "bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400",
+    label: "Running",
+    variant: "info",
+  },
+  STARTING: {
+    bannerCls:
+      "bg-blue-100   text-blue-700   dark:bg-blue-950   dark:text-blue-400",
+    label: "Starting",
+    variant: "info",
+  },
+  SUCCESS: {
+    bannerCls:
+      "bg-green-100  text-green-700  dark:bg-green-950  dark:text-green-400",
+    label: "Success",
+    variant: "success",
   },
 }
 
@@ -179,22 +192,24 @@ const STALE_CONFIG: Record<
   { label: string; variant: "success" | "warning" | "error" | "default" }
 > = {
   FRESH: { label: "Fresh", variant: "success" },
-  STALE: { label: "Stale", variant: "warning" },
   MISSING: { label: "Missing", variant: "error" },
+  STALE: { label: "Stale", variant: "warning" },
   UNKNOWN: { label: "Unknown", variant: "default" },
 }
 
 const VARIANT_DOT_CLS: Record<string, string> = {
-  success: "bg-green-600 dark:bg-green-400",
+  default: "bg-muted-foreground",
   error: "bg-destructive",
   info: "bg-blue-600 dark:bg-blue-400",
+  success: "bg-green-600 dark:bg-green-400",
   warning: "bg-orange-600 dark:bg-orange-400",
-  default: "bg-muted-foreground",
 }
 
 function StaleStatusBadge({ status }: { status: string }) {
   const cfg = STALE_CONFIG[status]
-  if (!cfg) return <Badge variant="outline">{status}</Badge>
+  if (!cfg) {
+    return <Badge variant="outline">{status}</Badge>
+  }
   return (
     <Status variant={cfg.variant}>
       <StatusIndicator />
@@ -221,7 +236,9 @@ function useAssetStatus(pathSegments: string[]) {
             cache: "no-store",
           }
         )
-        if (!res.ok) return
+        if (!res.ok) {
+          return
+        }
         const data = (await res.json()) as AssetStatus
         if (!cancelled) {
           setStatus(data)
@@ -230,11 +247,11 @@ function useAssetStatus(pathSegments: string[]) {
             data.unstarted_run_ids.length > 0 ||
             (data.latest_run !== null &&
               ACTIVE_STATUSES.has(data.latest_run.status))
-          timerRef.current = setTimeout(poll, isActive ? 3000 : 10000)
+          timerRef.current = setTimeout(poll, isActive ? 3000 : 10_000)
         }
       } catch {
         if (!cancelled) {
-          timerRef.current = setTimeout(poll, 10000)
+          timerRef.current = setTimeout(poll, 10_000)
         }
       }
     }
@@ -243,7 +260,9 @@ function useAssetStatus(pathSegments: string[]) {
 
     return () => {
       cancelled = true
-      if (timerRef.current) clearTimeout(timerRef.current)
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathKey])
@@ -276,9 +295,9 @@ function Section({
   action?: React.ReactNode
 }) {
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/20">
-        <span className="text-xs font-semibold text-foreground">{title}</span>
+    <div className="overflow-hidden rounded-lg border">
+      <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-2.5">
+        <span className="font-semibold text-foreground text-xs">{title}</span>
         {action}
       </div>
       <div className="px-4 py-3">{children}</div>
@@ -300,7 +319,7 @@ function SideSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold">{title}</span>
+        <span className="font-semibold text-xs">{title}</span>
         <span className="text-[10px] text-muted-foreground">
           {collapsed ? "▶" : "▼"}
         </span>
@@ -319,7 +338,9 @@ function CurrentRunBanner({ liveStatus }: { liveStatus: AssetStatus }) {
     liveStatus.unstarted_run_ids.length > 0 ||
     (run !== null && ACTIVE_STATUSES.has(run.status))
 
-  if (!run) return null
+  if (!run) {
+    return null
+  }
 
   const cfg = RUN_STATUS_CONFIG[run.status]
   const bannerCls = cfg?.bannerCls ?? "bg-muted text-muted-foreground"
@@ -327,22 +348,22 @@ function CurrentRunBanner({ liveStatus }: { liveStatus: AssetStatus }) {
   return (
     <div
       className={cn(
-        "rounded-md px-3 py-2.5 flex items-center justify-between gap-3",
+        "flex items-center justify-between gap-3 rounded-md px-3 py-2.5",
         bannerCls
       )}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex min-w-0 items-center gap-2">
         {cfg && (
           <StatusIndicator
             className={cn("shrink-0", VARIANT_DOT_CLS[cfg.variant])}
           />
         )}
-        <span className="text-xs font-medium">{cfg?.label ?? run.status}</span>
-        <span className="text-[10px] font-mono opacity-70 truncate">
+        <span className="font-medium text-xs">{cfg?.label ?? run.status}</span>
+        <span className="truncate font-mono text-[10px] opacity-70">
           {run.run_id.slice(0, 8)}…
         </span>
       </div>
-      <div className="text-[10px] shrink-0 opacity-80">
+      <div className="shrink-0 text-[10px] opacity-80">
         {isActive && run.start_time ? (
           <ElapsedTime startSec={run.start_time} />
         ) : (
@@ -379,7 +400,9 @@ export default function AssetDetailPage() {
         { method: "POST" }
       )
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      if (!res.ok) {
+        throw new Error(json.error ?? `HTTP ${res.status}`)
+      }
       toast.success("Materialization started", {
         description: `Run ${(json.run_id as string).slice(0, 8)}…`,
       })
@@ -397,7 +420,9 @@ export default function AssetDetailPage() {
     fetchWithAuth(url, { cache: "no-store" })
       .then(async (res) => {
         const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+        if (!res.ok) {
+          throw new Error(json.error ?? `HTTP ${res.status}`)
+        }
         return json as AssetNodeDetail
       })
       .then(setDetail)
@@ -415,47 +440,47 @@ export default function AssetDetailPage() {
   const latestMatTimestamp = liveMat?.timestamp ?? latestMat?.timestamp
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 border-b shrink-0">
+      <div className="flex shrink-0 items-center gap-3 border-b px-5">
         <Link
+          className="shrink-0 py-3 text-muted-foreground text-xs transition-colors hover:text-foreground"
           href="/pipelines"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 py-3"
         >
           Assets
         </Link>
         <span className="text-muted-foreground text-xs">/</span>
-        <span className="text-xs font-semibold truncate py-3">{assetName}</span>
+        <span className="truncate py-3 font-semibold text-xs">{assetName}</span>
 
         {/* Tabs */}
-        <div className="flex ml-2">
+        <div className="ml-2 flex">
           {(["overview", "lineage"] as const).map((t) => (
             <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
               className={cn(
-                "px-3 py-3 text-xs capitalize border-b-2 transition-colors",
+                "border-b-2 px-3 py-3 text-xs capitalize transition-colors",
                 tab === t
-                  ? "border-foreground text-foreground font-medium"
+                  ? "border-foreground font-medium text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              key={t}
+              onClick={() => setTab(t)}
+              type="button"
             >
               {t}
             </button>
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {detail?.stale_status && (
             <StaleStatusBadge status={detail.stale_status} />
           )}
           {detail?.is_executable && (
             <button
-              type="button"
-              onClick={handleMaterialize}
+              className="rounded-md border bg-background px-3 py-1 font-medium text-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               disabled={materializing}
-              className="text-xs px-3 py-1 border rounded-md bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              onClick={handleMaterialize}
+              type="button"
             >
               {materializing ? "Starting…" : "Materialize"}
             </button>
@@ -465,29 +490,29 @@ export default function AssetDetailPage() {
 
       {/* Lineage tab — full-bleed graph, no sidebar */}
       {tab === "lineage" && (
-        <div className="flex-1 min-h-0 relative">
+        <div className="relative min-h-0 flex-1">
           <LineageGraph currentPath={pathSegments} neighborhoodOnly />
         </div>
       )}
 
       {/* Overview tab */}
       {tab === "overview" && loading && (
-        <div className="flex items-center justify-center flex-1 text-sm text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           Loading…
         </div>
       )}
       {tab === "overview" && error && (
-        <div className="flex items-center justify-center flex-1 text-sm text-destructive font-mono px-6 text-center">
+        <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
           {error}
         </div>
       )}
 
       {/* Two-column layout */}
       {tab === "overview" && detail && (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* ── Main content ── */}
-          <div className="flex-1 min-w-0 overflow-y-auto">
-            <div className="max-w-2xl mx-auto px-6 py-5 flex flex-col gap-4">
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            <div className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-5">
               {/* Status */}
               <Section title="Status">
                 <div className="flex flex-col gap-3">
@@ -495,18 +520,18 @@ export default function AssetDetailPage() {
                   {liveStatus && <CurrentRunBanner liveStatus={liveStatus} />}
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="font-medium text-muted-foreground text-xs">
                       Latest materialization
                     </span>
                     {latestMatTimestamp ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
                         <span className="text-xs">
                           {fmtRelativeTime(latestMatTimestamp)}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         Never
                       </span>
                     )}
@@ -514,23 +539,23 @@ export default function AssetDetailPage() {
 
                   {detail.materializations.length > 0 && (
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div className="mb-1.5 flex items-center justify-between">
                         <span className="text-[10px] text-muted-foreground">
                           Recent updates
                         </span>
                         <span className="text-[10px] text-muted-foreground">
                           Showing all {detail.materializations.length} update
-                          {detail.materializations.length !== 1 ? "s" : ""}
+                          {detail.materializations.length === 1 ? "" : "s"}
                         </span>
                       </div>
-                      <div className="flex items-end gap-0.5 h-5">
+                      <div className="flex h-5 items-end gap-0.5">
                         {detail.materializations
                           .slice()
                           .reverse()
                           .map((_, i) => (
                             <div
+                              className="h-3 w-2 rounded-sm bg-green-500"
                               key={i}
-                              className="w-2 h-3 bg-green-500 rounded-sm"
                             />
                           ))}
                       </div>
@@ -542,13 +567,13 @@ export default function AssetDetailPage() {
               {/* Description */}
               <Section title="Description">
                 {detail.description ? (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="text-muted-foreground text-sm leading-relaxed">
                     {detail.description}
                   </p>
                 ) : (
                   <div className="py-1">
-                    <p className="text-sm font-medium">No description found</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="font-medium text-sm">No description found</p>
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       You can add a description to any asset by adding a
                       &apos;description&apos; argument to it.
                     </p>
@@ -561,23 +586,23 @@ export default function AssetDetailPage() {
                 <Section title="Metadata">
                   <div className="flex flex-col gap-2">
                     <input
-                      type="text"
-                      placeholder="Filter metadata keys"
-                      value={metaFilter}
+                      className="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring sm:w-52"
                       onChange={(e) => setMetaFilter(e.target.value)}
-                      className="text-xs px-2.5 py-1.5 border rounded-md bg-background w-full sm:w-52 focus:outline-none focus:ring-1 focus:ring-ring"
+                      placeholder="Filter metadata keys"
+                      type="text"
+                      value={metaFilter}
                     />
-                    <div className="border rounded-md overflow-hidden">
+                    <div className="overflow-hidden rounded-md border">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b bg-muted/30">
-                            <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                               Key
                             </th>
-                            <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                               Timestamp
                             </th>
-                            <th className="text-left px-3 py-2 font-medium text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                               Value
                             </th>
                           </tr>
@@ -592,19 +617,19 @@ export default function AssetDetailPage() {
                                   .includes(metaFilter.toLowerCase())
                             )
                             .map((entry, i) => (
-                              <tr key={i} className="align-top">
-                                <td className="px-3 py-2 font-mono text-foreground whitespace-nowrap">
+                              <tr className="align-top" key={i}>
+                                <td className="whitespace-nowrap px-3 py-2 font-mono text-foreground">
                                   {entry.label}
                                 </td>
-                                <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                                   <span className="inline-flex items-center gap-1">
-                                    <span className="text-blue-400 text-[10px]">
+                                    <span className="text-[10px] text-blue-400">
                                       ⊕
                                     </span>
                                     {fmtTimestamp(latestMat.timestamp)}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 font-mono text-foreground break-all whitespace-pre-wrap max-w-xs">
+                                <td className="max-w-xs whitespace-pre-wrap break-all px-3 py-2 font-mono text-foreground">
                                   {fmtMetadataValue(entry)}
                                 </td>
                               </tr>
@@ -622,20 +647,20 @@ export default function AssetDetailPage() {
                 <Section title="Lineage">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-2">
+                      <p className="mb-2 text-muted-foreground text-xs">
                         Upstream assets
                       </p>
                       {detail.dependency_keys.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-muted-foreground text-xs">—</span>
                       ) : (
                         <div className="flex flex-col gap-1.5">
                           {detail.dependency_keys.map((k, i) => (
                             <Link
-                              key={i}
+                              className="inline-flex w-fit items-center gap-1.5 font-mono text-green-600 text-xs hover:underline dark:text-green-400"
                               href={`/pipelines/assets/${k.join("/")}`}
-                              className="inline-flex items-center gap-1.5 text-xs font-mono text-green-600 dark:text-green-400 hover:underline w-fit"
+                              key={i}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
                               {k[k.length - 1]}
                             </Link>
                           ))}
@@ -643,18 +668,18 @@ export default function AssetDetailPage() {
                       )}
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-2">
+                      <p className="mb-2 text-muted-foreground text-xs">
                         Downstream assets
                       </p>
                       {detail.depended_by_keys.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-muted-foreground text-xs">—</span>
                       ) : (
                         <div className="flex flex-col gap-1.5">
                           {detail.depended_by_keys.map((k, i) => (
                             <Link
-                              key={i}
+                              className="inline-flex w-fit items-center gap-1.5 font-mono text-xs hover:underline"
                               href={`/pipelines/assets/${k.join("/")}`}
-                              className="inline-flex items-center gap-1.5 text-xs font-mono hover:underline w-fit"
+                              key={i}
                             >
                               {k[k.length - 1]}
                             </Link>
@@ -672,18 +697,18 @@ export default function AssetDetailPage() {
                   <div className="flex flex-col gap-2">
                     {detail.stale_causes.map((c, i) => (
                       <div
+                        className="flex flex-col gap-0.5 rounded-md border px-3 py-2"
                         key={i}
-                        className="flex flex-col gap-0.5 border rounded-md px-3 py-2"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono">
+                          <span className="font-mono text-xs">
                             {c.key.join("/")}
                           </span>
-                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                             {c.category}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           {c.reason}
                         </p>
                         {c.dependency && (
@@ -708,18 +733,18 @@ export default function AssetDetailPage() {
                   <div className="divide-y">
                     {detail.materializations.slice(1).map((m, i) => (
                       <div
-                        key={i}
                         className="flex items-center justify-between py-2"
+                        key={i}
                       >
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs">
                             {fmtTimestamp(m.timestamp)}
                           </span>
-                          <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[200px]">
+                          <span className="max-w-[200px] truncate font-mono text-[10px] text-muted-foreground">
                             {m.run_id}
                           </span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
                           {m.metadata.length} entries
                         </span>
                       </div>
@@ -731,17 +756,17 @@ export default function AssetDetailPage() {
           </div>
 
           {/* ── Sidebar ── */}
-          <div className="w-64 border-l shrink-0 overflow-y-auto">
+          <div className="w-64 shrink-0 overflow-y-auto border-l">
             <div className="flex flex-col">
               {/* Definition */}
               <div className="px-4 py-5">
                 <SideSection title="Definition">
                   <div className="flex flex-col gap-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                      <p className="mb-1 text-[10px] text-muted-foreground uppercase tracking-wider">
                         Group
                       </p>
-                      <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-0.5 rounded">
+                      <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs">
                         <span className="text-blue-400">▦</span>
                         {detail.group_name ?? "—"}
                       </span>
@@ -749,10 +774,10 @@ export default function AssetDetailPage() {
 
                     {detail.repository_location && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                        <p className="mb-1 text-[10px] text-muted-foreground uppercase tracking-wider">
                           Code location
                         </p>
-                        <span className="text-xs text-blue-500">
+                        <span className="text-blue-500 text-xs">
                           {detail.repository_location}
                         </span>
                       </div>
@@ -760,14 +785,14 @@ export default function AssetDetailPage() {
 
                     {kinds.length > 0 && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                        <p className="mb-1 text-[10px] text-muted-foreground uppercase tracking-wider">
                           Kinds
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {kinds.map((kind) => (
                             <span
+                              className="inline-flex items-center rounded-full border px-1.5 py-0.5 font-medium text-[10px] capitalize"
                               key={kind}
-                              className="inline-flex items-center text-[10px] border px-1.5 py-0.5 rounded-full font-medium capitalize"
                             >
                               {kind}
                             </span>
@@ -778,14 +803,14 @@ export default function AssetDetailPage() {
 
                     {(detail.tags ?? []).length > 0 && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                        <p className="mb-1 text-[10px] text-muted-foreground uppercase tracking-wider">
                           Tags
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {(detail.tags ?? []).map((tag, i) => (
                             <span
+                              className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
                               key={i}
-                              className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono break-all"
                             >
                               {tag.key}
                               {tag.value ? `=${tag.value}` : ""}
@@ -804,10 +829,10 @@ export default function AssetDetailPage() {
               <div className="px-4 py-5">
                 <SideSection title="Automation details">
                   <div className="rounded-md border px-3 py-3">
-                    <p className="text-xs font-medium">
+                    <p className="font-medium text-xs">
                       No automations found for this asset
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                    <p className="mt-1 text-[10px] text-muted-foreground leading-relaxed">
                       Dagster offers several ways to run data pipelines without
                       manual intervention, including traditional scheduling and
                       event-based triggers.
@@ -820,7 +845,7 @@ export default function AssetDetailPage() {
 
               {/* Compute details */}
               <div className="px-4 py-5">
-                <SideSection title="Compute details" collapsed />
+                <SideSection collapsed title="Compute details" />
               </div>
             </div>
           </div>

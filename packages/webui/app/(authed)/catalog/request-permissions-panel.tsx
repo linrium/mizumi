@@ -101,7 +101,7 @@ function formatQueueDecision(
 
 const CANCELLABLE: RequestStatus[] = ["pending", "ready", "needs-info"]
 
-type Props = {
+interface Props {
   resource: string
   scope: RequestScope
 }
@@ -110,7 +110,7 @@ function parseResource(resource: string, scope: RequestScope) {
   const parts = resource.split(".")
   return {
     catalog: parts[0] ?? resource,
-    schema: scope !== "catalog" ? parts[1] : undefined,
+    schema: scope === "catalog" ? undefined : parts[1],
     table: scope === "table" ? parts[2] : undefined,
   }
 }
@@ -143,32 +143,16 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
 
   const form = useForm({
     defaultValues: {
-      submitAs: "personal" as RequestSubmitAs,
-      teamId: "",
       privileges: [] as string[],
       rationale: "",
       requestedDurationDays: "" as string,
-    },
-    validators: {
-      onSubmit: ({ value }) => {
-        if (value.submitAs === "team" && !value.teamId) {
-          return {
-            fields: { teamId: "Choose the team submitting this request." },
-          }
-        }
-        if (value.privileges.length === 0) {
-          return { fields: { privileges: "Select at least one privilege." } }
-        }
-      },
+      submitAs: "personal" as RequestSubmitAs,
+      teamId: "",
     },
     onSubmit: async ({ value, formApi }) => {
       setServerError(null)
-      const parsedDuration = parseInt(value.requestedDurationDays, 10)
+      const parsedDuration = Number.parseInt(value.requestedDurationDays, 10)
       const result = await submitPermissionRequestAction({
-        submitAs: value.submitAs,
-        teamId: value.submitAs === "team" ? value.teamId : undefined,
-        resource,
-        scope,
         privileges: value.privileges
           .filter((p) => !grantedPrivileges.has(p))
           .sort(),
@@ -177,6 +161,10 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
           !Number.isNaN(parsedDuration) && parsedDuration > 0
             ? parsedDuration
             : undefined,
+        resource,
+        scope,
+        submitAs: value.submitAs,
+        teamId: value.submitAs === "team" ? value.teamId : undefined,
       })
       if (result.error) {
         setServerError(result.error)
@@ -196,6 +184,18 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
       formApi.reset()
       formApi.setFieldValue("submitAs", value.submitAs)
       formApi.setFieldValue("teamId", value.teamId)
+    },
+    validators: {
+      onSubmit: ({ value }) => {
+        if (value.submitAs === "team" && !value.teamId) {
+          return {
+            fields: { teamId: "Choose the team submitting this request." },
+          }
+        }
+        if (value.privileges.length === 0) {
+          return { fields: { privileges: "Select at least one privilege." } }
+        }
+      },
     },
   })
 
@@ -231,26 +231,26 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
   }
 
   return (
-    <div className="grid h-full lg:grid-cols-[520px_minmax(0,1fr)] overflow-hidden">
+    <div className="grid h-full overflow-hidden lg:grid-cols-[520px_minmax(0,1fr)]">
       {/* ── Left: submit form ── */}
       <form
+        className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5"
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
         }}
-        className="flex flex-col gap-5 overflow-y-auto border-r bg-card p-5"
       >
         <form.Field name="submitAs">
           {(field) => (
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              <Label className="text-muted-foreground text-xs uppercase tracking-wide">
                 Submit as
               </Label>
               <Select
-                value={field.state.value}
                 onValueChange={(value) =>
                   field.handleChange(value as RequestSubmitAs)
                 }
+                value={field.state.value}
               >
                 <SelectTrigger className="text-xs">
                   <SelectValue placeholder="Choose request identity" />
@@ -274,13 +274,13 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     submitAs !== "team" && "opacity-60"
                   )}
                 >
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wide">
                     Submit as team
                   </Label>
                   <Select
-                    value={field.state.value}
-                    onValueChange={(value) => field.handleChange(value)}
                     disabled={submitAs !== "team"}
+                    onValueChange={(value) => field.handleChange(value)}
+                    value={field.state.value}
                   >
                     <SelectTrigger className="text-xs">
                       <SelectValue
@@ -298,7 +298,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     </SelectContent>
                   </Select>
                   {field.state.meta.errors.length > 0 && (
-                    <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-xs">
                       {String(field.state.meta.errors[0])}
                     </p>
                   )}
@@ -309,15 +309,15 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         </form.Field>
 
         <div className="space-y-3">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <Label className="text-muted-foreground text-xs uppercase tracking-wide">
             Privileges
           </Label>
           <form.Field name="privileges">
             {(field) => (
               <>
                 {PRIVILEGE_GROUPS.map((group) => (
-                  <div key={group.label} className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">
+                  <div className="space-y-1.5" key={group.label}>
+                    <p className="font-medium text-[11px] text-muted-foreground">
                       {group.label}
                     </p>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -327,18 +327,8 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                           granted || field.state.value.includes(priv)
                         return (
                           <button
-                            key={priv}
-                            type="button"
-                            disabled={granted}
-                            onClick={() => {
-                              field.setValue(
-                                checked
-                                  ? field.state.value.filter((p) => p !== priv)
-                                  : [...field.state.value, priv]
-                              )
-                            }}
                             className={cn(
-                              "flex min-w-0 items-center gap-2 rounded border px-2.5 py-1.5 text-xs transition-colors outline-none",
+                              "flex min-w-0 items-center gap-2 rounded border px-2.5 py-1.5 text-xs outline-none transition-colors",
                               granted
                                 ? "cursor-default border-emerald-500/40 bg-emerald-500/8 text-emerald-700 dark:text-emerald-400"
                                 : cn(
@@ -348,6 +338,16 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                                       : "border-border text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                                   )
                             )}
+                            disabled={granted}
+                            key={priv}
+                            onClick={() => {
+                              field.setValue(
+                                checked
+                                  ? field.state.value.filter((p) => p !== priv)
+                                  : [...field.state.value, priv]
+                              )
+                            }}
+                            type="button"
                           >
                             <span
                               aria-hidden="true"
@@ -364,7 +364,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                               {priv}
                             </span>
                             {granted && (
-                              <span className="ml-auto shrink-0 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                              <span className="ml-auto shrink-0 font-medium text-[10px] text-emerald-600 dark:text-emerald-400">
                                 Granted
                               </span>
                             )}
@@ -375,7 +375,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                   </div>
                 ))}
                 {field.state.meta.errors.length > 0 && (
-                  <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-xs">
                     {String(field.state.meta.errors[0])}
                   </p>
                 )}
@@ -387,15 +387,15 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         <form.Field name="rationale">
           {(field) => (
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              <Label className="text-muted-foreground text-xs uppercase tracking-wide">
                 Rationale / comment
               </Label>
               <Textarea
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                placeholder="Describe why you need this access…"
                 className="min-h-20 text-xs"
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                placeholder="Describe why you need this access…"
+                value={field.state.value}
               />
             </div>
           )}
@@ -404,18 +404,18 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         <form.Field name="requestedDurationDays">
           {(field) => (
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              <Label className="text-muted-foreground text-xs uppercase tracking-wide">
                 Requested duration (days)
               </Label>
               <Input
-                type="number"
-                min={1}
-                max={365}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                placeholder="e.g. 30 — leave blank for template default"
                 className="text-xs"
+                max={365}
+                min={1}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                placeholder="e.g. 30 — leave blank for template default"
+                type="number"
+                value={field.state.value}
               />
               <p className="text-[11px] text-muted-foreground">
                 Capped by the matched policy template's maximum duration.
@@ -425,7 +425,7 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         </form.Field>
 
         {serverError && (
-          <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <p className="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-destructive text-xs">
             {serverError}
           </p>
         )}
@@ -433,10 +433,10 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button
-              type="submit"
-              size="sm"
-              disabled={isSubmitting}
               className="self-start"
+              disabled={isSubmitting}
+              size="sm"
+              type="submit"
             >
               {isSubmitting ? "Submitting…" : "Submit request"}
             </Button>
@@ -446,44 +446,44 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
 
       {/* ── Right: history ── */}
       <div className="flex flex-col overflow-hidden bg-card">
-        <div className="border-b px-5 py-3 shrink-0">
-          <h2 className="text-sm font-semibold">Request history</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+        <div className="shrink-0 border-b px-5 py-3">
+          <h2 className="font-semibold text-sm">Request history</h2>
+          <p className="mt-0.5 text-muted-foreground text-xs">
             All requests for this resource
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {loadingHistory ? (
-            <p className="px-5 py-4 text-xs text-muted-foreground">Loading…</p>
+            <p className="px-5 py-4 text-muted-foreground text-xs">Loading…</p>
           ) : history.length === 0 ? (
-            <p className="px-5 py-8 text-center text-xs text-muted-foreground">
+            <p className="px-5 py-8 text-center text-muted-foreground text-xs">
               No requests yet for this resource.
             </p>
           ) : (
             <ul className="divide-y">
               {history.map((req) => (
-                <li key={req.id} className="flex flex-col gap-2 px-5 py-4">
+                <li className="flex flex-col gap-2 px-5 py-4" key={req.id}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Status variant={getStatusVariant(req.status)}>
                         <StatusIndicator />
                         <StatusLabel className="text-xs">
                           {formatStatusLabel(req.status)}
                         </StatusLabel>
                       </Status>
-                      <span className="font-mono text-xs text-muted-foreground">
+                      <span className="font-mono text-muted-foreground text-xs">
                         {req.code}
                       </span>
                     </div>
                     {CANCELLABLE.includes(req.status) && (
                       <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
+                        className="h-6 shrink-0 text-muted-foreground text-xs hover:text-destructive"
                         disabled={cancellingId === req.id}
                         onClick={() => handleCancel(req.id)}
-                        className="h-6 shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                        size="sm"
+                        type="button"
+                        variant="destructive"
                       >
                         {cancellingId === req.id ? "Cancelling…" : "Cancel"}
                       </Button>
@@ -492,14 +492,14 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
 
                   <div className="flex flex-wrap gap-1">
                     {req.privileges.map((p) => (
-                      <Badge key={p} variant="outline" className="text-[11px]">
+                      <Badge className="text-[11px]" key={p} variant="outline">
                         {p}
                       </Badge>
                     ))}
                   </div>
 
                   {req.rationale && (
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                    <p className="line-clamp-2 text-muted-foreground text-xs">
                       {req.rationale}
                     </p>
                   )}
@@ -507,22 +507,22 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                   <div className="flex flex-wrap gap-1">
                     {req.policy_template_name ? (
                       <>
-                        <Badge variant="outline" className="text-[11px]">
+                        <Badge className="text-[11px]" variant="outline">
                           {req.policy_template_name}
                         </Badge>
                         {req.policy_template_resource ? (
-                          <Badge variant="outline" className="text-[11px]">
+                          <Badge className="text-[11px]" variant="outline">
                             {req.policy_template_resource}
                           </Badge>
                         ) : null}
                         {req.policy_template_approval_mode ? (
-                          <Badge variant="outline" className="text-[11px]">
+                          <Badge className="text-[11px]" variant="outline">
                             {req.policy_template_approval_mode}
                           </Badge>
                         ) : null}
                       </>
                     ) : (
-                      <Badge variant="outline" className="text-[11px]">
+                      <Badge className="text-[11px]" variant="outline">
                         Manual exception
                       </Badge>
                     )}
@@ -536,9 +536,9 @@ export function RequestPermissionsPanel({ resource, scope }: Props) {
                     <div className="flex flex-wrap gap-1">
                       {req.approval_steps.map((step) => (
                         <Badge
+                          className="text-[11px]"
                           key={step.id}
                           variant={step.is_current ? "secondary" : "outline"}
-                          className="text-[11px]"
                         >
                           {`S${step.stage_order} · ${step.approver_team} · ${step.status}`}
                         </Badge>

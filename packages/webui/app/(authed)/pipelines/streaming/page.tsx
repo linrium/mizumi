@@ -1,33 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { MoreHorizontalIcon } from "@hugeicons/core-free-icons"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +20,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,23 +65,27 @@ type StreamingJob = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTimestamp(ts: string | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   return new Date(ts).toLocaleString()
 }
 
 type StateVariant = "success" | "warning" | "error" | "default"
 
 const STATE_CONFIG: Record<string, { label: string; variant: StateVariant }> = {
-  RUNNING: { label: "Running", variant: "success" },
   COMPLETED: { label: "Completed", variant: "default" },
   FAILED: { label: "Failed", variant: "error" },
-  SUBMITTED: { label: "Submitted", variant: "warning" },
   PENDING: { label: "Pending", variant: "warning" },
+  RUNNING: { label: "Running", variant: "success" },
+  SUBMITTED: { label: "Submitted", variant: "warning" },
   UNKNOWN: { label: "Unknown", variant: "default" },
 }
 
 function K8sStateBadge({ state }: { state: string | null | undefined }) {
-  if (!state) return <span className="text-muted-foreground">—</span>
+  if (!state) {
+    return <span className="text-muted-foreground">—</span>
+  }
   const cfg = STATE_CONFIG[state] ?? {
     label: state,
     variant: "default" as StateVariant,
@@ -102,65 +106,63 @@ function buildColumns(
 ): ColumnDef<StreamingJob>[] {
   return [
     {
-      id: "name",
-      header: "Name",
       cell: ({ row }) => (
         <span className="font-medium font-mono text-xs">
           {row.original.name}
         </span>
       ),
+      header: "Name",
+      id: "name",
     },
     {
-      id: "deployment",
-      header: "Namespace",
       cell: ({ row }) => (
         <div className="space-y-0.5">
           <div className="font-medium">{row.original.namespace}</div>
-          <div className="text-xs text-muted-foreground font-mono">
+          <div className="font-mono text-muted-foreground text-xs">
             {row.original.image}
           </div>
         </div>
       ),
+      header: "Namespace",
+      id: "deployment",
     },
     {
-      id: "state",
-      header: "State",
       cell: ({ row }) => (
         <K8sStateBadge state={row.original.k8s_status?.state} />
       ),
+      header: "State",
+      id: "state",
     },
     {
-      id: "executors",
-      header: "Executors",
       cell: ({ row }) => {
         const { executor_instances, executor_cores, executor_memory } =
           row.original
         return (
           <div className="space-y-0.5">
             <div className="font-medium">{executor_instances} instances</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {executor_cores} cores · {executor_memory}
             </div>
           </div>
         )
       },
+      header: "Executors",
+      id: "executors",
     },
     {
-      id: "created_at",
-      header: "Created",
       accessorFn: (j) => fmtTimestamp(j.created_at),
+      header: "Created",
+      id: "created_at",
     },
     {
-      id: "actions",
-      header: "",
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              onClick={(e) => e.stopPropagation()}
+              size="icon-sm"
               type="button"
               variant="ghost"
-              size="icon-sm"
-              onClick={(e) => e.stopPropagation()}
             >
               <HugeiconsIcon icon={MoreHorizontalIcon} size={14} />
               <span className="sr-only">Open actions</span>
@@ -187,6 +189,8 @@ function buildColumns(
           </DropdownMenuContent>
         </DropdownMenu>
       ),
+      header: "",
+      id: "actions",
     },
   ]
 }
@@ -210,7 +214,9 @@ export default function StreamingPage() {
         cache: "no-store",
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      if (!res.ok) {
+        throw new Error(json.error ?? `HTTP ${res.status}`)
+      }
       setJobs(json.jobs ?? [])
     } catch (e) {
       setError((e as Error).message)
@@ -224,7 +230,9 @@ export default function StreamingPage() {
   }, [])
 
   async function handleRestart() {
-    if (!restartTarget || actionPending) return
+    if (!restartTarget || actionPending) {
+      return
+    }
     setActionPending(true)
     try {
       const res = await fetchWithAuth(
@@ -232,7 +240,9 @@ export default function StreamingPage() {
         { method: "POST" }
       )
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      if (!res.ok) {
+        throw new Error(json.error ?? `HTTP ${res.status}`)
+      }
       toast.success("Job restarted", { description: restartTarget.name })
       setRestartTarget(null)
       load()
@@ -246,7 +256,9 @@ export default function StreamingPage() {
   }
 
   async function handleDelete() {
-    if (!deleteTarget || actionPending) return
+    if (!deleteTarget || actionPending) {
+      return
+    }
     setActionPending(true)
     try {
       const res = await fetchWithAuth(
@@ -271,30 +283,32 @@ export default function StreamingPage() {
 
   const columns = buildColumns(setRestartTarget, setDeleteTarget)
   const table = useReactTable({
-    data: jobs,
     columns,
+    data: jobs,
     getCoreRowModel: getCoreRowModel(),
   })
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading streaming jobs…
       </div>
     )
-  if (error)
+  }
+  if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error}
       </div>
     )
+  }
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto">
+    <div className="min-h-0 flex-1 overflow-auto">
       <Table>
-        <TableHeader className="sticky top-0 bg-background z-10">
+        <TableHeader className="sticky top-0 z-10 bg-background">
           {table.getHeaderGroups().map((hg) => (
-            <TableRow key={hg.id} className="hover:bg-transparent">
+            <TableRow className="hover:bg-transparent" key={hg.id}>
               {hg.headers.map((h) => (
                 <TableHead key={h.id}>
                   {h.isPlaceholder
@@ -309,14 +323,14 @@ export default function StreamingPage() {
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
-                key={row.id}
                 className="cursor-pointer"
+                key={row.id}
                 onClick={() =>
                   router.push(`/pipelines/streaming/${row.original.id}`)
                 }
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="align-top">
+                  <TableCell className="align-top" key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
@@ -325,8 +339,8 @@ export default function StreamingPage() {
           ) : (
             <TableRow>
               <TableCell
-                colSpan={columns.length}
                 className="h-24 text-center text-muted-foreground"
+                colSpan={columns.length}
               >
                 No streaming jobs found
               </TableCell>
@@ -336,10 +350,12 @@ export default function StreamingPage() {
       </Table>
 
       <Dialog
-        open={restartTarget != null}
         onOpenChange={(open) => {
-          if (!open && !actionPending) setRestartTarget(null)
+          if (!(open || actionPending)) {
+            setRestartTarget(null)
+          }
         }}
+        open={restartTarget != null}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -350,17 +366,17 @@ export default function StreamingPage() {
           </DialogHeader>
           {restartTarget && (
             <div className="divide-y rounded-md border text-sm">
-              <div className="px-3 py-2.5 space-y-0.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Job
                 </p>
-                <p className="font-mono font-medium">{restartTarget.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="font-medium font-mono">{restartTarget.name}</p>
+                <p className="text-muted-foreground text-xs">
                   {restartTarget.namespace}
                 </p>
               </div>
-              <div className="px-3 py-2.5 space-y-1">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-1 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Current state
                 </p>
                 <K8sStateBadge state={restartTarget.k8s_status?.state} />
@@ -369,17 +385,17 @@ export default function StreamingPage() {
           )}
           <DialogFooter>
             <Button
-              type="button"
-              variant="outline"
               disabled={actionPending}
               onClick={() => setRestartTarget(null)}
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              type="button"
               disabled={actionPending}
               onClick={handleRestart}
+              type="button"
             >
               {actionPending ? "Restarting…" : "Restart"}
             </Button>
@@ -388,10 +404,12 @@ export default function StreamingPage() {
       </Dialog>
 
       <Dialog
-        open={deleteTarget != null}
         onOpenChange={(open) => {
-          if (!open && !actionPending) setDeleteTarget(null)
+          if (!(open || actionPending)) {
+            setDeleteTarget(null)
+          }
         }}
+        open={deleteTarget != null}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -402,20 +420,20 @@ export default function StreamingPage() {
           </DialogHeader>
           {deleteTarget && (
             <div className="divide-y rounded-md border text-sm">
-              <div className="px-3 py-2.5 space-y-0.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Job
                 </p>
-                <p className="font-mono font-medium">{deleteTarget.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="font-medium font-mono">{deleteTarget.name}</p>
+                <p className="text-muted-foreground text-xs">
                   {deleteTarget.namespace}
                 </p>
               </div>
-              <div className="px-3 py-2.5 space-y-0.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5 px-3 py-2.5">
+                <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                   Image
                 </p>
-                <p className="font-mono text-xs text-muted-foreground break-all">
+                <p className="break-all font-mono text-muted-foreground text-xs">
                   {deleteTarget.image}
                 </p>
               </div>
@@ -423,18 +441,18 @@ export default function StreamingPage() {
           )}
           <DialogFooter>
             <Button
-              type="button"
-              variant="outline"
               disabled={actionPending}
               onClick={() => setDeleteTarget(null)}
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              type="button"
-              variant="destructive"
               disabled={actionPending}
               onClick={handleDelete}
+              type="button"
+              variant="destructive"
             >
               {actionPending ? "Deleting…" : "Delete"}
             </Button>

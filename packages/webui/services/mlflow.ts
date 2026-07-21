@@ -154,16 +154,16 @@ export async function searchLoggedModels() {
   return mlflowFetch<{ models?: MlflowLoggedModel[] }>(
     "/api/2.0/mlflow/logged-models/search",
     {
-      method: "POST",
       body: JSON.stringify({
         experiment_ids: ["1"],
         order_by: [
           {
-            field_name: "creation_time",
             ascending: false,
+            field_name: "creation_time",
           },
         ],
       }),
+      method: "POST",
     }
   )
 }
@@ -175,7 +175,6 @@ export async function searchRuns(
   return mlflowFetch<{ runs?: MlflowRun[]; next_page_token?: string }>(
     "/api/2.0/mlflow/runs/search",
     {
-      method: "POST",
       body: JSON.stringify({
         experiment_ids: experimentIds,
         ...(options?.registeredModelUri
@@ -186,6 +185,7 @@ export async function searchRuns(
         max_results: 50,
         order_by: ["start_time DESC"],
       }),
+      method: "POST",
     }
   )
 }

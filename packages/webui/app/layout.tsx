@@ -6,18 +6,18 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  variable: "--font-geist-sans",
 })
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  variable: "--font-geist-mono",
 })
 
 export const metadata: Metadata = {
-  title: "Mizumi",
   description: "Kubernetes-native data platform",
+  title: "Mizumi",
 }
 
 export default async function RootLayout({
@@ -29,10 +29,10 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      lang="en"
     >
-      <body className="h-full flex flex-col">
+      <body className="flex h-full flex-col">
         <AuthHeaderProvider idToken={session?.idToken} />
         {children}
         <Toaster />

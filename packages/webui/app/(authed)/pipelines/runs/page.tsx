@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
   TableBody,
@@ -17,8 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,16 +42,24 @@ type Run = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTimestamp(ts: string | number | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   const ms = typeof ts === "string" ? Number(ts) * 1000 : ts * 1000
   return new Date(ms).toLocaleString()
 }
 
 function fmtDuration(start: number | null, end: number | null): string {
-  if (!start) return "—"
+  if (!start) {
+    return "—"
+  }
   const sec = Math.round((end ?? Date.now() / 1000) - start)
-  if (sec < 60) return `${sec}s`
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  if (sec < 60) {
+    return `${sec}s`
+  }
+  if (sec < 3600) {
+    return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  }
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
@@ -63,17 +71,19 @@ function RunStatusBadge({ status }: { status: string }) {
       variant: "success" | "error" | "info" | "warning" | "default"
     }
   > = {
-    SUCCESS: { label: "Success", variant: "success" },
+    CANCELED: { label: "Canceled", variant: "default" },
+    CANCELING: { label: "Canceling", variant: "warning" },
     FAILURE: { label: "Failed", variant: "error" },
+    NOT_STARTED: { label: "Not started", variant: "default" },
+    QUEUED: { label: "Queued", variant: "default" },
     STARTED: { label: "Running", variant: "info" },
     STARTING: { label: "Starting", variant: "info" },
-    QUEUED: { label: "Queued", variant: "default" },
-    CANCELING: { label: "Canceling", variant: "warning" },
-    CANCELED: { label: "Canceled", variant: "default" },
-    NOT_STARTED: { label: "Not started", variant: "default" },
+    SUCCESS: { label: "Success", variant: "success" },
   }
   const cfg = config[status]
-  if (!cfg) return <Badge variant="outline">{status}</Badge>
+  if (!cfg) {
+    return <Badge variant="outline">{status}</Badge>
+  }
   return (
     <Status variant={cfg.variant}>
       <StatusIndicator />
@@ -91,7 +101,9 @@ async function apiFetch<T>(
     : `/api/dagster/${path}`
   const res = await fetchWithAuth(url, { cache: "no-store" })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as T
 }
 
@@ -99,62 +111,61 @@ async function apiFetch<T>(
 
 const COLUMNS: ColumnDef<Run>[] = [
   {
-    id: "run_id",
-    header: "Run ID",
     accessorKey: "run_id",
     cell: ({ getValue }) => (
       <span className="font-mono text-muted-foreground">
         {getValue() as string}
       </span>
     ),
+    header: "Run ID",
+    id: "run_id",
   },
   {
-    id: "status",
-    header: "Status",
     cell: ({ row }) => <RunStatusBadge status={row.original.status} />,
+    header: "Status",
+    id: "status",
   },
   {
-    id: "target",
-    header: "Target",
     cell: ({ row }) => {
       const sel = row.original.asset_selection
       const visible = sel.length > 0 ? sel.slice(0, 3) : null
       const overflow = sel.length > 3 ? sel.length - 3 : 0
-      if (!visible)
+      if (!visible) {
         return (
-          <Badge variant="outline" className="font-mono">
+          <Badge className="font-mono" variant="outline">
             {row.original.job_name}
           </Badge>
         )
+      }
       return (
         <div className="flex flex-wrap gap-1">
           {visible.map((path, i) => (
-            <Badge key={i} variant="outline" className="font-mono">
+            <Badge className="font-mono" key={i} variant="outline">
               {path[path.length - 1]}
             </Badge>
           ))}
           {overflow > 0 && (
-            <Badge variant="outline" className="text-muted-foreground">
+            <Badge className="text-muted-foreground" variant="outline">
               +{overflow}
             </Badge>
           )}
         </div>
       )
     },
+    header: "Target",
+    id: "target",
   },
   {
-    id: "started",
-    header: "Started",
     accessorFn: (r) => fmtTimestamp(r.start_time ?? r.creation_time),
+    header: "Started",
+    id: "started",
   },
   {
-    id: "duration",
-    header: "Duration",
     accessorFn: (r) => fmtDuration(r.start_time, r.end_time),
+    header: "Duration",
+    id: "duration",
   },
   {
-    id: "steps",
-    header: "Steps",
     accessorFn: (r) => {
       const ok = r.stats?.steps_succeeded ?? 0
       const fail = r.stats?.steps_failed ?? 0
@@ -162,6 +173,8 @@ const COLUMNS: ColumnDef<Run>[] = [
       const total = ok + fail + can
       return total ? `${ok}/${total}` : "—"
     },
+    header: "Steps",
+    id: "steps",
   },
 ]
 
@@ -181,30 +194,32 @@ export default function RunsPage() {
   }, [])
 
   const table = useReactTable({
-    data: runs,
     columns: COLUMNS,
+    data: runs,
     getCoreRowModel: getCoreRowModel(),
   })
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading runs…
       </div>
     )
-  if (error)
+  }
+  if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error}
       </div>
     )
+  }
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto">
+    <div className="min-h-0 flex-1 overflow-auto">
       <Table>
-        <TableHeader className="sticky top-0 bg-background z-10">
+        <TableHeader className="sticky top-0 z-10 bg-background">
           {table.getHeaderGroups().map((hg) => (
-            <TableRow key={hg.id} className="hover:bg-transparent">
+            <TableRow className="hover:bg-transparent" key={hg.id}>
               {hg.headers.map((h) => (
                 <TableHead key={h.id}>
                   {h.isPlaceholder
@@ -219,8 +234,8 @@ export default function RunsPage() {
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow
-                key={row.id}
                 className="cursor-pointer"
+                key={row.id}
                 onClick={() =>
                   router.push(`/pipelines/runs/${row.original.run_id}`)
                 }
@@ -235,8 +250,8 @@ export default function RunsPage() {
           ) : (
             <TableRow>
               <TableCell
-                colSpan={COLUMNS.length}
                 className="h-24 text-center text-muted-foreground"
+                colSpan={COLUMNS.length}
               >
                 No runs found
               </TableCell>

@@ -76,20 +76,20 @@ function formatRenewalLabel(status: GrantStatus) {
 }
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "healthy", label: "Healthy" },
-  { value: "expiring", label: "Expiring" },
-  { value: "expired", label: "Expired" },
-  { value: "revoked", label: "Revoked" },
+  { label: "All statuses", value: "all" },
+  { label: "Healthy", value: "healthy" },
+  { label: "Expiring", value: "expiring" },
+  { label: "Expired", value: "expired" },
+  { label: "Revoked", value: "revoked" },
 ]
 
 // Shared summary block used in both modals
 function GrantSummary({ grant }: { grant: TimeBoundGrant }) {
   return (
-    <div className="rounded-md border bg-muted/40 px-3 py-2.5 text-xs space-y-1.5">
+    <div className="space-y-1.5 rounded-md border bg-muted/40 px-3 py-2.5 text-xs">
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">Principal</span>
-        <span className="font-medium text-right">{grant.principal}</span>
+        <span className="text-right font-medium">{grant.principal}</span>
       </div>
       {grant.team && (
         <div className="flex justify-between gap-4">
@@ -99,12 +99,12 @@ function GrantSummary({ grant }: { grant: TimeBoundGrant }) {
       )}
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">Resource</span>
-        <span className="font-mono text-right break-all">{grant.resource}</span>
+        <span className="break-all text-right font-mono">{grant.resource}</span>
       </div>
       {grant.scope && (
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Scope</span>
-          <Badge variant="outline" className="text-[10px]">
+          <Badge className="text-[10px]" variant="outline">
             {grant.scope}
           </Badge>
         </div>
@@ -145,16 +145,18 @@ export default function TimeBoundAccessPage() {
   }
 
   function closeDialog() {
-    if (submitting) return
+    if (submitting) {
+      return
+    }
     setDialogGrant(null)
   }
 
   function fetchGrants() {
     setLoading(true)
     listTimeBoundGrants({
-      status: statusFilter !== "all" ? statusFilter : undefined,
-      resource: resourceFilter || undefined,
       principal: principalFilter || undefined,
+      resource: resourceFilter || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
     })
       .then(setGrants)
       .catch(() => toast.error("Failed to load grants"))
@@ -167,7 +169,9 @@ export default function TimeBoundAccessPage() {
   }, [statusFilter, resourceFilter, principalFilter])
 
   async function handleConfirmRevoke() {
-    if (!dialogGrant) return
+    if (!dialogGrant) {
+      return
+    }
     const grant = dialogGrant
     setSubmitting(true)
     try {
@@ -187,9 +191,11 @@ export default function TimeBoundAccessPage() {
   }
 
   async function handleConfirmRenew() {
-    if (!dialogGrant) return
+    if (!dialogGrant) {
+      return
+    }
     const grant = dialogGrant
-    const days = parseInt(renewDays, 10)
+    const days = Number.parseInt(renewDays, 10)
     if (!days || days < 1) {
       toast.error("Enter a valid number of days (≥ 1)")
       return
@@ -224,15 +230,15 @@ export default function TimeBoundAccessPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="border-b shrink-0 px-3 py-2.5">
+      <div className="shrink-0 border-b px-3 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-sm font-semibold">Time-bound access</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="font-semibold text-sm">Time-bound access</h1>
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Temporary grants, renewals, and expirations that need attention.
             </p>
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {expiringToday > 0 &&
               `${expiringToday} grant${expiringToday === 1 ? "" : "s"} expire${expiringToday === 1 ? "s" : ""} today`}
             {expiringToday > 0 && expired > 0 && " and "}
@@ -242,7 +248,7 @@ export default function TimeBoundAccessPage() {
 
         {/* Filters */}
         <div className="mt-2 flex flex-wrap gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select onValueChange={setStatusFilter} value={statusFilter}>
             <SelectTrigger className="h-7 w-36 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -256,23 +262,23 @@ export default function TimeBoundAccessPage() {
           </Select>
 
           <Input
-            value={resourceFilter}
+            className="h-7 w-56 text-xs"
             onChange={(e) => setResourceFilter(e.target.value)}
             placeholder="Filter by resource…"
-            className="h-7 w-56 text-xs"
+            value={resourceFilter}
           />
 
           <Input
-            value={principalFilter}
+            className="h-7 w-52 text-xs"
             onChange={(e) => setPrincipalFilter(e.target.value)}
             placeholder="Filter by principal…"
-            className="h-7 w-52 text-xs"
+            value={principalFilter}
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -289,8 +295,8 @@ export default function TimeBoundAccessPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   Loading…
                 </TableCell>
@@ -298,8 +304,8 @@ export default function TimeBoundAccessPage() {
             ) : grants.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={7}
                 >
                   No grants match the current filters.
                 </TableCell>
@@ -315,23 +321,23 @@ export default function TimeBoundAccessPage() {
                     <TableCell className="align-top">
                       <div className="space-y-0.5">
                         <div className="font-medium">{grant.principal}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           {grant.team}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
-                      <div className="font-mono text-xs text-muted-foreground break-all">
+                      <div className="break-all font-mono text-muted-foreground text-xs">
                         {grant.resource}
                       </div>
                       {grant.scope && (
-                        <Badge variant="outline" className="mt-1 text-[10px]">
+                        <Badge className="mt-1 text-[10px]" variant="outline">
                           {grant.scope}
                         </Badge>
                       )}
                     </TableCell>
                     <TableCell>{grant.privilege}</TableCell>
-                    <TableCell className="align-top text-xs text-muted-foreground">
+                    <TableCell className="align-top text-muted-foreground text-xs">
                       <div>
                         Started{" "}
                         {formatDistanceToNowStrict(new Date(grant.started_at), {
@@ -353,7 +359,7 @@ export default function TimeBoundAccessPage() {
                         </StatusLabel>
                       </Status>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[180px] truncate">
+                    <TableCell className="max-w-[180px] truncate text-muted-foreground text-xs">
                       {grant.reason}
                     </TableCell>
                     <TableCell className="text-right">
@@ -361,9 +367,9 @@ export default function TimeBoundAccessPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
+                              className="h-6 w-6"
                               size="icon"
                               variant="ghost"
-                              className="h-6 w-6"
                             >
                               <MoreHorizontal className="h-3.5 w-3.5" />
                               <span className="sr-only">Open actions</span>
@@ -402,8 +408,8 @@ export default function TimeBoundAccessPage() {
 
       {/* Revoke confirmation dialog */}
       <Dialog
-        open={dialogGrant !== null && dialogMode === "revoke"}
         onOpenChange={(open) => !open && closeDialog()}
+        open={dialogGrant !== null && dialogMode === "revoke"}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -416,16 +422,16 @@ export default function TimeBoundAccessPage() {
           {dialogGrant && <GrantSummary grant={dialogGrant} />}
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={closeDialog}
               disabled={submitting}
+              onClick={closeDialog}
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              onClick={handleConfirmRevoke}
               disabled={submitting}
+              onClick={handleConfirmRevoke}
+              variant="destructive"
             >
               {submitting ? "Revoking…" : "Revoke grant"}
             </Button>
@@ -435,8 +441,8 @@ export default function TimeBoundAccessPage() {
 
       {/* Renew dialog */}
       <Dialog
-        open={dialogGrant !== null && dialogMode === "renew"}
         onOpenChange={(open) => !open && closeDialog()}
+        open={dialogGrant !== null && dialogMode === "renew"}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -448,21 +454,21 @@ export default function TimeBoundAccessPage() {
           </DialogHeader>
           {dialogGrant && <GrantSummary grant={dialogGrant} />}
           <div className="space-y-1.5">
-            <Label htmlFor="renew-days" className="text-xs">
+            <Label className="text-xs" htmlFor="renew-days">
               Extension (days)
             </Label>
             <Input
-              id="renew-days"
-              type="number"
-              min={1}
-              max={365}
-              value={renewDays}
-              onChange={(e) => setRenewDays(e.target.value)}
               className="h-8 text-sm"
+              id="renew-days"
+              max={365}
+              min={1}
+              onChange={(e) => setRenewDays(e.target.value)}
               placeholder="e.g. 30"
+              type="number"
+              value={renewDays}
             />
             {Number(renewDays) >= 1 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 New expiry:{" "}
                 {new Date(
                   Date.now() + Number(renewDays) * 86_400_000
@@ -476,13 +482,13 @@ export default function TimeBoundAccessPage() {
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
-              onClick={closeDialog}
               disabled={submitting}
+              onClick={closeDialog}
+              variant="outline"
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmRenew} disabled={submitting}>
+            <Button disabled={submitting} onClick={handleConfirmRenew}>
               {submitting ? "Renewing…" : "Confirm renewal"}
             </Button>
           </DialogFooter>

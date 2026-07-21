@@ -29,39 +29,39 @@ import { isGradientDefComponent, isPatternDefComponent } from "./chart-defs"
 export type BarOrientation = "vertical" | "horizontal"
 
 export interface BarChartProps {
-  /** Data array - each item should have an x-axis key and numeric values */
-  data: Record<string, unknown>[]
-  /** Key in data for the categorical axis. Default: "name" */
-  xDataKey?: string
-  /** Chart margins */
-  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
   animationDuration?: number
   /** CSS easing for bar grow transitions. */
   animationEasing?: string
-  /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition
-  /** Signature of motion URL state — triggers enter replay when it changes. */
-  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
   aspectRatio?: string
-  /** Additional class name for the container */
-  className?: string
   /** Gap between bar groups as a fraction of band width (0-1). Default: 0.2 */
   barGap?: number
   /** Fixed bar width in pixels. If not set, bars auto-size to fill the band. */
   barWidth?: number
+  /** Child components (Bar, Grid, ChartTooltip, etc.) */
+  children: ReactNode
+  /** Additional class name for the container */
+  className?: string
+  /** Data array - each item should have an x-axis key and numeric values */
+  data: Record<string, unknown>[]
+  /** Motion enter transition (spring or cubic-bezier tween). */
+  enterTransition?: Transition
+  /** Chart margins */
+  margin?: Partial<Margin>
   /** Bar chart orientation. Default: "vertical" */
   orientation?: BarOrientation
+  /** Signature of motion URL state — triggers enter replay when it changes. */
+  revealSignature?: string
   /** Whether to stack bars instead of grouping them. Default: false */
   stacked?: boolean
   /** Gap between stacked bar segments in pixels. Default: 0 */
   stackGap?: number
-  /** Child components (Bar, Grid, ChartTooltip, etc.) */
-  children: ReactNode
+  /** Key in data for the categorical axis. Default: "name" */
+  xDataKey?: string
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 40, bottom: 40, left: 40 }
+const DEFAULT_MARGIN: Margin = { bottom: 40, left: 40, right: 40, top: 40 }
 
 // Extract bar configs from children synchronously
 function extractBarConfigs(children: ReactNode): LineConfig[] {
@@ -122,22 +122,22 @@ function isPostOverlayComponent(child: ReactElement): boolean {
 }
 
 interface ChartInnerProps {
-  width: number
-  height: number
-  data: Record<string, unknown>[]
-  xDataKey: string
-  margin: Margin
   animationDuration: number
   animationEasing: string
-  enterTransition?: Transition
-  revealSignature?: string
   barGap: number
   barWidthProp?: number
-  orientation: BarOrientation
-  stacked: boolean
-  stackGap: number
   children: ReactNode
   containerRef: React.RefObject<HTMLDivElement | null>
+  data: Record<string, unknown>[]
+  enterTransition?: Transition
+  height: number
+  margin: Margin
+  orientation: BarOrientation
+  revealSignature?: string
+  stacked: boolean
+  stackGap: number
+  width: number
+  xDataKey: string
 }
 
 function ChartInner({
@@ -177,8 +177,8 @@ function ChartInner({
       const value = d[xDataKey]
       if (value instanceof Date) {
         return value.toLocaleDateString("en-US", {
-          month: "short",
           day: "numeric",
+          month: "short",
         })
       }
       return String(value ?? "")
@@ -205,9 +205,9 @@ function ChartInner({
       ? [0, innerHeight]
       : [0, innerWidth]
     return scaleBand<string>({
-      range,
       domain,
       padding: barGap,
+      range,
     })
   }, [innerWidth, innerHeight, data, categoryAccessor, barGap, isHorizontal])
 
@@ -250,16 +250,16 @@ function ChartInner({
   const valueScale = useMemo(() => {
     const range = isHorizontal ? [0, innerWidth] : [innerHeight, 0]
     return scaleLinear({
-      range,
       domain: [0, maxValue * 1.1],
       nice: true,
+      range,
     })
   }, [innerWidth, innerHeight, maxValue, isHorizontal])
 
   // Compute stack offsets for stacked bars
   const stackOffsets = useMemo(() => {
     if (!stacked) {
-      return undefined
+      return
     }
     const offsets = new Map<number, Map<string, number>>()
     for (let i = 0; i < data.length; i++) {
@@ -301,10 +301,10 @@ function ChartInner({
     const start = now - data.length * 24 * 60 * 60 * 1000
     const scale = {
       ...categoryScale,
-      domain: () => [new Date(start), new Date(now)],
-      range: () => [0, innerWidth] as [number, number],
-      invert: (x: number) => new Date(start + (x / innerWidth) * (now - start)),
       copy: () => scale,
+      domain: () => [new Date(start), new Date(now)],
+      invert: (x: number) => new Date(start + (x / innerWidth) * (now - start)),
+      range: () => [0, innerWidth] as [number, number],
     }
     return scale
   }, [categoryScale, innerWidth, data.length])
@@ -422,11 +422,11 @@ function ChartInner({
       }
 
       setTooltipData({
-        point: d,
         index: clampedIndex,
+        point: d,
         x: tooltipX,
-        yPositions,
         xPositions: Object.keys(xPositions).length > 0 ? xPositions : undefined,
+        yPositions,
       })
       setHoveredBarIndex(clampedIndex)
     },
@@ -480,37 +480,37 @@ function ChartInner({
   })
 
   const contextValue = {
+    animationDuration,
+    animationEasing,
+    bandWidth,
+    // Bar-specific properties
+    barScale: categoryScale,
+    barXAccessor: categoryAccessor,
+    columnWidth,
+    containerRef,
     data,
+    dateLabels,
+    enterTransition,
+    height,
+    hoveredBarIndex,
+    innerHeight,
+    innerWidth,
+    isLoaded,
+    lines,
+    margin,
+    orientation,
+    revealEpoch,
+    setHoveredBarIndex,
+    setTooltipData,
+    stacked,
+    stackOffsets,
+    tooltipData,
+    width,
+    xAccessor: xAccessorDate,
     xScale: fakeTimeScale as unknown as ReturnType<
       typeof import("@visx/scale").scaleTime<number>
     >,
     yScale: valueScale,
-    width,
-    height,
-    innerWidth,
-    innerHeight,
-    margin,
-    columnWidth,
-    tooltipData,
-    setTooltipData,
-    containerRef,
-    lines,
-    isLoaded,
-    animationDuration,
-    animationEasing,
-    enterTransition,
-    revealEpoch,
-    xAccessor: xAccessorDate,
-    dateLabels,
-    // Bar-specific properties
-    barScale: categoryScale,
-    bandWidth,
-    hoveredBarIndex,
-    setHoveredBarIndex,
-    barXAccessor: categoryAccessor,
-    orientation,
-    stacked,
-    stackOffsets,
   }
 
   return (

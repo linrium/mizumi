@@ -7,9 +7,9 @@ export const DEFAULT_ANIMATION_DURATION_MS = 1100
 
 /** Default enter transition — matches the original line chart reveal. */
 export const DEFAULT_CHART_ENTER_TRANSITION: Transition = {
-  type: "tween",
   duration: DEFAULT_ANIMATION_DURATION_MS / 1000,
   ease: [0.85, 0, 0.15, 1],
+  type: "tween",
 }
 
 /**
@@ -26,8 +26,8 @@ export function clipRevealTransition(enterTransition?: Transition): Transition {
       : DEFAULT_ANIMATION_DURATION_MS / 1000
 
   return {
-    type: "tween",
     duration,
     ease: DEFAULT_CHART_ENTER_TRANSITION.ease,
+    type: "tween",
   }
 }

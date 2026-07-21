@@ -35,7 +35,7 @@ export function readTokenClaims(token?: string | null): IdTokenClaims | null {
 
 export function normalizeGroups(groups?: string[] | string) {
   if (!groups) {
-    return undefined
+    return
   }
 
   const values = Array.isArray(groups) ? groups : [groups]

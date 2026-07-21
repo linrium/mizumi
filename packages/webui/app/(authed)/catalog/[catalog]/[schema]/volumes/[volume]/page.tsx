@@ -8,21 +8,25 @@ import {
   IconPhoto,
 } from "@tabler/icons-react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { cn } from "@/lib/utils"
-import type { S3Object } from "@/services/catalog-types"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
+import type { S3Object } from "@/services/catalog-types"
 import { listVolumeFilesAction } from "../../../../actions"
 import { useVolumeDetail } from "./volume-context"
 
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
@@ -37,8 +41,10 @@ function baseName(key: string): string {
   return key.split("/").pop() ?? key
 }
 
+const S3_BUCKET_RE = /^s3:\/\/([^/]+)/
+
 function bucketFromLocation(location: string): string {
-  const m = location.match(/^s3:\/\/([^/]+)/)
+  const m = location.match(S3_BUCKET_RE)
   return m ? m[1] : ""
 }
 
@@ -58,14 +64,16 @@ export default function VolumeFilesPage() {
 
   const load = useCallback(
     (token: string | undefined) => {
-      if (!storageLocation) return
+      if (!storageLocation) {
+        return
+      }
       currentTokenRef.current = token
       setLoading(true)
       setError(null)
       setObjects(null)
       listVolumeFilesAction(storageLocation, token)
-        .then(({ objects, nextContinuationToken }) => {
-          setObjects(objects)
+        .then(({ objects: fetchedObjects, nextContinuationToken }) => {
+          setObjects(fetchedObjects)
           setNextToken(nextContinuationToken)
         })
         .catch((e: Error) => setError(e.message))
@@ -80,11 +88,13 @@ export default function VolumeFilesPage() {
     load(undefined)
   }, [load])
 
-  if (!detail) return null
+  if (!detail) {
+    return null
+  }
 
   if (!storageLocation) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         No storage location configured for this volume.
       </div>
     )
@@ -92,7 +102,7 @@ export default function VolumeFilesPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading files…
       </div>
     )
@@ -100,13 +110,15 @@ export default function VolumeFilesPage() {
 
   if (error) {
     return (
-      <div className="p-4 text-sm text-destructive font-mono whitespace-pre-wrap overflow-auto">
+      <div className="overflow-auto whitespace-pre-wrap p-4 font-mono text-destructive text-sm">
         {error}
       </div>
     )
   }
 
-  if (!objects) return null
+  if (!objects) {
+    return null
+  }
 
   const bucket = bucketFromLocation(storageLocation)
   const hasPrev = prevTokens.length > 0
@@ -126,36 +138,36 @@ export default function VolumeFilesPage() {
 
   return (
     <>
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="px-5 py-3 border-b shrink-0 flex flex-wrap gap-6">
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="flex shrink-0 flex-wrap gap-6 border-b px-5 py-3">
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
               Location
             </p>
-            <p className="text-xs font-mono mt-0.5">{storageLocation}</p>
+            <p className="mt-0.5 font-mono text-xs">{storageLocation}</p>
           </div>
         </div>
 
         {objects.length === 0 && !hasPrev ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
             Volume is empty.
           </div>
         ) : (
           <>
             <div className="flex-1 overflow-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full border-collapse text-xs">
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
                   <tr>
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b">
+                    <th className="border-b px-4 py-2 text-left font-medium text-muted-foreground">
                       Name
                     </th>
-                    <th className="px-4 py-2 text-right font-medium text-muted-foreground border-b w-24">
+                    <th className="w-24 border-b px-4 py-2 text-right font-medium text-muted-foreground">
                       Size
                     </th>
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground border-b w-44">
+                    <th className="w-44 border-b px-4 py-2 text-left font-medium text-muted-foreground">
                       Modified
                     </th>
-                    <th className="px-4 py-2 border-b w-10" />
+                    <th className="w-10 border-b px-4 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -164,33 +176,33 @@ export default function VolumeFilesPage() {
                     const isImage = IMAGE_RE.test(name)
                     return (
                       <tr
-                        key={obj.key}
                         className={cn(
-                          "border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors",
+                          "border-border/60 border-b transition-colors last:border-0 hover:bg-accent/30",
                           i % 2 === 0 ? "bg-background" : "bg-muted/20"
                         )}
+                        key={obj.key}
                       >
                         <td className="px-4 py-2">
                           <button
-                            type="button"
+                            className="flex w-full items-center gap-2 text-left hover:underline"
                             onClick={() => setSelected(obj)}
-                            className="flex items-center gap-2 hover:underline text-left w-full"
+                            type="button"
                           >
                             {isImage ? (
                               <IconPhoto
-                                size={13}
                                 className="shrink-0 text-muted-foreground"
+                                size={13}
                               />
                             ) : (
                               <IconFile
-                                size={13}
                                 className="shrink-0 text-muted-foreground"
+                                size={13}
                               />
                             )}
-                            <span className="font-mono truncate">{name}</span>
+                            <span className="truncate font-mono">{name}</span>
                           </button>
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        <td className="px-4 py-2 text-right text-muted-foreground tabular-nums">
                           {formatBytes(obj.size)}
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">
@@ -201,10 +213,10 @@ export default function VolumeFilesPage() {
                         <td className="px-4 py-2">
                           {isImage && (
                             <button
-                              type="button"
-                              onClick={() => setSelected(obj)}
-                              className="p-1 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
                               aria-label="Preview"
+                              className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+                              onClick={() => setSelected(obj)}
+                              type="button"
                             >
                               <IconEye size={13} />
                             </button>
@@ -217,22 +229,22 @@ export default function VolumeFilesPage() {
               </table>
             </div>
 
-            <div className="shrink-0 border-t px-4 py-2 flex items-center justify-end gap-1">
+            <div className="flex shrink-0 items-center justify-end gap-1 border-t px-4 py-2">
               <button
-                type="button"
+                aria-label="Previous page"
+                className="rounded p-1 transition-colors hover:bg-accent/50 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!hasPrev}
                 onClick={handlePrev}
-                className="p-1 rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Previous page"
+                type="button"
               >
                 <IconChevronLeft size={15} />
               </button>
               <button
-                type="button"
+                aria-label="Next page"
+                className="rounded p-1 transition-colors hover:bg-accent/50 disabled:cursor-not-allowed disabled:opacity-30"
                 disabled={!hasNext}
                 onClick={handleNext}
-                className="p-1 rounded hover:bg-accent/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="Next page"
+                type="button"
               >
                 <IconChevronRight size={15} />
               </button>
@@ -242,14 +254,16 @@ export default function VolumeFilesPage() {
       </div>
 
       <Sheet
-        open={!!selected}
         onOpenChange={(open) => {
-          if (!open) setSelected(null)
+          if (!open) {
+            setSelected(null)
+          }
         }}
+        open={!!selected}
       >
-        <SheetContent className="w-[420px] sm:max-w-[420px] flex flex-col gap-0 p-0 overflow-hidden">
-          <SheetHeader className="px-5 py-4 border-b shrink-0">
-            <SheetTitle className="text-sm font-semibold truncate">
+        <SheetContent className="flex w-[420px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[420px]">
+          <SheetHeader className="shrink-0 border-b px-5 py-4">
+            <SheetTitle className="truncate font-semibold text-sm">
               {selected ? baseName(selected.key) : ""}
             </SheetTitle>
             <SheetDescription className="sr-only">
@@ -257,18 +271,18 @@ export default function VolumeFilesPage() {
             </SheetDescription>
           </SheetHeader>
 
-          {selected && (
-            <div className="flex flex-col flex-1 overflow-auto">
-              <div className="flex items-center justify-center bg-muted/40 border-b min-h-64">
+          {selected ? (
+            <div className="flex flex-1 flex-col overflow-auto">
+              <div className="flex min-h-64 items-center justify-center border-b bg-muted/40">
                 <img
-                  src={`/api/files/${bucket}/${selected.key}`}
                   alt={baseName(selected.key)}
-                  className="max-w-full max-h-80 object-contain"
+                  className="max-h-80 max-w-full object-contain"
+                  src={`/api/files/${bucket}/${selected.key}`}
                 />
               </div>
 
-              <div className="px-5 py-4 space-y-3 text-xs">
-                <MetaRow label="Key" value={selected.key} mono />
+              <div className="space-y-3 px-5 py-4 text-xs">
+                <MetaRow label="Key" mono value={selected.key} />
                 <MetaRow label="Size" value={formatBytes(selected.size)} />
                 <MetaRow
                   label="Modified"
@@ -280,7 +294,7 @@ export default function VolumeFilesPage() {
                 />
               </div>
             </div>
-          )}
+          ) : null}
         </SheetContent>
       </Sheet>
     </>
@@ -298,7 +312,7 @@ function MetaRow({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
         {label}
       </p>
       <p className={cn("break-all", mono && "font-mono")}>{value}</p>

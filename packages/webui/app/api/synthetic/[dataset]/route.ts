@@ -41,11 +41,11 @@ export async function GET(request: Request, context: RouteContext) {
     const body = await response.text()
 
     return new Response(body, {
-      status: response.status,
       headers: {
         "Content-Type":
           response.headers.get("Content-Type") ?? "application/json",
       },
+      status: response.status,
     })
   } catch (error) {
     return Response.json(

@@ -1,10 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { useComposedRefs } from "@/lib/compose-refs"
-import { getCellKey } from "@/components/data-grid/data-grid"
-import { cn } from "@/lib/utils"
 import type { DataGridCellProps } from "@/components/data-grid/data-grid"
+import { getCellKey } from "@/components/data-grid/data-grid"
+import { useComposedRefs } from "@/lib/compose-refs"
+import { cn } from "@/lib/utils"
 
 interface DataGridCellWrapperProps<TData>
   extends DataGridCellProps<TData>,
@@ -31,7 +31,9 @@ export function DataGridCellWrapper<TData>({
 
   const onCellChange = React.useCallback(
     (node: HTMLDivElement | null) => {
-      if (!cellMapRef) return
+      if (!cellMapRef) {
+        return
+      }
 
       const cellKey = getCellKey(rowIndex, columnId)
 
@@ -84,7 +86,9 @@ export function DataGridCellWrapper<TData>({
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       onKeyDownProp?.(event)
 
-      if (event.defaultPrevented) return
+      if (event.defaultPrevented) {
+        return
+      }
 
       if (
         event.key === "ArrowUp" ||
@@ -156,23 +160,16 @@ export function DataGridCellWrapper<TData>({
 
   return (
     <div
-      role="button"
-      data-slot="grid-cell-wrapper"
       data-editing={isEditing ? "" : undefined}
       data-focused={isFocused ? "" : undefined}
       data-selected={isSelected ? "" : undefined}
+      data-slot="grid-cell-wrapper"
+      role="button"
       tabIndex={isFocused && !isEditing ? 0 : -1}
       {...props}
-      ref={composedRef}
       className={cn(
         "size-full px-2 py-1.5 text-start text-sm outline-none has-data-[slot=checkbox]:pt-2.5",
         {
-          "ring-1 ring-ring ring-inset": isFocused,
-          "bg-yellow-100 dark:bg-yellow-900/30":
-            isSearchMatch && !isActiveSearchMatch,
-          "bg-orange-200 dark:bg-orange-900/50": isActiveSearchMatch,
-          "bg-primary/10": isSelected && !isEditing,
-          "cursor-default": !isEditing,
           "**:data-[slot=grid-cell-content]:line-clamp-1":
             !isEditing && rowHeight === "short",
           "**:data-[slot=grid-cell-content]:line-clamp-2":
@@ -181,16 +178,23 @@ export function DataGridCellWrapper<TData>({
             !isEditing && rowHeight === "tall",
           "**:data-[slot=grid-cell-content]:line-clamp-4":
             !isEditing && rowHeight === "extra-tall",
+          "bg-orange-200 dark:bg-orange-900/50": isActiveSearchMatch,
+          "bg-primary/10": isSelected && !isEditing,
+          "bg-yellow-100 dark:bg-yellow-900/30":
+            isSearchMatch && !isActiveSearchMatch,
+          "cursor-default": !isEditing,
+          "ring-1 ring-ring ring-inset": isFocused,
         },
         className
       )}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
+      onKeyDown={onKeyDown}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
       onMouseUp={onMouseUp}
-      onKeyDown={onKeyDown}
+      ref={composedRef}
     />
   )
 }

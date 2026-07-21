@@ -37,12 +37,12 @@ const DEFAULT_REVIEWER_NAME = "HDBank Data Steward"
 const DEFAULT_REQUEST_TEAM_ID = "10000000-0000-0000-0000-000000000002"
 
 const TEAM_IDS_BY_NAME: Record<string, string> = {
-  "VietJetair Analytics": "10000000-0000-0000-0000-000000000001",
-  "VietJetair Data Platform": "10000000-0000-0000-0000-000000000002",
-  "HDBank Risk Analytics": "10000000-0000-0000-0000-000000000003",
   "HDBank Data Steward": "10000000-0000-0000-0000-000000000004",
+  "HDBank Risk Analytics": "10000000-0000-0000-0000-000000000003",
   "HDBank Security": "10000000-0000-0000-0000-000000000005",
   "Partnership Data Platform": "10000000-0000-0000-0000-000000000006",
+  "VietJetair Analytics": "10000000-0000-0000-0000-000000000001",
+  "VietJetair Data Platform": "10000000-0000-0000-0000-000000000002",
 }
 
 function resolveRequesterTeamId(groups?: string[]) {
@@ -55,20 +55,22 @@ function resolveRequesterTeamId(groups?: string[]) {
   return DEFAULT_REQUEST_TEAM_ID
 }
 
+const S3_LOCATION_RE = /^s3:\/\/([^/]+)\/(.+)$/
+
 export async function getCatalogsAction() {
-  return getCatalogs()
+  return await getCatalogs()
 }
 
 export async function getSchemasAction(catalog: string) {
-  return getSchemas(catalog)
+  return await getSchemas(catalog)
 }
 
 export async function getTablesAction(catalog: string, schema: string) {
-  return getTables(catalog, schema)
+  return await getTables(catalog, schema)
 }
 
 export async function getVolumesAction(catalog: string, schema: string) {
-  return getVolumes(catalog, schema)
+  return await getVolumes(catalog, schema)
 }
 
 export async function getVolumeAction(
@@ -76,21 +78,23 @@ export async function getVolumeAction(
   schema: string,
   volume: string
 ) {
-  return getVolume(catalog, schema, volume)
+  return await getVolume(catalog, schema, volume)
 }
 
 export async function listVolumeFilesAction(
   storageLocation: string,
   continuationToken?: string
 ) {
-  const match = storageLocation.match(/^s3:\/\/([^/]+)\/(.+)$/)
-  if (!match) throw new Error(`Invalid storage location: ${storageLocation}`)
+  const match = storageLocation.match(S3_LOCATION_RE)
+  if (!match) {
+    throw new Error(`Invalid storage location: ${storageLocation}`)
+  }
   const [, bucket, prefix] = match as [string, string, string]
-  return listS3Objects(bucket, prefix, { continuationToken })
+  return await listS3Objects(bucket, prefix, { continuationToken })
 }
 
 export async function getModelsAction(catalog: string, schema: string) {
-  return getModels(catalog, schema)
+  return await getModels(catalog, schema)
 }
 
 export async function getModelAction(
@@ -98,7 +102,7 @@ export async function getModelAction(
   schema: string,
   model: string
 ) {
-  return getModel(catalog, schema, model)
+  return await getModel(catalog, schema, model)
 }
 
 export async function getModelVersionsAction(
@@ -106,7 +110,7 @@ export async function getModelVersionsAction(
   schema: string,
   model: string
 ) {
-  return getModelVersions(catalog, schema, model)
+  return await getModelVersions(catalog, schema, model)
 }
 
 export async function searchMlflowExperimentsAction() {
@@ -160,7 +164,7 @@ export async function getTableAction(
   schema: string,
   table: string
 ) {
-  return getTable(catalog, schema, table)
+  return await getTable(catalog, schema, table)
 }
 
 export async function getPermissionsAction(
@@ -169,7 +173,7 @@ export async function getPermissionsAction(
   schema?: string,
   table?: string
 ) {
-  return getPermissions(resourceType, catalog, schema, table)
+  return await getPermissions(resourceType, catalog, schema, table)
 }
 
 export async function getMyPrivilegesAction(
@@ -194,45 +198,45 @@ export async function patchPermissionsAction(input: {
   add: string[]
   remove: string[]
 }) {
-  return patchPermissions(input)
+  return await patchPermissions(input)
 }
 
 // ── Permission request store ──────────────────────────────────────────────────
 
-export type StoredPermissionRequest = {
-  id: string
+export interface StoredPermissionRequest {
+  approval_steps: PermissionApprovalStep[]
   code: string
-  submit_as?: "personal" | "team"
-  requester: string
-  team_id?: string | null
-  team: string | null
-  resource: string
-  scope: RequestScope
-  privileges: string[]
-  submitted_at: string
+  current_approval_step_id: string | null
   expires_at: string
   expires_in_days: number
-  status: RequestStatus
-  reviewer: string
-  rationale: string
-  risk: RiskLevel
+  id: string
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_id: string | null
   policy_template_name: string | null
-  policy_template_resource: string | null
-  policy_template_approval_mode: "auto" | "review" | "escalate" | null
-  policy_template_owner_id: string | null
   policy_template_owner: string | null
-  renewal_of: string | null
-  approval_steps: PermissionApprovalStep[]
-  current_approval_step_id: string | null
+  policy_template_owner_id: string | null
+  policy_template_resource: string | null
+  privileges: string[]
   queue_decision:
     | "auto-approved"
     | "time-bounded"
     | "security-escalation"
     | "manual-review"
+  rationale: string
+  renewal_of: string | null
+  requester: string
+  resource: string
+  reviewer: string
+  risk: RiskLevel
+  scope: RequestScope
+  status: RequestStatus
+  submit_as?: "personal" | "team"
+  submitted_at: string
+  team: string | null
+  team_id?: string | null
 }
 
-export type MyTeamOption = {
+export interface MyTeamOption {
   id: string
   name: string
 }
@@ -241,205 +245,205 @@ export type RequestSubmitAs = "personal" | "team"
 
 const permissionStore: StoredPermissionRequest[] = [
   {
-    id: "PR-1042",
+    approval_steps: [
+      {
+        acted_at: "2026-05-16T02:00:00.000Z",
+        approver_label: "Data steward review",
+        approver_team: "HDBank Data Steward",
+        approver_team_id: "10000000-0000-0000-0000-000000000004",
+        id: "step-1042-1",
+        is_current: false,
+        stage_order: 1,
+        status: "approved",
+      },
+      {
+        acted_at: null,
+        approver_label: "Security sign-off",
+        approver_team: "HDBank Security",
+        approver_team_id: "10000000-0000-0000-0000-000000000005",
+        id: "step-1042-2",
+        is_current: true,
+        stage_order: 2,
+        status: "pending",
+      },
+    ],
     code: "PR-1042",
-    submit_as: "team",
-    requester: "Khao Pad",
-    team: "HDBank Risk Analytics",
-    resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
-    scope: "table",
-    privileges: ["SELECT", "MODIFY"],
-    submitted_at: "2026-05-16T01:12:00.000Z",
+    current_approval_step_id: "step-1042-2",
     expires_at: "2026-05-17T01:12:00.000Z",
     expires_in_days: 1,
-    status: "pending",
-    reviewer: "HDBank Data Steward",
-    rationale:
-      "Temporary write access is needed to validate chargeback risk thresholds before the next fraud release.",
-    risk: "high",
+    id: "PR-1042",
+    policy_template_approval_mode: "escalate",
     policy_template_id: "40000000-0000-0000-0000-000000000004",
     policy_template_name: "HDBank chargeback writeback",
+    policy_template_owner: "HDBank Security",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000005",
     policy_template_resource:
       "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
-    policy_template_approval_mode: "escalate",
-    policy_template_owner_id: "10000000-0000-0000-0000-000000000005",
-    policy_template_owner: "HDBank Security",
-    renewal_of: null,
-    approval_steps: [
-      {
-        id: "step-1042-1",
-        stage_order: 1,
-        approver_team_id: "10000000-0000-0000-0000-000000000004",
-        approver_team: "HDBank Data Steward",
-        approver_label: "Data steward review",
-        status: "approved",
-        acted_at: "2026-05-16T02:00:00.000Z",
-        is_current: false,
-      },
-      {
-        id: "step-1042-2",
-        stage_order: 2,
-        approver_team_id: "10000000-0000-0000-0000-000000000005",
-        approver_team: "HDBank Security",
-        approver_label: "Security sign-off",
-        status: "pending",
-        acted_at: null,
-        is_current: true,
-      },
-    ],
-    current_approval_step_id: "step-1042-2",
+    privileges: ["SELECT", "MODIFY"],
     queue_decision: "time-bounded",
+    rationale:
+      "Temporary write access is needed to validate chargeback risk thresholds before the next fraud release.",
+    renewal_of: null,
+    requester: "Khao Pad",
+    resource: "hdbank.hdbank_payments_prod_gold.risk_detection_v1",
+    reviewer: "HDBank Data Steward",
+    risk: "high",
+    scope: "table",
+    status: "pending",
+    submit_as: "team",
+    submitted_at: "2026-05-16T01:12:00.000Z",
+    team: "HDBank Risk Analytics",
   },
   {
-    id: "PR-1041",
+    approval_steps: [
+      {
+        acted_at: null,
+        approver_label: "Workspace owner review",
+        approver_team: "Partnership Data Platform",
+        approver_team_id: "10000000-0000-0000-0000-000000000006",
+        id: "step-1041-1",
+        is_current: true,
+        stage_order: 1,
+        status: "pending",
+      },
+      {
+        acted_at: null,
+        approver_label: "Data steward review",
+        approver_team: "HDBank Data Steward",
+        approver_team_id: "10000000-0000-0000-0000-000000000004",
+        id: "step-1041-2",
+        is_current: false,
+        stage_order: 2,
+        status: "waiting",
+      },
+    ],
     code: "PR-1041",
-    submit_as: "team",
-    requester: "Linh Tran",
-    team: "VietJetair Analytics",
-    resource: "partnership_sandbox.analytics",
-    scope: "schema",
-    privileges: ["USE_SCHEMA", "SELECT"],
-    submitted_at: "2026-05-15T06:30:00.000Z",
+    current_approval_step_id: "step-1041-1",
     expires_at: "2026-05-21T06:30:00.000Z",
     expires_in_days: 6,
-    status: "ready",
-    reviewer: "Partnership Data Platform",
-    rationale:
-      "Preparing a joint VietJet and HDBank partner performance readout for the weekly business review.",
-    risk: "medium",
+    id: "PR-1041",
+    policy_template_approval_mode: "review",
     policy_template_id: "40000000-0000-0000-0000-000000000003",
     policy_template_name: "Partner analytics read",
-    policy_template_resource: "partnership_sandbox.analytics",
-    policy_template_approval_mode: "review",
-    policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
     policy_template_owner: "Partnership Data Platform",
-    renewal_of: null,
-    approval_steps: [
-      {
-        id: "step-1041-1",
-        stage_order: 1,
-        approver_team_id: "10000000-0000-0000-0000-000000000006",
-        approver_team: "Partnership Data Platform",
-        approver_label: "Workspace owner review",
-        status: "pending",
-        acted_at: null,
-        is_current: true,
-      },
-      {
-        id: "step-1041-2",
-        stage_order: 2,
-        approver_team_id: "10000000-0000-0000-0000-000000000004",
-        approver_team: "HDBank Data Steward",
-        approver_label: "Data steward review",
-        status: "waiting",
-        acted_at: null,
-        is_current: false,
-      },
-    ],
-    current_approval_step_id: "step-1041-1",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000006",
+    policy_template_resource: "partnership_sandbox.analytics",
+    privileges: ["USE_SCHEMA", "SELECT"],
     queue_decision: "time-bounded",
+    rationale:
+      "Preparing a joint VietJet and HDBank partner performance readout for the weekly business review.",
+    renewal_of: null,
+    requester: "Linh Tran",
+    resource: "partnership_sandbox.analytics",
+    reviewer: "Partnership Data Platform",
+    risk: "medium",
+    scope: "schema",
+    status: "ready",
+    submit_as: "team",
+    submitted_at: "2026-05-15T06:30:00.000Z",
+    team: "VietJetair Analytics",
   },
   {
-    id: "PR-1039",
+    approval_steps: [],
     code: "PR-1039",
-    submit_as: "team",
-    requester: "Khao Soi",
-    team: "VietJetair Analytics",
-    resource: "vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
-    scope: "schema",
-    privileges: ["USE_SCHEMA", "SELECT"],
-    submitted_at: "2026-05-14T10:00:00.000Z",
+    current_approval_step_id: null,
     expires_at: "2026-05-30T10:00:00.000Z",
     expires_in_days: 14,
-    status: "approved",
-    reviewer: "VietJetair Data Platform",
-    rationale:
-      "Sandbox access for route-performance experimentation during the fare optimization sprint.",
-    risk: "low",
+    id: "PR-1039",
+    policy_template_approval_mode: "auto",
     policy_template_id: "40000000-0000-0000-0000-000000000001",
     policy_template_name: "VietJet sandbox read",
+    policy_template_owner: "VietJetair Data Platform",
+    policy_template_owner_id: "10000000-0000-0000-0000-000000000002",
     policy_template_resource:
       "vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
-    policy_template_approval_mode: "auto",
-    policy_template_owner_id: "10000000-0000-0000-0000-000000000002",
-    policy_template_owner: "VietJetair Data Platform",
-    renewal_of: null,
-    approval_steps: [],
-    current_approval_step_id: null,
+    privileges: ["USE_SCHEMA", "SELECT"],
     queue_decision: "auto-approved",
+    rationale:
+      "Sandbox access for route-performance experimentation during the fare optimization sprint.",
+    renewal_of: null,
+    requester: "Khao Soi",
+    resource: "vietjetair_sandbox.vietjetair_bookings_sandbox_gold",
+    reviewer: "VietJetair Data Platform",
+    risk: "low",
+    scope: "schema",
+    status: "approved",
+    submit_as: "team",
+    submitted_at: "2026-05-14T10:00:00.000Z",
+    team: "VietJetair Analytics",
   },
 ]
 
-type PermissionRequestApiResponse = {
-  id: string
+interface PermissionRequestApiResponse {
+  approval_steps: PermissionApprovalStep[]
   code: string
-  submit_as: "personal" | "team"
-  requester_id: string
-  requester: string
-  requester_email: string
-  team_id: string | null
-  team: string | null
-  resource: string
-  scope: RequestScope
-  privileges: string[]
-  submitted_at: string
+  current_approval_step_id: string | null
   expires_at: string
   expires_in_days: number
-  status: RequestStatus
-  reviewer_id: string
-  reviewer: string
-  rationale: string
-  risk: RiskLevel
+  id: string
+  policy_template_approval_mode: "auto" | "review" | "escalate" | null
   policy_template_id: string | null
   policy_template_name: string | null
-  policy_template_resource: string | null
-  policy_template_approval_mode: "auto" | "review" | "escalate" | null
-  policy_template_owner_id: string | null
   policy_template_owner: string | null
-  renewal_of: string | null
-  approval_steps: PermissionApprovalStep[]
-  current_approval_step_id: string | null
+  policy_template_owner_id: string | null
+  policy_template_resource: string | null
+  privileges: string[]
   queue_decision:
     | "auto-approved"
     | "time-bounded"
     | "security-escalation"
     | "manual-review"
+  rationale: string
+  renewal_of: string | null
+  requester: string
+  requester_email: string
+  requester_id: string
+  resource: string
+  reviewer: string
+  reviewer_id: string
+  risk: RiskLevel
+  scope: RequestScope
+  status: RequestStatus
+  submit_as: "personal" | "team"
+  submitted_at: string
+  team: string | null
+  team_id: string | null
 }
 
 function mapPermissionRequest(
   request: PermissionRequestApiResponse
 ): StoredPermissionRequest {
   return {
-    id: request.id,
+    approval_steps: request.approval_steps,
     code: request.code,
-    submit_as: request.submit_as,
-    requester: request.requester,
-    team_id: request.team_id,
-    team: request.team,
-    resource: request.resource,
-    scope: request.scope,
-    privileges: request.privileges,
-    submitted_at: request.submitted_at,
+    current_approval_step_id: request.current_approval_step_id,
     expires_at: request.expires_at,
     expires_in_days: request.expires_in_days,
-    status: request.status,
+    id: request.id,
+    policy_template_approval_mode: request.policy_template_approval_mode,
+    policy_template_id: request.policy_template_id,
+    policy_template_name: request.policy_template_name,
+    policy_template_owner: request.policy_template_owner,
+    policy_template_owner_id: request.policy_template_owner_id,
+    policy_template_resource: request.policy_template_resource,
+    privileges: request.privileges,
+    queue_decision: request.queue_decision,
+    rationale: request.rationale,
+    renewal_of: request.renewal_of,
+    requester: request.requester,
+    resource: request.resource,
     reviewer:
       request.reviewer ||
       (request.reviewer_id === DEFAULT_REVIEWER_ID
         ? DEFAULT_REVIEWER_NAME
         : request.reviewer_id),
-    rationale: request.rationale,
     risk: request.risk,
-    policy_template_id: request.policy_template_id,
-    policy_template_name: request.policy_template_name,
-    policy_template_resource: request.policy_template_resource,
-    policy_template_approval_mode: request.policy_template_approval_mode,
-    policy_template_owner_id: request.policy_template_owner_id,
-    policy_template_owner: request.policy_template_owner,
-    renewal_of: request.renewal_of,
-    approval_steps: request.approval_steps,
-    current_approval_step_id: request.current_approval_step_id,
-    queue_decision: request.queue_decision,
+    scope: request.scope,
+    status: request.status,
+    submit_as: request.submit_as,
+    submitted_at: request.submitted_at,
+    team: request.team,
+    team_id: request.team_id,
   }
 }
 
@@ -538,25 +542,25 @@ export async function submitPermissionRequestAction(body: {
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/permissions/requests`, {
-      method: "POST",
+      body: JSON.stringify({
+        privileges: body.privileges,
+        rationale: body.rationale,
+        requester_id: session.sub,
+        resource: body.resource,
+        scope: body.scope,
+        submit_as: body.submitAs,
+        team: body.submitAs === "team" ? body.teamId : null,
+        ...(body.requestedDurationDays !== null && {
+          requested_duration_days: body.requestedDurationDays,
+        }),
+        ...(body.renewalOf !== null && { renewal_of: body.renewalOf }),
+      }),
       cache: "no-store",
       headers: {
         Authorization: `Bearer ${session.idToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        requester_id: session.sub,
-        submit_as: body.submitAs,
-        team: body.submitAs === "team" ? body.teamId : null,
-        resource: body.resource,
-        scope: body.scope,
-        privileges: body.privileges,
-        rationale: body.rationale,
-        ...(body.requestedDurationDays != null && {
-          requested_duration_days: body.requestedDurationDays,
-        }),
-        ...(body.renewalOf != null && { renewal_of: body.renewalOf }),
-      }),
+      method: "POST",
     })
 
     if (!res.ok) {
@@ -595,13 +599,13 @@ export async function cancelPermissionRequestAction(
       const res = await fetch(
         `${API_BASE_URL}/api/permissions/requests/${id}`,
         {
-          method: "PATCH",
+          body: JSON.stringify({ status: "cancelled" }),
           cache: "no-store",
           headers: {
             Authorization: `Bearer ${session.idToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ status: "cancelled" }),
+          method: "PATCH",
         }
       )
 
@@ -614,9 +618,13 @@ export async function cancelPermissionRequestAction(
   }
 
   const idx = permissionStore.findIndex((r) => r.id === id)
-  if (idx === -1) return { error: "Request not found." }
+  if (idx === -1) {
+    return { error: "Request not found." }
+  }
   const current = permissionStore[idx]
-  if (!current) return { error: "Request not found." }
+  if (!current) {
+    return { error: "Request not found." }
+  }
   permissionStore[idx] = { ...current, status: "cancelled" }
   return { data: permissionStore[idx] }
 }

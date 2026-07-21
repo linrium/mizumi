@@ -1,8 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   type ColumnDef,
   flexRender,
@@ -10,6 +7,12 @@ import {
   getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table"
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import {
   Table,
   TableBody,
@@ -18,10 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { toast } from "sonner"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,26 +53,32 @@ function extractKinds(tags: RunTag[]): string[] {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTimestamp(ts: string | number | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   const ms = typeof ts === "string" ? Number(ts) * 1000 : ts * 1000
   return new Date(ms).toLocaleString()
 }
 
 function StaleStatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="text-muted-foreground">—</span>
+  if (!status) {
+    return <span className="text-muted-foreground">—</span>
+  }
 
   const config: Record<
     string,
     { label: string; variant: "success" | "warning" | "error" | "default" }
   > = {
     FRESH: { label: "Fresh", variant: "success" },
-    STALE: { label: "Stale", variant: "warning" },
     MISSING: { label: "Missing", variant: "error" },
+    STALE: { label: "Stale", variant: "warning" },
     UNKNOWN: { label: "Unknown", variant: "default" },
   }
 
   const cfg = config[status]
-  if (!cfg) return <span className="text-muted-foreground">{status}</span>
+  if (!cfg) {
+    return <span className="text-muted-foreground">{status}</span>
+  }
 
   return (
     <Status variant={cfg.variant}>
@@ -91,7 +97,9 @@ async function apiFetch<T>(
     : `/api/dagster/${path}`
   const res = await fetchWithAuth(url, { cache: "no-store" })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as T
 }
 
@@ -103,7 +111,9 @@ async function materializeAsset(path: string[]): Promise<{ run_id: string }> {
     }
   )
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as { run_id: string }
 }
 
@@ -111,12 +121,14 @@ async function materializeManyAssets(
   paths: string[][]
 ): Promise<{ run_id: string }> {
   const res = await fetchWithAuth("/api/dagster/materialize-many", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ paths }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as { run_id: string }
 }
 
@@ -146,10 +158,10 @@ function MaterializeButton({ path }: { path: string[] }) {
 
   return (
     <button
-      type="button"
-      onClick={handleClick}
+      className="whitespace-nowrap rounded border px-3 py-1 text-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
       disabled={pending}
-      className="text-xs px-3 py-1 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+      onClick={handleClick}
+      type="button"
     >
       {pending ? "Starting…" : "Materialize"}
     </button>
@@ -160,83 +172,84 @@ function MaterializeButton({ path }: { path: string[] }) {
 
 const COLUMNS: ColumnDef<AssetNode>[] = [
   {
-    id: "select",
+    cell: ({ row }) => (
+      <Checkbox
+        aria-label="Select row"
+        checked={row.getIsSelected()}
+        onCheckedChange={(v) => row.toggleSelected(!!v)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    ),
+    enableHiding: false,
+    enableSorting: false,
     header: ({ table }) => (
       <Checkbox
+        aria-label="Select all"
         checked={
           table.getIsAllPageRowsSelected() ||
           (table.getIsSomePageRowsSelected() && "indeterminate")
         }
         onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-        aria-label="Select all"
       />
     ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(v) => row.toggleSelected(!!v)}
-        onClick={(e) => e.stopPropagation()}
-        aria-label="Select row"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
+    id: "select",
   },
   {
-    id: "name",
-    header: "Asset",
     cell: ({ row }) => (
       <Link
+        className="font-medium underline-offset-2 hover:underline"
         href={`/pipelines/assets/${row.original.path.join("/")}`}
-        className="font-medium hover:underline underline-offset-2"
       >
         {row.original.path[0] ?? ""}
       </Link>
     ),
+    header: "Asset",
+    id: "name",
   },
-  { id: "group", header: "Group", accessorFn: (n) => n.group_name ?? "—" },
+  { accessorFn: (n) => n.group_name ?? "—", header: "Group", id: "group" },
   {
-    id: "kind",
-    header: "Kind",
     cell: ({ row }) => {
       const kinds = extractKinds(row.original.tags)
-      if (kinds.length === 0)
+      if (kinds.length === 0) {
         return <span className="text-muted-foreground">—</span>
+      }
       return (
         <div className="flex flex-wrap gap-1">
           {kinds.map((k) => (
-            <Badge key={k} variant="outline" className="capitalize">
+            <Badge className="capitalize" key={k} variant="outline">
               {k}
             </Badge>
           ))}
         </div>
       )
     },
+    header: "Kind",
+    id: "kind",
   },
   {
-    id: "status",
-    header: "Stale Status",
     cell: ({ row }) => <StaleStatusBadge status={row.original.stale_status} />,
+    header: "Stale Status",
+    id: "status",
   },
   {
-    id: "last_mat",
-    header: "Last Materialized",
     accessorFn: (n) => fmtTimestamp(n.last_materialization?.timestamp),
+    header: "Last Materialized",
+    id: "last_mat",
   },
   {
-    id: "upstream",
-    header: "Upstream",
     accessorFn: (n) => n.dependency_keys.length || "—",
+    header: "Upstream",
+    id: "upstream",
   },
   {
-    id: "downstream",
-    header: "Downstream",
     accessorFn: (n) => n.depended_by_keys.length || "—",
+    header: "Downstream",
+    id: "downstream",
   },
   {
-    id: "actions",
-    header: "",
     cell: ({ row }) => <MaterializeButton path={row.original.path} />,
+    header: "",
+    id: "actions",
   },
 ]
 
@@ -256,8 +269,8 @@ export default function AssetsPage() {
   }, [])
 
   const table = useReactTable({
-    data: nodes,
     columns: COLUMNS,
+    data: nodes,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onRowSelectionChange: setRowSelection,
@@ -292,26 +305,28 @@ export default function AssetsPage() {
     }
   }
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading assets…
       </div>
     )
-  if (error)
+  }
+  if (error) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error}
       </div>
     )
+  }
 
   const freshCount = nodes.filter((n) => n.stale_status === "FRESH").length
   const staleCount = nodes.filter((n) => n.stale_status === "STALE").length
   const missingCount = nodes.filter((n) => n.stale_status === "MISSING").length
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="flex items-center gap-3 px-4 h-10 border-b bg-muted/50 text-sm shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-10 shrink-0 items-center gap-3 border-b bg-muted/50 px-4 text-sm">
         {selectedCount > 0 ? (
           <span className="text-muted-foreground">
             {selectedCount} selected
@@ -339,28 +354,28 @@ export default function AssetsPage() {
         {selectedCount > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <button
-              type="button"
-              onClick={handleMaterializeSelected}
+              className="rounded border px-2 py-0.5 text-xs transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               disabled={materializingAll}
-              className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleMaterializeSelected}
+              type="button"
             >
               {materializingAll ? "Starting…" : "Materialize Selected"}
             </button>
             <button
-              type="button"
+              className="rounded border px-2 py-0.5 text-xs transition-colors hover:bg-muted"
               onClick={() => setRowSelection({})}
-              className="text-xs px-2 py-0.5 border rounded hover:bg-muted transition-colors"
+              type="button"
             >
               Clear
             </button>
           </div>
         )}
       </div>
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
-          <TableHeader className="sticky top-0 bg-background z-10">
+          <TableHeader className="sticky top-0 z-10 bg-background">
             {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="hover:bg-transparent">
+              <TableRow className="hover:bg-transparent" key={hg.id}>
                 {hg.headers.map((h) => (
                   <TableHead key={h.id}>
                     {h.isPlaceholder
@@ -388,8 +403,8 @@ export default function AssetsPage() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={COLUMNS.length}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={COLUMNS.length}
                 >
                   No assets found
                 </TableCell>

@@ -13,15 +13,15 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const TABS = [
-  { label: "Assets", href: "/pipelines/assets", icon: IconAsset },
-  { label: "Runs", href: "/pipelines/runs", icon: IconListDetails },
+  { href: "/pipelines/assets", icon: IconAsset, label: "Assets" },
+  { href: "/pipelines/runs", icon: IconListDetails, label: "Runs" },
   {
-    label: "Schedules",
     href: "/pipelines/schedules",
     icon: IconCalendarEvent,
+    label: "Schedules",
   },
-  { label: "Streaming", href: "/pipelines/streaming", icon: IconWaveSine },
-  { label: "Lineage", href: "/pipelines/lineage", icon: IconTimeline },
+  { href: "/pipelines/streaming", icon: IconWaveSine, label: "Streaming" },
+  { href: "/pipelines/lineage", icon: IconTimeline, label: "Lineage" },
 ] as const satisfies ReadonlyArray<{
   label: string
   href: string
@@ -36,25 +36,25 @@ export default function PipelinesLayout({
   const pathname = usePathname()
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-0 border-b shrink-0 px-3">
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-0 border-b px-3">
         {TABS.map((t) => (
           <Link
-            key={t.href}
-            href={t.href}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors",
+              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 font-medium text-xs transition-colors",
               pathname === t.href || pathname.startsWith(`${t.href}/`)
                 ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
+            href={t.href}
+            key={t.href}
           >
             <t.icon size={12} />
             {t.label}
           </Link>
         ))}
       </div>
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {children}
       </div>
     </div>

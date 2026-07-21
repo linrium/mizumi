@@ -88,10 +88,10 @@ export function PieCenterShell({
       const computed = pieGenerator(data)
       return computed.map((arc, index) => ({
         data: arc.data,
-        index,
-        startAngle: arc.startAngle,
         endAngle: arc.endAngle,
+        index,
         padAngle: arc.padAngle,
+        startAngle: arc.startAngle,
         value: arc.value,
       })) as PieArcData[]
     }
@@ -102,18 +102,20 @@ export function PieCenterShell({
     return [
       {
         data: d0,
-        index: 0,
-        startAngle: -Math.PI / 2,
         endAngle: (3 * Math.PI) / 2,
+        index: 0,
         padAngle: 0,
+        startAngle: -Math.PI / 2,
         value: 0,
       },
     ]
   }, [data])
 
-  const getColor = useCallback((index: number) => {
-    return defaultPieColors[index % defaultPieColors.length] as string
-  }, [])
+  const getColor = useCallback(
+    (index: number) =>
+      defaultPieColors[index % defaultPieColors.length] as string,
+    []
+  )
 
   const getFill = useCallback(
     (index: number) => {
@@ -131,24 +133,24 @@ export function PieCenterShell({
 
   const contextValue: PieContextValue = useMemo(
     () => ({
-      data,
-      arcs,
-      size: contextSize,
-      center,
-      outerRadius,
-      innerRadius: innerRadiusPx,
-      padAngle: 0,
-      cornerRadius: 0,
-      hoverOffset: SHELL_HOVER_OFFSET,
-      hoveredIndex: null,
-      setHoveredIndex: () => undefined,
       animationKey: 0,
-      isLoaded: true,
-      enterStaggerScale: 1,
+      arcs,
+      center,
       containerRef,
-      totalValue,
+      cornerRadius: 0,
+      data,
+      enterStaggerScale: 1,
       getColor,
       getFill,
+      hoveredIndex: null,
+      hoverOffset: SHELL_HOVER_OFFSET,
+      innerRadius: innerRadiusPx,
+      isLoaded: true,
+      outerRadius,
+      padAngle: 0,
+      setHoveredIndex: () => undefined,
+      size: contextSize,
+      totalValue,
     }),
     [
       data,

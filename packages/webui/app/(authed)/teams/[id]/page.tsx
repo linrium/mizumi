@@ -2,7 +2,6 @@
 
 import {
   Add01Icon,
-  ArrowLeft01Icon,
   Delete02Icon,
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons"
@@ -84,10 +83,13 @@ export default function TeamDetailPage({
           setAllUsers(usersData)
         }
       } catch (err) {
-        if (!cancelled)
+        if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load team")
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
@@ -107,7 +109,9 @@ export default function TeamDetailPage({
   }
 
   async function handleAdd() {
-    if (adding || !selectedUserId) return
+    if (adding || !selectedUserId) {
+      return
+    }
     setAdding(true)
     setAddError(null)
     try {
@@ -124,7 +128,9 @@ export default function TeamDetailPage({
   }
 
   async function handleRemove(userId: string) {
-    if (removingId) return
+    if (removingId) {
+      return
+    }
     setRemovingId(userId)
     try {
       await removeTeamMember(id, userId)
@@ -138,7 +144,7 @@ export default function TeamDetailPage({
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-xs">
         Loading…
       </div>
     )
@@ -147,10 +153,10 @@ export default function TeamDetailPage({
   if (error || !team) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2">
-        <p className="text-xs text-destructive">{error ?? "Team not found"}</p>
+        <p className="text-destructive text-xs">{error ?? "Team not found"}</p>
         <Link
+          className="text-muted-foreground text-xs hover:underline"
           href="/teams"
-          className="text-xs text-muted-foreground hover:underline"
         >
           Back to teams
         </Link>
@@ -160,15 +166,15 @@ export default function TeamDetailPage({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b shrink-0">
+      <div className="shrink-0 border-b">
         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold truncate">{team.name}</h1>
+              <h1 className="truncate font-semibold text-sm">{team.name}</h1>
               <div className="mt-1">
                 <Badge variant="outline">{team.workspace}</Badge>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-muted-foreground text-xs">
                 Created{" "}
                 {formatDistanceToNowStrict(new Date(team.created_at), {
                   addSuffix: true,
@@ -177,10 +183,10 @@ export default function TeamDetailPage({
             </div>
           </div>
           <Button
-            type="button"
-            size="sm"
-            onClick={openAdd}
             disabled={availableUsers.length === 0}
+            onClick={openAdd}
+            size="sm"
+            type="button"
           >
             <HugeiconsIcon icon={Add01Icon} size={14} />
             Add member
@@ -188,7 +194,7 @@ export default function TeamDetailPage({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -219,12 +225,12 @@ export default function TeamDetailPage({
                   </TableCell>
                   <TableCell>
                     <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
+                      className="text-muted-foreground hover:text-destructive"
                       disabled={removingId === member.user_id}
                       onClick={() => handleRemove(member.user_id)}
-                      className="text-muted-foreground hover:text-destructive"
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
                     >
                       <HugeiconsIcon icon={Delete02Icon} size={14} />
                       <span className="sr-only">Remove member</span>
@@ -235,8 +241,8 @@ export default function TeamDetailPage({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={5}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={5}
                 >
                   No members yet
                 </TableCell>
@@ -246,22 +252,24 @@ export default function TeamDetailPage({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground shrink-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t px-3 py-2 text-muted-foreground text-xs">
         <div className="flex items-center gap-2">
           <HugeiconsIcon icon={UserMultiple02Icon} size={14} />
           Members inherit the team's permissions and policy template
           eligibility.
         </div>
         <span>
-          {members.length} member{members.length !== 1 ? "s" : ""}
+          {members.length} member{members.length === 1 ? "" : "s"}
         </span>
       </div>
 
       <Dialog
-        open={addOpen}
         onOpenChange={(open) => {
-          if (!open && !adding) setAddOpen(false)
+          if (!(open || adding)) {
+            setAddOpen(false)
+          }
         }}
+        open={addOpen}
       >
         <DialogContent>
           <DialogHeader>
@@ -272,8 +280,8 @@ export default function TeamDetailPage({
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="member-select">User</Label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger id="member-select" className="w-full">
+            <Select onValueChange={setSelectedUserId} value={selectedUserId}>
+              <SelectTrigger className="w-full" id="member-select">
                 <SelectValue placeholder="Select a user…" />
               </SelectTrigger>
               <SelectContent position="popper">
@@ -289,21 +297,21 @@ export default function TeamDetailPage({
                 ))}
               </SelectContent>
             </Select>
-            {addError && <p className="text-xs text-destructive">{addError}</p>}
+            {addError && <p className="text-destructive text-xs">{addError}</p>}
           </div>
           <DialogFooter>
             <Button
-              type="button"
-              variant="outline"
               disabled={adding}
               onClick={() => setAddOpen(false)}
+              type="button"
+              variant="outline"
             >
               Cancel
             </Button>
             <Button
-              type="button"
               disabled={adding || !selectedUserId}
               onClick={handleAdd}
+              type="button"
             >
               {adding ? "Adding…" : "Add member"}
             </Button>

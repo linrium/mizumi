@@ -1,7 +1,7 @@
 "use client"
 
-import { readStoredIdToken, writeStoredIdToken } from "@/lib/auth/storage"
 import { KEYCLOAK_PROVIDER_ID } from "@/lib/auth/constants"
+import { readStoredIdToken, writeStoredIdToken } from "@/lib/auth/storage"
 import type { AppSession } from "@/lib/auth/types"
 import { authClient } from "@/lib/auth-client"
 
@@ -16,13 +16,15 @@ async function fetchFreshIdToken(): Promise<string | undefined> {
   refreshPromise = (async () => {
     try {
       const res = await fetch("/api/auth/get-access-token", {
-        method: "POST",
+        body: JSON.stringify({ providerId: KEYCLOAK_PROVIDER_ID }),
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerId: KEYCLOAK_PROVIDER_ID }),
+        method: "POST",
       })
 
-      if (!res.ok) return undefined
+      if (!res.ok) {
+        return
+      }
 
       const data = (await res.json()) as {
         idToken?: string
@@ -35,7 +37,6 @@ async function fetchFreshIdToken(): Promise<string | undefined> {
 
       return token
     } catch {
-      return undefined
     } finally {
       refreshPromise = null
     }

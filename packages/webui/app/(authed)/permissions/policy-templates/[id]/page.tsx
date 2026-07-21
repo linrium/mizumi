@@ -31,8 +31,12 @@ function formatScopeLabel(scope: string) {
 }
 
 function formatApprovalMode(mode: string) {
-  if (mode === "auto") return "Auto-approve"
-  if (mode === "review") return "Reviewer gate"
+  if (mode === "auto") {
+    return "Auto-approve"
+  }
+  if (mode === "review") {
+    return "Reviewer gate"
+  }
   return "Security escalation"
 }
 
@@ -64,7 +68,9 @@ export default function PolicyTemplateDetailPage() {
     let cancelled = false
 
     async function load() {
-      if (!templateId) return
+      if (!templateId) {
+        return
+      }
       setLoading(true)
       setError(null)
 
@@ -74,7 +80,9 @@ export default function PolicyTemplateDetailPage() {
           listPermissionRequests(),
         ])
 
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
 
         setTemplate(templateData)
         setRequests(
@@ -83,7 +91,9 @@ export default function PolicyTemplateDetailPage() {
           )
         )
       } catch (err) {
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
         setError(
           err instanceof Error ? err.message : "Failed to load policy template"
         )
@@ -115,7 +125,7 @@ export default function PolicyTemplateDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading policy template…
       </div>
     )
@@ -125,12 +135,12 @@ export default function PolicyTemplateDetailPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <div>
-          <p className="text-sm font-semibold">Template unavailable</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="font-semibold text-sm">Template unavailable</p>
+          <p className="mt-1 text-muted-foreground text-xs">
             {error ?? "The policy template could not be found."}
           </p>
         </div>
-        <Button asChild variant="outline" size="sm">
+        <Button asChild size="sm" variant="outline">
           <Link href="/permissions/policy-templates">Back to templates</Link>
         </Button>
       </div>
@@ -140,16 +150,16 @@ export default function PolicyTemplateDetailPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Page header */}
-      <div className="border-b px-6 py-3 shrink-0">
+      <div className="shrink-0 border-b px-6 py-3">
         <div className="min-w-0">
           <Link
+            className="text-muted-foreground text-xs hover:underline"
             href="/permissions/policy-templates"
-            className="text-xs text-muted-foreground hover:underline"
           >
             Back to policy templates
           </Link>
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <h1 className="text-sm font-semibold">{template.name}</h1>
+            <h1 className="font-semibold text-sm">{template.name}</h1>
             <Badge variant="outline">{formatScopeLabel(template.scope)}</Badge>
             <Badge variant={getRiskVariant(template.risk)}>
               {template.risk} risk
@@ -158,7 +168,7 @@ export default function PolicyTemplateDetailPage() {
               {formatApprovalMode(template.approval_mode)}
             </Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-muted-foreground text-xs">
             {template.owner} owns this reusable access path for{" "}
             <span className="font-mono">
               {formatResourceLabel(template.resource)}
@@ -169,13 +179,13 @@ export default function PolicyTemplateDetailPage() {
       </div>
 
       {/* Body: scrollable main content + sticky rightbar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Main content */}
-        <div className="flex-1 min-w-0 overflow-auto">
-          <div className="max-w-2xl mx-auto px-6 py-5 space-y-4">
+        <div className="min-w-0 flex-1 overflow-auto">
+          <div className="mx-auto max-w-2xl space-y-4 px-6 py-5">
             <section className="rounded-lg border bg-card">
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Template summary</h2>
+                <h2 className="font-semibold text-sm">Template summary</h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Scope, owner, update cadence, and usage footprint.
                 </p>
@@ -184,23 +194,23 @@ export default function PolicyTemplateDetailPage() {
               <div className="grid gap-x-4 gap-y-3 px-4 py-4 md:grid-cols-2">
                 <div className="space-y-2.5">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Owner
                     </p>
-                    <p className="mt-0.5 text-sm font-medium">
+                    <p className="mt-0.5 font-medium text-sm">
                       {template.owner}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Resource target
                     </p>
-                    <p className="mt-0.5 font-mono text-xs break-all text-muted-foreground">
+                    <p className="mt-0.5 break-all font-mono text-muted-foreground text-xs">
                       {formatResourceLabel(template.resource)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Approval mode
                     </p>
                     <p className="mt-0.5 text-sm">
@@ -211,13 +221,13 @@ export default function PolicyTemplateDetailPage() {
 
                 <div className="space-y-2.5">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Updated
                     </p>
                     <p className="mt-0.5 text-sm">
                       {formatAbsoluteDate(template.last_updated)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       {formatDistanceToNowStrict(
                         new Date(template.last_updated),
                         {
@@ -227,7 +237,7 @@ export default function PolicyTemplateDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Usage
                     </p>
                     <p className="mt-0.5 text-sm">
@@ -236,7 +246,7 @@ export default function PolicyTemplateDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Matched requests in queue
                     </p>
                     <p className="mt-0.5 text-sm">{requests.length}</p>
@@ -247,13 +257,13 @@ export default function PolicyTemplateDetailPage() {
 
             <section className="rounded-lg border bg-card">
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">Access envelope</h2>
+                <h2 className="font-semibold text-sm">Access envelope</h2>
               </div>
               <Separator />
               <div className="space-y-3 px-4 py-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Eligible teams
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -265,7 +275,7 @@ export default function PolicyTemplateDetailPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
                       Allowed privileges
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -282,7 +292,7 @@ export default function PolicyTemplateDetailPage() {
 
             <section className="rounded-lg border bg-card">
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold">
+                <h2 className="font-semibold text-sm">
                   Recent matched requests
                 </h2>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -295,9 +305,9 @@ export default function PolicyTemplateDetailPage() {
                   <div className="space-y-1.5">
                     {recentRequests.map((request) => (
                       <Link
-                        key={request.id}
-                        href={`/permissions/${request.id}`}
                         className="block rounded-md border px-3 py-2 transition-colors hover:bg-accent/30"
+                        href={`/permissions/${request.id}`}
+                        key={request.id}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -310,14 +320,14 @@ export default function PolicyTemplateDetailPage() {
                                 {formatSubmitter(request)}
                               </Badge>
                             </div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
+                            <p className="mt-0.5 text-muted-foreground text-xs">
                               {request.requester} ·{" "}
                               <span className="font-mono">
                                 {request.resource}
                               </span>
                             </p>
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-muted-foreground text-xs">
                             {formatDistanceToNowStrict(
                               new Date(request.submitted_at),
                               {
@@ -330,7 +340,7 @@ export default function PolicyTemplateDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     No current permission requests are matched to this template.
                   </p>
                 )}
@@ -340,12 +350,12 @@ export default function PolicyTemplateDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <aside className="hidden lg:flex w-72 shrink-0 flex-col border-l overflow-auto">
+        <aside className="hidden w-72 shrink-0 flex-col overflow-auto border-l lg:flex">
           <div className="divide-y">
             {/* Approval flow */}
             <div>
               <div className="px-4 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
                   Approval flow
                 </h2>
               </div>
@@ -354,22 +364,22 @@ export default function PolicyTemplateDetailPage() {
                   <div className="space-y-1.5">
                     {template.approval_steps.map((step) => (
                       <div
-                        key={step.id}
                         className="rounded-md border px-3 py-2"
+                        key={step.id}
                       >
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-sm font-medium">
+                          <span className="font-medium text-sm">
                             {`Stage ${step.stage_order} · ${step.approver_team}`}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-0.5 text-muted-foreground text-xs">
                           {step.approver_label || "Approval required"}
                         </p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     No explicit approval steps. Approval mode is handled
                     directly.
                   </p>
@@ -380,11 +390,11 @@ export default function PolicyTemplateDetailPage() {
             {/* Design intent */}
             <div>
               <div className="px-4 py-3">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
                   Design intent
                 </h2>
               </div>
-              <div className="space-y-2.5 px-4 pb-4 text-xs text-muted-foreground">
+              <div className="space-y-2.5 px-4 pb-4 text-muted-foreground text-xs">
                 <p>
                   This template standardizes a recurring access path so teams
                   can request a known privilege set without manual policy

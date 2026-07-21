@@ -6,13 +6,13 @@ import { clipRevealTransition } from "./animation"
 
 export interface ChartRevealClipProps {
   clipPathId: string
-  height: number
-  targetWidth: number
   enterTransition?: Transition
-  /** Bumps when motion settings change to replay the reveal. */
-  revealEpoch: number
+  height: number
   /** Extra inset around the clip rect so edge glyphs are not cut off. */
   padding?: number
+  /** Bumps when motion settings change to replay the reveal. */
+  revealEpoch: number
+  targetWidth: number
 }
 
 /**

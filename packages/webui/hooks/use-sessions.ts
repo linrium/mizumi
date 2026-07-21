@@ -17,11 +17,15 @@ export function useSessions() {
   const fetchSessions = useCallback(async () => {
     try {
       const res = await apiFetch("/api/sessions")
-      if (!res.ok) return
+      if (!res.ok) {
+        return
+      }
       const data: { sessions: Session[] } = await res.json()
       const list = data.sessions ?? []
       setSessions(list)
-      if (list.length > 0) setActiveId((prev) => prev ?? list[0].session_id)
+      if (list.length > 0) {
+        setActiveId((prev) => prev ?? list[0].session_id)
+      }
     } catch {}
   }, [])
 
@@ -29,7 +33,9 @@ export function useSessions() {
     setCreating(true)
     try {
       const res = await apiFetch("/api/sessions", { method: "POST" })
-      if (!res.ok) return null
+      if (!res.ok) {
+        return null
+      }
       const session: Session = await res.json()
       setSessions((prev) => [...prev, session])
       setActiveId(session.session_id)
@@ -58,13 +64,13 @@ export function useSessions() {
   }, [])
 
   return {
-    sessions,
     activeId,
-    setActiveId,
+    createSession,
     creating,
+    deleteSession,
     deleting,
     fetchSessions,
-    createSession,
-    deleteSession,
+    sessions,
+    setActiveId,
   }
 }

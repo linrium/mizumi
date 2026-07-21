@@ -29,21 +29,21 @@ const LineageGraph = dynamic(
 )
 
 const NODE_TYPE_OPTIONS = [
-  { value: "table", label: "tables" },
-  { value: "topic", label: "topics" },
-  { value: "dagster_asset", label: "assets" },
-  { value: "spark_job", label: "spark jobs" },
-  { value: "streaming_job", label: "streaming jobs" },
-  { value: "daft_job", label: "daft jobs" },
-  { value: "dagster_job", label: "dagster jobs" },
-  { value: "schedule", label: "schedules" },
-  { value: "dashboard", label: "dashboards" },
-  { value: "mlflow_experiment", label: "mlflow experiments" },
-  { value: "mlflow_model", label: "mlflow models" },
-  { value: "pretrained_model", label: "pretrained models" },
-  { value: "volume", label: "volumes" },
-  { value: "catalog", label: "catalogs" },
-  { value: "schema", label: "schemas" },
+  { label: "tables", value: "table" },
+  { label: "topics", value: "topic" },
+  { label: "assets", value: "dagster_asset" },
+  { label: "spark jobs", value: "spark_job" },
+  { label: "streaming jobs", value: "streaming_job" },
+  { label: "daft jobs", value: "daft_job" },
+  { label: "dagster jobs", value: "dagster_job" },
+  { label: "schedules", value: "schedule" },
+  { label: "dashboards", value: "dashboard" },
+  { label: "mlflow experiments", value: "mlflow_experiment" },
+  { label: "mlflow models", value: "mlflow_model" },
+  { label: "pretrained models", value: "pretrained_model" },
+  { label: "volumes", value: "volume" },
+  { label: "catalogs", value: "catalog" },
+  { label: "schemas", value: "schema" },
 ] as const
 
 const DEFAULT_SELECTED_NODE_TYPES = [
@@ -73,19 +73,25 @@ export default function LineagePage() {
 
   const filters = useMemo(
     () => ({
-      query,
-      runtimeOnly,
       includeContains,
       nodeTypes: selectedNodeTypes,
+      query,
+      runtimeOnly,
     }),
     [query, runtimeOnly, includeContains, selectedNodeTypes]
   )
 
   const activeFilterCount = useMemo(() => {
     let count = 0
-    if (query.trim()) count += 1
-    if (runtimeOnly) count += 1
-    if (includeContains) count += 1
+    if (query.trim()) {
+      count += 1
+    }
+    if (runtimeOnly) {
+      count += 1
+    }
+    if (includeContains) {
+      count += 1
+    }
     if (selectedNodeTypes.join("|") !== DEFAULT_SELECTED_NODE_TYPES.join("|")) {
       count += 1
     }
@@ -114,7 +120,9 @@ export default function LineagePage() {
         method: "POST",
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+      if (!res.ok) {
+        throw new Error(json.error ?? `HTTP ${res.status}`)
+      }
       setRefreshKey((value) => value + 1)
       toast.success("Lineage rebuilt", {
         description: `${json.nodes_count ?? 0} nodes, ${json.edges_count ?? 0} edges`,
@@ -129,27 +137,27 @@ export default function LineagePage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="border-b bg-background/90 backdrop-blur shrink-0">
-        <div className="px-5 py-3 flex items-center gap-2 overflow-x-auto">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 border-b bg-background/90 backdrop-blur">
+        <div className="flex items-center gap-2 overflow-x-auto px-5 py-3">
           <Input
-            value={query}
+            className="w-full min-w-52 max-w-sm"
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search lineage"
-            className="w-full min-w-52 max-w-sm"
+            value={query}
           />
 
-          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <Popover onOpenChange={setFiltersOpen} open={filtersOpen}>
             <PopoverTrigger asChild>
               <Button
+                className="shrink-0"
+                size="default"
                 type="button"
                 variant="outline"
-                size="default"
-                className="shrink-0"
               >
                 Filters
                 {activeFilterCount > 0 && (
-                  <Badge variant="secondary" className="ml-1">
+                  <Badge className="ml-1" variant="secondary">
                     {activeFilterCount}
                   </Badge>
                 )}
@@ -166,8 +174,8 @@ export default function LineagePage() {
                       return (
                         <CommandItem
                           key={option.value}
-                          value={`${option.label} ${option.value}`}
                           onSelect={() => toggleNodeType(option.value)}
+                          value={`${option.label} ${option.value}`}
                         >
                           <Checkbox checked={checked} />
                           <span>{option.label}</span>
@@ -178,15 +186,15 @@ export default function LineagePage() {
                   <CommandSeparator />
                   <CommandGroup heading="Options">
                     <CommandItem
-                      value="runtime activity"
                       onSelect={() => setRuntimeOnly((value) => !value)}
+                      value="runtime activity"
                     >
                       <Checkbox checked={runtimeOnly} />
                       <span>Only items with runtime activity</span>
                     </CommandItem>
                     <CommandItem
-                      value="containment edges"
                       onSelect={() => setIncludeContains((value) => !value)}
+                      value="containment edges"
                     >
                       <Checkbox checked={includeContains} />
                       <span>Show catalog/schema containment</span>
@@ -198,49 +206,49 @@ export default function LineagePage() {
           </Popover>
 
           {selectedNodeTypes.length < NODE_TYPE_OPTIONS.length && (
-            <Badge variant="outline" className="shrink-0">
+            <Badge className="shrink-0" variant="outline">
               {selectedNodeTypes.length} types
             </Badge>
           )}
           {runtimeOnly && (
-            <Badge variant="outline" className="shrink-0">
+            <Badge className="shrink-0" variant="outline">
               runtime
             </Badge>
           )}
           {includeContains && (
-            <Badge variant="outline" className="shrink-0">
+            <Badge className="shrink-0" variant="outline">
               containment
             </Badge>
           )}
 
           <Button
+            className="shrink-0"
+            onClick={resetFilters}
+            size="default"
             type="button"
             variant="ghost"
-            size="default"
-            onClick={resetFilters}
-            className="shrink-0"
           >
             Reset
           </Button>
 
           <Button
+            className="ml-auto shrink-0"
+            disabled={rebuilding}
+            onClick={handleRebuild}
+            size="default"
             type="button"
             variant="outline"
-            size="default"
-            onClick={handleRebuild}
-            disabled={rebuilding}
-            className="shrink-0 ml-auto"
           >
             {rebuilding ? "Rebuilding…" : "Rebuild lineage"}
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative">
+      <div className="relative min-h-0 flex-1">
         <LineageGraph
-          key={refreshKey}
-          filters={filters}
           enableNeighborhoodSelection
+          filters={filters}
+          key={refreshKey}
         />
       </div>
     </div>

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 import {
   getCatalogs,
   getSchemas,
-  getTables,
   getTable,
+  getTables,
 } from "@/services/catalog"
 
 export type CatalogCompletionSchema = {
@@ -62,9 +62,9 @@ export async function GET() {
         .filter((t) => t !== null)
         .map((t) => ({
           catalog: t.catalog_name,
-          schema: t.schema_name,
-          name: t.name,
           columns: t.columns.map((c) => ({ name: c.name, type: c.type_text })),
+          name: t.name,
+          schema: t.schema_name,
         })),
     }
 

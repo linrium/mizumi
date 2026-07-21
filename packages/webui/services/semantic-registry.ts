@@ -121,13 +121,19 @@ export async function listSemanticDefinitions(params?: {
     "/api/semantic-registry/definitions",
     window.location.origin
   )
-  if (params?.search) url.searchParams.set("search", params.search)
-  if (params?.namespace) url.searchParams.set("namespace", params.namespace)
+  if (params?.search) {
+    url.searchParams.set("search", params.search)
+  }
+  if (params?.namespace) {
+    url.searchParams.set("namespace", params.namespace)
+  }
   if (params?.status && params.status !== "all") {
     url.searchParams.set("status", params.status)
   }
   const res = await apiFetch(url.toString())
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   const body = await res.json()
   return body.definitions
 }
@@ -136,11 +142,13 @@ export async function createSemanticDefinition(
   body: CreateSemanticDefinitionBody
 ): Promise<SemanticDefinitionDetail> {
   const res = await apiFetch("/api/semantic-registry/definitions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   return res.json()
 }
 
@@ -152,12 +160,14 @@ export async function createSemanticVersion(
   const res = await apiFetch(
     `/api/semantic-registry/definitions/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/versions`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     }
   )
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   return res.json()
 }
 
@@ -168,7 +178,9 @@ export async function listSemanticVersions(
   const res = await apiFetch(
     `/api/semantic-registry/definitions/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`
   )
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   const body = await res.json()
   return body.versions
 }
@@ -181,7 +193,9 @@ export async function getSemanticDefinition(
   const res = await apiFetch(
     `/api/semantic-registry/definitions/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/versions/${version}`
   )
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   return res.json()
 }
 
@@ -195,12 +209,14 @@ export async function transitionSemanticStatus(
   const res = await apiFetch(
     `/api/semantic-registry/definitions/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/versions/${version}/status`,
     {
-      method: "PATCH",
+      body: JSON.stringify({ reason: reason ?? null, status }),
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, reason: reason ?? null }),
+      method: "PATCH",
     }
   )
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   return res.json()
 }
 
@@ -217,7 +233,9 @@ export async function compareSemanticVersions(
   url.searchParams.set("from", String(from))
   url.searchParams.set("to", String(to))
   const res = await apiFetch(url.toString())
-  if (!res.ok) throw await responseError(res)
+  if (!res.ok) {
+    throw await responseError(res)
+  }
   return res.json()
 }
 

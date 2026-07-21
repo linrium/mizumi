@@ -14,8 +14,8 @@ const omlx = createOpenAI({
   baseURL: "http://localhost:3333/v1",
 })
 const openai = createOpenAI({
-  baseURL: process.env.OPENAI_BASE_URL,
   apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL,
 })
 
 async function ensureSession(
@@ -27,10 +27,12 @@ async function ensureSession(
   }
 
   const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
   const res = await fetch(`${API_BASE}/api/sessions`, {
-    method: "POST",
     headers,
+    method: "POST",
   })
   if (!res.ok) {
     throw new Error(`Failed to create session: HTTP ${res.status}`)
@@ -42,11 +44,13 @@ async function ensureSession(
 
 async function runSql(sessionId: string, sql: string, token?: string) {
   const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/query`, {
-    method: "POST",
+    body: JSON.stringify({ idToken: token, sql }),
     headers,
-    body: JSON.stringify({ sql, idToken: token }),
+    method: "POST",
   })
   const data = await res.json()
   if (!res.ok) {
@@ -162,26 +166,6 @@ export async function handleDashboardGenerate(req: NextRequest) {
     createPanel: tool({
       description:
         "Create a new dashboard panel with a chart. Call once per distinct metric or visualization the user asks for.",
-      inputSchema: z.object({
-        title: z.string().describe("Short panel title"),
-        sql: z
-          .string()
-          .describe(
-            "SQL query. Always use fully qualified names: <catalog>.<schema>.<table>"
-          ),
-        chartType: chartTypeEnum.describe(
-          "bar -> categories, line/area -> time-series, pie -> proportions <=8 slices, scatter -> correlation/bubble matrix, sankey -> flows, funnel -> journey steps, heatmap -> two-dimensional intensity"
-        ),
-        xCol: z
-          .string()
-          .describe("Column for x-axis labels or pie slice names"),
-        yCol: z.string().describe("Column for numeric values"),
-        explanation: z
-          .string()
-          .describe("One sentence describing what this panel shows"),
-        width: z.number().int().min(3).max(12).default(6),
-        height: z.number().int().min(3).max(8).default(4),
-      }),
       execute: async ({
         sql,
         title,
@@ -195,32 +179,52 @@ export async function handleDashboardGenerate(req: NextRequest) {
         try {
           const data = await runSql(resolvedSessionId, sql, idToken)
           return {
-            title,
-            sql,
             chartType,
+            columns: data.columns,
+            explanation,
+            height,
+            row_count: data.row_count,
+            rows: data.rows,
+            sql,
+            title,
+            width,
             xCol,
             yCol,
-            explanation,
-            width,
-            height,
-            columns: data.columns,
-            rows: data.rows,
-            row_count: data.row_count,
           }
         } catch (error) {
           return {
-            title,
-            sql,
             chartType,
+            error: (error as Error).message,
+            explanation,
+            height,
+            sql,
+            title,
+            width,
             xCol,
             yCol,
-            explanation,
-            width,
-            height,
-            error: (error as Error).message,
           }
         }
       },
+      inputSchema: z.object({
+        chartType: chartTypeEnum.describe(
+          "bar -> categories, line/area -> time-series, pie -> proportions <=8 slices, scatter -> correlation/bubble matrix, sankey -> flows, funnel -> journey steps, heatmap -> two-dimensional intensity"
+        ),
+        explanation: z
+          .string()
+          .describe("One sentence describing what this panel shows"),
+        height: z.number().int().min(3).max(8).default(4),
+        sql: z
+          .string()
+          .describe(
+            "SQL query. Always use fully qualified names: <catalog>.<schema>.<table>"
+          ),
+        title: z.string().describe("Short panel title"),
+        width: z.number().int().min(3).max(12).default(6),
+        xCol: z
+          .string()
+          .describe("Column for x-axis labels or pie slice names"),
+        yCol: z.string().describe("Column for numeric values"),
+      }),
     }),
     editPanel: tool({
       description:
@@ -229,22 +233,6 @@ export async function handleDashboardGenerate(req: NextRequest) {
         'use lastCreatedIds when the user says "the last one" or "those panels"; ' +
         "otherwise match by title from the panels list. " +
         "Only include fields that need to change — omit unchanged ones.",
-      inputSchema: z.object({
-        panelId: z.string(),
-        title: z.string().optional(),
-        sql: z
-          .string()
-          .optional()
-          .describe(
-            "New SQL query (omit to keep existing). Always use fully qualified names: <catalog>.<schema>.<table>"
-          ),
-        chartType: chartTypeEnum.optional(),
-        xCol: z.string().optional(),
-        yCol: z.string().optional(),
-        explanation: z
-          .string()
-          .describe("One sentence describing what changed"),
-      }),
       execute: async ({
         panelId,
         title,
@@ -256,42 +244,63 @@ export async function handleDashboardGenerate(req: NextRequest) {
       }) => {
         const target = (panels ?? []).find((panel) => panel.id === panelId)
         if (!target) {
-          return { panelId, error: `Panel id "${panelId}" not found` }
+          return { error: `Panel id "${panelId}" not found`, panelId }
         }
 
         const effectiveSql = sql ?? target.sql
         try {
           const data = await runSql(resolvedSessionId, effectiveSql, idToken)
           return {
-            panelId,
-            title: title ?? target.title,
-            sql: effectiveSql,
             chartType: chartType ?? target.chartType,
+            columns: data.columns,
+            explanation,
+            panelId,
+            row_count: data.row_count,
+            rows: data.rows,
+            sql: effectiveSql,
+            title: title ?? target.title,
             xCol: xCol ?? target.xCol,
             yCol: yCol ?? target.yCol,
-            explanation,
-            columns: data.columns,
-            rows: data.rows,
-            row_count: data.row_count,
           }
         } catch (error) {
           return {
-            panelId,
-            title: title ?? target.title,
-            sql: effectiveSql,
             chartType: chartType ?? target.chartType,
+            error: (error as Error).message,
+            explanation,
+            panelId,
+            sql: effectiveSql,
+            title: title ?? target.title,
             xCol: xCol ?? target.xCol,
             yCol: yCol ?? target.yCol,
-            explanation,
-            error: (error as Error).message,
           }
         }
       },
+      inputSchema: z.object({
+        chartType: chartTypeEnum.optional(),
+        explanation: z
+          .string()
+          .describe("One sentence describing what changed"),
+        panelId: z.string(),
+        sql: z
+          .string()
+          .optional()
+          .describe(
+            "New SQL query (omit to keep existing). Always use fully qualified names: <catalog>.<schema>.<table>"
+          ),
+        title: z.string().optional(),
+        xCol: z.string().optional(),
+        yCol: z.string().optional(),
+      }),
     }),
   }
 
   const result = streamText({
+    messages: await convertToModelMessages(
+      messages as Parameters<typeof convertToModelMessages>[0],
+      { tools }
+    ),
     model,
+    stopWhen: stepCountIs(15),
     system: `You are a data analyst managing dashboard panels for the Mizumi lakehouse platform.
 You have two tools: createPanel (add new panels) and editPanel (modify existing panels).
 
@@ -343,12 +352,7 @@ ${schema}
 
 ## On error:
 If a tool returns an error field, quote it briefly and stop.`,
-    messages: await convertToModelMessages(
-      messages as Parameters<typeof convertToModelMessages>[0],
-      { tools }
-    ),
     tools,
-    stopWhen: stepCountIs(15),
   })
 
   return result.toUIMessageStreamResponse({

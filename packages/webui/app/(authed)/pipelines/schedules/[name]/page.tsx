@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
-import { Badge } from "@/components/ui/badge"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
+import Link from "next/link"
+import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 
 dayjs.extend(relativeTime)
 
@@ -94,25 +94,37 @@ type TickHistoryResponse = {
 async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetchWithAuth(`/api/dagster/${path}`, { cache: "no-store" })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(json.error ?? `HTTP ${res.status}`)
+  }
   return json as T
 }
 
 function fmtTs(ts: number | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   return dayjs(ts * 1000).format("MMM D, h:mm:ss A")
 }
 
 function fmtTsRel(ts: number | null | undefined): string {
-  if (!ts) return ""
+  if (!ts) {
+    return ""
+  }
   return dayjs(ts * 1000).fromNow()
 }
 
 function fmtDuration(start: number, end: number | null | undefined): string {
-  if (!end) return "—"
+  if (!end) {
+    return "—"
+  }
   const ms = (end - start) * 1000
-  if (ms < 1000) return `${ms.toFixed(0)}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  if (ms < 1000) {
+    return `${ms.toFixed(0)}ms`
+  }
+  if (ms < 60_000) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
   return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`
 }
 
@@ -120,10 +132,10 @@ const TICK_STATUS_CONFIG: Record<
   string,
   { label: string; variant: "success" | "error" | "warning" | "default" }
 > = {
-  SUCCESS: { label: "Success", variant: "success" },
   FAILURE: { label: "Failed", variant: "error" },
   SKIPPED: { label: "Skipped", variant: "warning" },
   STARTED: { label: "Started", variant: "default" },
+  SUCCESS: { label: "Success", variant: "success" },
 }
 
 const SCHEDULE_STATUS_CONFIG: Record<
@@ -138,15 +150,15 @@ const RUN_STATUS_CONFIG: Record<
   string,
   { label: string; variant: "success" | "error" | "warning" | "default" }
 > = {
-  SUCCESS: { label: "Success", variant: "success" },
+  CANCELED: { label: "Canceled", variant: "warning" },
+  CANCELING: { label: "Canceling", variant: "warning" },
   FAILURE: { label: "Failed", variant: "error" },
+  NOT_STARTED: { label: "Not Started", variant: "default" },
+  QUEUED: { label: "Queued", variant: "default" },
+  RUNNING: { label: "Running", variant: "default" },
   STARTED: { label: "Started", variant: "default" },
   STARTING: { label: "Starting", variant: "default" },
-  RUNNING: { label: "Running", variant: "default" },
-  CANCELING: { label: "Canceling", variant: "warning" },
-  CANCELED: { label: "Canceled", variant: "warning" },
-  QUEUED: { label: "Queued", variant: "default" },
-  NOT_STARTED: { label: "Not Started", variant: "default" },
+  SUCCESS: { label: "Success", variant: "success" },
 }
 
 // ── DetailRow ─────────────────────────────────────────────────────────────────
@@ -160,7 +172,7 @@ function DetailRow({
 }) {
   return (
     <div className="flex justify-between gap-4 text-xs">
-      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className="shrink-0 text-muted-foreground">{label}</span>
       <span className="text-right">{children}</span>
     </div>
   )
@@ -171,25 +183,25 @@ function DetailRow({
 function AssetCard({ asset }: { asset: ScheduleAsset }) {
   const name = asset.key[asset.key.length - 1]
   return (
-    <div className="rounded-lg border bg-card px-4 py-3 flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="text-xs font-mono font-semibold truncate">{name}</span>
+    <div className="flex flex-col gap-1.5 rounded-lg border bg-card px-4 py-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-mono font-semibold text-xs">{name}</span>
         {asset.compute_kind && (
-          <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0">
+          <Badge className="shrink-0 px-1.5 py-0 text-[9px]" variant="outline">
             {asset.compute_kind}
           </Badge>
         )}
         {!asset.is_executable && (
           <Badge
+            className="shrink-0 px-1.5 py-0 text-[9px] text-muted-foreground"
             variant="outline"
-            className="text-[9px] px-1.5 py-0 shrink-0 text-muted-foreground"
           >
             observable
           </Badge>
         )}
       </div>
       {asset.key.length > 1 && (
-        <span className="text-[10px] font-mono text-muted-foreground truncate">
+        <span className="truncate font-mono text-[10px] text-muted-foreground">
           {asset.key.join(" / ")}
         </span>
       )}
@@ -199,17 +211,17 @@ function AssetCard({ asset }: { asset: ScheduleAsset }) {
         </span>
       )}
       {asset.description && (
-        <span className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3">
+        <span className="line-clamp-3 text-[10px] text-muted-foreground leading-relaxed">
           {asset.description}
         </span>
       )}
       {asset.job_names.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-0.5">
+        <div className="mt-0.5 flex flex-wrap gap-1">
           {asset.job_names.map((j) => (
             <Badge
+              className="px-1.5 py-0 font-mono text-[9px]"
               key={j}
               variant="secondary"
-              className="text-[9px] px-1.5 py-0 font-mono"
             >
               {j}
             </Badge>
@@ -249,7 +261,7 @@ function TickRow({ tick }: { tick: HistoryTick }) {
         </td>
         <td className="px-4 py-2.5">
           <span title={fmtTs(tick.timestamp)}>{fmtTsRel(tick.timestamp)}</span>
-          <span className="text-muted-foreground ml-1.5 text-[10px]">
+          <span className="ml-1.5 text-[10px] text-muted-foreground">
             {fmtTs(tick.timestamp)}
           </span>
         </td>
@@ -262,7 +274,7 @@ function TickRow({ tick }: { tick: HistoryTick }) {
               {tick.runs.map((r) => {
                 const rc = RUN_STATUS_CONFIG[r.status]
                 return (
-                  <span key={r.id} className="flex items-center gap-1">
+                  <span className="flex items-center gap-1" key={r.id}>
                     {rc ? (
                       <Status variant={rc.variant}>
                         <StatusIndicator />
@@ -281,8 +293,8 @@ function TickRow({ tick }: { tick: HistoryTick }) {
             <div className="flex flex-wrap gap-1">
               {tick.run_ids.map((id) => (
                 <code
-                  key={id}
                   className="font-mono text-[10px] text-muted-foreground"
+                  key={id}
                 >
                   {id.slice(0, 8)}
                 </code>
@@ -292,7 +304,7 @@ function TickRow({ tick }: { tick: HistoryTick }) {
             <span className="text-muted-foreground">—</span>
           )}
         </td>
-        <td className="px-4 py-2.5 text-muted-foreground max-w-xs truncate">
+        <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
           {tick.skip_reason ??
             (tick.error ? (
               <span className="text-destructive">
@@ -305,13 +317,13 @@ function TickRow({ tick }: { tick: HistoryTick }) {
       </tr>
       {expanded && hasDetail && (
         <tr className="border-b bg-muted/20">
-          <td colSpan={5} className="px-4 py-3">
+          <td className="px-4 py-3" colSpan={5}>
             {tick.error && (
               <div className="mb-2">
-                <p className="text-[10px] font-semibold text-destructive mb-1">
+                <p className="mb-1 font-semibold text-[10px] text-destructive">
                   Error
                 </p>
-                <pre className="text-[10px] font-mono text-destructive whitespace-pre-wrap leading-relaxed">
+                <pre className="whitespace-pre-wrap font-mono text-[10px] text-destructive leading-relaxed">
                   {tick.error.message}
                   {tick.error.stack.length > 0 &&
                     "\n\nStack:\n" + tick.error.stack.join("\n")}
@@ -357,7 +369,9 @@ export default function ScheduleDetailPage() {
       .then((d) => {
         const found = d.schedules.find((s) => s.name === name) ?? null
         setSchedule(found)
-        if (!found) setError("Schedule not found")
+        if (!found) {
+          setError("Schedule not found")
+        }
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoadingSchedule(false))
@@ -370,16 +384,18 @@ export default function ScheduleDetailPage() {
       .then(setAssetSelection)
       .catch(() =>
         setAssetSelection({
-          schedule_name: name,
           asset_selection_string: null,
           assets: [],
+          schedule_name: name,
         })
       )
       .finally(() => setLoadingAssets(false))
   }, [name])
 
   useEffect(() => {
-    if (tab !== "ticks" || tickHistory) return
+    if (tab !== "ticks" || tickHistory) {
+      return
+    }
     setLoadingTicks(true)
     apiFetch<TickHistoryResponse>(
       `schedules/${encodeURIComponent(name)}/ticks?limit=50`
@@ -391,18 +407,20 @@ export default function ScheduleDetailPage() {
       .finally(() => setLoadingTicks(false))
   }, [tab, name, tickHistory])
 
-  if (loadingSchedule)
+  if (loadingSchedule) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     )
-  if (error || !schedule)
+  }
+  if (error || !schedule) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error ?? "Schedule not found"}
       </div>
     )
+  }
 
   const statusCfg = schedule.status
     ? SCHEDULE_STATUS_CONFIG[schedule.status]
@@ -412,17 +430,17 @@ export default function ScheduleDetailPage() {
     : null
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b shrink-0">
+      <div className="flex shrink-0 items-center gap-3 border-b px-5 py-3">
         <Link
+          className="text-muted-foreground text-xs transition-colors hover:text-foreground"
           href="/pipelines/schedules"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Schedules
         </Link>
         <span className="text-muted-foreground text-xs">/</span>
-        <span className="text-xs font-mono font-semibold">{name}</span>
+        <span className="font-mono font-semibold text-xs">{name}</span>
         {statusCfg && (
           <Status variant={statusCfg.variant}>
             <StatusIndicator />
@@ -432,21 +450,21 @@ export default function ScheduleDetailPage() {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Main */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Tabs */}
-          <div className="flex items-center gap-0 border-b shrink-0 px-3">
+          <div className="flex shrink-0 items-center gap-0 border-b px-3">
             {(["assets", "ticks"] as Tab[]).map((t) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
                 className={cn(
-                  "px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors capitalize",
+                  "-mb-px border-b-2 px-3 py-2.5 font-medium text-xs capitalize transition-colors",
                   tab === t
                     ? "border-foreground text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
+                key={t}
+                onClick={() => setTab(t)}
               >
                 {t === "assets" ? "Assets" : "Tick History"}
               </button>
@@ -454,35 +472,35 @@ export default function ScheduleDetailPage() {
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 min-h-0 overflow-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             {tab === "assets" && (
               <div className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <p className="text-sm font-semibold">Assets</p>
+                <div className="mb-4 flex items-center gap-3">
+                  <p className="font-semibold text-sm">Assets</p>
                   {assetSelection?.asset_selection_string && (
-                    <code className="text-[10px] bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
+                    <code className="rounded bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground">
                       {assetSelection.asset_selection_string}
                     </code>
                   )}
                   {!loadingAssets && assetSelection && (
-                    <span className="text-xs text-muted-foreground ml-auto">
+                    <span className="ml-auto text-muted-foreground text-xs">
                       {assetSelection.assets.length} asset
-                      {assetSelection.assets.length !== 1 ? "s" : ""}
+                      {assetSelection.assets.length === 1 ? "" : "s"}
                     </span>
                   )}
                 </div>
                 {loadingAssets ? (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-muted-foreground text-sm">
                     Loading assets…
                   </div>
                 ) : assetSelection && assetSelection.assets.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
                     {assetSelection.assets.map((asset) => (
-                      <AssetCard key={asset.key.join("/")} asset={asset} />
+                      <AssetCard asset={asset} key={asset.key.join("/")} />
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-muted-foreground text-sm">
                     No assets in this schedule's selection.
                   </div>
                 )}
@@ -491,12 +509,12 @@ export default function ScheduleDetailPage() {
 
             {tab === "ticks" &&
               (loadingTicks ? (
-                <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+                <div className="flex h-32 items-center justify-center text-muted-foreground text-sm">
                   Loading ticks…
                 </div>
               ) : (
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-background z-10 border-b">
+                  <thead className="sticky top-0 z-10 border-b bg-background">
                     <tr className="text-left text-muted-foreground">
                       <th className="px-4 py-2.5 font-medium">Status</th>
                       <th className="px-4 py-2.5 font-medium">Timestamp</th>
@@ -513,8 +531,8 @@ export default function ScheduleDetailPage() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={5}
                           className="px-4 py-8 text-center text-muted-foreground"
+                          colSpan={5}
                         >
                           No tick history found.
                         </td>
@@ -527,10 +545,10 @@ export default function ScheduleDetailPage() {
         </div>
 
         {/* Sidebar: schedule metadata */}
-        <div className="w-64 border-l shrink-0 overflow-y-auto">
-          <div className="px-4 py-4 flex flex-col gap-4">
+        <div className="w-64 shrink-0 overflow-y-auto border-l">
+          <div className="flex flex-col gap-4 px-4 py-4">
             <div>
-              <p className="text-xs font-semibold mb-2">Schedule</p>
+              <p className="mb-2 font-semibold text-xs">Schedule</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="Cron">
                   <code className="font-mono">{schedule.cron_schedule}</code>
@@ -555,7 +573,7 @@ export default function ScheduleDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs font-semibold mb-2">Next Tick</p>
+                  <p className="mb-2 font-semibold text-xs">Next Tick</p>
                   <div className="flex flex-col gap-2">
                     <DetailRow label="In">
                       <span title={fmtTs(schedule.next_tick)}>
@@ -576,7 +594,7 @@ export default function ScheduleDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs font-semibold mb-2">Last Tick</p>
+                  <p className="mb-2 font-semibold text-xs">Last Tick</p>
                   <div className="flex flex-col gap-2">
                     <DetailRow label="Result">
                       {tickCfg ? (
@@ -607,8 +625,8 @@ export default function ScheduleDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs font-semibold mb-2">Description</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <p className="mb-2 font-semibold text-xs">Description</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     {schedule.description}
                   </p>
                 </div>

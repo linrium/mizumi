@@ -7,11 +7,11 @@ const DEFAULT_BADGE_GAP = 4 // gap-1 = 4px
 const DEFAULT_OVERFLOW_BADGE_WIDTH = 40 // Approximate width of "+N" badge
 
 interface MeasureBadgeWidthProps {
-  label: string
   cacheKey: string
-  iconSize?: number
-  maxWidth?: number
   className?: string
+  iconSize?: number
+  label: string
+  maxWidth?: number
 }
 
 function measureBadgeWidth({
@@ -59,23 +59,23 @@ function measureBadgeWidth({
 }
 
 interface UseBadgeOverflowProps<T> {
-  items: T[]
-  getLabel: (item: T) => string
-  containerRef: React.RefObject<HTMLElement | null>
-  lineCount: number
+  badgeGap?: number
   cacheKeyPrefix?: string
-  iconSize?: number
-  maxWidth?: number
   className?: string
   containerPadding?: number
-  badgeGap?: number
+  containerRef: React.RefObject<HTMLElement | null>
+  getLabel: (item: T) => string
+  iconSize?: number
+  items: T[]
+  lineCount: number
+  maxWidth?: number
   overflowBadgeWidth?: number
 }
 
 interface UseBadgeOverflowReturn<T> {
-  visibleItems: T[]
-  hiddenCount: number
   containerWidth: number
+  hiddenCount: number
+  visibleItems: T[]
 }
 
 export function useBadgeOverflow<T>({
@@ -94,7 +94,9 @@ export function useBadgeOverflow<T>({
   const [containerWidth, setContainerWidth] = React.useState(0)
 
   React.useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current) {
+      return
+    }
 
     function measureWidth() {
       if (containerRef.current) {
@@ -115,7 +117,7 @@ export function useBadgeOverflow<T>({
 
   const result = React.useMemo(() => {
     if (!containerWidth || items.length === 0) {
-      return { visibleItems: items, hiddenCount: 0, containerWidth }
+      return { containerWidth, hiddenCount: 0, visibleItems: items }
     }
 
     let currentLineWidth = 0
@@ -126,11 +128,11 @@ export function useBadgeOverflow<T>({
       const label = getLabel(item)
       const cacheKey = cacheKeyPrefix ? `${cacheKeyPrefix}:${label}` : label
       const badgeWidth = measureBadgeWidth({
-        label,
         cacheKey,
-        iconSize,
-        maxWidth,
         className,
+        iconSize,
+        label,
+        maxWidth,
       })
       const widthWithGap = badgeWidth + badgeGap
 
@@ -154,9 +156,9 @@ export function useBadgeOverflow<T>({
     }
 
     return {
-      visibleItems: visible,
-      hiddenCount: Math.max(0, items.length - visible.length),
       containerWidth,
+      hiddenCount: Math.max(0, items.length - visible.length),
+      visibleItems: visible,
     }
   }, [
     items,

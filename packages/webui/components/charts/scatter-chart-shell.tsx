@@ -25,18 +25,18 @@ import { isPostOverlayComponent } from "./time-series-chart-shell"
 import { useScatterChartInteraction } from "./use-scatter-chart-interaction"
 
 export interface ScatterChartInnerProps {
-  width: number
-  height: number
-  data: Record<string, unknown>[]
-  xDataKey: string
-  margin: Margin
   animationDuration: number
   animationEasing?: string
-  enterTransition?: Transition
-  revealSignature?: string
   children: ReactNode
   containerRef: React.RefObject<HTMLDivElement | null>
+  data: Record<string, unknown>[]
+  enterTransition?: Transition
+  height: number
   lines: LineConfig[]
+  margin: Margin
+  revealSignature?: string
+  width: number
+  xDataKey: string
 }
 
 export function ScatterChartInner({
@@ -125,8 +125,8 @@ export function ScatterChartInner({
     () =>
       data.map((d) =>
         xAccessor(d).toLocaleDateString("en-US", {
-          month: "short",
           day: "numeric",
+          month: "short",
         })
       ),
     [data, xAccessor]
@@ -152,14 +152,14 @@ export function ScatterChartInner({
     interactionHandlers,
     interactionStyle,
   } = useScatterChartInteraction({
-    xScale,
-    yScale,
+    bisectDate,
+    canInteract,
     data,
     lines,
     margin,
     xAccessor,
-    bisectDate,
-    canInteract,
+    xScale,
+    yScale,
   })
 
   if (width < 10 || height < 10) {
@@ -187,28 +187,28 @@ export function ScatterChartInner({
   })
 
   const contextValue: ChartContextValue = {
-    data,
-    xScale: xScale as ChartContextValue["xScale"],
-    yScale: yScale as ChartContextValue["yScale"],
-    width,
-    height,
-    innerWidth,
-    innerHeight,
-    margin,
-    columnWidth,
-    tooltipData,
-    setTooltipData,
-    containerRef,
-    lines,
-    isLoaded,
     animationDuration,
     animationEasing,
-    enterTransition,
-    revealEpoch,
-    xAccessor,
-    dateLabels,
-    selection,
     clearSelection,
+    columnWidth,
+    containerRef,
+    data,
+    dateLabels,
+    enterTransition,
+    height,
+    innerHeight,
+    innerWidth,
+    isLoaded,
+    lines,
+    margin,
+    revealEpoch,
+    selection,
+    setTooltipData,
+    tooltipData,
+    width,
+    xAccessor,
+    xScale: xScale as ChartContextValue["xScale"],
+    yScale: yScale as ChartContextValue["yScale"],
   }
 
   return (

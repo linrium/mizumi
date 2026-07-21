@@ -24,54 +24,54 @@ export default function CatalogPage() {
   }, [catalog])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 pt-4 shrink-0">
-        <h1 className="text-sm font-semibold">{catalog}</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {schemas.length} schema{schemas.length !== 1 ? "s" : ""}
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 px-6 pt-4">
+        <h1 className="font-semibold text-sm">{catalog}</h1>
+        <p className="mt-0.5 text-muted-foreground text-xs">
+          {schemas.length} schema{schemas.length === 1 ? "" : "s"}
         </p>
         <CatalogTabs
           tabs={[
             {
-              href: `/catalog/${catalog}`,
-              label: "schemas",
               active: true,
+              href: `/catalog/${catalog}`,
               icon: IconDatabase,
+              label: "schemas",
             },
             {
+              active: false,
               href: `/catalog/${catalog}/permissions`,
-              label: "permissions",
-              active: false,
               icon: IconShieldLock,
+              label: "permissions",
             },
             {
-              href: `/catalog/${catalog}/request-permissions`,
-              label: "request access",
               active: false,
+              href: `/catalog/${catalog}/request-permissions`,
               icon: IconKey,
+              label: "request access",
             },
           ]}
         />
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {loading && (
-          <p className="px-6 py-4 text-xs text-muted-foreground">Loading…</p>
-        )}
-        {error && (
-          <p className="px-6 py-4 text-xs text-destructive font-mono">
+        {loading ? (
+          <p className="px-6 py-4 text-muted-foreground text-xs">Loading…</p>
+        ) : null}
+        {error ? (
+          <p className="px-6 py-4 font-mono text-destructive text-xs">
             {error}
           </p>
-        )}
+        ) : null}
 
-        {!loading && !error && (
-          <table className="w-full text-xs border-collapse">
+        {!(loading || error) && (
+          <table className="w-full border-collapse text-xs">
             <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
               <tr>
-                <th className="px-5 py-2 text-left font-medium text-muted-foreground border-b">
+                <th className="border-b px-5 py-2 text-left font-medium text-muted-foreground">
                   Name
                 </th>
-                <th className="px-5 py-2 text-left font-medium text-muted-foreground border-b">
+                <th className="border-b px-5 py-2 text-left font-medium text-muted-foreground">
                   Comment
                 </th>
               </tr>
@@ -79,17 +79,17 @@ export default function CatalogPage() {
             <tbody>
               {schemas.map((sch) => (
                 <tr
+                  className="border-border/60 border-b transition-colors last:border-0 hover:bg-accent/30"
                   key={sch.name}
-                  className="border-b border-border/60 last:border-0 hover:bg-accent/30 transition-colors"
                 >
                   <td className="px-5 py-2">
                     <Link
+                      className="flex w-fit items-center gap-1.5 font-medium font-mono underline-offset-2 hover:underline"
                       href={`/catalog/${catalog}/${sch.name}`}
-                      className="flex items-center gap-1.5 font-mono font-medium hover:underline underline-offset-2 w-fit"
                     >
                       <IconDatabase
-                        size={13}
                         className="shrink-0 text-muted-foreground"
+                        size={13}
                       />
                       {sch.name}
                     </Link>
@@ -102,8 +102,8 @@ export default function CatalogPage() {
               {schemas.length === 0 && (
                 <tr>
                   <td
-                    colSpan={2}
                     className="px-5 py-8 text-center text-muted-foreground"
+                    colSpan={2}
                   >
                     No schemas found
                   </td>

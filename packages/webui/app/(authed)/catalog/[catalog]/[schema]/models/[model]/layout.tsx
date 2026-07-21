@@ -11,8 +11,8 @@ import { ModelContext, type RegisteredModelDetail } from "./model-context"
 type Tab = "models" | "runs"
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "models", label: "Models", icon: IconBoxModel },
-  { key: "runs", label: "Runs", icon: IconRun },
+  { icon: IconBoxModel, key: "models", label: "Models" },
+  { icon: IconRun, key: "runs", label: "Runs" },
 ]
 
 export default function ModelLayout({
@@ -41,11 +41,11 @@ export default function ModelLayout({
   }, [catalog, schema, model])
 
   if (error) {
-    return <div className="p-4 text-sm text-destructive font-mono">{error}</div>
+    return <div className="p-4 font-mono text-destructive text-sm">{error}</div>
   }
   if (!detail) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading…
       </div>
     )
@@ -63,51 +63,51 @@ export default function ModelLayout({
 
   return (
     <ModelContext value={detail}>
-      <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex h-full flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-4 border-b shrink-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <IconBrain size={15} className="text-muted-foreground" />
-            <h2 className="text-sm font-semibold">{detail.name}</h2>
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+        <div className="shrink-0 border-b px-5 py-4">
+          <div className="mb-0.5 flex items-center gap-2">
+            <IconBrain className="text-muted-foreground" size={15} />
+            <h2 className="font-semibold text-sm">{detail.name}</h2>
+            <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
               model
             </span>
           </div>
-          <div className="flex items-center gap-1.5 mt-1 group/path">
-            <p className="text-xs text-muted-foreground font-mono">
+          <div className="group/path mt-1 flex items-center gap-1.5">
+            <p className="font-mono text-muted-foreground text-xs">
               {fullPath}
             </p>
             <button
-              type="button"
+              className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/path:opacity-100"
               onClick={() => {
                 navigator.clipboard.writeText(fullPath)
                 toast.success("Copied to clipboard")
               }}
-              className="opacity-0 group-hover/path:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+              type="button"
             >
               <IconCopy size={12} />
             </button>
           </div>
-          {detail.comment && (
-            <p className="text-xs text-muted-foreground mt-1.5 italic">
+          {detail.comment ? (
+            <p className="mt-1.5 text-muted-foreground text-xs italic">
               {detail.comment}
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* Tab bar */}
-        <div className="flex items-center gap-0 px-5 border-b shrink-0">
+        <div className="flex shrink-0 items-center gap-0 border-b px-5">
           {TABS.map((tab) => (
             <button
-              key={tab.key}
-              type="button"
-              onClick={() => navigate(tab.key)}
               className={cn(
-                "px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors",
+                "-mb-px border-b-2 px-3 py-2 font-medium text-xs transition-colors",
                 activeTab === tab.key
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              key={tab.key}
+              onClick={() => navigate(tab.key)}
+              type="button"
             >
               <span className="flex items-center gap-1.5">
                 <tab.icon size={12} />

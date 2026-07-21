@@ -44,12 +44,12 @@ import {
 } from "@/services/semantic-registry"
 
 const NEXT_STATUS: Partial<Record<SemanticStatus, SemanticStatus[]>> = {
-  draft: ["validated", "retired"],
-  validated: ["candidate"],
+  active: ["deprecated"],
   candidate: ["certified"],
   certified: ["active"],
-  active: ["deprecated"],
   deprecated: ["retired"],
+  draft: ["validated", "retired"],
+  validated: ["candidate"],
 }
 
 function statusVariant(status: SemanticStatus) {
@@ -84,12 +84,14 @@ function parseDependencyLines(value: string) {
     .filter(Boolean)
     .map((line) => {
       const match = line.match(/^(.+)\.([^.@]+)@v?(\d+)$/)
-      if (!match) throw new Error(`Invalid dependency reference: ${line}`)
+      if (!match) {
+        throw new Error(`Invalid dependency reference: ${line}`)
+      }
       return {
-        namespace: match[1],
-        name: match[2],
-        version: Number(match[3]),
         dependency_type: "semantic",
+        name: match[2],
+        namespace: match[1],
+        version: Number(match[3]),
       }
     })
 }
@@ -107,10 +109,10 @@ function parsePhysicalLines(value: string) {
       const [catalog, schemaName, ...objectParts] = parts
       return {
         catalog,
-        schema_name: schemaName,
+        contract_version: null,
         object_name: objectParts.join("."),
         object_type: "table",
-        contract_version: null,
+        schema_name: schemaName,
       }
     })
 }
@@ -171,17 +173,17 @@ function NewVersionDialog({
     try {
       const spec = JSON.parse(specJson)
       await createSemanticVersion(base.namespace, base.name, {
-        namespace: base.namespace,
-        name: base.name,
-        object_type: "metric",
-        version: Number(version),
-        owner_principal: owner,
-        description,
-        spec,
-        time_semantics: base.time_semantics,
-        supersedes_version: base.version,
         dependencies: parseDependencyLines(dependencies),
+        description,
+        name: base.name,
+        namespace: base.namespace,
+        object_type: "metric",
+        owner_principal: owner,
         physical_dependencies: parsePhysicalLines(physical),
+        spec,
+        supersedes_version: base.version,
+        time_semantics: base.time_semantics,
+        version: Number(version),
       })
       toast.success("Semantic version created")
       onCreated(Number(version))
@@ -197,7 +199,7 @@ function NewVersionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New version</DialogTitle>
@@ -209,23 +211,23 @@ function NewVersionDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Semantic name</Label>
-              <Input value={`${base.namespace}.${base.name}`} disabled />
+              <Input disabled value={`${base.namespace}.${base.name}`} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="version">Version</Label>
               <Input
                 id="version"
-                value={version}
                 inputMode="numeric"
                 onChange={(e) => setVersion(e.target.value)}
+                value={version}
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="owner">Owner</Label>
               <Input
                 id="owner"
-                value={owner}
                 onChange={(e) => setOwner(e.target.value)}
+                value={owner}
               />
             </div>
           </div>
@@ -233,31 +235,31 @@ function NewVersionDialog({
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={description}
-              rows={2}
               onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              value={description}
             />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="spec">Metric spec JSON</Label>
             <Textarea
-              id="spec"
-              value={specJson}
-              rows={8}
               className="font-mono text-xs"
+              id="spec"
               onChange={(e) => setSpecJson(e.target.value)}
+              rows={8}
+              value={specJson}
             />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="dependencies">Semantic dependencies</Label>
             <Textarea
-              id="dependencies"
-              value={dependencies}
-              rows={3}
               className="font-mono text-xs"
+              id="dependencies"
               onChange={(e) => setDependencies(e.target.value)}
+              rows={3}
+              value={dependencies}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Optional. Each line must reference an existing definition, for
               example finance.net_spend@v1.
             </p>
@@ -265,25 +267,25 @@ function NewVersionDialog({
           <div className="grid gap-1.5">
             <Label htmlFor="physical">Physical dependencies</Label>
             <Textarea
-              id="physical"
-              value={physical}
-              rows={3}
               className="font-mono text-xs"
+              id="physical"
               onChange={(e) => setPhysical(e.target.value)}
+              rows={3}
+              value={physical}
             />
           </div>
           {error ? (
-            <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <p className="flex items-center gap-1.5 text-destructive text-xs">
               <IconAlertTriangle size={13} />
               {error}
             </p>
           ) : null}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button onClick={() => onOpenChange(false)} variant="outline">
             Cancel
           </Button>
-          <Button onClick={submit} disabled={saving}>
+          <Button disabled={saving} onClick={submit}>
             {saving ? "Creating..." : "Create version"}
           </Button>
         </DialogFooter>
@@ -304,7 +306,9 @@ export default function SemanticDefinitionDetailPage() {
   const [actioning, setActioning] = useState<SemanticStatus | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [versionParam, setVersionParam] = useState(() => {
-    if (typeof window === "undefined") return 0
+    if (typeof window === "undefined") {
+      return 0
+    }
     return Number(
       new URLSearchParams(window.location.search).get("version") ?? 0
     )
@@ -339,7 +343,9 @@ export default function SemanticDefinitionDetailPage() {
           )
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
     void load()
@@ -354,7 +360,9 @@ export default function SemanticDefinitionDetailPage() {
   )
 
   async function transition(status: SemanticStatus) {
-    if (!detail) return
+    if (!detail) {
+      return
+    }
     setActioning(status)
     try {
       const updated = await transitionSemanticStatus(
@@ -379,7 +387,7 @@ export default function SemanticDefinitionDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         Loading semantic definition...
       </div>
     )
@@ -388,13 +396,13 @@ export default function SemanticDefinitionDetailPage() {
   if (error || !detail) {
     return (
       <div className="p-4">
-        <Button variant="ghost" asChild>
+        <Button asChild variant="ghost">
           <Link href="/semantic-registry">
             <IconArrowLeft size={14} />
             Semantic Registry
           </Link>
         </Button>
-        <p className="mt-4 text-sm text-destructive">
+        <p className="mt-4 text-destructive text-sm">
           {error ?? "Semantic definition not found"}
         </p>
       </div>
@@ -407,7 +415,7 @@ export default function SemanticDefinitionDetailPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b">
         <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
-          <Button variant="ghost" size="default" asChild>
+          <Button asChild size="default" variant="ghost">
             <Link href="/semantic-registry">
               <IconArrowLeft size={14} />
               Registry
@@ -415,30 +423,30 @@ export default function SemanticDefinitionDetailPage() {
           </Button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-mono text-sm font-semibold">
+              <h1 className="font-mono font-semibold text-sm">
                 {definition.namespace}.{definition.name}
               </h1>
               <Status variant={statusVariant(definition.status)}>
                 <StatusIndicator />
                 <StatusLabel>{formatStatus(definition.status)}</StatusLabel>
               </Status>
-              <Badge variant="outline" className="font-mono">
+              <Badge className="font-mono" variant="outline">
                 <IconGitBranch size={11} />v{definition.version}
               </Badge>
             </div>
-            <p className="mt-0.5 max-w-3xl truncate text-xs text-muted-foreground">
+            <p className="mt-0.5 max-w-3xl truncate text-muted-foreground text-xs">
               {definition.description || "No description"}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Select
-              value={String(selectedVersion)}
               onValueChange={(value) => {
                 setVersionParam(Number(value))
                 router.push(
                   `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${value}`
                 )
               }}
+              value={String(selectedVersion)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -451,7 +459,7 @@ export default function SemanticDefinitionDetailPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" asChild>
+            <Button asChild variant="outline">
               <Link
                 href={`/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/compare?from=${Math.max(1, definition.version - 1)}&to=${definition.version}`}
               >
@@ -467,14 +475,14 @@ export default function SemanticDefinitionDetailPage() {
         </div>
         {nextStatuses.length > 0 ? (
           <div className="flex items-center gap-2 overflow-x-auto px-3 pb-2.5">
-            <span className="text-xs text-muted-foreground">Lifecycle</span>
+            <span className="text-muted-foreground text-xs">Lifecycle</span>
             {nextStatuses.map((status) => (
               <Button
-                key={status}
-                variant="outline"
-                size="default"
                 disabled={actioning === status}
+                key={status}
                 onClick={() => transition(status)}
+                size="default"
+                variant="outline"
               >
                 {actioning === status ? "Updating..." : `Mark ${status}`}
               </Button>
@@ -487,7 +495,7 @@ export default function SemanticDefinitionDetailPage() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="space-y-4">
             <div>
-              <h2 className="text-sm font-semibold">Definition</h2>
+              <h2 className="font-semibold text-sm">Definition</h2>
               <div className="mt-2">
                 <JsonBlock value={definition.spec} />
               </div>
@@ -495,7 +503,7 @@ export default function SemanticDefinitionDetailPage() {
 
             {definition.time_semantics ? (
               <div>
-                <h2 className="text-sm font-semibold">Time semantics</h2>
+                <h2 className="font-semibold text-sm">Time semantics</h2>
                 <div className="mt-2">
                   <JsonBlock value={definition.time_semantics} />
                 </div>
@@ -503,13 +511,13 @@ export default function SemanticDefinitionDetailPage() {
             ) : null}
 
             <div>
-              <h2 className="text-sm font-semibold">Physical dependencies</h2>
+              <h2 className="font-semibold text-sm">Physical dependencies</h2>
               <div className="mt-2 divide-y rounded-md border">
                 {detail.physical_dependencies.length > 0 ? (
                   detail.physical_dependencies.map((item) => (
                     <div
-                      key={item.id}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                      key={item.id}
                     >
                       <span className="font-mono">
                         {item.catalog}.{item.schema_name}.{item.object_name}
@@ -518,7 +526,7 @@ export default function SemanticDefinitionDetailPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <div className="px-3 py-6 text-center text-muted-foreground text-sm">
                     No physical references
                   </div>
                 )}
@@ -527,21 +535,21 @@ export default function SemanticDefinitionDetailPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <h2 className="text-sm font-semibold">Semantic dependencies</h2>
+                <h2 className="font-semibold text-sm">Semantic dependencies</h2>
                 <div className="mt-2 divide-y rounded-md border">
                   {detail.dependencies.length > 0 ? (
                     detail.dependencies.map((item) => (
                       <Link
-                        key={item.id}
-                        href={`/semantic-registry/${encodeURIComponent(item.namespace)}/${encodeURIComponent(item.name)}?version=${item.version}`}
                         className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-muted/50"
+                        href={`/semantic-registry/${encodeURIComponent(item.namespace)}/${encodeURIComponent(item.name)}?version=${item.version}`}
+                        key={item.id}
                       >
                         <span className="font-mono">{semanticLabel(item)}</span>
                         <Badge variant="outline">{item.status}</Badge>
                       </Link>
                     ))
                   ) : (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    <div className="px-3 py-6 text-center text-muted-foreground text-sm">
                       No semantic dependencies
                     </div>
                   )}
@@ -549,21 +557,21 @@ export default function SemanticDefinitionDetailPage() {
               </div>
 
               <div>
-                <h2 className="text-sm font-semibold">Direct dependents</h2>
+                <h2 className="font-semibold text-sm">Direct dependents</h2>
                 <div className="mt-2 divide-y rounded-md border">
                   {detail.dependents.length > 0 ? (
                     detail.dependents.map((item) => (
                       <Link
-                        key={item.id}
-                        href={`/semantic-registry/${encodeURIComponent(item.namespace)}/${encodeURIComponent(item.name)}?version=${item.version}`}
                         className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-muted/50"
+                        href={`/semantic-registry/${encodeURIComponent(item.namespace)}/${encodeURIComponent(item.name)}?version=${item.version}`}
+                        key={item.id}
                       >
                         <span className="font-mono">{semanticLabel(item)}</span>
                         <Badge variant="outline">{item.status}</Badge>
                       </Link>
                     ))
                   ) : (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    <div className="px-3 py-6 text-center text-muted-foreground text-sm">
                       No direct dependents
                     </div>
                   )}
@@ -574,7 +582,7 @@ export default function SemanticDefinitionDetailPage() {
 
           <aside className="space-y-4">
             <div className="rounded-md border p-3">
-              <h2 className="text-sm font-semibold">Metadata</h2>
+              <h2 className="font-semibold text-sm">Metadata</h2>
               <Separator className="my-3" />
               <dl className="grid gap-2 text-sm">
                 <div className="flex justify-between gap-3">
@@ -602,22 +610,22 @@ export default function SemanticDefinitionDetailPage() {
             </div>
 
             <div className="rounded-md border p-3">
-              <h2 className="text-sm font-semibold">Lifecycle history</h2>
+              <h2 className="font-semibold text-sm">Lifecycle history</h2>
               <Separator className="my-3" />
               <div className="space-y-3">
                 {detail.lifecycle_history.length > 0 ? (
                   detail.lifecycle_history.map((event) => (
-                    <div key={event.id} className="text-sm">
+                    <div className="text-sm" key={event.id}>
                       <div className="flex items-center justify-between gap-2">
                         <Badge variant="outline">{event.new_status}</Badge>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-foreground text-xs">
                           {new Intl.DateTimeFormat("en", {
                             dateStyle: "medium",
                             timeStyle: "short",
                           }).format(new Date(event.created_at))}
                         </span>
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div className="mt-1 text-muted-foreground text-xs">
                         {event.previous_status ?? "created"} →{" "}
                         {event.new_status} by {event.principal}
                       </div>
@@ -627,7 +635,7 @@ export default function SemanticDefinitionDetailPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     No lifecycle events recorded
                   </p>
                 )}
@@ -638,14 +646,14 @@ export default function SemanticDefinitionDetailPage() {
       </div>
 
       <NewVersionDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
         current={detail}
         onCreated={(version) =>
           router.push(
             `/semantic-registry/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?version=${version}`
           )
         }
+        onOpenChange={setDialogOpen}
+        open={dialogOpen}
       />
     </div>
   )

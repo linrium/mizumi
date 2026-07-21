@@ -162,14 +162,22 @@ export async function listPermissionRequests(params?: {
   all?: boolean
 }): Promise<PermissionRequest[]> {
   const url = new URL("/api/permissions/requests", window.location.origin)
-  if (params?.resource) url.searchParams.set("resource", params.resource)
+  if (params?.resource) {
+    url.searchParams.set("resource", params.resource)
+  }
   if (params?.status && params.status !== "all") {
     url.searchParams.set("status", params.status)
   }
-  if (params?.search) url.searchParams.set("search", params.search)
-  if (params?.all) url.searchParams.set("all", "true")
+  if (params?.search) {
+    url.searchParams.set("search", params.search)
+  }
+  if (params?.all) {
+    url.searchParams.set("all", "true")
+  }
   const res = await apiFetch(url.toString())
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.requests
 }
@@ -178,9 +186,9 @@ export async function createPermissionRequest(
   body: CreatePermissionRequestBody
 ): Promise<PermissionRequest> {
   const res = await apiFetch("/api/permissions/requests", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -195,7 +203,9 @@ export async function getPermissionRequest(
   const res = await apiFetch(
     `/api/permissions/requests/${encodeURIComponent(id)}`
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   return res.json()
 }
 
@@ -208,16 +218,18 @@ export async function updateRequestStatus(
   const res = await apiFetch(
     `/api/permissions/requests/${encodeURIComponent(id)}`,
     {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        status,
         approval_step_id: approvalStepId ?? null,
         grant_duration_days: grantDurationDays ?? null,
+        status,
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
     }
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   return res.json()
 }
 
@@ -229,18 +241,22 @@ export async function cancelPermissionRequest(
 
 export async function bulkApprove(ids: string[]): Promise<PermissionRequest[]> {
   const res = await apiFetch("/api/permissions/requests/bulk-approve", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.updated
 }
 
 export async function listPolicyTemplates(): Promise<PolicyTemplate[]> {
   const res = await apiFetch("/api/permissions/policy-templates")
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.templates
 }
@@ -256,7 +272,9 @@ export async function getPolicyTemplate(id: string): Promise<PolicyTemplate> {
 
 export async function listBlastRadius(): Promise<BlastRadiusPreview[]> {
   const res = await apiFetch("/api/permissions/blast-radius")
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.previews
 }
@@ -267,7 +285,9 @@ export async function getBlastRadius(
   const res = await apiFetch(
     `/api/permissions/requests/${encodeURIComponent(requestId)}/blast-radius`
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   return res.json()
 }
 
@@ -277,11 +297,19 @@ export async function listTimeBoundGrants(params?: {
   principal?: string
 }): Promise<TimeBoundGrant[]> {
   const url = new URL("/api/permissions/grants", window.location.origin)
-  if (params?.status) url.searchParams.set("status", params.status)
-  if (params?.resource) url.searchParams.set("resource", params.resource)
-  if (params?.principal) url.searchParams.set("principal", params.principal)
+  if (params?.status) {
+    url.searchParams.set("status", params.status)
+  }
+  if (params?.resource) {
+    url.searchParams.set("resource", params.resource)
+  }
+  if (params?.principal) {
+    url.searchParams.set("principal", params.principal)
+  }
   const res = await apiFetch(url.toString())
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   const body = await res.json()
   return body.grants
 }
@@ -290,7 +318,9 @@ export async function getTimeBoundGrant(id: string): Promise<TimeBoundGrant> {
   const res = await apiFetch(
     `/api/permissions/grants/${encodeURIComponent(id)}`
   )
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
   return res.json()
 }
 
@@ -301,9 +331,9 @@ export async function revokeGrant(
   const res = await apiFetch(
     `/api/permissions/grants/${encodeURIComponent(id)}/revoke`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: reason ?? null }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     }
   )
   if (!res.ok) {
@@ -320,9 +350,9 @@ export async function adminRenewGrant(
   const res = await apiFetch(
     `/api/permissions/grants/${encodeURIComponent(id)}/renew`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expires_at: expiresAt }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     }
   )
   if (!res.ok) {

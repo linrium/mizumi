@@ -34,8 +34,12 @@ function formatScopeLabel(scope: string) {
 }
 
 function formatApprovalMode(mode: string) {
-  if (mode === "auto") return "Auto-approve"
-  if (mode === "review") return "Reviewer gate"
+  if (mode === "auto") {
+    return "Auto-approve"
+  }
+  if (mode === "review") {
+    return "Reviewer gate"
+  }
   return "Security escalation"
 }
 
@@ -59,22 +63,22 @@ export default function PolicyTemplatesPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b shrink-0 px-3 py-2.5">
+      <div className="shrink-0 border-b px-3 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-sm font-semibold">Policy templates</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="font-semibold text-sm">Policy templates</h1>
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Reusable grant recipes for common access patterns.
             </p>
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {autoApproveCount} template
             {autoApproveCount === 1 ? "" : "s"} eligible for auto-approval
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -92,8 +96,8 @@ export default function PolicyTemplatesPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={8}
                 >
                   Loading…
                 </TableCell>
@@ -105,8 +109,8 @@ export default function PolicyTemplatesPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/permissions/policy-templates/${template.id}`}
                           className="font-medium hover:underline"
+                          href={`/permissions/policy-templates/${template.id}`}
                         >
                           {template.name}
                         </Link>

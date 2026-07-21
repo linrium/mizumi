@@ -11,11 +11,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
-type Prediction = {
+interface Prediction {
   label: string
-  score: number
-  rankings: Array<{ label: string; score: number }>
-  model_uri: string
   metadata: {
     run_ts?: string
     clip_model_id?: string
@@ -23,6 +20,9 @@ type Prediction = {
     train_accuracy?: number
     classes?: string[]
   }
+  model_uri: string
+  rankings: Array<{ label: string; score: number }>
+  score: number
 }
 
 export default function VietjetairBaggageModelPage() {
@@ -43,12 +43,22 @@ export default function VietjetairBaggageModelPage() {
   }, [file])
 
   const topScore = useMemo(() => {
-    if (!prediction) return null
+    if (!prediction) {
+      return null
+    }
     return `${Math.round(prediction.score * 1000) / 10}%`
   }, [prediction])
 
+  const emptyPredictionPanel = error ? null : (
+    <div className="flex h-full items-center justify-center text-muted-foreground text-xs">
+      No prediction yet
+    </div>
+  )
+
   async function submit() {
-    if (!file) return
+    if (!file) {
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -59,8 +69,8 @@ export default function VietjetairBaggageModelPage() {
 
     try {
       const response = await fetch("/api/models/baggage-damage/predict", {
-        method: "POST",
         body: form,
+        method: "POST",
       })
       const body = await response.json().catch(() => null)
       if (!response.ok) {
@@ -80,19 +90,19 @@ export default function VietjetairBaggageModelPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b bg-muted/30 px-4 py-3">
         <IconPhotoScan
-          size={15}
           className="text-muted-foreground"
+          size={15}
           stroke={1.5}
         />
         <div className="min-w-0">
-          <div className="text-sm font-medium">Baggage Damage Model</div>
-          <div className="truncate text-xs text-muted-foreground">
+          <div className="font-medium text-sm">Baggage Damage Model</div>
+          <div className="truncate text-muted-foreground text-xs">
             VietJet Air image classifier
           </div>
         </div>
         <Badge
-          variant="outline"
           className="ml-auto rounded px-2 font-mono text-[10px]"
+          variant="outline"
         >
           20260524T112308Z
         </Badge>
@@ -102,19 +112,19 @@ export default function VietjetairBaggageModelPage() {
         <div className="flex min-h-0 flex-col border-r max-lg:border-r-0 max-lg:border-b">
           <div className="flex shrink-0 items-center gap-2 border-b bg-muted/20 px-4 py-2.5">
             <IconUpload
-              size={15}
               className="text-muted-foreground"
+              size={15}
               stroke={1.5}
             />
-            <span className="text-sm font-medium">Image</span>
+            <span className="font-medium text-sm">Image</span>
             <Button
-              size="sm"
+              className="ml-auto h-7 gap-1.5 px-3 text-[11px]"
               disabled={!file || loading}
               onClick={submit}
-              className="ml-auto h-7 gap-1.5 px-3 text-[11px]"
+              size="sm"
             >
               {loading ? (
-                <IconLoader2 size={11} className="animate-spin" />
+                <IconLoader2 className="animate-spin" size={11} />
               ) : (
                 <IconBrain size={11} />
               )}
@@ -124,7 +134,6 @@ export default function VietjetairBaggageModelPage() {
 
           <label className="m-4 flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-md border border-dashed bg-muted/10 transition-colors hover:bg-muted/20">
             <input
-              type="file"
               accept="image/*"
               className="sr-only"
               onChange={(event) => {
@@ -132,29 +141,30 @@ export default function VietjetairBaggageModelPage() {
                 setPrediction(null)
                 setError(null)
               }}
+              type="file"
             />
             {previewUrl ? (
               <div className="relative h-full w-full">
                 <Image
-                  src={previewUrl}
                   alt=""
-                  fill
-                  unoptimized
-                  sizes="(max-width: 1024px) 100vw, 45vw"
                   className="object-contain"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 45vw"
+                  src={previewUrl}
+                  unoptimized
                 />
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 px-6 text-center">
                 <IconPhotoScan
-                  size={28}
                   className="text-muted-foreground"
+                  size={28}
                   stroke={1.5}
                 />
-                <span className="text-sm font-medium">
+                <span className="font-medium text-sm">
                   Select baggage photo
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   JPG, PNG, WebP, or BMP
                 </span>
               </div>
@@ -165,11 +175,11 @@ export default function VietjetairBaggageModelPage() {
         <div className="flex min-h-0 flex-col overflow-hidden">
           <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-muted/20 px-4">
             <IconBrain
-              size={15}
               className="text-muted-foreground"
+              size={15}
               stroke={1.5}
             />
-            <span className="text-sm font-medium">Prediction</span>
+            <span className="font-medium text-sm">Prediction</span>
             {prediction ? (
               <Badge className="ml-auto rounded px-2 font-mono text-[10px]">
                 {topScore}
@@ -179,7 +189,7 @@ export default function VietjetairBaggageModelPage() {
 
           <div className="min-h-0 flex-1 overflow-auto p-4">
             {error ? (
-              <pre className="whitespace-pre-wrap rounded-md border border-destructive/30 bg-destructive/5 p-3 font-mono text-xs text-destructive">
+              <pre className="whitespace-pre-wrap rounded-md border border-destructive/30 bg-destructive/5 p-3 font-mono text-destructive text-xs">
                 {error}
               </pre>
             ) : null}
@@ -187,29 +197,29 @@ export default function VietjetairBaggageModelPage() {
             {prediction ? (
               <div className="space-y-4">
                 <div className="rounded-md border bg-background p-4">
-                  <div className="text-xs font-medium uppercase text-muted-foreground">
+                  <div className="font-medium text-muted-foreground text-xs uppercase">
                     Top label
                   </div>
-                  <div className="mt-1 text-2xl font-semibold">
+                  <div className="mt-1 font-semibold text-2xl">
                     {prediction.label}
                   </div>
-                  <div className="mt-1 font-mono text-sm text-muted-foreground">
+                  <div className="mt-1 font-mono text-muted-foreground text-sm">
                     {topScore}
                   </div>
                 </div>
 
                 <div className="rounded-md border bg-background">
-                  <div className="border-b px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
+                  <div className="border-b px-3 py-2 font-medium text-muted-foreground text-xs uppercase">
                     Rankings
                   </div>
                   <div className="divide-y">
                     {prediction.rankings.map((item) => (
                       <div
-                        key={item.label}
                         className="grid grid-cols-[minmax(0,1fr)_64px] items-center gap-3 px-3 py-2"
+                        key={item.label}
                       >
                         <span className="truncate text-sm">{item.label}</span>
-                        <span className="text-right font-mono text-xs text-muted-foreground">
+                        <span className="text-right font-mono text-muted-foreground text-xs">
                           {Math.round(item.score * 1000) / 10}%
                         </span>
                       </div>
@@ -248,11 +258,9 @@ export default function VietjetairBaggageModelPage() {
                   </div>
                 </div>
               </div>
-            ) : !error ? (
-              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                No prediction yet
-              </div>
-            ) : null}
+            ) : (
+              emptyPredictionPanel
+            )}
           </div>
         </div>
       </div>

@@ -21,39 +21,39 @@ function getNodeIndex(nodeOrIndex: NodeOrIndex): number | undefined {
 }
 
 export interface SankeyNodeProps {
-  /** Fill color for nodes. Default: uses theme colors */
-  fill?: string
-  /** Corner radius for nodes. Default: 4 */
-  lineCap?: number
   /** Opacity when another node/link is hovered. Default: 0.4 */
   fadedOpacity?: number
-  /** Show node labels. Default: true */
-  showLabels?: boolean
+  /** Fill color for nodes. Default: uses theme colors */
+  fill?: string
   /** Custom node color function */
   getNodeColor?: (
     node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
     index: number
   ) => string
+  /** Corner radius for nodes. Default: 4 */
+  lineCap?: number
+  /** Show node labels. Default: true */
+  showLabels?: boolean
 }
 
 interface AnimatedNodeProps {
-  x: number
-  y: number
-  width: number
-  height: number
-  fill: string
-  rx: number
-  index: number
-  totalNodes: number
-  isFaded: boolean
-  fadedOpacity: number
   animationDuration: number
+  fadedOpacity: number
+  fill: string
+  height: number
+  index: number
+  isFaded: boolean
+  isLeftSide: boolean
+  name: string
   onMouseEnter: () => void
   onMouseLeave: () => void
-  name: string
-  value: number
-  isLeftSide: boolean
+  rx: number
   showLabels: boolean
+  totalNodes: number
+  value: number
+  width: number
+  x: number
+  y: number
 }
 
 function AnimatedNode({
@@ -244,11 +244,11 @@ export function SankeyNode({
         const handleMouseEnter = () => {
           setHoveredNodeIndex(index)
           setTooltipData({
-            type: "node",
+            data: node,
             nodeIndex: index,
+            type: "node",
             x: 0,
             y: 0,
-            data: node,
           })
         }
 

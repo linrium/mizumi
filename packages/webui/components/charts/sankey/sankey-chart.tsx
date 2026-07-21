@@ -22,34 +22,34 @@ import {
 } from "./sankey-context"
 
 export interface SankeyData {
-  nodes: SankeyNodeDatum[]
   links: SankeyLinkDatum[]
+  nodes: SankeyNodeDatum[]
 }
 
 export interface SankeyChartProps {
-  /** Sankey data with nodes and links */
-  data: SankeyData
-  /** Chart margins */
-  margin?: Partial<Margin>
   /** Animation duration in milliseconds. Default: 1100 */
   animationDuration?: number
-  /** Motion enter transition (spring or cubic-bezier tween). */
-  enterTransition?: Transition
-  /** Signature of motion URL state — triggers enter replay when it changes. */
-  revealSignature?: string
   /** Aspect ratio as "width / height". Default: "2 / 1" */
   aspectRatio?: string
-  /** Node width in pixels. Default: 16 */
-  nodeWidth?: number
-  /** Node padding in pixels. Default: 24 */
-  nodePadding?: number
-  /** Additional class name for the container */
-  className?: string
   /** Child components (SankeyNode, SankeyLink, SankeyTooltip) */
   children: ReactNode
+  /** Additional class name for the container */
+  className?: string
+  /** Sankey data with nodes and links */
+  data: SankeyData
+  /** Motion enter transition (spring or cubic-bezier tween). */
+  enterTransition?: Transition
+  /** Chart margins */
+  margin?: Partial<Margin>
+  /** Node padding in pixels. Default: 24 */
+  nodePadding?: number
+  /** Node width in pixels. Default: 16 */
+  nodeWidth?: number
+  /** Signature of motion URL state — triggers enter replay when it changes. */
+  revealSignature?: string
 }
 
-const DEFAULT_MARGIN: Margin = { top: 40, right: 180, bottom: 40, left: 180 }
+const DEFAULT_MARGIN: Margin = { bottom: 40, left: 180, right: 180, top: 40 }
 
 function SankeyChartInner({
   data,
@@ -97,21 +97,23 @@ function SankeyChartInner({
     return () => clearTimeout(timeout)
   }, [animationDuration, revealSignature])
 
-  const sankeyGenerator = useMemo(() => {
-    return sankey<SankeyNodeDatum, SankeyLinkDatum>()
-      .nodeWidth(nodeWidth)
-      .nodePadding(nodePadding)
-      .nodeAlign(sankeyCenter)
-      .extent([
-        [0, 0],
-        [innerWidth, innerHeight],
-      ])
-  }, [innerWidth, innerHeight, nodeWidth, nodePadding])
+  const sankeyGenerator = useMemo(
+    () =>
+      sankey<SankeyNodeDatum, SankeyLinkDatum>()
+        .nodeWidth(nodeWidth)
+        .nodePadding(nodePadding)
+        .nodeAlign(sankeyCenter)
+        .extent([
+          [0, 0],
+          [innerWidth, innerHeight],
+        ]),
+    [innerWidth, innerHeight, nodeWidth, nodePadding]
+  )
 
   const graph = useMemo(() => {
     const clonedData = {
-      nodes: data.nodes.map((node) => ({ ...node })),
       links: data.links.map((link) => ({ ...link })),
+      nodes: data.nodes.map((node) => ({ ...node })),
     }
     return sankeyGenerator(clonedData)
   }, [data, sankeyGenerator])
@@ -148,27 +150,27 @@ function SankeyChartInner({
   }
 
   const contextValue = {
-    graph,
-    nodes: graph.nodes,
-    links: graph.links,
-    width,
-    height,
-    innerWidth,
-    innerHeight,
-    margin,
-    hoveredNodeIndex,
-    hoveredLinkIndex,
-    setHoveredNodeIndex,
-    setHoveredLinkIndex,
-    tooltipData,
-    setTooltipData,
-    containerRef,
-    isLoaded,
     animationDuration,
-    enterTransition,
-    revealEpoch,
-    mousePos,
+    containerRef,
     createPath,
+    enterTransition,
+    graph,
+    height,
+    hoveredLinkIndex,
+    hoveredNodeIndex,
+    innerHeight,
+    innerWidth,
+    isLoaded,
+    links: graph.links,
+    margin,
+    mousePos,
+    nodes: graph.nodes,
+    revealEpoch,
+    setHoveredLinkIndex,
+    setHoveredNodeIndex,
+    setTooltipData,
+    tooltipData,
+    width,
   }
 
   return (

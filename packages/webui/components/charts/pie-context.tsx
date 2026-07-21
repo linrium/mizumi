@@ -27,63 +27,62 @@ export const defaultPieColors = [
 ]
 
 export interface PieData {
-  /** Display label for the slice */
-  label: string
-  /** Value for the slice (determines slice size relative to total) */
-  value: number
   /** Optional color override - falls back to palette */
   color?: string
   /** Optional fill override for patterns/gradients (e.g., "url(#patternId)") */
   fill?: string
+  /** Display label for the slice */
+  label: string
+  /** Value for the slice (determines slice size relative to total) */
+  value: number
 }
 
 /** Arc data computed by visx Pie */
 export interface PieArcData {
   data: PieData
-  index: number
-  startAngle: number
   endAngle: number
+  index: number
   padAngle: number
+  startAngle: number
   value: number
 }
 
 export interface PieContextValue {
-  // Data
-  data: PieData[]
-  arcs: PieArcData[]
-
-  // Dimensions
-  size: number
-  center: number
-  outerRadius: number
-  innerRadius: number
-  padAngle: number
-  cornerRadius: number
-
-  // Hover effect
-  hoverOffset: number
-
-  // Hover state
-  hoveredIndex: number | null
-  setHoveredIndex: (index: number | null) => void
-
   // Animation state
   animationKey: number
-  isLoaded: boolean
-  enterTransition?: Transition
-  enterStaggerScale: number
+  arcs: PieArcData[]
+  center: number
 
   // Container ref for portals
   containerRef: RefObject<HTMLDivElement | null>
-
-  // Computed values
-  totalValue: number
+  cornerRadius: number
+  // Data
+  data: PieData[]
+  enterStaggerScale: number
+  enterTransition?: Transition
 
   // Get color for a slice index
   getColor: (index: number) => string
 
   // Get fill for a slice index (supports patterns/gradients)
   getFill: (index: number) => string
+
+  // Hover state
+  hoveredIndex: number | null
+
+  // Hover effect
+  hoverOffset: number
+  innerRadius: number
+  isLoaded: boolean
+  outerRadius: number
+  padAngle: number
+  setHoveredIndex: (index: number | null) => void
+
+  // Dimensions
+  size: number
+
+  // Computed values
+  totalValue: number
 }
 
 const PieContext = createContext<PieContextValue | null>(null)

@@ -1,41 +1,23 @@
 "use client"
 
+import Editor from "@monaco-editor/react"
 import {
   IconArrowsExchange,
   IconBuildingBank,
   IconLoader2,
   IconSend,
 } from "@tabler/icons-react"
-import Editor from "@monaco-editor/react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiFetch } from "@/lib/api-client"
 
-type PaginatedResponse<T> = {
+interface PaginatedResponse<T> {
   data: T[]
-  total: number
+  hasMore: boolean
   limit: number
   offset: number
-  hasMore: boolean
-}
-
-type BankingTransaction = {
-  transactionId: string
-  userId: string
-  accountId: string
-  postedAt: string
-  transactionType: string
-  channel: string
-  merchantCategory: string
-  amount: string
-  currency: string
-  sourceBank: string
-  destinationBank: string
-  merchantName: string
-  balanceBefore: string
-  balanceAfter: string
-  city: string
+  total: number
 }
 
 type SendResult =
@@ -56,23 +38,32 @@ async function fetchBatch<T>(dataset: string, batchSize: number): Promise<T[]> {
     `/api/synthetic/${dataset}?limit=${batchSize}&random=true`,
     { cache: "no-store" }
   )
-  if (!response.ok) throw new Error(`Failed to load ${dataset}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load ${dataset}`)
+  }
   const payload = (await response.json()) as PaginatedResponse<T>
   return payload.data
 }
 
-type EventPanelProps = {
+function formatResultBadge(result: SendResult): string {
+  if (result.ok) {
+    return `${result.status} Accepted`
+  }
+  return result.status ? `${result.status} Error` : "Error"
+}
+
+interface EventPanelProps {
+  batchSize?: number
+  className?: string
+  dataset: string
+  endpoint: string
   icon: React.ComponentType<{
     size?: number
     className?: string
     stroke?: number
   }>
   label: string
-  dataset: string
-  endpoint: string
   normalize?: (item: unknown) => Record<string, unknown>
-  batchSize?: number
-  className?: string
 }
 
 function EventPanel({
@@ -98,33 +89,33 @@ function EventPanel({
       setEditorValue(JSON.stringify(batch, null, 2))
 
       const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(batch),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       })
       const body = await response.json().catch(() => null)
 
       if (response.ok) {
         const accepted = Array.isArray(body) ? body.length : batch.length
         setResult({
-          ok: true,
-          status: response.status,
           data: {
-            sent: batch.length,
             accepted,
             failed: Math.max(0, batch.length - accepted),
             sample: Array.isArray(body) ? body.slice(0, 5) : [body],
+            sent: batch.length,
           },
+          ok: true,
+          status: response.status,
         })
       } else {
         setResult({
+          error: (body as { error?: string } | null)?.error ?? "Request failed",
           ok: false,
           status: response.status,
-          error: (body as { error?: string } | null)?.error ?? "Request failed",
         })
       }
     } catch (error) {
-      setResult({ ok: false, error: (error as Error).message })
+      setResult({ error: (error as Error).message, ok: false })
     } finally {
       setSending(false)
     }
@@ -133,17 +124,17 @@ function EventPanel({
   return (
     <div className={`flex min-h-0 flex-col overflow-hidden ${className}`}>
       <div className="flex shrink-0 items-center gap-2.5 border-b bg-muted/20 px-4 py-2.5">
-        <Icon size={15} className="text-muted-foreground" stroke={1.5} />
-        <span className="text-sm font-medium">{label}</span>
+        <Icon className="text-muted-foreground" size={15} stroke={1.5} />
+        <span className="font-medium text-sm">{label}</span>
         <div className="ml-auto flex items-center gap-2">
           <Button
-            size="sm"
+            className="h-7 gap-1.5 px-3 text-[11px]"
             disabled={sending}
             onClick={handleSend}
-            className="h-7 gap-1.5 px-3 text-[11px]"
+            size="sm"
           >
             {sending ? (
-              <IconLoader2 size={11} className="animate-spin" />
+              <IconLoader2 className="animate-spin" size={11} />
             ) : (
               <IconSend size={11} />
             )}
@@ -156,53 +147,45 @@ function EventPanel({
         <Editor
           height="100%"
           language="json"
-          theme="vs"
-          value={editorValue}
           onChange={(v) => {
             setEditorValue(v ?? "")
             setResult(null)
           }}
           options={{
-            minimap: { enabled: false },
-            fontSize: 12,
-            lineNumbers: "on",
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            overviewRulerLanes: 0,
-            renderLineHighlight: "line",
-            padding: { top: 10, bottom: 10 },
             fontFamily: "var(--font-geist-mono)",
-            lineHeight: 1.55,
+            fontSize: 12,
             formatOnPaste: true,
             formatOnType: true,
+            lineHeight: 1.55,
+            lineNumbers: "on",
+            minimap: { enabled: false },
+            overviewRulerLanes: 0,
+            padding: { bottom: 10, top: 10 },
+            renderLineHighlight: "line",
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
           }}
+          theme="vs"
+          value={editorValue}
         />
       </div>
 
       <div className="h-52 shrink-0 border-t">
         <div className="flex h-8 shrink-0 items-center gap-3 border-b bg-muted/10 px-3">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
             Response
           </span>
-          {result && (
+          {result ? (
             <Badge
-              variant={result.ok ? "default" : "destructive"}
               className="rounded px-1.5 font-mono text-[10px]"
+              variant={result.ok ? "default" : "destructive"}
             >
-              {result.ok
-                ? `${result.status} Accepted`
-                : result.status
-                  ? `${result.status} Error`
-                  : "Error"}
+              {formatResultBadge(result)}
             </Badge>
-          )}
+          ) : null}
         </div>
         <div className="h-[calc(100%-32px)] overflow-auto px-4 py-2">
-          {!result ? (
-            <span className="text-xs text-muted-foreground">
-              Send {batchSize} events to see the batch response.
-            </span>
-          ) : (
+          {result ? (
             <pre
               className={`whitespace-pre-wrap font-mono text-xs ${
                 result.ok ? "text-foreground" : "text-destructive"
@@ -210,6 +193,10 @@ function EventPanel({
             >
               {result.ok ? JSON.stringify(result.data, null, 2) : result.error}
             </pre>
+          ) : (
+            <span className="text-muted-foreground text-xs">
+              Send {batchSize} events to see the batch response.
+            </span>
           )}
         </div>
       </div>
@@ -222,13 +209,13 @@ export default function HdbankPage() {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b bg-muted/30 px-4 py-3">
         <IconBuildingBank
-          size={15}
           className="text-muted-foreground"
+          size={15}
           stroke={1.5}
         />
         <div className="min-w-0">
-          <div className="text-sm font-medium">HDBank Events</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="font-medium text-sm">HDBank Events</div>
+          <div className="text-muted-foreground text-xs">
             Banking transactions are fetched from the synthetic server and sent
             to the batch API.
           </div>
@@ -236,11 +223,11 @@ export default function HdbankPage() {
       </div>
 
       <EventPanel
-        icon={IconArrowsExchange}
-        label="Banking Transaction Events"
+        className="flex-1"
         dataset="banking-transactions"
         endpoint="/api/tests/hdbank/banking-transactions/batch"
-        className="flex-1"
+        icon={IconArrowsExchange}
+        label="Banking Transaction Events"
       />
     </div>
   )

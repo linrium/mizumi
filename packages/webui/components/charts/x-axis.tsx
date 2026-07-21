@@ -17,11 +17,11 @@ export interface XAxisProps {
 }
 
 interface XAxisLabelProps {
-  label: string
-  x: number
   crosshairX: number | null
   isHovering: boolean
+  label: string
   tickerHalfWidth: number
+  x: number
 }
 
 function XAxisLabel({
@@ -51,11 +51,11 @@ function XAxisLabel({
     <div
       className="absolute"
       style={{
-        left: x,
         bottom: 12,
-        width: 0,
         display: "flex",
         justifyContent: "center",
+        left: x,
+        width: 0,
       }}
     >
       <span
@@ -97,13 +97,13 @@ export function XAxis({
     if (tickMode === "data") {
       return data.map((d, i) => ({
         date: xAccessor(d),
-        x: (xScale(xAccessor(d)) ?? 0) + margin.left,
         label:
           dateLabels[i] ??
           xAccessor(d).toLocaleDateString("en-US", {
-            month: "short",
             day: "numeric",
+            month: "short",
           }),
+        x: (xScale(xAccessor(d)) ?? 0) + margin.left,
       }))
     }
 
@@ -131,11 +131,11 @@ export function XAxis({
 
     return dates.map((date) => ({
       date,
-      x: (xScale(date) ?? 0) + margin.left,
       label: date.toLocaleDateString("en-US", {
-        month: "short",
         day: "numeric",
+        month: "short",
       }),
+      x: (xScale(date) ?? 0) + margin.left,
     }))
   }, [tickMode, data, xAccessor, xScale, margin.left, dateLabels, numTicks])
 

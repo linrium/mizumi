@@ -32,7 +32,9 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
 
   useEffect(() => {
     const el = containerRef.current
-    if (!el) return
+    if (!el) {
+      return
+    }
     const ro = new ResizeObserver((entries) => {
       setHeight(entries[0].contentRect.height)
     })
@@ -51,24 +53,24 @@ function ResultsGrid({ queryResult }: { queryResult: QueryResponse }) {
   const columns = useMemo<ColumnDef<Row>[]>(
     () =>
       queryResult.columns.map((col) => ({
-        id: col,
         accessorKey: col,
         header: col,
-        size: 120,
-        minSize: 60,
+        id: col,
         meta: { cell: { variant: "short-text" as const } },
+        minSize: 60,
+        size: 120,
       })),
     [queryResult]
   )
 
   const { table, ...dataGridProps } = useDataGrid<Row>({
-    data,
     columns,
+    data,
     readOnly: true,
   })
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+    <div className="min-h-0 flex-1 overflow-hidden" ref={containerRef}>
       <DataGrid
         table={table}
         {...dataGridProps}
@@ -93,7 +95,9 @@ function tablesInScope(
     refs.add(m[1].toLowerCase())
     m = re.exec(sql)
   }
-  if (refs.size === 0) return all
+  if (refs.size === 0) {
+    return all
+  }
   return all.filter((t) => {
     const lc = (s: string) => s.toLowerCase()
     return (
@@ -110,7 +114,6 @@ function buildCompletionProvider(
 ) {
   const CIK = monaco.languages.CompletionItemKind
   return {
-    triggerCharacters: ["."],
     provideCompletionItems(
       model: Parameters<
         Monaco["languages"]["registerCompletionItemProvider"]
@@ -133,17 +136,17 @@ function buildCompletionProvider(
     ) {
       const wordInfo = model.getWordUntilPosition(position)
       const range = {
-        startLineNumber: position.lineNumber,
+        endColumn: position.column,
         endLineNumber: position.lineNumber,
         startColumn: wordInfo.startColumn,
-        endColumn: position.column,
+        startLineNumber: position.lineNumber,
       }
 
       const lineText = model.getValueInRange({
-        startLineNumber: position.lineNumber,
-        startColumn: 1,
-        endLineNumber: position.lineNumber,
         endColumn: position.column,
+        endLineNumber: position.lineNumber,
+        startColumn: 1,
+        startLineNumber: position.lineNumber,
       })
 
       // Detect dot-chain: e.g. "catalog." or "catalog.schema."
@@ -163,9 +166,9 @@ function buildCompletionProvider(
           ]
           return {
             suggestions: schemas.map((s) => ({
-              label: s,
-              kind: CIK.Module,
               insertText: s,
+              kind: CIK.Module,
+              label: s,
               range,
             })),
           }
@@ -178,11 +181,11 @@ function buildCompletionProvider(
           )
           return {
             suggestions: tables.map((t) => ({
-              label: t.name,
-              kind: CIK.Class,
-              insertText: t.name,
-              range,
               detail: `${t.catalog}.${t.schema}`,
+              insertText: t.name,
+              kind: CIK.Class,
+              label: t.name,
+              range,
             })),
           }
         }
@@ -195,10 +198,10 @@ function buildCompletionProvider(
         context.triggerKind === monaco.languages.CompletionTriggerKind.Invoke
       ) {
         const textBeforeCursor = model.getValueInRange({
-          startLineNumber: 1,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
           endColumn: position.column,
+          endLineNumber: position.lineNumber,
+          startColumn: 1,
+          startLineNumber: 1,
         })
         // Strip the word currently being typed to find what keyword precedes it
         const beforeWord = textBeforeCursor.slice(
@@ -218,20 +221,20 @@ function buildCompletionProvider(
           }[] = []
           for (const catalog of data.catalogs) {
             suggestions.push({
-              label: catalog,
-              kind: CIK.Module,
               insertText: catalog,
+              kind: CIK.Module,
+              label: catalog,
               range,
             })
           }
           for (const table of data.tables) {
             const fqn = `${table.catalog}.${table.schema}.${table.name}`
             suggestions.push({
-              label: fqn,
-              kind: CIK.Class,
-              insertText: fqn,
-              range,
               detail: "table",
+              insertText: fqn,
+              kind: CIK.Class,
+              label: fqn,
+              range,
             })
           }
           return { suggestions }
@@ -252,11 +255,11 @@ function buildCompletionProvider(
             if (!seen.has(col.name)) {
               seen.add(col.name)
               suggestions.push({
-                label: col.name,
-                kind: CIK.Field,
-                insertText: col.name,
-                range,
                 detail: col.type,
+                insertText: col.name,
+                kind: CIK.Field,
+                label: col.name,
+                range,
               })
             }
           }
@@ -276,9 +279,9 @@ function buildCompletionProvider(
 
       for (const catalog of data.catalogs) {
         suggestions.push({
-          label: catalog,
-          kind: CIK.Module,
           insertText: catalog,
+          kind: CIK.Module,
+          label: catalog,
           range,
           sortText: `0${catalog}`,
         })
@@ -287,12 +290,12 @@ function buildCompletionProvider(
       for (const table of data.tables) {
         const fqn = `${table.catalog}.${table.schema}.${table.name}`
         suggestions.push({
-          label: fqn,
-          kind: CIK.Class,
+          detail: "table",
           insertText: fqn,
+          kind: CIK.Class,
+          label: fqn,
           range,
           sortText: `1${fqn}`,
-          detail: "table",
         })
       }
 
@@ -303,12 +306,12 @@ function buildCompletionProvider(
           if (!seen.has(col.name)) {
             seen.add(col.name)
             suggestions.push({
-              label: col.name,
-              kind: CIK.Field,
+              detail: col.type,
               insertText: col.name,
+              kind: CIK.Field,
+              label: col.name,
               range,
               sortText: `2${col.name}`,
-              detail: col.type,
             })
           }
         }
@@ -316,6 +319,7 @@ function buildCompletionProvider(
 
       return { suggestions }
     },
+    triggerCharacters: ["."],
   }
 }
 
@@ -353,7 +357,9 @@ export function SqlCodeEditor({
     fetch("/api/catalog/completions")
       .then((r) => r.json())
       .then((data: CatalogCompletionSchema) => {
-        if (cancelled) return
+        if (cancelled) {
+          return
+        }
         completionDataRef.current = data
         if (monacoRef.current) {
           disposeCompletionsRef.current?.dispose()
@@ -373,13 +379,11 @@ export function SqlCodeEditor({
   }, [])
 
   return (
-    <div className={cn("h-full flex flex-col", className)}>
+    <div className={cn("flex h-full flex-col", className)}>
       <div className={cn("min-h-0 flex-1", editorClassName)}>
         <Editor
           height="100%"
           language="sql"
-          theme="vs"
-          value={value}
           onChange={(nextValue) => onChange(nextValue ?? "")}
           onMount={(editor, monaco) => {
             if (onSubmit) {
@@ -399,21 +403,23 @@ export function SqlCodeEditor({
             }
           }}
           options={{
-            minimap: { enabled: false },
+            fontFamily: "var(--font-geist-mono)",
             fontSize: 13,
+            lineHeight: 1.6,
             lineNumbers,
+            minimap: { enabled: false },
+            overviewRulerLanes: 0,
+            padding: { bottom: 12, top: 12 },
+            renderLineHighlight: "line",
             scrollBeyondLastLine: false,
             wordWrap: "on",
-            overviewRulerLanes: 0,
-            renderLineHighlight: "line",
-            padding: { top: 12, bottom: 12 },
-            fontFamily: "var(--font-geist-mono)",
-            lineHeight: 1.6,
           }}
+          theme="vs"
+          value={value}
         />
       </div>
       {error ? (
-        <div className="px-4 py-1 text-xs text-destructive border-t border-destructive/20 bg-destructive/5">
+        <div className="border-destructive/20 border-t bg-destructive/5 px-4 py-1 text-destructive text-xs">
           {error}
         </div>
       ) : null}
@@ -429,9 +435,11 @@ export function SqlEditor() {
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
-    dragRef.current = { startY: e.clientY, startH: resultsHeight }
+    dragRef.current = { startH: resultsHeight, startY: e.clientY }
     const onMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return
+      if (!dragRef.current) {
+        return
+      }
       const delta = dragRef.current.startY - ev.clientY
       setResultsHeight(
         Math.min(
@@ -453,16 +461,16 @@ export function SqlEditor() {
     defaultValues: {
       sql: "select * from hdbank.hdbank_partnership_prod_bronze.customers_v1 limit 100",
     },
-    validators: { onSubmit: sqlSchema },
     onSubmit: async ({ value }) => {
       setResult(null)
       setResult(
         await executeSessionSqlQuery({
-          sql: value.sql,
           activeSessionId,
           createSession: async () => {
             const res = await apiFetch("/api/sessions", { method: "POST" })
-            if (!res.ok) return null
+            if (!res.ok) {
+              return null
+            }
             const session = (await res.json()) as {
               session_id: string
               pod: string
@@ -470,27 +478,31 @@ export function SqlEditor() {
             setActiveSessionId(session.session_id)
             return session
           },
+          sql: value.sql,
         })
       )
     },
+    validators: { onSubmit: sqlSchema },
   })
 
   const copyResults = () => {
-    if (!result?.ok) return
+    if (!result?.ok) {
+      return
+    }
     navigator.clipboard.writeText(formatQueryResultsAsTsv(result.data))
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
+      <div className="flex shrink-0 items-center gap-2 border-b bg-muted/30 px-4 py-2">
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button
-              size="sm"
+              className="h-7 gap-1.5 px-3 text-xs"
               disabled={isSubmitting}
               onClick={() => form.handleSubmit()}
-              className="gap-1.5 h-7 px-3 text-xs"
+              size="sm"
             >
               <IconPlayerPlay size={12} />
               {isSubmitting ? "Running…" : "Run"}
@@ -500,20 +512,17 @@ export function SqlEditor() {
       </div>
 
       {/* Editor pane */}
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1">
         <form
+          className="h-full"
           onSubmit={(e) => {
             e.preventDefault()
             form.handleSubmit()
           }}
-          className="h-full"
         >
           <form.Field name="sql" validators={{ onChange: sqlSchema.shape.sql }}>
             {(field) => (
               <SqlCodeEditor
-                value={field.state.value}
-                onChange={(nextValue) => field.handleChange(nextValue)}
-                onSubmit={() => form.handleSubmit()}
                 error={
                   field.state.meta.errors.length > 0
                     ? String(
@@ -522,6 +531,9 @@ export function SqlEditor() {
                       )
                     : undefined
                 }
+                onChange={(nextValue) => field.handleChange(nextValue)}
+                onSubmit={() => form.handleSubmit()}
+                value={field.state.value}
               />
             )}
           </form.Field>
@@ -530,36 +542,36 @@ export function SqlEditor() {
 
       {/* Results pane */}
       <div
-        className="shrink-0 border-t flex flex-col"
+        className="flex shrink-0 flex-col border-t"
         style={{ height: resultsHeight }}
       >
         {/* Resize handle */}
         <button
-          type="button"
           aria-label="Resize results pane"
+          className="h-1 w-full shrink-0 cursor-row-resize transition-colors hover:bg-primary/30"
           onMouseDown={handleResizeMouseDown}
-          className="h-1 w-full cursor-row-resize hover:bg-primary/30 transition-colors shrink-0"
+          type="button"
         />
         {/* Results toolbar */}
-        <div className="flex items-center gap-3 px-4 h-9 border-b bg-muted/20 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="flex h-9 shrink-0 items-center gap-3 border-b bg-muted/20 px-4">
+          <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
             Results
           </span>
           {result?.ok && (
             <>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {result.data.row_count}{" "}
                 {result.data.row_count === 1 ? "row" : "rows"}
               </span>
-              <span className="text-xs text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">·</span>
+              <span className="text-muted-foreground text-xs">
                 {result.elapsed}ms
               </span>
               <div className="flex-1" />
               <button
-                type="button"
+                className="flex items-center gap-1 text-muted-foreground text-xs transition-colors hover:text-foreground"
                 onClick={copyResults}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
               >
                 <HugeiconsIcon icon={Copy01Icon} size={12} />
                 Copy
@@ -571,19 +583,19 @@ export function SqlEditor() {
 
         {/* Results body */}
         {!result && (
-          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
             Run a query to see results
           </div>
         )}
 
         {result && !result.ok && (
-          <div className="flex-1 overflow-auto px-4 py-3 text-sm text-destructive font-mono whitespace-pre-wrap">
+          <div className="flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-destructive text-sm">
             {result.error}
           </div>
         )}
 
         {result?.ok && result.data.columns.length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
             Query executed successfully — no rows returned
           </div>
         )}

@@ -51,46 +51,46 @@ function getDefaultNodeColor(
 }
 
 export interface SankeyLinkProps {
-  /** Stroke color for links (overrides gradient). Default: uses gradient */
-  stroke?: string
-  /** Stroke opacity. Default: 0.5 */
-  strokeOpacity?: number
   /** Opacity when another link/node is hovered. Default: 0.1 */
   fadedOpacity?: number
-  /** Use gradient from source to target color. Default: true */
-  useGradient?: boolean
-  /** Custom function to get node color (for gradient) */
-  getNodeColor?: (
-    node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
-    index: number
-  ) => string
   /** Custom link color function (overrides gradient) */
   getLinkColor?: (
     link: SankeyLinkType<SankeyNodeDatum, SankeyLinkDatum>,
     index: number
   ) => string
-  /** Pattern definitions to render in defs. Use @visx/pattern components (PatternLines, PatternCircles, etc.) */
-  patterns?: React.ReactNode
   /** Return pattern ID for a link, or null/undefined to use gradient/solid color */
   getLinkPattern?: (
     link: SankeyLinkType<SankeyNodeDatum, SankeyLinkDatum>,
     index: number
   ) => string | null | undefined
+  /** Custom function to get node color (for gradient) */
+  getNodeColor?: (
+    node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>,
+    index: number
+  ) => string
+  /** Pattern definitions to render in defs. Use @visx/pattern components (PatternLines, PatternCircles, etc.) */
+  patterns?: React.ReactNode
+  /** Stroke color for links (overrides gradient). Default: uses gradient */
+  stroke?: string
+  /** Stroke opacity. Default: 0.5 */
+  strokeOpacity?: number
+  /** Use gradient from source to target color. Default: true */
+  useGradient?: boolean
 }
 
 interface AnimatedLinkProps {
-  path: string
-  width: number
-  stroke: string
-  strokeOpacity: number
+  animationDuration: number
+  fadedOpacity: number
   index: number
-  totalLinks: number
   isFaded: boolean
   isHighlighted: boolean
-  fadedOpacity: number
-  animationDuration: number
   onMouseEnter: () => void
   onMouseLeave: () => void
+  path: string
+  stroke: string
+  strokeOpacity: number
+  totalLinks: number
+  width: number
 }
 
 function AnimatedLink({
@@ -294,11 +294,11 @@ export function SankeyLink({
         const handleMouseEnter = () => {
           setHoveredLinkIndex(index)
           setTooltipData({
-            type: "link",
+            data: link,
             linkIndex: index,
+            type: "link",
             x: 0,
             y: 0,
-            data: link,
           })
         }
 

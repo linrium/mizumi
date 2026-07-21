@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
-import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
+import { useParams, useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import { Status, StatusIndicator, StatusLabel } from "@/components/ui/status"
 import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,25 +45,29 @@ type LogsResponse = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtTimestamp(ts: string | null | undefined): string {
-  if (!ts) return "—"
+  if (!ts) {
+    return "—"
+  }
   return new Date(ts).toLocaleString()
 }
 
 type StateVariant = "success" | "warning" | "error" | "default"
 
 const STATE_CONFIG: Record<string, { label: string; variant: StateVariant }> = {
-  RUNNING: { label: "Running", variant: "success" },
   COMPLETED: { label: "Completed", variant: "default" },
   FAILED: { label: "Failed", variant: "error" },
-  SUBMITTED: { label: "Submitted", variant: "warning" },
   PENDING: { label: "Pending", variant: "warning" },
+  RUNNING: { label: "Running", variant: "success" },
+  SUBMITTED: { label: "Submitted", variant: "warning" },
   UNKNOWN: { label: "Unknown", variant: "default" },
 }
 
 const ACTIVE_STATES = new Set(["RUNNING", "SUBMITTED", "PENDING"])
 
 function K8sStateBadge({ state }: { state: string | null | undefined }) {
-  if (!state) return <span className="text-muted-foreground">—</span>
+  if (!state) {
+    return <span className="text-muted-foreground">—</span>
+  }
   const cfg = STATE_CONFIG[state] ?? {
     label: state,
     variant: "default" as StateVariant,
@@ -108,17 +112,19 @@ function ConfirmButton({
 
   return (
     <button
-      type="button"
-      onClick={handleClick}
-      onBlur={() => {
-        if (stage === "confirming") setStage("idle")
-      }}
-      disabled={stage === "pending"}
       className={cn(
-        "text-xs px-3 py-1 border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap",
+        "whitespace-nowrap rounded border px-3 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         stage === "confirming" ? "bg-muted" : "hover:bg-muted",
         className
       )}
+      disabled={stage === "pending"}
+      onBlur={() => {
+        if (stage === "confirming") {
+          setStage("idle")
+        }
+      }}
+      onClick={handleClick}
+      type="button"
     >
       {stage === "pending"
         ? pendingLabel
@@ -173,7 +179,7 @@ function useJobDetail(id: string) {
           const active =
             jobData.k8s_status?.state &&
             ACTIVE_STATES.has(jobData.k8s_status.state)
-          timerRef.current = setTimeout(fetchAll, active ? 5000 : 30000)
+          timerRef.current = setTimeout(fetchAll, active ? 5000 : 30_000)
         }
       } catch (e) {
         if (!cancelled) {
@@ -186,11 +192,13 @@ function useJobDetail(id: string) {
     fetchAll()
     return () => {
       cancelled = true
-      if (timerRef.current) clearTimeout(timerRef.current)
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
     }
   }, [id])
 
-  return { job, logs, logsError, loading, error }
+  return { error, job, loading, logs, logsError }
 }
 
 // ── Detail row ────────────────────────────────────────────────────────────────
@@ -204,8 +212,8 @@ function DetailRow({
 }) {
   return (
     <div className="flex justify-between gap-2 text-xs">
-      <span className="text-muted-foreground shrink-0">{label}</span>
-      <span className="text-right font-mono truncate">{children}</span>
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="truncate text-right font-mono">{children}</span>
     </div>
   )
 }
@@ -225,7 +233,9 @@ export default function StreamingJobDetailPage() {
       method: "POST",
     })
     const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(json.error ?? `HTTP ${res.status}`)
+    }
     toast.success("Job restarted", { description: job?.name })
   }
 
@@ -243,14 +253,14 @@ export default function StreamingJobDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading job…
       </div>
     )
   }
   if (error || !job) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-destructive font-mono px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-6 text-center font-mono text-destructive text-sm">
         {error ?? "Job not found"}
       </div>
     )
@@ -259,23 +269,22 @@ export default function StreamingJobDetailPage() {
   const sparkConfEntries = Object.entries(job.spark_conf ?? {})
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 border-b shrink-0 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b px-5 py-3">
         <Link
+          className="text-muted-foreground text-xs transition-colors hover:text-foreground"
           href="/pipelines/streaming"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Streaming
         </Link>
         <span className="text-muted-foreground text-xs">/</span>
-        <span className="text-xs font-mono font-semibold">{job.name}</span>
+        <span className="font-mono font-semibold text-xs">{job.name}</span>
         <K8sStateBadge state={job.k8s_status?.state} />
-        <div className="ml-auto flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <ConfirmButton
-            label="Restart"
             confirmLabel="Confirm restart"
-            pendingLabel="Restarting…"
+            label="Restart"
             onConfirm={async () => {
               try {
                 await doRestart()
@@ -285,12 +294,12 @@ export default function StreamingJobDetailPage() {
                 })
               }
             }}
+            pendingLabel="Restarting…"
           />
           <ConfirmButton
-            label="Delete"
-            confirmLabel="Confirm delete"
-            pendingLabel="Deleting…"
             className="text-destructive"
+            confirmLabel="Confirm delete"
+            label="Delete"
             onConfirm={async () => {
               try {
                 await doDelete()
@@ -300,43 +309,44 @@ export default function StreamingJobDetailPage() {
                 })
               }
             }}
+            pendingLabel="Deleting…"
           />
         </div>
       </div>
 
       {/* Main split */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Left: logs */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex items-center px-4 py-2 border-b shrink-0 gap-2">
-            <span className="text-xs font-semibold">Logs</span>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2">
+            <span className="font-semibold text-xs">Logs</span>
             {logs?.pod && (
-              <span className="text-[10px] text-muted-foreground font-mono">
+              <span className="font-mono text-[10px] text-muted-foreground">
                 {logs.pod}
               </span>
             )}
           </div>
-          <div className="flex-1 overflow-auto min-h-0 p-4">
+          <div className="min-h-0 flex-1 overflow-auto p-4">
             {logsError ? (
-              <p className="text-xs text-muted-foreground font-mono">
+              <p className="font-mono text-muted-foreground text-xs">
                 {logsError}
               </p>
             ) : logs?.logs ? (
-              <pre className="text-[11px] font-mono whitespace-pre-wrap text-foreground leading-relaxed">
+              <pre className="whitespace-pre-wrap font-mono text-[11px] text-foreground leading-relaxed">
                 {logs.logs}
               </pre>
             ) : (
-              <p className="text-xs text-muted-foreground">No logs available</p>
+              <p className="text-muted-foreground text-xs">No logs available</p>
             )}
           </div>
         </div>
 
         {/* Right sidebar */}
-        <div className="w-64 border-l shrink-0 overflow-y-auto">
+        <div className="w-64 shrink-0 overflow-y-auto border-l">
           <div className="flex flex-col">
             {/* Status */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-2">Status</p>
+              <p className="mb-2 font-semibold text-xs">Status</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="State">
                   {job.k8s_status?.state ?? "—"}
@@ -348,14 +358,14 @@ export default function StreamingJobDetailPage() {
                 )}
                 {job.k8s_status?.spark_ui_url && (
                   <div className="flex justify-between gap-2 text-xs">
-                    <span className="text-muted-foreground shrink-0">
+                    <span className="shrink-0 text-muted-foreground">
                       Spark UI
                     </span>
                     <a
+                      className="truncate font-mono text-blue-500 hover:underline"
                       href={`http://${job.k8s_status.spark_ui_url}`}
-                      target="_blank"
                       rel="noreferrer"
-                      className="text-blue-500 hover:underline font-mono truncate"
+                      target="_blank"
                     >
                       {job.k8s_status.spark_ui_url}
                     </a>
@@ -368,7 +378,7 @@ export default function StreamingJobDetailPage() {
 
             {/* Job details */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-2">Details</p>
+              <p className="mb-2 font-semibold text-xs">Details</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="Namespace">{job.namespace}</DetailRow>
                 <DetailRow label="Spark">{job.spark_version}</DetailRow>
@@ -385,8 +395,8 @@ export default function StreamingJobDetailPage() {
 
             {/* Image */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-1">Image</p>
-              <p className="text-[10px] font-mono text-muted-foreground break-all">
+              <p className="mb-1 font-semibold text-xs">Image</p>
+              <p className="break-all font-mono text-[10px] text-muted-foreground">
                 {job.image}
               </p>
             </div>
@@ -395,8 +405,8 @@ export default function StreamingJobDetailPage() {
 
             {/* App file */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-1">Main File</p>
-              <p className="text-[10px] font-mono text-muted-foreground break-all">
+              <p className="mb-1 font-semibold text-xs">Main File</p>
+              <p className="break-all font-mono text-[10px] text-muted-foreground">
                 {job.main_application_file}
               </p>
             </div>
@@ -405,7 +415,7 @@ export default function StreamingJobDetailPage() {
 
             {/* Resources */}
             <div className="px-4 py-4">
-              <p className="text-xs font-semibold mb-2">Resources</p>
+              <p className="mb-2 font-semibold text-xs">Resources</p>
               <div className="flex flex-col gap-2">
                 <DetailRow label="Driver Cores">{job.driver_cores}</DetailRow>
                 <DetailRow label="Driver Memory">{job.driver_memory}</DetailRow>
@@ -421,12 +431,12 @@ export default function StreamingJobDetailPage() {
               <>
                 <div className="h-px bg-border" />
                 <div className="px-4 py-4">
-                  <p className="text-xs font-semibold mb-2">Spark Config</p>
+                  <p className="mb-2 font-semibold text-xs">Spark Config</p>
                   <div className="flex flex-col gap-1.5">
                     {sparkConfEntries.map(([k, v]) => (
                       <div
+                        className="break-all rounded bg-muted px-2 py-1 font-mono text-[10px]"
                         key={k}
-                        className="text-[10px] font-mono bg-muted rounded px-2 py-1 break-all"
                       >
                         <span className="text-muted-foreground">{k}</span>
                         {v ? (

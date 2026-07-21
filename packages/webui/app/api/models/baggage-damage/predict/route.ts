@@ -7,13 +7,13 @@ export async function POST(req: NextRequest) {
 
   const form = await req.formData()
   const upstream = await fetch(`${baseUrl}/predict`, {
-    method: "POST",
     body: form,
+    method: "POST",
   })
 
   const contentType = upstream.headers.get("content-type") ?? "application/json"
   return new Response(upstream.body, {
-    status: upstream.status,
     headers: { "content-type": contentType },
+    status: upstream.status,
   })
 }

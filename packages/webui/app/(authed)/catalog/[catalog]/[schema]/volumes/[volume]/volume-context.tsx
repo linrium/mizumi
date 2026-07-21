@@ -3,7 +3,7 @@
 import { createContext, useContext } from "react"
 import type { VolumeDetail } from "@/services/catalog-types"
 
-export type { VolumeDetail }
+export type { VolumeDetail } from "@/services/catalog-types"
 
 export const VolumeContext = createContext<VolumeDetail | null>(null)
 

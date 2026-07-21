@@ -10,43 +10,43 @@ export default function SchemaPermissionsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="px-6 pt-4 shrink-0">
+      <div className="shrink-0 px-6 pt-4">
         <div className="flex items-baseline gap-1.5">
-          <h1 className="text-sm font-semibold">{schema}</h1>
-          <span className="text-xs text-muted-foreground font-mono">
+          <h1 className="font-semibold text-sm">{schema}</h1>
+          <span className="font-mono text-muted-foreground text-xs">
             {catalog}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="mt-0.5 text-muted-foreground text-xs">
           Manage schema permissions
         </p>
         <CatalogTabs
           tabs={[
             {
+              active: false,
               href: `/catalog/${catalog}/${schema}`,
-              label: "tables",
-              active: false,
               icon: IconTableOptions,
+              label: "tables",
             },
             {
-              href: `/catalog/${catalog}/${schema}/permissions`,
-              label: "permissions",
               active: true,
+              href: `/catalog/${catalog}/${schema}/permissions`,
               icon: IconShieldLock,
+              label: "permissions",
             },
             {
-              href: `/catalog/${catalog}/${schema}/request-permissions`,
-              label: "request access",
               active: false,
+              href: `/catalog/${catalog}/${schema}/request-permissions`,
               icon: IconKey,
+              label: "request access",
             },
           ]}
         />
       </div>
 
       <PermissionsEditor
-        resourceType="schema"
         catalog={catalog}
+        resourceType="schema"
         schema={schema}
       />
     </div>

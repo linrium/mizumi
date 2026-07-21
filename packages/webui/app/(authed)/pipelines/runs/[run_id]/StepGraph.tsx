@@ -1,25 +1,25 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import dagre from "@dagrejs/dagre"
 import {
-  ReactFlow,
   Background,
-  Controls,
-  Handle,
-  Position,
-  useNodesState,
-  useEdgesState,
   BackgroundVariant,
+  Controls,
+  type Edge,
+  Handle,
   MarkerType,
   type Node,
-  type Edge,
   type NodeTypes,
+  Position,
+  ReactFlow,
   type ReactFlowInstance,
+  useEdgesState,
+  useNodesState,
 } from "@xyflow/react"
-import dagre from "@dagrejs/dagre"
+import { useEffect, useMemo, useState } from "react"
 import "@xyflow/react/dist/style.css"
-import { cn } from "@/lib/utils"
 import { apiFetch as fetchWithAuth } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,10 +73,10 @@ function deriveSteps(
   const ensure = (key: string) => {
     if (!steps.has(key)) {
       steps.set(key, {
-        key,
-        status: "pending",
-        startTime: null,
         endTime: null,
+        key,
+        startTime: null,
+        status: "pending",
         upstream: [],
       })
     }
@@ -85,22 +85,30 @@ function deriveSteps(
 
   for (const e of events) {
     const key = e.step_key
-    if (!key) continue
+    if (!key) {
+      continue
+    }
     const s = ensure(key)
     const ts = e.timestamp ? Number(e.timestamp) / 1000 : null
 
     switch (e.type) {
       case "ExecutionStepStartEvent":
         s.status = "running"
-        if (ts) s.startTime = ts
+        if (ts) {
+          s.startTime = ts
+        }
         break
       case "ExecutionStepSuccessEvent":
         s.status = "success"
-        if (ts) s.endTime = ts
+        if (ts) {
+          s.endTime = ts
+        }
         break
       case "ExecutionStepFailureEvent":
         s.status = "failure"
-        if (ts) s.endTime = ts
+        if (ts) {
+          s.endTime = ts
+        }
         break
       case "ExecutionStepSkippedEvent":
         s.status = "skipped"
@@ -114,12 +122,18 @@ function deriveSteps(
   // Populate upstream using asset dependency_keys
   for (const [stepKey, s] of steps) {
     const assetKey = stepToAsset.get(stepKey)
-    if (!assetKey) continue
+    if (!assetKey) {
+      continue
+    }
     const asset = assetByKey.get(assetKey)
-    if (!asset) continue
+    if (!asset) {
+      continue
+    }
     for (const dep of asset.dependency_keys) {
       const upStep = assetToStep.get(dep.join("/"))
-      if (upStep && steps.has(upStep)) s.upstream.push(upStep)
+      if (upStep && steps.has(upStep)) {
+        s.upstream.push(upStep)
+      }
     }
     s.upstream = [...new Set(s.upstream)]
   }
@@ -136,20 +150,26 @@ type StepNodeData = {
 }
 
 const STATUS_STYLES: Record<StepStatus, string> = {
-  success: "bg-green-500 text-white border-green-600",
   failure: "bg-red-500 text-white border-red-600",
+  pending:
+    "bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400",
   running: "bg-blue-500 text-white border-blue-600",
   skipped:
     "bg-zinc-300 text-zinc-600 border-zinc-400 dark:bg-zinc-700 dark:text-zinc-300",
-  pending:
-    "bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400",
+  success: "bg-green-500 text-white border-green-600",
 }
 
 function fmtSec(start: number | null, end: number | null): string {
-  if (!start) return ""
+  if (!start) {
+    return ""
+  }
   const sec = Math.round((end ?? Date.now() / 1000) - start)
-  if (sec < 60) return `${sec}s`
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  if (sec < 60) {
+    return `${sec}s`
+  }
+  if (sec < 3600) {
+    return `${Math.floor(sec / 60)}m ${sec % 60}s`
+  }
   return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`
 }
 
@@ -159,24 +179,24 @@ function StepNode({ data }: { data: StepNodeData }) {
   return (
     <div
       className={cn(
-        "rounded px-3 py-1.5 text-xs font-mono font-semibold border shadow-sm min-w-[120px] text-center cursor-default select-none",
+        "min-w-[120px] cursor-default select-none rounded border px-3 py-1.5 text-center font-mono font-semibold text-xs shadow-sm",
         STATUS_STYLES[info.status],
-        data.selected && "ring-2 ring-offset-1 ring-foreground"
+        data.selected && "ring-2 ring-foreground ring-offset-1"
       )}
     >
       <Handle
-        type="target"
-        position={Position.Left}
         className="!w-1.5 !h-1.5 !bg-white/60 !border-0"
+        position={Position.Left}
+        type="target"
       />
       <Handle
-        type="source"
-        position={Position.Right}
         className="!w-1.5 !h-1.5 !bg-white/60 !border-0"
+        position={Position.Right}
+        type="source"
       />
       <div className="truncate">{info.key}</div>
       {dur && (
-        <div className="text-[10px] opacity-75 font-normal mt-0.5">{dur}</div>
+        <div className="mt-0.5 font-normal text-[10px] opacity-75">{dur}</div>
       )}
     </div>
   )
@@ -193,18 +213,22 @@ function buildLayout(
   steps: StepInfo[],
   selectedKey: string | null
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
-  if (steps.length === 0) return { rfNodes: [], rfEdges: [] }
+  if (steps.length === 0) {
+    return { rfEdges: [], rfNodes: [] }
+  }
 
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "LR", nodesep: 24, ranksep: 60 })
+  g.setGraph({ nodesep: 24, rankdir: "LR", ranksep: 60 })
 
   for (const s of steps) {
-    g.setNode(s.key, { width: NODE_W, height: NODE_H })
+    g.setNode(s.key, { height: NODE_H, width: NODE_W })
   }
   for (const s of steps) {
     for (const up of s.upstream) {
-      if (g.hasNode(up)) g.setEdge(up, s.key)
+      if (g.hasNode(up)) {
+        g.setEdge(up, s.key)
+      }
     }
   }
   dagre.layout(g)
@@ -212,12 +236,12 @@ function buildLayout(
   const rfNodes: Node[] = steps.map((s) => {
     const { x, y } = g.node(s.key)
     return {
-      id: s.key,
-      type: "step",
-      position: { x: x - NODE_W / 2, y: y - NODE_H / 2 },
-      style: { width: NODE_W },
       data: { info: s, selected: s.key === selectedKey } satisfies StepNodeData,
       draggable: false,
+      id: s.key,
+      position: { x: x - NODE_W / 2, y: y - NODE_H / 2 },
+      style: { width: NODE_W },
+      type: "step",
     }
   })
 
@@ -226,19 +250,19 @@ function buildLayout(
       .filter((up) => g.hasNode(up))
       .map((up) => ({
         id: `${up}->${s.key}`,
-        source: up,
-        target: s.key,
         markerEnd: {
+          color: "#94a3b8",
+          height: 12,
           type: MarkerType.ArrowClosed,
           width: 12,
-          height: 12,
-          color: "#94a3b8",
         },
+        source: up,
         style: { stroke: "#94a3b8", strokeWidth: 1.5 },
+        target: s.key,
       }))
   )
 
-  return { rfNodes, rfEdges }
+  return { rfEdges, rfNodes }
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -277,7 +301,7 @@ export function StepGraph({
   useEffect(() => {
     setNodes(rfNodes)
     if (rfInstance && rfNodes.length > 0) {
-      setTimeout(() => rfInstance.fitView({ padding: 0.08, minZoom: 0.5 }), 0)
+      setTimeout(() => rfInstance.fitView({ minZoom: 0.5, padding: 0.08 }), 0)
     }
   }, [rfNodes, setNodes, rfInstance])
   useEffect(() => {
@@ -286,7 +310,7 @@ export function StepGraph({
 
   if (steps.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
         No steps yet
       </div>
     )
@@ -294,25 +318,25 @@ export function StepGraph({
 
   return (
     <ReactFlow
-      nodes={nodes}
       edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
+      maxZoom={2}
+      minZoom={0.1}
+      nodes={nodes}
+      nodesConnectable={false}
+      nodesDraggable={false}
       nodeTypes={nodeTypes}
+      onEdgesChange={onEdgesChange}
+      onInit={setRfInstance}
       onNodeClick={(_, node) =>
         onSelectStep(node.id === selectedKey ? null : node.id)
       }
-      onInit={setRfInstance}
-      minZoom={0.1}
-      maxZoom={2}
-      nodesDraggable={false}
-      nodesConnectable={false}
+      onNodesChange={onNodesChange}
     >
       <Background
-        variant={BackgroundVariant.Dots}
+        color="rgba(0,0,0,0.07)"
         gap={20}
         size={1}
-        color="rgba(0,0,0,0.07)"
+        variant={BackgroundVariant.Dots}
       />
       <Controls showInteractive={false} />
     </ReactFlow>

@@ -2,21 +2,21 @@
 
 import { createContext, useContext } from "react"
 
-export type Column = {
+export interface Column {
+  comment?: string
   name: string
-  type_text: string
   nullable: boolean
-  comment?: string
+  type_text: string
 }
-export type TableDetail = {
-  name: string
+export interface TableDetail {
   catalog_name: string
-  schema_name: string
-  table_type: string
-  data_source_format?: string
-  storage_location?: string
-  comment?: string
   columns: Column[]
+  comment?: string
+  data_source_format?: string
+  name: string
+  schema_name: string
+  storage_location?: string
+  table_type: string
 }
 
 export const TableContext = createContext<TableDetail | null>(null)

@@ -54,7 +54,9 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
 
   useEffect(() => {
     const el = containerRef.current
-    if (!el) return
+    if (!el) {
+      return
+    }
     const ro = new ResizeObserver((entries) =>
       setHeight(entries[0].contentRect.height)
     )
@@ -73,24 +75,24 @@ function PreviewGrid({ queryResult }: { queryResult: QueryResponse }) {
   const columns = useMemo<ColumnDef<Row>[]>(
     () =>
       queryResult.columns.map((col) => ({
-        id: col,
         accessorKey: col,
         header: col,
-        size: 120,
-        minSize: 60,
+        id: col,
         meta: { cell: { variant: "short-text" as const } },
+        minSize: 60,
+        size: 120,
       })),
     [queryResult]
   )
 
   const { table, ...dataGridProps } = useDataGrid<Row>({
-    data,
     columns,
+    data,
     readOnly: true,
   })
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+    <div className="min-h-0 flex-1 overflow-hidden" ref={containerRef}>
       <DataGrid
         table={table}
         {...dataGridProps}
@@ -127,11 +129,17 @@ export default function TablePreviewPage() {
       setQueryResult(null)
       try {
         const result = await loadPreviewQuery(catalog, schema, table)
-        if (!cancelled) setQueryResult(result)
+        if (!cancelled) {
+          setQueryResult(result)
+        }
       } catch (e) {
-        if (!cancelled) setError((e as Error).message)
+        if (!cancelled) {
+          setError((e as Error).message)
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
     load()
@@ -140,24 +148,29 @@ export default function TablePreviewPage() {
     }
   }, [catalog, schema, table])
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Loading preview…
       </div>
     )
-  if (error)
+  }
+  if (error) {
     return (
-      <div className="p-4 text-sm text-destructive font-mono whitespace-pre-wrap scroll-auto">
+      <div className="scroll-auto whitespace-pre-wrap p-4 font-mono text-destructive text-sm">
         {error}
       </div>
     )
-  if (!queryResult) return null
-  if (queryResult.row_count === 0)
+  }
+  if (!queryResult) {
+    return null
+  }
+  if (queryResult.row_count === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
         Table is empty
       </div>
     )
+  }
   return <PreviewGrid queryResult={queryResult} />
 }

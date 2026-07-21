@@ -13,30 +13,32 @@ import { cn } from "@/lib/utils"
 
 const TABS = [
   {
-    label: "Request Queue",
     href: "/permissions",
     icon: IconListDetails,
+    label: "Request Queue",
   },
   {
-    label: "Policy Templates",
     href: "/permissions/policy-templates",
     icon: IconTemplate,
+    label: "Policy Templates",
   },
   {
-    label: "Blast-Radius Preview",
     href: "/permissions/blast-radius-preview",
     icon: IconChartBubble,
+    label: "Blast-Radius Preview",
   },
   {
-    label: "Time-Bound Access",
     href: "/permissions/time-bound-access",
     icon: IconClockShield,
+    label: "Time-Bound Access",
   },
 ] as const satisfies ReadonlyArray<{
   label: string
   href: string
   icon: TablerIcon
 }>
+
+const PERMISSIONS_ROOT_RE = /^\/permissions\/[^/]+$/
 
 export default function PermissionsLayout({
   children,
@@ -50,29 +52,31 @@ export default function PermissionsLayout({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-0 border-b shrink-0 px-3 overflow-x-auto">
+      <div className="flex shrink-0 items-center gap-0 overflow-x-auto border-b px-3">
         {TABS.map((tab) => {
+          const isPermissionsRoot =
+            pathname === "/permissions" ||
+            (PERMISSIONS_ROOT_RE.test(pathname) &&
+              !nestedTabPaths.some(
+                (nestedPath) =>
+                  pathname === nestedPath ||
+                  pathname.startsWith(`${nestedPath}/`)
+              ))
           const isActive =
             tab.href === "/permissions"
-              ? pathname === "/permissions" ||
-                (/^\/permissions\/[^/]+$/.test(pathname) &&
-                  !nestedTabPaths.some(
-                    (nestedPath) =>
-                      pathname === nestedPath ||
-                      pathname.startsWith(`${nestedPath}/`)
-                  ))
+              ? isPermissionsRoot
               : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
 
           return (
             <Link
-              key={tab.href}
-              href={tab.href}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
+                "-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 font-medium text-xs transition-colors",
                 isActive
                   ? "border-foreground text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              href={tab.href}
+              key={tab.href}
             >
               <tab.icon size={12} />
               {tab.label}
@@ -80,7 +84,7 @@ export default function PermissionsLayout({
           )
         })}
       </div>
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {children}
       </div>
     </div>

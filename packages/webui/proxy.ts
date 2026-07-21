@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getSessionFromHeaders } from "@/lib/auth"
 
 const PUBLIC_PATHS = ["/login", "/auth"]

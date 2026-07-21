@@ -1,10 +1,10 @@
-import { headers } from "next/headers"
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 import { customSession, genericOAuth } from "better-auth/plugins"
-import type { AppSession } from "@/lib/auth/types"
+import { headers } from "next/headers"
 import { KEYCLOAK_PROVIDER_ID } from "@/lib/auth/constants"
 import { normalizeGroups, readTokenClaims } from "@/lib/auth/jwt"
+import type { AppSession } from "@/lib/auth/types"
 
 const DEFAULT_BASE_URL = "http://localhost:3000"
 const DEFAULT_REALM = "sovico"
@@ -70,19 +70,19 @@ function buildAppSession(input: {
   const claims = readTokenClaims(input.idToken)
 
   return {
-    id: input.session.id,
-    userId: input.session.userId,
-    name: claims?.name ?? input.user.name,
+    accessToken: input.accessToken ?? undefined,
     email: claims?.email ?? input.user.email,
     emailVerified: input.user.emailVerified,
+    expiresAt: input.session.expiresAt,
+    groups: normalizeGroups(claims?.groups),
+    id: input.session.id,
+    idToken: input.idToken ?? undefined,
     image: input.user.image,
+    name: claims?.name ?? input.user.name,
+    preferredUsername: claims?.preferred_username,
     realm: getRealmFromIssuer(getKeycloakIssuer()),
     sub: claims?.sub,
-    preferredUsername: claims?.preferred_username,
-    groups: normalizeGroups(claims?.groups),
-    idToken: input.idToken ?? undefined,
-    accessToken: input.accessToken ?? undefined,
-    expiresAt: input.session.expiresAt,
+    userId: input.session.userId,
   }
 }
 
@@ -96,22 +96,22 @@ async function hydrateSessionTokens(
 
   try {
     const tokens = await auth.api.getAccessToken({
-      headers: requestHeaders,
       body: {
         providerId: KEYCLOAK_PROVIDER_ID,
       },
+      headers: requestHeaders,
     })
     const claims = readTokenClaims(tokens.idToken)
 
     return {
       ...session,
-      realm: getRealmFromIssuer(getKeycloakIssuer()),
-      sub: claims?.sub ?? session.sub,
-      preferredUsername:
-        claims?.preferred_username ?? session.preferredUsername,
+      accessToken: tokens.accessToken ?? session.accessToken,
       groups: normalizeGroups(claims?.groups) ?? session.groups,
       idToken: tokens.idToken ?? session.idToken,
-      accessToken: tokens.accessToken ?? session.accessToken,
+      preferredUsername:
+        claims?.preferred_username ?? session.preferredUsername,
+      realm: getRealmFromIssuer(getKeycloakIssuer()),
+      sub: claims?.sub ?? session.sub,
     }
   } catch {
     return session
@@ -120,25 +120,24 @@ async function hydrateSessionTokens(
 
 export const auth = betterAuth({
   baseURL: getBaseUrl(),
-  secret: process.env.BETTER_AUTH_SECRET ?? "mizumi-webui-dev-auth-secret",
   plugins: [
     genericOAuth({
       config: [
         {
-          providerId: KEYCLOAK_PROVIDER_ID,
-          clientId: process.env.KEYCLOAK_CLIENT_ID ?? "webui",
-          clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? "webui-secret",
-          issuer: getKeycloakIssuer(),
           authorizationUrl: getKeycloakEndpoint(
             getKeycloakPublicBaseUrl(),
             "auth"
           ),
+          clientId: process.env.KEYCLOAK_CLIENT_ID ?? "webui",
+          clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? "webui-secret",
+          issuer: getKeycloakIssuer(),
+          providerId: KEYCLOAK_PROVIDER_ID,
+          scopes: ["openid", "profile", "email", "offline_access"],
           tokenUrl: getKeycloakEndpoint(getKeycloakInternalBaseUrl(), "token"),
           userInfoUrl: getKeycloakEndpoint(
             getKeycloakInternalBaseUrl(),
             "userinfo"
           ),
-          scopes: ["openid", "profile", "email", "offline_access"],
         },
       ],
     }),
@@ -149,14 +148,15 @@ export const auth = betterAuth({
       )
 
       return buildAppSession({
+        accessToken: account?.accessToken,
+        idToken: account?.idToken,
         session,
         user,
-        idToken: account?.idToken,
-        accessToken: account?.accessToken,
       })
     }),
     nextCookies(),
   ],
+  secret: process.env.BETTER_AUTH_SECRET ?? "mizumi-webui-dev-auth-secret",
 })
 
 export async function getServerSession() {

@@ -8,14 +8,14 @@ import { useChart } from "./chart-context"
 type CurveFactory = any
 
 export interface PatternAreaProps {
+  /** @deprecated Pattern fill is not clip-revealed; only the stroke `Area` animates. */
+  animate?: boolean
+  /** Curve function. Default: curveMonotoneX */
+  curve?: CurveFactory
   /** Key in data to use for y values */
   dataKey: string
   /** Fill color or pattern URL (e.g. `url(#pattern-id)`) */
   fill: string
-  /** Curve function. Default: curveMonotoneX */
-  curve?: CurveFactory
-  /** @deprecated Pattern fill is not clip-revealed; only the stroke `Area` animates. */
-  animate?: boolean
 }
 
 /**

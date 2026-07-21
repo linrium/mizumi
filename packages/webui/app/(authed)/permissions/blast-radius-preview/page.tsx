@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -24,7 +24,7 @@ function formatScopeLabel(scope: string) {
 function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "processing") {
     return (
-      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+      <Badge className="animate-pulse text-muted-foreground" variant="outline">
         LLM analysing…
       </Badge>
     )
@@ -32,8 +32,8 @@ function LlmRiskBadge({ status }: { status: LlmRiskStatus }) {
   if (status === "failed") {
     return (
       <Badge
+        className="border-destructive/40 text-destructive"
         variant="outline"
-        className="text-destructive border-destructive/40"
       >
         LLM failed
       </Badge>
@@ -69,23 +69,23 @@ export default function BlastRadiusPreviewPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b shrink-0 px-3 py-2.5">
+      <div className="shrink-0 border-b px-3 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-sm font-semibold">Blast-radius preview</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="font-semibold text-sm">Blast-radius preview</h1>
+            <p className="mt-0.5 text-muted-foreground text-xs">
               Impact analysis for requests that touch shared or sensitive
               resources.
             </p>
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {resolvedCount} request{resolvedCount === 1 ? "" : "s"} resolved to
             lineage
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow className="hover:bg-transparent">
@@ -99,8 +99,8 @@ export default function BlastRadiusPreviewPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
                   className="h-24 text-center text-muted-foreground"
+                  colSpan={4}
                 >
                   Loading…
                 </TableCell>
@@ -112,12 +112,12 @@ export default function BlastRadiusPreviewPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/permissions/${item.request_id}`}
                           className="font-medium hover:underline"
+                          href={`/permissions/${item.request_id}`}
                         >
                           {item.requester}
                         </Link>
-                        <span className="font-mono text-xs text-muted-foreground">
+                        <span className="font-mono text-muted-foreground text-xs">
                           {item.code}
                         </span>
                       </div>
@@ -125,7 +125,7 @@ export default function BlastRadiusPreviewPage() {
                   </TableCell>
                   <TableCell className="align-top">
                     <div className="space-y-1">
-                      <div className="font-mono text-xs text-muted-foreground">
+                      <div className="font-mono text-muted-foreground text-xs">
                         {item.resource}
                       </div>
                       <Badge variant="outline">
@@ -133,15 +133,15 @@ export default function BlastRadiusPreviewPage() {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="align-top text-xs text-muted-foreground">
+                  <TableCell className="align-top text-muted-foreground text-xs">
                     {item.lineage_resolved ? (
                       <span>
                         {[
-                          { v: item.total_downstream_nodes, l: "nodes" },
-                          { v: item.downstream_tables, l: "datasets" },
-                          { v: item.downstream_assets, l: "assets" },
-                          { v: item.downstream_jobs, l: "jobs" },
-                          { v: item.downstream_schedules, l: "schedules" },
+                          { l: "nodes", v: item.total_downstream_nodes },
+                          { l: "datasets", v: item.downstream_tables },
+                          { l: "assets", v: item.downstream_assets },
+                          { l: "jobs", v: item.downstream_jobs },
+                          { l: "schedules", v: item.downstream_schedules },
                         ]
                           .filter(({ v }) => v > 0)
                           .map(({ v, l }) => `${v} ${l}`)
@@ -151,23 +151,22 @@ export default function BlastRadiusPreviewPage() {
                       <span>No lineage root</span>
                     )}
                   </TableCell>
-                  <TableCell className="align-top max-w-56">
+                  <TableCell className="max-w-56 align-top">
                     <div className="space-y-1.5">
                       <LlmRiskBadge status={item.llm_risk} />
                       {item.llm_recommendation && (
-                        <p className="text-xs font-medium whitespace-normal">
+                        <p className="whitespace-normal font-medium text-xs">
                           {item.llm_recommendation}
                         </p>
                       )}
                       {item.llm_explanation && (
-                        <p className="text-xs text-muted-foreground whitespace-normal">
+                        <p className="whitespace-normal text-muted-foreground text-xs">
                           {item.llm_explanation}
                         </p>
                       )}
-                      {!item.llm_recommendation &&
-                        !item.llm_explanation &&
+                      {!(item.llm_recommendation || item.llm_explanation) &&
                         item.recommended_guardrail && (
-                          <p className="text-xs text-muted-foreground whitespace-normal">
+                          <p className="whitespace-normal text-muted-foreground text-xs">
                             {item.recommended_guardrail}
                           </p>
                         )}

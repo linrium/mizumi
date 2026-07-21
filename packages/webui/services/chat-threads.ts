@@ -48,9 +48,9 @@ export async function createChatThread(
   payload: ChatThreadPayload = {}
 ): Promise<ChatThread> {
   const response = await apiFetch("/api/chat/threads", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   })
   if (!response.ok) {
     throw new Error(await readJsonError(response))
@@ -65,9 +65,9 @@ export async function updateChatThread(
   const response = await apiFetch(
     `/api/chat/threads/${encodeURIComponent(id)}`,
     {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
     }
   )
   if (!response.ok) {

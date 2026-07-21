@@ -5,10 +5,10 @@ export type Direction = "ltr" | "rtl"
 export type RowHeightValue = "short" | "medium" | "tall" | "extra-tall"
 
 export interface CellSelectOption {
+  count?: number
+  icon?: React.FC<React.SVGProps<SVGSVGElement>>
   label: string
   value: string
-  icon?: React.FC<React.SVGProps<SVGSVGElement>>
-  count?: number
 }
 
 export type CellOpts =
@@ -50,42 +50,43 @@ export type CellOpts =
     }
 
 export interface CellUpdate {
-  rowIndex: number
   columnId: string
+  rowIndex: number
   value: unknown
 }
 
 declare module "@tanstack/react-table" {
-  // biome-ignore lint/correctness/noUnusedVariables: TData and TValue are used in the ColumnMeta interface
   interface ColumnMeta<TData extends RowData, TValue> {
-    label?: string
     cell?: CellOpts
+    label?: string
   }
 
-  // biome-ignore lint/correctness/noUnusedVariables: TData is used in the TableMeta interface
   interface TableMeta<TData extends RowData> {
-    dataGridRef?: React.RefObject<HTMLElement | null>
     cellMapRef?: React.RefObject<Map<string, HTMLDivElement>>
-    focusedCell?: CellPosition | null
+    contextMenu?: ContextMenuState
+    dataGridRef?: React.RefObject<HTMLElement | null>
     editingCell?: CellPosition | null
-    selectionState?: SelectionState
-    searchOpen?: boolean
+    focusedCell?: CellPosition | null
+    getIsActiveSearchMatch?: (rowIndex: number, columnId: string) => boolean
     getIsCellSelected?: (rowIndex: number, columnId: string) => boolean
     getIsSearchMatch?: (rowIndex: number, columnId: string) => boolean
-    getIsActiveSearchMatch?: (rowIndex: number, columnId: string) => boolean
     getVisualRowIndex?: (rowId: string) => number | undefined
-    rowHeight?: RowHeightValue
-    onRowHeightChange?: (value: RowHeightValue) => void
-    onRowSelect?: (rowId: string, checked: boolean, shiftKey: boolean) => void
-    onDataUpdate?: (params: CellUpdate | Array<CellUpdate>) => void
-    onRowsDelete?: (rowIndices: number[]) => void | Promise<void>
-    onColumnClick?: (columnId: string) => void
     onCellClick?: (
       rowIndex: number,
       columnId: string,
       event?: React.MouseEvent
     ) => void
+    onCellContextMenu?: (
+      rowIndex: number,
+      columnId: string,
+      event: React.MouseEvent
+    ) => void
     onCellDoubleClick?: (rowIndex: number, columnId: string) => void
+    onCellEditingStart?: (rowIndex: number, columnId: string) => void
+    onCellEditingStop?: (opts?: {
+      direction?: NavigationDirection
+      moveToNextRow?: boolean
+    }) => void
     onCellMouseDown?: (
       rowIndex: number,
       columnId: string,
@@ -93,52 +94,49 @@ declare module "@tanstack/react-table" {
     ) => void
     onCellMouseEnter?: (rowIndex: number, columnId: string) => void
     onCellMouseUp?: () => void
-    onCellContextMenu?: (
-      rowIndex: number,
-      columnId: string,
-      event: React.MouseEvent
-    ) => void
-    onCellEditingStart?: (rowIndex: number, columnId: string) => void
-    onCellEditingStop?: (opts?: {
-      direction?: NavigationDirection
-      moveToNextRow?: boolean
-    }) => void
     onCellsCopy?: () => void
     onCellsCut?: () => void
     onCellsPaste?: (expand?: boolean) => void
-    onSelectionClear?: () => void
-    onFilesUpload?: (params: {
-      files: File[]
-      rowIndex: number
-      columnId: string
-    }) => Promise<FileCellData[]>
+    onColumnClick?: (columnId: string) => void
+    onContextMenuOpenChange?: (open: boolean) => void
+    onDataUpdate?: (params: CellUpdate | CellUpdate[]) => void
     onFilesDelete?: (params: {
       fileIds: string[]
       rowIndex: number
       columnId: string
     }) => void | Promise<void>
-    contextMenu?: ContextMenuState
-    onContextMenuOpenChange?: (open: boolean) => void
-    pasteDialog?: PasteDialogState
+    onFilesUpload?: (params: {
+      files: File[]
+      rowIndex: number
+      columnId: string
+    }) => Promise<FileCellData[]>
     onPasteDialogOpenChange?: (open: boolean) => void
+    onRowHeightChange?: (value: RowHeightValue) => void
+    onRowSelect?: (rowId: string, checked: boolean, shiftKey: boolean) => void
+    onRowsDelete?: (rowIndices: number[]) => void | Promise<void>
+    onSelectionClear?: () => void
+    pasteDialog?: PasteDialogState
     readOnly?: boolean
+    rowHeight?: RowHeightValue
+    searchOpen?: boolean
+    selectionState?: SelectionState
   }
 }
 
 export interface CellPosition {
-  rowIndex: number
   columnId: string
+  rowIndex: number
 }
 
 export interface CellRange {
-  start: CellPosition
   end: CellPosition
+  start: CellPosition
 }
 
 export interface SelectionState {
+  isSelecting: boolean
   selectedCells: Set<string>
   selectionRange: CellRange | null
-  isSelecting: boolean
 }
 
 export interface ContextMenuState {
@@ -148,9 +146,9 @@ export interface ContextMenuState {
 }
 
 export interface PasteDialogState {
+  clipboardText: string
   open: boolean
   rowsNeeded: number
-  clipboardText: string
 }
 
 export type NavigationDirection =
@@ -170,29 +168,29 @@ export type NavigationDirection =
   | "pageright"
 
 export interface SearchState {
-  searchMatches: CellPosition[]
   matchIndex: number
-  searchOpen: boolean
-  onSearchOpenChange: (open: boolean) => void
-  searchQuery: string
-  onSearchQueryChange: (query: string) => void
-  onSearch: (query: string) => void
   onNavigateToNextMatch: () => void
   onNavigateToPrevMatch: () => void
+  onSearch: (query: string) => void
+  onSearchOpenChange: (open: boolean) => void
+  onSearchQueryChange: (query: string) => void
+  searchMatches: CellPosition[]
+  searchOpen: boolean
+  searchQuery: string
 }
 
 export interface DataGridCellProps<TData> {
   cell: Cell<TData, unknown>
-  tableMeta: TableMeta<TData>
-  rowIndex: number
   columnId: string
-  rowHeight: RowHeightValue
+  isActiveSearchMatch: boolean
   isEditing: boolean
   isFocused: boolean
-  isSelected: boolean
   isSearchMatch: boolean
-  isActiveSearchMatch: boolean
+  isSelected: boolean
   readOnly: boolean
+  rowHeight: RowHeightValue
+  rowIndex: number
+  tableMeta: TableMeta<TData>
 }
 
 export interface FileCellData {
@@ -253,7 +251,7 @@ export type FilterOperator =
   | BooleanFilterOperator
 
 export interface FilterValue {
+  endValue?: string | number
   operator: FilterOperator
   value?: string | number | string[]
-  endValue?: string | number
 }
