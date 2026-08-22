@@ -508,7 +508,7 @@ q "Build ${SPARK_IMAGE}"                   docker build -t "${SPARK_IMAGE}" pack
 q "Build ${DAFT_IMAGE}"                    docker build -t "${DAFT_IMAGE}" -f packages/daft/Dockerfile .
 q "Build ${DAFT_BAGGAGE_CLASSIFIER_IMAGE}" docker build -t "${DAFT_BAGGAGE_CLASSIFIER_IMAGE}" -f packages/daft/Dockerfile.baggage-classifier .
 q "Build ${DUCKDB_IMAGE}"                  docker build -t "${DUCKDB_IMAGE}" -f packages/duckdb/Dockerfile .
-q "Build ${DUCKDB_SERVER_IMAGE}"           docker build -t "${DUCKDB_SERVER_IMAGE}" packages/duckdb-server
+q "Build ${DUCKDB_SERVER_IMAGE}"           docker build -t "${DUCKDB_SERVER_IMAGE}" -f packages/duckdb-server/Dockerfile .
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────
