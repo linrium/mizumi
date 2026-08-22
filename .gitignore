@@ -18,3 +18,4 @@ packages/duckdb_uc/
 data/
 .DS_Store
 .env
+.build/
