@@ -467,9 +467,9 @@ fn validate_create_request(req: &CreateSemanticDefinitionRequest) -> Result<(), 
     validate_identifier("namespace", &req.namespace)?;
     validate_identifier("name", &req.name)?;
     validate_identifier("owner_principal", &req.owner_principal)?;
-    if req.object_type.trim() != "metric" {
+    if !["metric", "data_contract"].contains(&req.object_type.trim()) {
         return Err(AppError::BadRequest(
-            "only metric semantic definitions are supported in the MVP".into(),
+            "object_type must be metric or data_contract".into(),
         ));
     }
     if req.version <= 0 {
@@ -478,9 +478,7 @@ fn validate_create_request(req: &CreateSemanticDefinitionRequest) -> Result<(), 
         ));
     }
     if !req.spec.is_object() {
-        return Err(AppError::BadRequest(
-            "metric spec must be a JSON object".into(),
-        ));
+        return Err(AppError::BadRequest("spec must be a JSON object".into()));
     }
     for dep in &req.physical_dependencies {
         validate_physical_dependency(dep)?;

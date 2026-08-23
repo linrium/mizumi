@@ -14,6 +14,7 @@ NC='\033[0m'
 CONTROLPLANE_NS=controlplane
 CONTROLPLANE_MANIFESTS=infra/k8s/controlplane
 CONTROLPLANE_IMAGE=mizumi-controlplane:0.1.0
+DATA_CONTRACT_BOOTSTRAP_IMAGE=mizumi-data-contract-bootstrap:0.1.0
 
 WEBUI_NS=webui
 WEBUI_MANIFESTS=infra/k8s/webui
@@ -543,6 +544,8 @@ step "Build & deploy Controlplane"
 #───────────────────────────────────────────────────────────────────────────────
 q "Build ${CONTROLPLANE_IMAGE}" \
   docker build -f packages/controlplane/Dockerfile -t "${CONTROLPLANE_IMAGE}" .
+q "Build ${DATA_CONTRACT_BOOTSTRAP_IMAGE}" \
+  docker build -f packages/data-contract-bootstrap/Dockerfile -t "${DATA_CONTRACT_BOOTSTRAP_IMAGE}" .
 q "Create namespace" kubectl create namespace "${CONTROLPLANE_NS}" 2>/dev/null || true
 q "Create controlplane-secret" apply_openai_secret "${CONTROLPLANE_NS}" controlplane-secret
 q "Apply Postgres alias" kubectl apply -f "${CONTROLPLANE_MANIFESTS}/postgres.yaml"
@@ -556,6 +559,13 @@ q "Apply bootstrap job" \
 v "Wait for bootstrap job" \
   kubectl wait --for=condition=complete job/controlplane-bootstrap -n "${CONTROLPLANE_NS}" --timeout=180s
 v "Bootstrap logs" kubectl logs job/controlplane-bootstrap -n "${CONTROLPLANE_NS}"
+q "Delete stale data contract sync job" \
+  kubectl delete job data-contract-sync -n "${CONTROLPLANE_NS}" --ignore-not-found
+q "Apply data contract sync job" \
+  kubectl apply -f "${CONTROLPLANE_MANIFESTS}/data-contract-sync-job.yaml"
+v "Wait for data contract sync job" \
+  kubectl wait --for=condition=complete job/data-contract-sync -n "${CONTROLPLANE_NS}" --timeout=180s
+v "Data contract sync logs" kubectl logs job/data-contract-sync -n "${CONTROLPLANE_NS}"
 step_done
 
 #───────────────────────────────────────────────────────────────────────────────

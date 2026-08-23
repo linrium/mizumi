@@ -1,7 +1,9 @@
 pub mod chat_thread;
+pub mod data_contract;
 pub mod lineage;
 pub mod permission;
 pub mod query;
+pub mod semantic_registry;
 pub mod streaming;
 pub mod team;
 pub mod test_event;

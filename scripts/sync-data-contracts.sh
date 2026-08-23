@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONTROLPLANE_URL="${CONTROLPLANE_URL:-http://localhost:4000}"
+UC_URL="${UC_URL:-http://localhost:8082}"
+CONTROLPLANE_TOKEN="${CONTROLPLANE_TOKEN:-test}"
+CONTRACT_VERSION="${CONTRACT_VERSION:-1}"
+ACTIVATE_CONTRACTS="${ACTIVATE_CONTRACTS:-true}"
+
+export CONTROLPLANE_URL UC_URL CONTROLPLANE_TOKEN CONTRACT_VERSION ACTIVATE_CONTRACTS
+export UC_TOKEN="${UC_TOKEN:-}"
+export UC_TOKEN_FILE="${UC_TOKEN_FILE:-packages/uc/config/token.txt}"
+export CATALOG_FILTER="${CATALOG_FILTER:-}"
+export SCHEMA_FILTER="${SCHEMA_FILTER:-}"
+
+python3 packages/data-contract-bootstrap/bootstrap.py

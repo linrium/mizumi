@@ -1,11 +1,13 @@
 pub mod chat_thread_service;
 pub mod dagster_service;
+pub mod data_contract_service;
 pub mod expiry_worker;
 pub mod k8s_service;
 pub mod lineage_service;
 pub mod llm_service;
 pub mod mlflow_service;
 pub mod permission_service;
+pub mod semantic_registry_service;
 pub mod streaming_service;
 pub mod team_service;
 pub mod test_event_service;

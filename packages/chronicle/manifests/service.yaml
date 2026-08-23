@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chronicle
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chronicle
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

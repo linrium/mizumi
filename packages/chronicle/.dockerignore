@@ -1,0 +1,6 @@
+.data/
+.git/
+k8s/
+tmp/
+Dockerfile
+*.test

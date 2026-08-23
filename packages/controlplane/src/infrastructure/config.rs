@@ -69,6 +69,18 @@ pub struct DuckdbServerConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct DataContractCliConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_data_contract_cli_image")]
+    pub image: String,
+    #[serde(default = "default_data_contract_cli_namespace")]
+    pub namespace: String,
+    #[serde(default = "default_data_contract_cli_timeout_seconds")]
+    pub timeout_seconds: u64,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
     #[serde(default)]
@@ -83,6 +95,8 @@ pub struct Config {
     pub keycloak: KeycloakConfig,
     #[serde(default)]
     pub duckdb_server: DuckdbServerConfig,
+    #[serde(default)]
+    pub data_contract_cli: DataContractCliConfig,
     #[serde(default)]
     pub openai: OpenAiConfig,
 }
@@ -129,6 +143,18 @@ fn default_duckdb_server_uri() -> String {
     "quack:localhost:8090".to_string()
 }
 
+fn default_data_contract_cli_image() -> String {
+    "datacontract/cli:latest".to_string()
+}
+
+fn default_data_contract_cli_namespace() -> String {
+    "spark".to_string()
+}
+
+fn default_data_contract_cli_timeout_seconds() -> u64 {
+    120
+}
+
 fn default_openai_base_url() -> String {
     "https://api.openai.com/v1".to_string()
 }
@@ -137,6 +163,17 @@ impl Default for DuckdbServerConfig {
     fn default() -> Self {
         Self {
             uri: default_duckdb_server_uri(),
+        }
+    }
+}
+
+impl Default for DataContractCliConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            image: default_data_contract_cli_image(),
+            namespace: default_data_contract_cli_namespace(),
+            timeout_seconds: default_data_contract_cli_timeout_seconds(),
         }
     }
 }

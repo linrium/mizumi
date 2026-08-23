@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-contract-sync
+  namespace: controlplane
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: sync
+          image: mizumi-data-contract-bootstrap:0.1.0
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: CONTROLPLANE_URL
+              value: "http://controlplane-svc.controlplane.svc.cluster.local:4000"
+            - name: UC_URL
+              value: "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080"
+            - name: CONTROLPLANE_TOKEN
+              value: "test"
+            - name: CONTRACT_VERSION
+              value: "1"
+            - name: ACTIVATE_CONTRACTS
+              value: "true"
+            - name: UC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: unitycatalog-auth
+                  key: UC_INTERNAL_SERVICE_TOKEN

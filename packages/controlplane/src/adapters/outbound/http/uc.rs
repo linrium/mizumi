@@ -6,6 +6,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde_json::Value;
 
 use crate::infrastructure::telemetry;
 
@@ -123,6 +124,26 @@ impl UnityCatalogHttpProxy {
     ) -> Result<(), String> {
         self.patch_permissions(scope, resource, principal, &[], privileges)
             .await
+    }
+
+    pub async fn get_table(&self, full_name: &str) -> Result<Value, String> {
+        let uc_url = format!("{}/tables/{}", self.base_url, full_name);
+        let response =
+            telemetry::inject_trace(client().get(&uc_url).bearer_auth(&self.admin_token))
+                .send()
+                .await
+                .map_err(|e| format!("UC table request failed: {e}"))?;
+
+        if response.status().is_success() {
+            return response
+                .json::<Value>()
+                .await
+                .map_err(|e| format!("UC table response was not JSON: {e}"));
+        }
+
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        Err(format!("UC table request failed with {status}: {body}"))
     }
 
     async fn patch_permissions(

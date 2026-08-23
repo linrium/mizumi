@@ -163,6 +163,130 @@ export async function getTableAction(
   return getTable(catalog, schema, table)
 }
 
+async function controlplaneFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = await getServerSession()
+  const headers = new Headers(init?.headers)
+  if (session?.idToken) {
+    headers.set("Authorization", `Bearer ${session.idToken}`)
+  }
+  if (init?.body) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    cache: "no-store",
+    ...init,
+    headers,
+  })
+
+  if (!res.ok) {
+    throw new Error(await res.text())
+  }
+
+  return (await res.json()) as T
+}
+
+async function controlplaneText(path: string, init?: RequestInit): Promise<string> {
+  const session = await getServerSession()
+  const headers = new Headers(init?.headers)
+  if (session?.idToken) {
+    headers.set("Authorization", `Bearer ${session.idToken}`)
+  }
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    cache: "no-store",
+    ...init,
+    headers,
+  })
+
+  if (!res.ok) {
+    throw new Error(await res.text())
+  }
+
+  return res.text()
+}
+
+export async function getTableContractAction(
+  catalog: string,
+  schema: string,
+  table: string
+) {
+  const namespace = `${catalog}.${schema}`
+  const params = new URLSearchParams({ namespace, search: table })
+  const list = await controlplaneFetch<{
+    contracts: Array<{
+      namespace: string
+      name: string
+      active_version: number | null
+      latest_version: number
+    }>
+  }>(`/api/data-contracts?${params.toString()}`)
+  const summary = list.contracts.find(
+    (item) => item.namespace === namespace && item.name === table
+  )
+  if (!summary) return null
+
+  const version = summary.active_version ?? summary.latest_version
+  return controlplaneFetch(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}`
+  )
+}
+
+export async function importTableContractAction(
+  catalog: string,
+  schema: string,
+  table: string
+) {
+  return controlplaneFetch("/api/data-contracts/import-from-uc", {
+    method: "POST",
+    body: JSON.stringify({
+      table: `${catalog}.${schema}.${table}`,
+      version: 1,
+    }),
+  })
+}
+
+export async function validateTableContractAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number
+) {
+  const namespace = `${catalog}.${schema}`
+  return controlplaneFetch(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/validate`,
+    {
+      method: "POST",
+      body: JSON.stringify({ metadata_only: true }),
+    }
+  )
+}
+
+export async function activateTableContractAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number
+) {
+  const namespace = `${catalog}.${schema}`
+  return controlplaneFetch(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/activate`,
+    { method: "POST" }
+  )
+}
+
+export async function getTableContractYamlAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number
+) {
+  const namespace = `${catalog}.${schema}`
+  return controlplaneText(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/odcs.yaml`
+  )
+}
+
 export async function getPermissionsAction(
   resourceType: "catalog" | "schema" | "table",
   catalog: string,

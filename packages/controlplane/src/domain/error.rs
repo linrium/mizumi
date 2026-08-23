@@ -22,6 +22,8 @@ pub enum AppError {
     #[error("not found")]
     NotFound,
     #[error("{0}")]
+    BadRequest(String),
+    #[error("{0}")]
     Conflict(String),
 }
 
@@ -30,6 +32,7 @@ impl IntoResponse for AppError {
         let status = match &self {
             AppError::Timeout => StatusCode::GATEWAY_TIMEOUT,
             AppError::QueryFailed(_) => StatusCode::BAD_REQUEST,
+            AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,

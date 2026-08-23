@@ -1,9 +1,11 @@
 pub mod chat_threads;
 pub mod dagster;
+pub mod data_contracts;
 pub mod k8s;
 pub mod lineage;
 pub mod mlflow;
 pub mod permissions;
+pub mod semantic_registry;
 pub mod streaming;
 pub mod teams;
 pub mod tests;
@@ -18,7 +20,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::Response,
-    routing::{any, delete, get, post},
+    routing::{any, delete, get, patch, post},
 };
 use tower_http::cors::CorsLayer;
 
@@ -182,6 +184,62 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/lineage/nodes/{token}", get(lineage::get_lineage_node))
         .route("/api/lineage/graph", get(lineage::get_lineage_graph))
         .route("/api/lineage/blast-radius", get(lineage::get_blast_radius))
+        .route(
+            "/api/semantic-registry/definitions",
+            get(semantic_registry::list_definitions).post(semantic_registry::create_definition),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}",
+            get(semantic_registry::list_versions),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}/versions",
+            post(semantic_registry::create_version),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}/versions/{version}",
+            get(semantic_registry::get_definition_version),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}/versions/{version}/status",
+            patch(semantic_registry::transition_status),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}/versions/{version}/graph",
+            get(semantic_registry::get_graph),
+        )
+        .route(
+            "/api/semantic-registry/definitions/{namespace}/{name}/compare",
+            get(semantic_registry::compare_versions),
+        )
+        .route(
+            "/api/data-contracts",
+            get(data_contracts::list_contracts).post(data_contracts::create_contract),
+        )
+        .route(
+            "/api/data-contracts/import-from-uc",
+            post(data_contracts::import_from_uc),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions",
+            get(data_contracts::list_contract_versions),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}",
+            get(data_contracts::get_contract_version),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/odcs.yaml",
+            get(data_contracts::get_contract_yaml),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/validate",
+            post(data_contracts::validate_contract_version),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/activate",
+            post(data_contracts::activate_contract_version),
+        )
         .route("/dagster/assets", get(dagster::list_assets))
         .route("/dagster/asset-nodes", get(dagster::list_asset_nodes))
         .route("/dagster/asset-nodes/{*path}", get(dagster::get_asset_node))

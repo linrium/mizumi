@@ -85,6 +85,12 @@ spec:
                   key: UC_INTERNAL_SERVICE_TOKEN
             - name: DUCKDB_SERVER__URI
               value: "quack:duckdb-server-svc.spark.svc.cluster.local:9494"
+            - name: DATA_CONTRACT_CLI__ENABLED
+              value: "false"
+            - name: DATA_CONTRACT_CLI__IMAGE
+              value: "datacontract/cli:latest"
+            - name: DATA_CONTRACT_CLI__NAMESPACE
+              value: "spark"
             - name: DUCKDB_UC_TOKEN
               valueFrom:
                 secretKeyRef:

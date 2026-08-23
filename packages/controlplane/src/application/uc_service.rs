@@ -41,4 +41,8 @@ impl UnityCatalogProxyService {
             .revoke_permissions(scope, resource, principal, privileges)
             .await
     }
+
+    pub async fn get_table(&self, full_name: &str) -> Result<serde_json::Value, String> {
+        self.proxy.get_table(full_name).await
+    }
 }

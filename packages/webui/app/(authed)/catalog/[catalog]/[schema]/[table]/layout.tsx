@@ -2,6 +2,7 @@
 
 import {
   IconCopy,
+  IconFileCertificate,
   IconEyeTable,
   IconKey,
   IconSchema,
@@ -15,7 +16,12 @@ import { cn } from "@/lib/utils"
 import { getTableAction } from "../../../actions"
 import { TableContext, type TableDetail } from "./table-context"
 
-type Tab = "schema" | "preview" | "permissions" | "request-permissions"
+type Tab =
+  | "schema"
+  | "preview"
+  | "contracts"
+  | "permissions"
+  | "request-permissions"
 
 export default function TableLayout({
   children,
@@ -34,6 +40,8 @@ export default function TableLayout({
 
   const activeTab: Tab = pathname.endsWith("/preview")
     ? "preview"
+    : pathname.endsWith("/contracts")
+      ? "contracts"
     : pathname.endsWith("/request-permissions")
       ? "request-permissions"
       : pathname.endsWith("/permissions")
@@ -68,6 +76,8 @@ export default function TableLayout({
         ? basePath
         : tab === "preview"
           ? `${basePath}/preview`
+          : tab === "contracts"
+            ? `${basePath}/contracts`
           : tab === "permissions"
             ? `${basePath}/permissions`
             : `${basePath}/request-permissions`
@@ -112,6 +122,11 @@ export default function TableLayout({
             [
               { key: "schema", label: "schema", icon: IconSchema },
               { key: "preview", label: "preview", icon: IconEyeTable },
+              {
+                key: "contracts",
+                label: "contracts",
+                icon: IconFileCertificate,
+              },
               {
                 key: "permissions",
                 label: "permissions",

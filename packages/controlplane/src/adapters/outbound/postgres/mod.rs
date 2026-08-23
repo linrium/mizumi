@@ -3,6 +3,7 @@ pub mod chat_threads;
 pub mod lineage;
 pub mod permission_requests;
 pub mod policy_templates;
+pub mod semantic_registry;
 pub mod streaming_jobs;
 pub mod teams;
 pub mod time_bound_grants;

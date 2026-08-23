@@ -13,7 +13,7 @@ export type SemanticDefinition = {
   id: string
   namespace: string
   name: string
-  object_type: "metric"
+  object_type: "metric" | "data_contract"
   version: number
   status: SemanticStatus
   owner_principal: string
@@ -59,7 +59,7 @@ export type SemanticLifecycleEvent = {
 export type SemanticDefinitionSummary = {
   namespace: string
   name: string
-  object_type: "metric"
+  object_type: "metric" | "data_contract"
   owner_principal: string
   description: string
   active_version: number | null
@@ -84,7 +84,7 @@ export type SemanticDefinitionDetail = {
 export type CreateSemanticDefinitionBody = {
   namespace: string
   name: string
-  object_type?: "metric"
+  object_type?: "metric" | "data_contract"
   version: number
   owner_principal: string
   description: string

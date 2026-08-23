@@ -4,26 +4,32 @@ set -euo pipefail
 CONTROLPLANE_NS="${CONTROLPLANE_NS:-controlplane}"
 CONTROLPLANE_MANIFESTS="${CONTROLPLANE_MANIFESTS:-infra/k8s/controlplane}"
 CONTROLPLANE_IMAGE="${CONTROLPLANE_IMAGE:-mizumi-controlplane:0.1.0}"
+DATA_CONTRACT_BOOTSTRAP_IMAGE="${DATA_CONTRACT_BOOTSTRAP_IMAGE:-mizumi-data-contract-bootstrap:0.1.0}"
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-120s}"
 EXPECTED_CONTEXT="${EXPECTED_CONTEXT:-}"
 KIND_CLUSTER="${KIND_CLUSTER:-}"
 
 BUILD=true
 BOOTSTRAP=false
+SYNC_CONTRACTS=false
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--skip-build] [--bootstrap]
+Usage: $(basename "$0") [--skip-build] [--bootstrap] [--sync-contracts]
 
 Redeploy only the controlplane service.
 
 Options:
   --skip-build   Reuse the existing local image tag
   --bootstrap    Re-run infra/k8s/controlplane/bootstrap-job.yaml after rollout
+  --sync-contracts
+                 Re-run infra/k8s/controlplane/data-contract-sync-job.yaml after rollout
   -h, --help     Show this help
 
 Environment:
   CONTROLPLANE_IMAGE      Image tag to build (default: mizumi-controlplane:0.1.0)
+  DATA_CONTRACT_BOOTSTRAP_IMAGE
+                          Image tag for the data-contract sync job
   CONTROLPLANE_NS         Kubernetes namespace (default: controlplane)
   CONTROLPLANE_MANIFESTS  Manifest directory (default: infra/k8s/controlplane)
   WAIT_TIMEOUT            Rollout/bootstrap wait timeout (default: 120s)
@@ -40,6 +46,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --bootstrap)
       BOOTSTRAP=true
+      shift
+      ;;
+    --sync-contracts)
+      SYNC_CONTRACTS=true
       shift
       ;;
     -h|--help|help)
@@ -111,11 +121,15 @@ check_context
 if [[ "${BUILD}" == "true" ]]; then
   log "building ${CONTROLPLANE_IMAGE}"
   docker build -f packages/controlplane/Dockerfile -t "${CONTROLPLANE_IMAGE}" .
+  log "building ${DATA_CONTRACT_BOOTSTRAP_IMAGE}"
+  docker build -f packages/data-contract-bootstrap/Dockerfile -t "${DATA_CONTRACT_BOOTSTRAP_IMAGE}" .
 
   if [[ -n "${KIND_CLUSTER}" ]]; then
     require_command kind
     log "loading ${CONTROLPLANE_IMAGE} into kind cluster ${KIND_CLUSTER}"
     kind load docker-image "${CONTROLPLANE_IMAGE}" --name "${KIND_CLUSTER}"
+    log "loading ${DATA_CONTRACT_BOOTSTRAP_IMAGE} into kind cluster ${KIND_CLUSTER}"
+    kind load docker-image "${DATA_CONTRACT_BOOTSTRAP_IMAGE}" --name "${KIND_CLUSTER}"
   fi
 else
   log "skipping image build"
@@ -145,6 +159,15 @@ if [[ "${BOOTSTRAP}" == "true" ]]; then
   kubectl wait --for=condition=complete job/controlplane-bootstrap \
     -n "${CONTROLPLANE_NS}" --timeout="${WAIT_TIMEOUT}"
   kubectl logs job/controlplane-bootstrap -n "${CONTROLPLANE_NS}"
+fi
+
+if [[ "${SYNC_CONTRACTS}" == "true" ]]; then
+  log "re-running data contract sync job"
+  kubectl delete job data-contract-sync -n "${CONTROLPLANE_NS}" --ignore-not-found
+  kubectl apply -f "${CONTROLPLANE_MANIFESTS}/data-contract-sync-job.yaml"
+  kubectl wait --for=condition=complete job/data-contract-sync \
+    -n "${CONTROLPLANE_NS}" --timeout="${WAIT_TIMEOUT}"
+  kubectl logs job/data-contract-sync -n "${CONTROLPLANE_NS}"
 fi
 
 log "redeploy complete"

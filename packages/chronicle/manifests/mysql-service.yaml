@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle-mysql
+spec:
+  selector:
+    app.kubernetes.io/name: chronicle-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql

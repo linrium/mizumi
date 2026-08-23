@@ -13,9 +13,10 @@ use adapters::outbound::http::mlflow::MlflowHttpProxy;
 use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
     chat_thread_service::ChatThreadService, dagster_service::DagsterService,
-    expiry_worker::ExpiryWorker, k8s_service::K8sQueryService, lineage_service::LineageService,
-    llm_service::LlmService, mlflow_service::MlflowProxyService,
-    permission_service::PermissionService, streaming_service::StreamingJobService,
+    data_contract_service::DataContractService, expiry_worker::ExpiryWorker,
+    k8s_service::K8sQueryService, lineage_service::LineageService, llm_service::LlmService,
+    mlflow_service::MlflowProxyService, permission_service::PermissionService,
+    semantic_registry_service::SemanticRegistryService, streaming_service::StreamingJobService,
     team_service::TeamService, test_event_service::TestEventService,
     uc_service::UnityCatalogProxyService, user_service::UserService,
 };
@@ -66,6 +67,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let state = Arc::new(AppState {
         chat_thread_service: Arc::new(ChatThreadService::new(db.clone())),
+        data_contract_service: Arc::new(DataContractService::new(
+            db.clone(),
+            UnityCatalogProxyService::new(UnityCatalogHttpProxy::new(
+                config.unity_catalog.base_url.clone(),
+                uc_admin_token.clone(),
+            )),
+            config.data_contract_cli.clone(),
+        )),
         dagster_service: Arc::new(DagsterService),
         mlflow_service: Arc::new(MlflowProxyService::new(MlflowHttpProxy::new(
             config.mlflow.base_url.clone(),
@@ -85,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )),
             llm_service,
         )),
+        semantic_registry_service: Arc::new(SemanticRegistryService::new(db.clone())),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),
         team_service: Arc::new(TeamService::new(db.clone())),
         test_event_service: Arc::new(TestEventService::new(kafka_producer)),
