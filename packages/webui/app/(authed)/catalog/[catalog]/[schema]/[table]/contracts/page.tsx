@@ -2,6 +2,7 @@
 
 import {
   IconCheck,
+  IconCopy,
   IconExternalLink,
   IconFileCertificate,
   IconRefresh,
@@ -9,6 +10,7 @@ import {
   IconShieldCheck,
   IconX,
 } from "@tabler/icons-react"
+import Editor from "@monaco-editor/react"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
@@ -84,6 +86,8 @@ export default function TableContractsPage() {
     table: string
   }>()
   const [contract, setContract] = useState<ContractDetail | null>(null)
+  const [yaml, setYaml] = useState<string>("")
+  const [yamlLoading, setYamlLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -97,6 +101,7 @@ export default function TableContractsPage() {
   function load() {
     setLoading(true)
     setError(null)
+    setYaml("")
     getTableContractAction(catalog, schema, table)
       .then((value: unknown) => setContract(value as ContractDetail | null))
       .catch((e: Error) => setError(e.message))
@@ -104,6 +109,38 @@ export default function TableContractsPage() {
   }
 
   useEffect(load, [catalog, schema, table])
+
+  useEffect(() => {
+    if (!contract) {
+      setYaml("")
+      return
+    }
+
+    let cancelled = false
+    setYamlLoading(true)
+    getTableContractYamlAction(
+      catalog,
+      schema,
+      table,
+      contract.definition.version
+    )
+      .then((value) => {
+        if (!cancelled) setYaml(value)
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setYaml("")
+          toast.error("YAML preview failed", { description: e.message })
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setYamlLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [catalog, schema, table, contract?.definition.version])
 
   function runImport() {
     startTransition(async () => {
@@ -163,14 +200,16 @@ export default function TableContractsPage() {
     if (!contract) return
     startTransition(async () => {
       try {
-        const yaml = await getTableContractYamlAction(
-          catalog,
-          schema,
-          table,
-          contract.definition.version
-        )
+        const contractYaml =
+          yaml ||
+          (await getTableContractYamlAction(
+            catalog,
+            schema,
+            table,
+            contract.definition.version
+          ))
         const url = URL.createObjectURL(
-          new Blob([yaml], { type: "application/yaml" })
+          new Blob([contractYaml], { type: "application/yaml" })
         )
         const link = document.createElement("a")
         link.href = url
@@ -183,6 +222,12 @@ export default function TableContractsPage() {
         })
       }
     })
+  }
+
+  function copyYaml() {
+    if (!yaml) return
+    navigator.clipboard.writeText(yaml)
+    toast.success("YAML copied")
   }
 
   if (loading) {
@@ -258,7 +303,7 @@ export default function TableContractsPage() {
             </Button>
             <Button variant="ghost" onClick={downloadYaml} disabled={isPending}>
               <IconExternalLink />
-              YAML
+              Download YAML
             </Button>
           </div>
         </div>
@@ -328,6 +373,75 @@ export default function TableContractsPage() {
           ))}
         </TableBody>
       </Table>
+
+      <div className="border-t px-5 py-4">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-semibold">ODCS YAML</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Read-only contract document generated from Unity Catalog metadata.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!contract) return
+                setYamlLoading(true)
+                getTableContractYamlAction(
+                  catalog,
+                  schema,
+                  table,
+                  contract.definition.version
+                )
+                  .then(setYaml)
+                  .catch((e: Error) =>
+                    toast.error("YAML refresh failed", {
+                      description: e.message,
+                    })
+                  )
+                  .finally(() => setYamlLoading(false))
+              }}
+              disabled={yamlLoading || isPending}
+            >
+              <IconRefresh />
+              Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyYaml}
+              disabled={!yaml || yamlLoading}
+            >
+              <IconCopy />
+              Copy
+            </Button>
+          </div>
+        </div>
+        <div className="h-[420px] overflow-hidden rounded-md border bg-background">
+          <Editor
+            height="100%"
+            language="yaml"
+            theme="vs"
+            value={yamlLoading ? "Loading YAML..." : yaml}
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              fontSize: 12,
+              lineNumbers: "on",
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              overviewRulerLanes: 0,
+              renderLineHighlight: "line",
+              padding: { top: 12, bottom: 12 },
+              fontFamily: "var(--font-geist-mono)",
+              lineHeight: 1.6,
+              automaticLayout: true,
+            }}
+          />
+        </div>
+      </div>
     </div>
   )
 }
