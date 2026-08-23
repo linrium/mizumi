@@ -21,6 +21,7 @@ import {
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
+import { JsonCodeViewer } from "@/components/json-code-viewer"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -433,42 +434,38 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[280px_1fr] lg:px-8">
-        <aside>
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <IconServer className="size-4 text-slate-500" />
-              <h2 className="font-medium text-sm">Runtime</h2>
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="mb-4 flex items-center gap-2">
+            <IconServer className="size-4 text-slate-500" />
+            <h2 className="font-medium text-sm">Runtime</h2>
+          </div>
+          <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-slate-500">Storage</dt>
+              <dd className="font-medium">{storageLabel}</dd>
             </div>
-            <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-slate-500">Storage</dt>
-                <dd className="font-medium">{storageLabel}</dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Log directory</dt>
-                <dd className="break-all font-mono text-xs">
-                  {status?.log_dir || "Unavailable"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Signer</dt>
-                <dd className="font-medium">
-                  {status?.signer || "Unavailable"}
-                </dd>
-              </div>
-              <div>
-                <dt className="flex items-center gap-1 text-slate-500">
-                  <IconKey className="size-3.5" />
-                  Verifier key
-                </dt>
-                <dd className="break-all font-mono text-xs">
-                  {compactKey(status?.verifier_key)}
-                </dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
+            <div>
+              <dt className="text-slate-500">Log directory</dt>
+              <dd className="break-all font-mono text-xs">
+                {status?.log_dir || "Unavailable"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Signer</dt>
+              <dd className="font-medium">{status?.signer || "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1 text-slate-500">
+                <IconKey className="size-3.5" />
+                Verifier key
+              </dt>
+              <dd className="break-all font-mono text-xs">
+                {compactKey(status?.verifier_key)}
+              </dd>
+            </div>
+          </dl>
+        </section>
 
         <div className="space-y-5">
           <section className="grid gap-4 md:grid-cols-3">
@@ -614,11 +611,15 @@ export default function Home() {
                   </Button>
                 </div>
                 <div className="max-h-[34rem] overflow-auto">
-                  <pre className="min-h-56 p-3 font-mono text-slate-700 text-xs">
-                    {selectedEntry
-                      ? displayEntryBody(selectedEntry)
-                      : "Select an entry to inspect it."}
-                  </pre>
+                  <div className="p-3">
+                    <JsonCodeViewer
+                      height={224}
+                      value={
+                        selectedEntry ? displayEntryBody(selectedEntry) : ""
+                      }
+                      emptyText="Select an entry to inspect it."
+                    />
+                  </div>
                   {entryProof ? (
                     <div className="border-slate-200 border-t p-3">
                       <div

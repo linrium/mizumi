@@ -1,6 +1,17 @@
 "use client"
 
 import {
+  Background,
+  Controls,
+  type Edge,
+  Handle,
+  MarkerType,
+  type Node,
+  Position,
+  ReactFlow,
+} from "@xyflow/react"
+import "@xyflow/react/dist/style.css"
+import {
   IconArrowLeft,
   IconCircleCheck,
   IconCircleX,
@@ -11,8 +22,9 @@ import {
   IconShieldCheck,
 } from "@tabler/icons-react"
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import { JsonCodeViewer } from "@/components/json-code-viewer"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -54,6 +66,13 @@ type ProofStep = {
   siblingHash: string
   siblingSide: "left" | "right"
   pathSide: "left" | "right"
+}
+
+type MerkleNodeData = {
+  label: string
+  hash: string
+  caption: string
+  tone: "entry" | "path" | "sibling" | "root"
 }
 
 function formatNumber(value: number | undefined) {
@@ -106,6 +125,251 @@ function proofSteps(proof: EntryProofResponse | null): ProofStep[] {
   })
 }
 
+function nodeClass(tone: MerkleNodeData["tone"]) {
+  return cn(
+    "w-56 rounded-md border bg-white px-3 py-2 text-left shadow-sm",
+    tone === "entry" && "border-slate-300 bg-white",
+    tone === "path" && "border-sky-300 bg-sky-50",
+    tone === "sibling" && "border-violet-300 bg-violet-50",
+    tone === "root" && "border-emerald-300 bg-emerald-50",
+  )
+}
+
+function MerkleGraphNode({ data }: { data: MerkleNodeData }) {
+  return (
+    <div className={cn(nodeClass(data.tone), "relative")}>
+      <Handle
+        id="top-source"
+        type="source"
+        position={Position.Top}
+        className="!size-2 !border-2 !border-white !bg-sky-500"
+      />
+      <Handle
+        id="bottom-source"
+        type="source"
+        position={Position.Bottom}
+        className="!size-2 !border-2 !border-white !bg-violet-500"
+      />
+      <Handle
+        id="bottom-target"
+        type="target"
+        position={Position.Bottom}
+        className="!size-2 !border-2 !border-white !bg-sky-500"
+      />
+      <Handle
+        id="left-source"
+        type="source"
+        position={Position.Left}
+        className="!size-2 !border-2 !border-white !bg-violet-500"
+      />
+      <Handle
+        id="left-target"
+        type="target"
+        position={Position.Left}
+        className="!size-2 !border-2 !border-white !bg-violet-500"
+      />
+      <Handle
+        id="right-source"
+        type="source"
+        position={Position.Right}
+        className="!size-2 !border-2 !border-white !bg-violet-500"
+      />
+      <Handle
+        id="right-target"
+        type="target"
+        position={Position.Right}
+        className="!size-2 !border-2 !border-white !bg-violet-500"
+      />
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="truncate font-medium text-slate-800 text-xs">
+          {data.label}
+        </span>
+        <span className="rounded bg-white/70 px-1.5 py-0.5 text-slate-500 text-[10px]">
+          {data.caption}
+        </span>
+      </div>
+      <div className="break-all font-mono text-slate-700 text-[10px] leading-4">
+        {data.hash}
+      </div>
+    </div>
+  )
+}
+
+const nodeTypes = {
+  merkle: MerkleGraphNode,
+}
+
+function merkleGraph(proof: EntryProofResponse | null): {
+  nodes: Node<MerkleNodeData>[]
+  edges: Edge[]
+} {
+  if (!proof) {
+    return { nodes: [], edges: [] }
+  }
+
+  const steps = proofSteps(proof)
+  const pathX = 320
+  const siblingX = 760
+  const verticalGap = 170
+  const rootY = 32
+  const leafY = rootY + Math.max(1, steps.length + 1) * verticalGap
+  const nodes: Node<MerkleNodeData>[] = [
+    {
+      id: "entry",
+      type: "merkle",
+      position: { x: pathX, y: leafY + 132 },
+      data: {
+        label: `Entry #${proof.index}`,
+        hash: compactHash(displayEntryBody(proof.entry), 28, 18),
+        caption: "body",
+        tone: "entry",
+      },
+      draggable: false,
+    },
+    {
+      id: "leaf",
+      type: "merkle",
+      position: { x: pathX, y: leafY },
+      data: {
+        label: "Leaf hash",
+        hash: proof.leaf_hash,
+        caption: "leaf",
+        tone: "path",
+      },
+      draggable: false,
+    },
+    {
+      id: "root",
+      type: "merkle",
+      position: { x: pathX, y: rootY },
+      data: {
+        label: "Checkpoint root",
+        hash: proof.root_hash,
+        caption: "root",
+        tone: "root",
+      },
+      draggable: false,
+    },
+  ]
+
+  const edges: Edge[] = [
+    {
+      id: "entry-leaf",
+      source: "entry",
+      target: "leaf",
+      sourceHandle: "top-source",
+      targetHandle: "bottom-target",
+      label: "hash entry body",
+      animated: proof.verified,
+      type: "bezier",
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { stroke: "#0ea5e9", strokeWidth: 2 },
+      labelBgPadding: [8, 4],
+      labelBgBorderRadius: 4,
+      labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.92 },
+      labelStyle: { fill: "#0369a1", fontSize: 11, fontWeight: 600 },
+      interactionWidth: 18,
+    },
+  ]
+
+  let previousPathNode = "leaf"
+  steps.forEach((step, index) => {
+    const levelY = leafY - (index + 1) * verticalGap
+    const pathNodeId = index === steps.length - 1 ? "root" : `path-${index + 1}`
+    const siblingNodeId = `sibling-${index}`
+    const targetY = pathNodeId === "root" ? rootY : levelY
+    const childY = targetY + verticalGap
+
+    if (pathNodeId !== "root") {
+      nodes.push({
+        id: pathNodeId,
+        type: "merkle",
+        position: { x: pathX, y: targetY },
+        data: {
+          label: `Computed path hash`,
+          hash: `level ${step.level + 1}`,
+          caption: `L${step.level + 1}`,
+          tone: "path",
+        },
+        draggable: false,
+      })
+    }
+
+    nodes.push({
+      id: siblingNodeId,
+      type: "merkle",
+      position: { x: siblingX, y: childY },
+      data: {
+        label: `Proof sibling`,
+        hash: step.siblingHash,
+        caption: `${step.siblingSide} L${step.level}`,
+        tone: "sibling",
+      },
+      draggable: false,
+    })
+
+    edges.push(
+      {
+        id: `${previousPathNode}-${pathNodeId}`,
+        source: previousPathNode,
+        target: pathNodeId,
+        sourceHandle: "top-source",
+        targetHandle: "bottom-target",
+        label: `${step.pathSide} path hash`,
+        animated: proof.verified,
+        type: "bezier",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: "#0ea5e9", strokeWidth: 2 },
+        labelBgPadding: [8, 4],
+        labelBgBorderRadius: 4,
+        labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.92 },
+        labelStyle: { fill: "#0369a1", fontSize: 11, fontWeight: 600 },
+        interactionWidth: 18,
+      },
+      {
+        id: `${siblingNodeId}-${pathNodeId}`,
+        source: siblingNodeId,
+        target: pathNodeId,
+        sourceHandle: "top-source",
+        targetHandle: "bottom-target",
+        label: `${step.siblingSide} proof sibling`,
+        type: "bezier",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: "#8b5cf6", strokeWidth: 2 },
+        labelBgPadding: [8, 4],
+        labelBgBorderRadius: 4,
+        labelBgStyle: { fill: "#faf5ff", fillOpacity: 0.94 },
+        labelStyle: { fill: "#6d28d9", fontSize: 11, fontWeight: 600 },
+        interactionWidth: 18,
+      },
+    )
+
+    previousPathNode = pathNodeId
+  })
+
+  if (steps.length === 0) {
+    edges.push({
+      id: "leaf-root",
+      source: "leaf",
+      target: "root",
+      sourceHandle: "top-source",
+      targetHandle: "bottom-target",
+      label: "single-entry tree",
+      animated: proof.verified,
+      type: "bezier",
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { stroke: "#0ea5e9", strokeWidth: 2 },
+      labelBgPadding: [8, 4],
+      labelBgBorderRadius: 4,
+      labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.92 },
+      labelStyle: { fill: "#0369a1", fontSize: 11, fontWeight: 600 },
+      interactionWidth: 18,
+    })
+  }
+
+  return { nodes, edges }
+}
+
 function Metric({
   label,
   value,
@@ -154,12 +418,12 @@ function HashBox({
 }
 
 function MerkleVisualization({ proof }: { proof: EntryProofResponse | null }) {
-  const steps = useMemo(() => proofSteps(proof), [proof])
+  const graph = useMemo(() => merkleGraph(proof), [proof])
 
   if (!proof) {
     return (
       <div className="flex min-h-96 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-slate-500 text-sm">
-        Select an entry and verify it to draw the Merkle path.
+        Select an entry to draw the Merkle path.
       </div>
     )
   }
@@ -188,71 +452,22 @@ function MerkleVisualization({ proof }: { proof: EntryProofResponse | null }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto p-4">
-        <div className="min-w-[620px] space-y-4">
-          <HashBox
-            label={`Leaf hash for entry #${proof.index}`}
-            value={proof.leaf_hash}
-            tone="path"
-          />
-
-          {steps.length === 0 ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600 text-sm">
-              This tree has one entry, so the leaf hash is also the Merkle root.
-            </div>
-          ) : (
-            steps.map((step) => (
-              <div
-                key={`${step.level}-${step.siblingHash}`}
-                className="space-y-2"
-              >
-                <div className="flex justify-center text-slate-400 text-xs">
-                  combine at level {step.level}
-                </div>
-                <div className="grid grid-cols-[1fr_56px_1fr] items-center gap-3">
-                  {step.siblingSide === "left" ? (
-                    <HashBox
-                      label={`Sibling hash on the left`}
-                      value={compactHash(step.siblingHash, 18, 12)}
-                      tone="sibling"
-                    />
-                  ) : (
-                    <HashBox
-                      label={`Path hash on the left`}
-                      value={`computed level ${step.level}`}
-                      tone="path"
-                    />
-                  )}
-                  <div className="flex h-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 font-mono text-slate-500 text-xs">
-                    hash
-                  </div>
-                  {step.siblingSide === "right" ? (
-                    <HashBox
-                      label={`Sibling hash on the right`}
-                      value={compactHash(step.siblingHash, 18, 12)}
-                      tone="sibling"
-                    />
-                  ) : (
-                    <HashBox
-                      label={`Path hash on the right`}
-                      value={`computed level ${step.level}`}
-                      tone="path"
-                    />
-                  )}
-                </div>
-                <div className="flex justify-center">
-                  <div className="h-6 border-slate-300 border-l" />
-                </div>
-              </div>
-            ))
-          )}
-
-          <HashBox
-            label="Checkpoint Merkle root"
-            value={proof.root_hash}
-            tone="root"
-          />
-        </div>
+      <div className="h-[720px] overflow-hidden rounded-b-lg bg-slate-50">
+        <ReactFlow
+          nodes={graph.nodes}
+          edges={graph.edges}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.35}
+          maxZoom={1.4}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+        >
+          <Background color="#cbd5e1" gap={20} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
       </div>
     </div>
   )
@@ -267,6 +482,47 @@ export default function MerklePage() {
   const [loading, setLoading] = useState(false)
   const [proofLoading, setProofLoading] = useState(false)
   const [error, setError] = useState("")
+  const proofRequestId = useRef(0)
+
+  const verifyEntry = useCallback(async (entry: LogEntry | null) => {
+    const requestId = proofRequestId.current + 1
+    proofRequestId.current = requestId
+
+    if (!entry) {
+      setProof(null)
+      setProofLoading(false)
+      return
+    }
+
+    setProofLoading(true)
+    setError("")
+    setProof(null)
+    try {
+      const response = await fetch(
+        `/api/chronicle/api/entries/${entry.index}/proof`,
+        { cache: "no-store" },
+      )
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+      const nextProof = (await response.json()) as EntryProofResponse
+      if (proofRequestId.current === requestId) {
+        setProof(nextProof)
+      }
+    } catch (proofError) {
+      if (proofRequestId.current === requestId) {
+        setError(
+          proofError instanceof Error
+            ? proofError.message
+            : "Unable to verify entry",
+        )
+      }
+    } finally {
+      if (proofRequestId.current === requestId) {
+        setProofLoading(false)
+      }
+    }
+  }, [])
 
   const loadEntries = useCallback(async () => {
     setLoading(true)
@@ -285,8 +541,9 @@ export default function MerklePage() {
       const data = (await response.json()) as EntriesResponse
       setEntries(data.entries)
       setEntriesTotal(data.total)
-      setSelectedEntry(data.entries[0] ?? null)
-      setProof(null)
+      const firstEntry = data.entries[0] ?? null
+      setSelectedEntry(firstEntry)
+      void verifyEntry(firstEntry)
     } catch (entriesError) {
       setError(
         entriesError instanceof Error
@@ -296,44 +553,15 @@ export default function MerklePage() {
     } finally {
       setLoading(false)
     }
-  }, [query])
+  }, [query, verifyEntry])
 
   useEffect(() => {
     void loadEntries()
   }, [loadEntries])
 
-  const verifyEntry = async (entry = selectedEntry) => {
-    if (!entry) {
-      return
-    }
-
-    setProofLoading(true)
-    setError("")
-    setProof(null)
-    try {
-      const response = await fetch(
-        `/api/chronicle/api/entries/${entry.index}/proof`,
-        { cache: "no-store" },
-      )
-      if (!response.ok) {
-        throw new Error(await response.text())
-      }
-      setProof((await response.json()) as EntryProofResponse)
-    } catch (proofError) {
-      setError(
-        proofError instanceof Error
-          ? proofError.message
-          : "Unable to verify entry",
-      )
-    } finally {
-      setProofLoading(false)
-    }
-  }
-
   const selectEntry = (entry: LogEntry) => {
     setSelectedEntry(entry)
-    setProof(null)
-    setError("")
+    void verifyEntry(entry)
   }
 
   return (
@@ -442,33 +670,6 @@ export default function MerklePage() {
               )}
             </div>
           </section>
-
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <IconShieldCheck className="size-4 text-slate-500" />
-              <h2 className="font-medium text-sm">Selected Entry</h2>
-            </div>
-            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 font-mono text-slate-500 text-xs">
-                {selectedEntry ? `#${selectedEntry.index}` : "No entry"}
-              </div>
-              <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-slate-700 text-xs">
-                {selectedEntry
-                  ? displayEntryBody(selectedEntry)
-                  : "Select an entry to inspect it."}
-              </pre>
-            </div>
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => void verifyEntry()}
-              disabled={!selectedEntry || proofLoading}
-              className="w-full"
-            >
-              <IconShieldCheck />
-              Verify and Draw Tree
-            </Button>
-          </section>
         </aside>
 
         <div className="space-y-5">
@@ -494,6 +695,28 @@ export default function MerklePage() {
               label="Proof nodes"
               value={formatNumber(proof?.proof.length)}
             />
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white">
+            <div className="flex flex-col gap-2 border-slate-200 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <IconShieldCheck className="size-4 text-slate-500" />
+                <h2 className="font-medium text-sm">Selected Entry</h2>
+                <span className="font-mono text-slate-500 text-xs">
+                  {selectedEntry ? `#${selectedEntry.index}` : "No entry"}
+                </span>
+              </div>
+              {proofLoading ? (
+                <span className="text-slate-500 text-xs">Verifying...</span>
+              ) : null}
+            </div>
+            <div className="p-4">
+              <JsonCodeViewer
+                height={224}
+                value={selectedEntry ? displayEntryBody(selectedEntry) : ""}
+                emptyText="Select an entry to inspect it."
+              />
+            </div>
           </section>
 
           <MerkleVisualization proof={proof} />
