@@ -35,5 +35,10 @@
         "organizeImports": "on"
       }
     }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded"
+    }
   }
 }
