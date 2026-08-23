@@ -742,7 +742,7 @@ export default function TableContractsPage() {
         )}
       </div>
 
-      <div className="border-t px-5 py-4">
+      <div className="px-5 py-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-xs font-semibold">ODCS YAML</h3>
