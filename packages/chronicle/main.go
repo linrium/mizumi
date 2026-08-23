@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -10,16 +12,23 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
+	tlog "github.com/transparency-dev/formats/log"
+	"github.com/transparency-dev/merkle/proof"
+	"github.com/transparency-dev/merkle/rfc6962"
 	"github.com/transparency-dev/tessera"
+	"github.com/transparency-dev/tessera/api"
 	"github.com/transparency-dev/tessera/api/layout"
+	tesseraclient "github.com/transparency-dev/tessera/client"
 	tesseraaws "github.com/transparency-dev/tessera/storage/aws"
 	"github.com/transparency-dev/tessera/storage/posix"
 	"github.com/yokeTH/gofiber-scalar/scalar/v3"
@@ -41,6 +50,10 @@ func main() {
 	signer, verifierKey, err := loadOrCreateSigner(cfg.signerKeyFile)
 	if err != nil {
 		log.Fatalf("load signer: %v", err)
+	}
+	verifier, err := note.NewVerifier(strings.TrimSpace(verifierKey))
+	if err != nil {
+		log.Fatalf("load verifier: %v", err)
 	}
 
 	driver, err := newStorageDriver(ctx, cfg)
@@ -132,6 +145,15 @@ func main() {
 		return c.Send(checkpoint)
 	})
 
+	app.Get("/api/entries", func(c fiber.Ctx) error {
+		return sendEntries(c, reader)
+	})
+	app.Get("/api/entries/search", func(c fiber.Ctx) error {
+		return sendEntries(c, reader)
+	})
+	app.Get("/api/entries/:index/proof", func(c fiber.Ctx) error {
+		return sendEntryProof(c, reader, verifier, signer.Name())
+	})
 	app.Get("/tile/entries/*", func(c fiber.Ctx) error {
 		return sendEntryBundle(c, reader, c.Params("*"))
 	})
@@ -174,6 +196,30 @@ type config struct {
 	mysqlPassword    string
 	mysqlMaxOpenConn int
 	mysqlMaxIdleConn int
+}
+
+type logEntryResponse struct {
+	Index      uint64         `json:"index"`
+	Bundle     string         `json:"bundle"`
+	Body       string         `json:"body,omitempty"`
+	BodyBase64 string         `json:"body_base64,omitempty"`
+	JSON       map[string]any `json:"json,omitempty"`
+	EventType  string         `json:"event_type,omitempty"`
+	Source     string         `json:"source,omitempty"`
+	OccurredAt string         `json:"occurred_at,omitempty"`
+}
+
+type entryProofResponse struct {
+	Index              uint64           `json:"index"`
+	TreeSize           uint64           `json:"tree_size"`
+	LeafHash           string           `json:"leaf_hash"`
+	RootHash           string           `json:"root_hash"`
+	Proof              []string         `json:"proof"`
+	Verified           bool             `json:"verified"`
+	VerificationError  string           `json:"verification_error,omitempty"`
+	Checkpoint         string           `json:"checkpoint"`
+	Entry              logEntryResponse `json:"entry"`
+	CheckpointVerified bool             `json:"checkpoint_verified"`
 }
 
 func loadConfig() config {
@@ -307,6 +353,234 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func sendEntries(c fiber.Ctx, reader tessera.LogReader) error {
+	size, err := reader.IntegratedSize(c.Context())
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	limit, err := queryUint(c, "limit", 100, 500)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	offset, err := queryUint(c, "offset", 0, size)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	query := strings.TrimSpace(c.Query("q"))
+
+	entries, err := collectEntries(c.Context(), reader, size, offset, limit+1, query)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	hasMore := uint64(len(entries)) > limit
+	if hasMore {
+		entries = entries[:limit]
+	}
+
+	return c.JSON(fiber.Map{
+		"entries":  entries,
+		"has_more": hasMore,
+		"limit":    limit,
+		"offset":   offset,
+		"query":    query,
+		"total":    size,
+	})
+}
+
+func sendEntryProof(c fiber.Ctx, reader tessera.LogReader, verifier note.Verifier, origin string) error {
+	index, err := strconv.ParseUint(c.Params("index"), 10, 64)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "index must be a positive integer")
+	}
+
+	checkpointRaw, err := reader.ReadCheckpoint(c.Context())
+	if err != nil {
+		return logResourceError(err)
+	}
+	checkpoint, _, _, err := tlog.ParseCheckpoint(checkpointRaw, origin, verifier)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("verify checkpoint: %v", err))
+	}
+	if index >= checkpoint.Size {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("index %d is not covered by checkpoint size %d", index, checkpoint.Size))
+	}
+
+	entry, rawEntry, err := getEntryAtIndex(c.Context(), reader, index, checkpoint.Size)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	proofBuilder, err := tesseraclient.NewProofBuilder(c.Context(), checkpoint.Size, reader.ReadTile)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("create proof builder: %v", err))
+	}
+	proofNodes, err := proofBuilder.InclusionProof(c.Context(), index)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("build inclusion proof: %v", err))
+	}
+
+	leafHash := rfc6962.DefaultHasher.HashLeaf(rawEntry)
+	verificationError := ""
+	verified := true
+	if err := proof.VerifyInclusion(rfc6962.DefaultHasher, index, checkpoint.Size, leafHash, proofNodes, checkpoint.Hash); err != nil {
+		verified = false
+		verificationError = err.Error()
+	}
+
+	return c.JSON(entryProofResponse{
+		Index:              index,
+		TreeSize:           checkpoint.Size,
+		LeafHash:           base64.StdEncoding.EncodeToString(leafHash),
+		RootHash:           base64.StdEncoding.EncodeToString(checkpoint.Hash),
+		Proof:              encodeProofNodes(proofNodes),
+		Verified:           verified,
+		VerificationError:  verificationError,
+		Checkpoint:         string(checkpointRaw),
+		Entry:              entry,
+		CheckpointVerified: true,
+	})
+}
+
+func collectEntries(ctx context.Context, reader tessera.LogReader, size, offset, limit uint64, query string) ([]logEntryResponse, error) {
+	if limit == 0 || offset >= size {
+		return []logEntryResponse{}, nil
+	}
+
+	from := offset
+	count := limit
+	scanSize := size
+	if query == "" && from+count > size {
+		count = size - from
+	}
+	if query != "" {
+		from = 0
+		count = size
+	}
+
+	queryLower := strings.ToLower(query)
+	matchesToSkip := offset
+	entries := make([]logEntryResponse, 0, limit)
+
+	for ri := range layout.Range(from, count, scanSize) {
+		raw, err := reader.ReadEntryBundle(ctx, ri.Index, ri.Partial)
+		if err != nil {
+			return nil, fmt.Errorf("read entry bundle %d: %w", ri.Index, err)
+		}
+
+		bundle := api.EntryBundle{}
+		if err := bundle.UnmarshalText(raw); err != nil {
+			return nil, fmt.Errorf("parse entry bundle %d: %w", ri.Index, err)
+		}
+
+		end := ri.First + ri.N
+		if end > uint(len(bundle.Entries)) {
+			end = uint(len(bundle.Entries))
+		}
+
+		for i := ri.First; i < end; i++ {
+			entry := newLogEntryResponse(ri.Index, ri.Partial, i, bundle.Entries[i])
+			if queryLower != "" && !strings.Contains(strings.ToLower(entrySearchText(entry)), queryLower) {
+				continue
+			}
+			if queryLower != "" && matchesToSkip > 0 {
+				matchesToSkip--
+				continue
+			}
+
+			entries = append(entries, entry)
+			if uint64(len(entries)) >= limit {
+				return entries, nil
+			}
+		}
+	}
+
+	return entries, nil
+}
+
+func getEntryAtIndex(ctx context.Context, reader tessera.LogReader, index uint64, treeSize uint64) (logEntryResponse, []byte, error) {
+	bundleIndex := index / layout.EntryBundleWidth
+	offset := uint(index % layout.EntryBundleWidth)
+	partial := layout.PartialTileSize(0, bundleIndex, treeSize)
+	raw, err := reader.ReadEntryBundle(ctx, bundleIndex, partial)
+	if err != nil {
+		return logEntryResponse{}, nil, fmt.Errorf("read entry bundle %d: %w", bundleIndex, err)
+	}
+
+	bundle := api.EntryBundle{}
+	if err := bundle.UnmarshalText(raw); err != nil {
+		return logEntryResponse{}, nil, fmt.Errorf("parse entry bundle %d: %w", bundleIndex, err)
+	}
+	if offset >= uint(len(bundle.Entries)) {
+		return logEntryResponse{}, nil, fmt.Errorf("entry index %d is outside bundle %d", index, bundleIndex)
+	}
+	entryRaw := bundle.Entries[offset]
+	return newLogEntryResponse(bundleIndex, partial, offset, entryRaw), entryRaw, nil
+}
+
+func newLogEntryResponse(bundleIndex uint64, partial uint8, entryOffset uint, raw []byte) logEntryResponse {
+	entry := logEntryResponse{
+		Index:  bundleIndex*layout.EntryBundleWidth + uint64(entryOffset),
+		Bundle: layout.EntriesPath(bundleIndex, partial),
+	}
+	if utf8.Valid(raw) {
+		entry.Body = string(raw)
+	} else {
+		entry.BodyBase64 = base64.StdEncoding.EncodeToString(raw)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err == nil {
+		entry.JSON = parsed
+		entry.EventType, _ = parsed["event_type"].(string)
+		entry.Source, _ = parsed["source"].(string)
+		entry.OccurredAt, _ = parsed["occurred_at"].(string)
+	}
+
+	return entry
+}
+
+func encodeProofNodes(nodes [][]byte) []string {
+	encoded := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		encoded = append(encoded, base64.StdEncoding.EncodeToString(node))
+	}
+	return encoded
+}
+
+func entrySearchText(entry logEntryResponse) string {
+	parts := []string{
+		strconv.FormatUint(entry.Index, 10),
+		entry.Bundle,
+		entry.Body,
+		entry.BodyBase64,
+		entry.EventType,
+		entry.Source,
+		entry.OccurredAt,
+	}
+	if entry.JSON != nil {
+		if raw, err := json.Marshal(entry.JSON); err == nil {
+			parts = append(parts, string(raw))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func queryUint(c fiber.Ctx, name string, fallback uint64, max uint64) (uint64, error) {
+	value := c.Query(name)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	if parsed > max {
+		return max, nil
+	}
+	return parsed, nil
 }
 
 func sendEntryBundle(c fiber.Ctx, reader tessera.LogReader, requested string) error {

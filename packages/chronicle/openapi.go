@@ -66,6 +66,7 @@ type openAPISchema struct {
 	Type       string                   `json:"type,omitempty"`
 	Format     string                   `json:"format,omitempty"`
 	Enum       []string                 `json:"enum,omitempty"`
+	Items      *openAPISchema           `json:"items,omitempty"`
 	Required   []string                 `json:"required,omitempty"`
 	Properties map[string]openAPISchema `json:"properties,omitempty"`
 	Minimum    *int                     `json:"minimum,omitempty"`
@@ -143,6 +144,56 @@ func openAPIMetadata() openAPIDocument {
 					Responses: responses(
 						response("201", "Entry appended and assigned a Tessera log index", content("application/json", schemaRef("AppendEntryResponse"))),
 						errorResponse("400"),
+						errorResponse("500"),
+					),
+				},
+			},
+			"/api/entries": {
+				Get: &openAPIOperation{
+					Summary:     "List entries",
+					Description: "Returns decoded log entries with pagination and optional text search.",
+					OperationID: "listEntries",
+					Parameters: []openAPIParameter{
+						queryParameter("limit", "Maximum entries to return, capped at 500."),
+						queryParameter("offset", "Entry index offset, or matching-entry offset when q is supplied."),
+						queryParameter("q", "Optional text search across entry body and common event fields."),
+					},
+					Responses: responses(
+						response("200", "Entries page", content("application/json", schemaRef("EntriesResponse"))),
+						errorResponse("400"),
+						errorResponse("500"),
+					),
+				},
+			},
+			"/api/entries/search": {
+				Get: &openAPIOperation{
+					Summary:     "Search entries",
+					Description: "Alias for /api/entries with the q query parameter.",
+					OperationID: "searchEntries",
+					Parameters: []openAPIParameter{
+						queryParameter("limit", "Maximum matching entries to return, capped at 500."),
+						queryParameter("offset", "Matching-entry offset."),
+						queryParameter("q", "Text search across entry body and common event fields."),
+					},
+					Responses: responses(
+						response("200", "Entries page", content("application/json", schemaRef("EntriesResponse"))),
+						errorResponse("400"),
+						errorResponse("500"),
+					),
+				},
+			},
+			"/api/entries/{index}/proof": {
+				Get: &openAPIOperation{
+					Summary:     "Verify entry inclusion",
+					Description: "Builds and verifies a Merkle inclusion proof for one entry against the latest signed checkpoint.",
+					OperationID: "getEntryProof",
+					Parameters: []openAPIParameter{
+						pathParameter("index", "Log entry index to prove."),
+					},
+					Responses: responses(
+						response("200", "Inclusion proof verification result", content("application/json", schemaRef("EntryProofResponse"))),
+						errorResponse("400"),
+						errorResponse("404"),
 						errorResponse("500"),
 					),
 				},
@@ -239,6 +290,48 @@ func openAPIMetadata() openAPIDocument {
 						"published_by": {Type: "string", Example: "/checkpoint"},
 					},
 				),
+				"LogEntry": objectSchema(
+					[]string{"index", "bundle"},
+					map[string]openAPISchema{
+						"index":       uint64SchemaWithExample(0),
+						"bundle":      {Type: "string", Example: "000.p/1"},
+						"body":        {Type: "string"},
+						"body_base64": {Type: "string"},
+						"json":        {Type: "object"},
+						"event_type":  {Type: "string", Example: "permission.granted"},
+						"source":      {Type: "string", Example: "controlplane"},
+						"occurred_at": {Type: "string", Example: "2026-08-23T12:00:00Z"},
+					},
+				),
+				"EntriesResponse": objectSchema(
+					[]string{"entries", "has_more", "limit", "offset", "query", "total"},
+					map[string]openAPISchema{
+						"entries":  arraySchema(schemaRef("LogEntry")),
+						"has_more": {Type: "boolean", Example: false},
+						"limit":    uint64SchemaWithExample(100),
+						"offset":   uint64SchemaWithExample(0),
+						"query":    {Type: "string"},
+						"total":    uint64SchemaWithExample(1),
+					},
+				),
+				"EntryProofResponse": objectSchema(
+					[]string{"index", "tree_size", "leaf_hash", "root_hash", "proof", "verified", "checkpoint", "entry", "checkpoint_verified"},
+					map[string]openAPISchema{
+						"index":              uint64SchemaWithExample(0),
+						"tree_size":          uint64SchemaWithExample(1),
+						"leaf_hash":          {Type: "string"},
+						"root_hash":          {Type: "string"},
+						"proof":              arraySchema(openAPISchema{Type: "string"}),
+						"verified":           {Type: "boolean", Example: true},
+						"verification_error": {Type: "string"},
+						"checkpoint":         {Type: "string"},
+						"entry":              schemaRef("LogEntry"),
+						"checkpoint_verified": {
+							Type:    "boolean",
+							Example: true,
+						},
+					},
+				),
 			},
 		},
 	}
@@ -304,6 +397,13 @@ func objectSchema(required []string, properties map[string]openAPISchema) openAP
 	}
 }
 
+func arraySchema(item openAPISchema) openAPISchema {
+	return openAPISchema{
+		Type:  "array",
+		Items: &item,
+	}
+}
+
 func stringSchema(example string) openAPISchema {
 	return openAPISchema{Type: "string", Example: example}
 }
@@ -328,6 +428,15 @@ func pathParameter(name string, description string) openAPIParameter {
 		Name:        name,
 		In:          "path",
 		Required:    true,
+		Description: description,
+		Schema:      openAPISchema{Type: "string"},
+	}
+}
+
+func queryParameter(name string, description string) openAPIParameter {
+	return openAPIParameter{
+		Name:        name,
+		In:          "query",
 		Description: description,
 		Schema:      openAPISchema{Type: "string"},
 	}
