@@ -81,6 +81,12 @@ pub struct DataContractCliConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct TelemetryConfig {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
     #[serde(default)]
@@ -99,6 +105,8 @@ pub struct Config {
     pub data_contract_cli: DataContractCliConfig,
     #[serde(default)]
     pub openai: OpenAiConfig,
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 impl Config {
@@ -175,6 +183,12 @@ impl Default for DataContractCliConfig {
             namespace: default_data_contract_cli_namespace(),
             timeout_seconds: default_data_contract_cli_timeout_seconds(),
         }
+    }
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self { enabled: false }
     }
 }
 

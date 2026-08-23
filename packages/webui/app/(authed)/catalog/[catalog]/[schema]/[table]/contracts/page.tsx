@@ -1,34 +1,29 @@
 "use client"
 
 import {
-  IconCheck,
+  IconActivity,
+  IconCalendarClock,
+  IconClock,
   IconCopy,
   IconExternalLink,
   IconFileCertificate,
   IconRefresh,
   IconRocket,
   IconShieldCheck,
-  IconX,
 } from "@tabler/icons-react"
 import Editor from "@monaco-editor/react"
+import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   Status,
   StatusIndicator,
   StatusLabel,
 } from "@/components/ui/status"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   activateTableContractAction,
   getTableContractAction,
@@ -36,6 +31,30 @@ import {
   importTableContractAction,
   validateTableContractAction,
 } from "../../../../actions"
+
+type SlaProperty = {
+  id?: string
+  property?: string
+  value?: unknown
+  valueExt?: unknown
+  unit?: string
+  element?: string
+  driver?: string
+  description?: string
+  scheduler?: string
+  schedule?: string
+}
+
+type StreamingJob = {
+  id: string
+  name: string
+  main_application_file: string
+}
+
+type SlaActionTarget = {
+  href: string
+  label: string
+}
 
 type ContractDetail = {
   definition: {
@@ -48,6 +67,7 @@ type ContractDetail = {
     spec: {
       id?: string
       apiVersion?: string
+      slaProperties?: SlaProperty[]
       schema?: Array<{
         properties?: Array<unknown>
       }>
@@ -72,11 +92,248 @@ type ContractDetail = {
   }
 }
 
+const DAGSTER_DAILY_SCHEDULE = "cross_sell_daily_schedule"
+
+const DAGSTER_ASSET_BY_TABLE: Record<string, string> = {
+  "hdbank.hdbank_partnership_prod_bronze.customers_v1": "hdbank_bronze_customers",
+  "hdbank.hdbank_partnership_prod_gold.vietjet_activation_candidates_v1":
+    "hdbank_gold_vietjet_activation_candidates",
+  "hdbank.hdbank_partnership_prod_silver.customers_v1": "hdbank_silver_customers",
+  "hdbank.hdbank_partnership_prod_silver.travel_spend_features_v1":
+    "hdbank_silver_travel_spend_features",
+  "partnership.co_brand_gold.campaign_summary_v1": "partnership_gold_campaign_summary",
+  "partnership.co_brand_gold.co_brand_offer_audience_v1":
+    "partnership_gold_co_brand_offer_audience",
+  "partnership.co_brand_silver.customer_360_v1": "partnership_silver_customer_360",
+  "vietjetair.vietjetair_partnership_prod_bronze.customers_v1":
+    "vietjetair_bronze_customers",
+  "vietjetair.vietjetair_partnership_prod_gold.baggage_damage_classifications_v1":
+    "vietjetair_gold_baggage_damage_classifications",
+  "vietjetair.vietjetair_partnership_prod_gold.hdbank_finance_candidates_v1":
+    "vietjetair_gold_hdbank_finance_candidates",
+  "vietjetair.vietjetair_partnership_prod_silver.booking_features_v1":
+    "vietjetair_silver_booking_features",
+  "vietjetair.vietjetair_partnership_prod_silver.customers_v1":
+    "vietjetair_silver_customers",
+}
+
 function statusVariant(status: string) {
   if (status === "active" || status === "certified") return "success"
   if (status === "deprecated" || status === "retired") return "warning"
   if (status === "draft") return "default"
   return "info"
+}
+
+function formatSlaValue(sla: SlaProperty) {
+  const value = valueToString(sla.value)
+  const valueExt = valueToString(sla.valueExt)
+  const unit = sla.unit ? ` ${sla.unit}` : ""
+  return [value ? `${value}${unit}` : "—", valueExt].filter(Boolean).join(" / ")
+}
+
+function valueToString(value: unknown) {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return JSON.stringify(value)
+}
+
+function labelForSlaProperty(property?: string) {
+  if (!property) return "SLA"
+  return property
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (char) => char.toUpperCase())
+}
+
+function defaultSlaProperties(schema: string, table: string): SlaProperty[] {
+  const schemaName = schema.toLowerCase()
+  const tableName = table.toLowerCase()
+  const isStreaming =
+    schemaName.includes("bronze") &&
+    ["transactions", "tickets", "incidents", "events"].some((token) =>
+      tableName.includes(token)
+    )
+
+  const properties: SlaProperty[] = isStreaming
+    ? [
+        {
+          description:
+            "Streaming bronze data should be queryable within 15 minutes of source arrival.",
+          driver: "operational",
+          element: table,
+          id: "stream_latency_15_minutes",
+          property: "latency",
+          unit: "minutes",
+          value: "15",
+        },
+        {
+          description:
+            "Spark Structured Streaming jobs should keep the target table continuously available.",
+          driver: "operational",
+          element: table,
+          id: "stream_availability",
+          property: "availability",
+          unit: "percent",
+          value: "99.5",
+        },
+      ]
+    : [
+        {
+          description:
+            "Dagster cross_sell_daily_schedule refreshes this contract's batch asset daily.",
+          driver: "analytics",
+          element: table,
+          id: "daily_frequency",
+          property: "frequency",
+          schedule: "0 2 * * *",
+          scheduler: "dagster",
+          unit: "d",
+          value: "1",
+        },
+        {
+          description:
+            "Daily batch outputs should be available after the scheduled Spark materialization window.",
+          driver: "analytics",
+          element: table,
+          id: "daily_time_of_availability",
+          property: "timeOfAvailability",
+          schedule: "0 2 * * *",
+          scheduler: "dagster",
+          value: "03:00+00:00",
+        },
+      ]
+
+  return [
+    ...properties,
+    {
+      description: "Mizumi retains this dataset indefinitely.",
+      driver: "operational",
+      element: table,
+      id: "default_retention",
+      property: "retention",
+      value: "forever",
+    },
+  ]
+}
+
+function isStreamingTable(schema: string, table: string) {
+  const schemaName = schema.toLowerCase()
+  const tableName = table.toLowerCase()
+  return (
+    schemaName.includes("bronze") &&
+    ["transactions", "tickets", "incidents", "events"].some((token) =>
+      tableName.includes(token)
+    )
+  )
+}
+
+function isDagsterSla(sla: SlaProperty) {
+  return sla.scheduler?.toLowerCase() === "dagster"
+}
+
+function slaActionTargets(
+  sla: SlaProperty,
+  catalog: string,
+  schema: string,
+  table: string,
+  streamingJobs: StreamingJob[]
+): SlaActionTarget[] {
+  if (isDagsterSla(sla)) {
+    const scheduleHref = `/pipelines/schedules/${encodeURIComponent(DAGSTER_DAILY_SCHEDULE)}`
+    const assetKey = dagsterAssetForTable(catalog, schema, table)
+    const targets = [
+      {
+        href: scheduleHref,
+        label: `Dagster schedule: ${DAGSTER_DAILY_SCHEDULE}`,
+      },
+    ]
+
+    if (assetKey) {
+      targets.unshift({
+        href: `/pipelines/assets/${encodeURIComponent(assetKey)}`,
+        label: `Dagster asset: ${assetKey}`,
+      })
+    }
+
+    return targets
+  }
+
+  if (!isStreamingTable(schema, table)) {
+    return []
+  }
+
+  const job = findStreamingJobForTable(streamingJobs, table)
+  return [
+    {
+      href: job ? `/pipelines/streaming/${encodeURIComponent(job.id)}` : "/pipelines/streaming",
+      label: job ? `Spark stream: ${job.name}` : "Spark streams",
+    },
+  ]
+}
+
+function dagsterAssetForTable(catalog: string, schema: string, table: string) {
+  return DAGSTER_ASSET_BY_TABLE[`${catalog}.${schema}.${table}`]
+}
+
+function findStreamingJobForTable(streamingJobs: StreamingJob[], table: string) {
+  const tableKey = normalizeLookupKey(table.replace(/_v\d+$/i, ""))
+  return streamingJobs.find((job) => {
+    const nameKey = normalizeLookupKey(job.name)
+    const fileKey = normalizeLookupKey(job.main_application_file)
+    return nameKey.includes(tableKey) || fileKey.includes(tableKey)
+  })
+}
+
+function normalizeLookupKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
+function slaElementTargets(
+  element: string | undefined,
+  catalog: string,
+  schema: string,
+  table: string
+) {
+  return (element ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((label) => ({
+      href: catalogPathForElement(label, catalog, schema, table),
+      label,
+    }))
+}
+
+function catalogPathForElement(
+  element: string,
+  catalog: string,
+  schema: string,
+  table: string
+) {
+  const parts = element.split(".").filter(Boolean)
+  const encode = encodeURIComponent
+
+  if (parts.length >= 4) {
+    return `/catalog/${encode(parts[0])}/${encode(parts[1])}/${encode(parts[2])}`
+  }
+
+  if (parts.length === 3) {
+    if (parts[0] === catalog) {
+      return `/catalog/${encode(parts[0])}/${encode(parts[1])}/${encode(parts[2])}`
+    }
+
+    return `/catalog/${encode(catalog)}/${encode(parts[0])}/${encode(parts[1])}`
+  }
+
+  if (parts.length === 2) {
+    if (parts[0] === table) {
+      return `/catalog/${encode(catalog)}/${encode(schema)}/${encode(table)}`
+    }
+
+    return `/catalog/${encode(catalog)}/${encode(schema)}/${encode(parts[0])}`
+  }
+
+  return `/catalog/${encode(catalog)}/${encode(schema)}/${encode(parts[0] || table)}`
 }
 
 export default function TableContractsPage() {
@@ -90,6 +347,7 @@ export default function TableContractsPage() {
   const [yamlLoading, setYamlLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [streamingJobs, setStreamingJobs] = useState<StreamingJob[]>([])
   const [isPending, startTransition] = useTransition()
 
   const fullPath = `${catalog}.${schema}.${table}`
@@ -97,6 +355,12 @@ export default function TableContractsPage() {
     () => contract?.definition.spec.schema?.[0]?.properties?.length ?? 0,
     [contract]
   )
+  const storedSlaProperties = contract?.definition.spec.slaProperties ?? []
+  const slaProperties =
+    storedSlaProperties.length > 0
+      ? storedSlaProperties
+      : defaultSlaProperties(schema, table)
+  const hasStoredSlaProperties = storedSlaProperties.length > 0
 
   function load() {
     setLoading(true)
@@ -109,6 +373,23 @@ export default function TableContractsPage() {
   }
 
   useEffect(load, [catalog, schema, table])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchWithAuth("/api/streaming/jobs", { cache: "no-store" })
+      .then(async (res) => {
+        const body = await res.json()
+        if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+        if (!cancelled) setStreamingJobs(body.jobs ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setStreamingJobs([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!contract) {
@@ -145,9 +426,9 @@ export default function TableContractsPage() {
   function runImport() {
     startTransition(async () => {
       try {
-        await importTableContractAction(catalog, schema, table)
+        const next = await importTableContractAction(catalog, schema, table)
+        setContract(next as ContractDetail)
         toast.success("Data contract synced")
-        load()
       } catch (e) {
         toast.error("Sync failed", {
           description: e instanceof Error ? e.message : "Unknown error",
@@ -340,39 +621,126 @@ export default function TableContractsPage() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Result</TableHead>
-            <TableHead>Check</TableHead>
-            <TableHead>Field</TableHead>
-            <TableHead>Details</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contract.validation.checks.map((check, index) => (
-            <TableRow key={`${check.check}-${check.field ?? index}`}>
-              <TableCell>
-                <span className="inline-flex items-center gap-1">
-                  {check.result === "passed" ? (
-                    <IconCheck size={13} className="text-green-600" />
-                  ) : (
-                    <IconX size={13} className="text-destructive" />
+      <div className="border-b px-5 py-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <IconActivity size={15} className="text-muted-foreground" />
+            <h3 className="text-xs font-semibold">Service-level agreements</h3>
+          </div>
+          <Badge variant="outline">{slaProperties.length} SLA</Badge>
+        </div>
+        {!hasStoredSlaProperties && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Inferred from Mizumi pipeline defaults. Sync to persist these entries into the
+            ODCS YAML.
+          </p>
+        )}
+        {slaProperties.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No SLA properties are defined in this contract.
+          </p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {slaProperties.map((sla, index) => {
+              const elementTargets = slaElementTargets(
+                sla.element,
+                catalog,
+                schema,
+                table
+              )
+              const actionTargets = slaActionTargets(
+                sla,
+                catalog,
+                schema,
+                table,
+                streamingJobs
+              )
+
+              return (
+                <div
+                  key={sla.id ?? `${sla.property}-${index}`}
+                  className="rounded-md border bg-background p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold">
+                        {labelForSlaProperty(sla.property)}
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        {sla.id ?? "unnamed"}
+                      </p>
+                    </div>
+                    {sla.driver && (
+                      <Badge variant="secondary" className="shrink-0">
+                        {sla.driver}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-3 space-y-3 text-xs">
+                    <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Target
+                      </p>
+                      <p className="mt-1 font-mono">{formatSlaValue(sla)}</p>
+                    </div>
+                    <div className="rounded-md bg-muted/40 px-2 py-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Element
+                      </p>
+                      {elementTargets.length === 0 ? (
+                        <p className="mt-1 truncate font-mono">—</p>
+                      ) : (
+                        <div className="mt-1 flex min-w-0 flex-wrap gap-1">
+                          {elementTargets.map((target) => (
+                            <Link
+                              key={`${sla.id ?? index}-${target.label}`}
+                              href={target.href}
+                              className="inline-flex min-w-0 items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[11px] text-foreground transition-colors hover:bg-accent"
+                              title={`Open ${target.label}`}
+                            >
+                              <span className="truncate">{target.label}</span>
+                              <IconExternalLink size={11} className="shrink-0" />
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {actionTargets.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {actionTargets.map((target) => (
+                        <Link
+                          key={`${sla.id ?? index}-${target.label}`}
+                          href={target.href}
+                          className="inline-flex min-w-0 items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+                          title={`Open ${target.label}`}
+                        >
+                          <span className="truncate">{target.label}</span>
+                          <IconExternalLink size={11} className="shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
                   )}
-                  {check.result}
-                </span>
-              </TableCell>
-              <TableCell>{check.check}</TableCell>
-              <TableCell className="font-mono text-muted-foreground">
-                {check.field ?? "—"}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {check.details ?? "—"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  {(sla.scheduler || sla.schedule) && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <IconCalendarClock size={13} />
+                      <span className="truncate">
+                        {sla.scheduler ?? "scheduler"} / {sla.schedule ?? "—"}
+                      </span>
+                    </div>
+                  )}
+                  {sla.description && (
+                    <div className="mt-3 flex gap-2 text-xs text-muted-foreground">
+                      <IconClock size={13} className="mt-0.5 shrink-0" />
+                      <p>{sla.description}</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="border-t px-5 py-4">
         <div className="mb-2 flex items-center justify-between gap-3">

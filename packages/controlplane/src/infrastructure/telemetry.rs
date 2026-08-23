@@ -19,6 +19,9 @@ use opentelemetry_sdk::{Resource, metrics::SdkMeterProvider, trace::SdkTracerPro
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::infrastructure::config::TelemetryConfig;
+
 const SERVICE_NAME: &str = "controlplane";
 const OTLP_HTTP_ENDPOINT: &str = "http://signoz-ingester.signoz.svc.cluster.local:4318";
 
@@ -43,11 +46,11 @@ impl TelemetryGuard {
     }
 }
 
-pub fn init() -> Result<TelemetryGuard, Box<dyn std::error::Error>> {
+pub fn init(config: &TelemetryConfig) -> Result<TelemetryGuard, Box<dyn std::error::Error>> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
     let fmt_layer = tracing_subscriber::fmt::layer();
 
-    if otel_enabled() {
+    if otel_enabled(config) {
         let resource = Resource::builder()
             .with_service_name(SERVICE_NAME)
             .with_attribute(KeyValue::new("deployment.environment.name", "development"))
@@ -172,10 +175,15 @@ pub async fn record_http_metrics(req: Request, next: Next) -> Response {
     response
 }
 
-fn otel_enabled() -> bool {
-    env::var("OTEL_SDK_DISABLED")
-        .map(|value| value != "true")
-        .unwrap_or(true)
+fn otel_enabled(config: &TelemetryConfig) -> bool {
+    if env::var("OTEL_SDK_DISABLED")
+        .map(|value| value == "true")
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    config.enabled
 }
 
 fn signal_endpoint(signal_var: &str, signal_path: &str) -> String {

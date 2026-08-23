@@ -43,9 +43,9 @@ fn resolve_uc_admin_token(config: &Config) -> Result<String, Box<dyn std::error:
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let telemetry = telemetry::init()?;
-
     let config = Config::load().expect("failed to load config");
+    let telemetry = telemetry::init(&config.telemetry)?;
+
     let uc_admin_token = resolve_uc_admin_token(&config)?;
     let db = db::create_pool(&config.database.url)
         .await

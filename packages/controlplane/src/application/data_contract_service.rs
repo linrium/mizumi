@@ -346,6 +346,10 @@ fn odcs_from_uc_table(
         .collect::<Vec<_>>();
     let contract_id = req.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
     let table_comment = table.get("comment").and_then(Value::as_str);
+    let sla_properties = req
+        .sla_properties
+        .clone()
+        .unwrap_or_else(|| default_sla_properties(&schema_name, &object_name));
 
     Ok(json!({
         "apiVersion": "v3.1.0",
@@ -392,6 +396,7 @@ fn odcs_from_uc_table(
             "catalog": catalog,
             "schema": schema_name
         }],
+        "slaProperties": sla_properties,
         "customProperties": [{
             "property": "mizumi.contract.generatedFrom",
             "value": "unity-catalog"
@@ -400,6 +405,75 @@ fn odcs_from_uc_table(
             "value": full_name
         }]
     }))
+}
+
+fn default_sla_properties(schema_name: &str, object_name: &str) -> Vec<Value> {
+    let mut properties = if is_streaming_table(schema_name, object_name) {
+        vec![
+            json!({
+                "id": "stream_latency_15_minutes",
+                "property": "latency",
+                "value": "15",
+                "unit": "minutes",
+                "element": object_name,
+                "driver": "operational",
+                "description": "Streaming bronze data should be queryable within 15 minutes of source arrival."
+            }),
+            json!({
+                "id": "stream_availability",
+                "property": "availability",
+                "value": "99.5",
+                "unit": "percent",
+                "element": object_name,
+                "driver": "operational",
+                "description": "Spark Structured Streaming jobs should keep the target table continuously available."
+            }),
+        ]
+    } else {
+        vec![
+            json!({
+                "id": "daily_frequency",
+                "property": "frequency",
+                "value": "1",
+                "unit": "d",
+                "element": object_name,
+                "scheduler": "dagster",
+                "schedule": "0 2 * * *",
+                "driver": "analytics",
+                "description": "Dagster cross_sell_daily_schedule refreshes this contract's batch asset daily."
+            }),
+            json!({
+                "id": "daily_time_of_availability",
+                "property": "timeOfAvailability",
+                "value": "03:00+00:00",
+                "element": object_name,
+                "scheduler": "dagster",
+                "schedule": "0 2 * * *",
+                "driver": "analytics",
+                "description": "Daily batch outputs should be available after the scheduled Spark materialization window."
+            }),
+        ]
+    };
+
+    properties.push(json!({
+        "id": "default_retention",
+        "property": "retention",
+        "value": "forever",
+        "element": object_name,
+        "driver": "operational",
+        "description": "Mizumi retains this dataset indefinitely."
+    }));
+    properties
+}
+
+fn is_streaming_table(schema_name: &str, object_name: &str) -> bool {
+    let schema = schema_name.to_ascii_lowercase();
+    let object = object_name.to_ascii_lowercase();
+    schema.contains("bronze")
+        && (object.contains("transactions")
+            || object.contains("tickets")
+            || object.contains("incidents")
+            || object.contains("events"))
 }
 
 fn odcs_property_from_uc_column(column: &Value) -> Value {

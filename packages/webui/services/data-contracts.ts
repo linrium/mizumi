@@ -46,6 +46,7 @@ export type ImportDataContractFromUcBody = {
   version?: number
   owner_principal?: string
   id?: string
+  sla_properties?: Array<Record<string, unknown>>
 }
 
 export async function listDataContracts(params?: {

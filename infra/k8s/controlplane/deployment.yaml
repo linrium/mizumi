@@ -114,6 +114,8 @@ spec:
               value: "sovico"
             - name: RUST_LOG
               value: "debug"
+            - name: TELEMETRY__ENABLED
+              value: "false"
             - name: OTEL_SERVICE_NAME
               value: "controlplane"
             - name: OTEL_RESOURCE_ATTRIBUTES

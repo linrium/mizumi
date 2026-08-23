@@ -1,6 +1,9 @@
 bind_addr = "0.0.0.0:4000"
 bypass_token = "test"
 
+[telemetry]
+enabled = false
+
 [database]
 url = "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
 

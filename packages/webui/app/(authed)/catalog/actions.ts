@@ -226,7 +226,7 @@ export async function getTableContractAction(
   )
   if (!summary) return null
 
-  const version = summary.active_version ?? summary.latest_version
+  const version = summary.latest_version
   return controlplaneFetch(
     `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}`
   )
@@ -237,11 +237,25 @@ export async function importTableContractAction(
   schema: string,
   table: string
 ) {
+  const namespace = `${catalog}.${schema}`
+  const params = new URLSearchParams({ namespace, search: table })
+  const list = await controlplaneFetch<{
+    contracts: Array<{
+      namespace: string
+      name: string
+      latest_version: number
+    }>
+  }>(`/api/data-contracts?${params.toString()}`)
+  const summary = list.contracts.find(
+    (item) => item.namespace === namespace && item.name === table
+  )
+  const version = (summary?.latest_version ?? 0) + 1
+
   return controlplaneFetch("/api/data-contracts/import-from-uc", {
     method: "POST",
     body: JSON.stringify({
       table: `${catalog}.${schema}.${table}`,
-      version: 1,
+      version,
     }),
   })
 }
@@ -257,7 +271,7 @@ export async function validateTableContractAction(
     `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/validate`,
     {
       method: "POST",
-      body: JSON.stringify({ metadata_only: true }),
+      body: JSON.stringify({ metadata_only: false }),
     }
   )
 }

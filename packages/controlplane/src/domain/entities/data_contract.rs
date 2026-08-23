@@ -31,6 +31,8 @@ pub struct ImportDataContractFromUcRequest {
     pub owner_principal: Option<String>,
     #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
+    pub sla_properties: Option<Vec<Value>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -94,6 +96,7 @@ pub fn validate_odcs(odcs: &Value, metadata_only: bool) -> DataContractValidatio
 
     if !metadata_only {
         validate_quality_shape(odcs, &mut checks);
+        validate_sla_shape(odcs, &mut checks);
     }
 
     let valid = checks.iter().all(|check| check.result == "passed");
@@ -213,6 +216,106 @@ fn validate_quality_array(
     }
 }
 
+fn validate_sla_shape(odcs: &Value, checks: &mut Vec<DataContractValidationCheck>) {
+    let Some(sla_properties) = odcs.get("slaProperties") else {
+        return;
+    };
+    let Some(sla_properties) = sla_properties.as_array() else {
+        checks.push(failed(
+            "slaProperties",
+            "slaProperties must be an array when present",
+        ));
+        return;
+    };
+
+    for (index, sla) in sla_properties.iter().enumerate() {
+        let field = sla
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty())
+            .map(|id| format!("slaProperties.{id}"))
+            .unwrap_or_else(|| format!("slaProperties[{index}]"));
+
+        let Some(property) = sla.get("property").and_then(Value::as_str) else {
+            checks.push(failed(&field, "SLA property is required"));
+            continue;
+        };
+        if property.trim().is_empty() {
+            checks.push(failed(&field, "SLA property is required"));
+            continue;
+        }
+
+        if !has_scalar_value(sla.get("value")) {
+            checks.push(failed(&field, "SLA value is required"));
+            continue;
+        }
+
+        let property_lower = property.to_ascii_lowercase();
+        if matches!(
+            property_lower.as_str(),
+            "frequency" | "fy" | "latency" | "ly" | "retention" | "re"
+        ) && !is_indefinite_retention(&property_lower, sla.get("value"))
+            && sla
+            .get("unit")
+            .and_then(Value::as_str)
+            .is_none_or(|unit| unit.trim().is_empty())
+        {
+            checks.push(failed(
+                &field,
+                "SLA unit is required for frequency, latency, and retention",
+            ));
+            continue;
+        }
+
+        if let Some(driver) = sla.get("driver").and_then(Value::as_str) {
+            let driver_lower = driver.to_ascii_lowercase();
+            if !matches!(
+                driver_lower.as_str(),
+                "regulatory" | "analytics" | "operational"
+            ) {
+                checks.push(failed(
+                    &field,
+                    "SLA driver must be regulatory, analytics, or operational",
+                ));
+                continue;
+            }
+        }
+
+        if sla.get("schedule").is_some()
+            && sla
+                .get("scheduler")
+                .and_then(Value::as_str)
+                .is_none_or(|scheduler| scheduler.trim().is_empty())
+        {
+            checks.push(failed(
+                &field,
+                "SLA scheduler is required when schedule is present",
+            ));
+            continue;
+        }
+
+        checks.push(passed(&field));
+    }
+}
+
+fn is_indefinite_retention(property: &str, value: Option<&Value>) -> bool {
+    if !matches!(property, "retention" | "re") {
+        return false;
+    }
+
+    value
+        .and_then(Value::as_str)
+        .is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "forever" | "indefinite"))
+}
+
+fn has_scalar_value(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::String(value)) => !value.trim().is_empty(),
+        Some(Value::Number(_) | Value::Bool(_)) => true,
+        _ => false,
+    }
+}
+
 fn passed(field: &str) -> DataContractValidationCheck {
     DataContractValidationCheck {
         result: "passed".to_string(),
@@ -237,4 +340,83 @@ fn default_version() -> i32 {
 
 pub fn is_data_contract(definition: &SemanticDefinition) -> bool {
     definition.object_type == "data_contract"
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::validate_odcs;
+
+    fn valid_contract_with_sla(sla_properties: serde_json::Value) -> serde_json::Value {
+        json!({
+            "apiVersion": "v3.1.0",
+            "kind": "DataContract",
+            "id": "contract-1",
+            "version": "1",
+            "status": "draft",
+            "schema": [{
+                "name": "orders",
+                "logicalType": "object",
+                "properties": [{
+                    "name": "created_at",
+                    "logicalType": "timestamp"
+                }]
+            }],
+            "slaProperties": sla_properties
+        })
+    }
+
+    #[test]
+    fn validates_odcs_sla_properties() {
+        let result = validate_odcs(
+            &valid_contract_with_sla(json!([{
+                "id": "daily_frequency",
+                "property": "frequency",
+                "value": "1",
+                "unit": "d",
+                "element": "orders.created_at",
+                "scheduler": "dagster",
+                "schedule": "0 2 * * *",
+                "driver": "analytics"
+            }])),
+            false,
+        );
+
+        assert!(result.valid);
+    }
+
+    #[test]
+    fn rejects_sla_frequency_without_unit() {
+        let result = validate_odcs(
+            &valid_contract_with_sla(json!([{
+                "id": "daily_frequency",
+                "property": "frequency",
+                "value": "1"
+            }])),
+            false,
+        );
+
+        assert!(!result.valid);
+        assert!(
+            result
+                .checks
+                .iter()
+                .any(|check| check.field.as_deref() == Some("slaProperties.daily_frequency"))
+        );
+    }
+
+    #[test]
+    fn allows_indefinite_retention_without_unit() {
+        let result = validate_odcs(
+            &valid_contract_with_sla(json!([{
+                "id": "default_retention",
+                "property": "retention",
+                "value": "forever"
+            }])),
+            false,
+        );
+
+        assert!(result.valid);
+    }
 }
