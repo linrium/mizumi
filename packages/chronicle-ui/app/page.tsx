@@ -18,6 +18,7 @@ import {
   IconTable,
   IconTimeline,
 } from "@tabler/icons-react"
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -421,6 +422,13 @@ export default function Home() {
               <IconRefresh />
               Refresh
             </Button>
+            <Link
+              href="/merkle"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2.5 font-medium text-slate-700 text-xs transition hover:bg-slate-50"
+            >
+              <IconGitBranch className="size-4" />
+              Merkle Tree
+            </Link>
           </div>
         </div>
       </header>
