@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use serde_json::json;
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
@@ -7,7 +8,10 @@ use crate::{
     adapters::outbound::postgres::{
         blast_radius, lineage, permission_requests, policy_templates, teams, time_bound_grants,
     },
-    application::{llm_service::LlmService, uc_service::UnityCatalogProxyService},
+    application::{
+        chronicle_service::ChronicleAuditService, llm_service::LlmService,
+        uc_service::UnityCatalogProxyService,
+    },
     domain::{
         entities::lineage::{LineageEdge, LineageNode},
         entities::permission::{
@@ -50,6 +54,7 @@ pub struct PermissionService {
     db: PgPool,
     uc_service: UnityCatalogProxyService,
     llm_service: Option<LlmService>,
+    chronicle: ChronicleAuditService,
 }
 
 impl PermissionService {
@@ -57,11 +62,13 @@ impl PermissionService {
         db: PgPool,
         uc_service: UnityCatalogProxyService,
         llm_service: Option<LlmService>,
+        chronicle: ChronicleAuditService,
     ) -> Self {
         Self {
             db,
             uc_service,
             llm_service,
+            chronicle,
         }
     }
 
@@ -484,6 +491,23 @@ impl PermissionService {
                 ),
             }
             self.apply_guardrail_if_ready(request.id).await;
+            self.chronicle
+                .record(
+                    "permission.grant.renewed",
+                    json!({
+                        "outcome": "success",
+                        "request_id": request.id,
+                        "renewal_grant_id": renewal_grant_id,
+                        "principals": principals,
+                        "resource": request.resource,
+                        "scope": request.scope,
+                        "privileges": request.privileges,
+                        "expires_at": effective_expires_at,
+                        "reviewer_id": request.reviewer_id,
+                        "reviewer": request.reviewer,
+                    }),
+                )
+                .await;
             return Ok(());
         }
 
@@ -516,6 +540,27 @@ impl PermissionService {
         }
 
         self.apply_guardrail_if_ready(request.id).await;
+        self.chronicle
+            .record(
+                "permission.grant.created",
+                json!({
+                    "outcome": "success",
+                    "request_id": request.id,
+                    "submit_as": request.submit_as,
+                    "requester_id": request.requester_id,
+                    "requester_email": request.requester_email,
+                    "team_id": request.team_id,
+                    "principals": principals,
+                    "resource": request.resource,
+                    "scope": request.scope,
+                    "privileges": request.privileges,
+                    "started_at": started_at,
+                    "expires_at": effective_expires_at,
+                    "reviewer_id": request.reviewer_id,
+                    "reviewer": request.reviewer,
+                }),
+            )
+            .await;
 
         Ok(())
     }
@@ -1117,7 +1162,32 @@ impl PermissionService {
             self.spawn_llm_analysis(request.clone());
         }
 
-        Ok(Self::into_response(request))
+        let response = Self::into_response(request);
+        self.chronicle
+            .record(
+                "permission.request.created",
+                json!({
+                    "outcome": "success",
+                    "request_id": response.id,
+                    "request_code": response.code,
+                    "submit_as": response.submit_as,
+                    "requester_id": response.requester_id,
+                    "requester_email": response.requester_email,
+                    "team_id": response.team_id,
+                    "resource": response.resource,
+                    "scope": response.scope,
+                    "privileges": response.privileges,
+                    "status": response.status,
+                    "risk": response.risk,
+                    "policy_template_id": response.policy_template_id,
+                    "queue_decision": response.queue_decision,
+                    "expires_at": response.expires_at,
+                    "renewal_of": response.renewal_of,
+                }),
+            )
+            .await;
+
+        Ok(response)
     }
 
     pub async fn get_request(&self, id: Uuid) -> Result<PermissionRequestResponse, AppError> {
@@ -1210,7 +1280,28 @@ impl PermissionService {
             .ok_or(AppError::NotFound)?,
         };
 
-        Ok(Self::into_response(updated))
+        let response = Self::into_response(updated);
+        self.chronicle
+            .record(
+                "permission.request.status_changed",
+                json!({
+                    "outcome": "success",
+                    "request_id": response.id,
+                    "request_code": response.code,
+                    "previous_status": existing.status,
+                    "status": response.status,
+                    "requested_status": body.status,
+                    "approval_step_id": body.approval_step_id,
+                    "grant_duration_days": body.grant_duration_days,
+                    "reviewer_id": response.reviewer_id,
+                    "resource": response.resource,
+                    "scope": response.scope,
+                    "privileges": response.privileges,
+                }),
+            )
+            .await;
+
+        Ok(response)
     }
 
     pub async fn bulk_approve(
@@ -1231,7 +1322,21 @@ impl PermissionService {
 
         let requests =
             permission_requests::bulk_update_status(&self.db, &body.ids, "approved").await?;
-        Ok(requests.into_iter().map(Self::into_response).collect())
+        let responses = requests
+            .into_iter()
+            .map(Self::into_response)
+            .collect::<Vec<_>>();
+        self.chronicle
+            .record(
+                "permission.request.bulk_approved",
+                json!({
+                    "outcome": "success",
+                    "request_ids": body.ids,
+                    "updated_count": responses.len(),
+                }),
+            )
+            .await;
+        Ok(responses)
     }
 
     pub async fn list_policy_templates(&self) -> Result<Vec<PolicyTemplate>, AppError> {
@@ -1331,11 +1436,26 @@ impl PermissionService {
                 "expires_at must be in the future".into(),
             ));
         }
-        time_bound_grants::extend(&self.db, id, body.expires_at)
+        let grant = time_bound_grants::extend(&self.db, id, body.expires_at)
             .await?
             .ok_or_else(|| {
                 AppError::QueryFailed("grant not found or already expired/revoked".into())
-            })
+            })?;
+        self.chronicle
+            .record(
+                "permission.grant.renewed_by_admin",
+                json!({
+                    "outcome": "success",
+                    "grant_id": grant.id,
+                    "principal": grant.principal,
+                    "resource": grant.resource,
+                    "scope": grant.scope,
+                    "privilege": grant.privilege,
+                    "expires_at": grant.expires_at,
+                }),
+            )
+            .await;
+        Ok(grant)
     }
 
     /// Revoke a grant: remove the UC privilege and mark the grant as `revoked`.
@@ -1369,8 +1489,24 @@ impl PermissionService {
             "grant revoked — UC privilege removed"
         );
 
-        time_bound_grants::revoke(&self.db, id)
+        let revoked = time_bound_grants::revoke(&self.db, id)
             .await?
-            .ok_or(AppError::NotFound)
+            .ok_or(AppError::NotFound)?;
+        self.chronicle
+            .record(
+                "permission.grant.revoked",
+                json!({
+                    "outcome": "success",
+                    "grant_id": revoked.id,
+                    "principal": revoked.principal,
+                    "resource": revoked.resource,
+                    "scope": revoked.scope,
+                    "privilege": revoked.privilege,
+                    "reason": body.reason,
+                    "source_request_id": revoked.source_request_id,
+                }),
+            )
+            .await;
+        Ok(revoked)
     }
 }

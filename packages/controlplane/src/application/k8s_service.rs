@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 
 use crate::{
     adapters::outbound::kubernetes::duckdb,
+    application::chronicle_service::ChronicleAuditService,
     domain::{
         entities::query::{QueryRequest, QueryResponse},
         error::AppError,
@@ -11,19 +12,90 @@ use crate::{
 #[derive(Clone)]
 pub struct K8sQueryService {
     duckdb_server_uri: String,
+    chronicle: ChronicleAuditService,
 }
 
 impl K8sQueryService {
-    pub fn new(duckdb_server_uri: String) -> Self {
-        Self { duckdb_server_uri }
+    pub fn new(duckdb_server_uri: String, chronicle: ChronicleAuditService) -> Self {
+        Self {
+            duckdb_server_uri,
+            chronicle,
+        }
     }
 
     pub async fn run_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
-        let client = duckdb::client().await?;
-        let job_name = duckdb::create_query_job(&client, &req.sql, req.id_token.as_deref()).await?;
+        let sql = req.sql;
+        let id_token = req.id_token;
+        let client = match duckdb::client().await {
+            Ok(client) => client,
+            Err(error) => {
+                self.chronicle
+                    .record_error(
+                        "data.query.failed",
+                        &error.to_string(),
+                        json!({
+                            "engine": "duckdb",
+                            "stage": "client",
+                            "sql": sql,
+                        }),
+                    )
+                    .await;
+                return Err(error);
+            }
+        };
+        let job_name = match duckdb::create_query_job(&client, &sql, id_token.as_deref()).await {
+            Ok(job_name) => job_name,
+            Err(error) => {
+                self.chronicle
+                    .record_error(
+                        "data.query.failed",
+                        &error.to_string(),
+                        json!({
+                            "engine": "duckdb",
+                            "stage": "create_job",
+                            "sql": sql,
+                        }),
+                    )
+                    .await;
+                return Err(error);
+            }
+        };
         let result = duckdb::wait_for_completion(&client, &job_name).await;
         let _ = duckdb::delete_query_job(&client, &job_name).await;
-        duckdb::parse_output(&result?)
+        let output = result.and_then(|raw| duckdb::parse_output(&raw));
+
+        match &output {
+            Ok(response) => {
+                self.chronicle
+                    .record(
+                        "data.query.completed",
+                        json!({
+                            "outcome": "success",
+                            "engine": "duckdb",
+                            "job_name": job_name,
+                            "sql": sql,
+                            "row_count": response.row_count,
+                            "columns": &response.columns,
+                        }),
+                    )
+                    .await;
+            }
+            Err(error) => {
+                self.chronicle
+                    .record_error(
+                        "data.query.failed",
+                        &error.to_string(),
+                        json!({
+                            "engine": "duckdb",
+                            "job_name": job_name,
+                            "sql": sql,
+                        }),
+                    )
+                    .await;
+            }
+        }
+
+        output
     }
 
     pub async fn create_session(&self) -> Result<Value, AppError> {
@@ -55,7 +127,23 @@ impl K8sQueryService {
             return Err(AppError::NotFound);
         }
 
-        self.run_query(req).await
+        let sql = req.sql.clone();
+        let response = self.run_query(req).await;
+        if let Ok(response) = &response {
+            self.chronicle
+                .record(
+                    "data.session_query.completed",
+                    json!({
+                        "outcome": "success",
+                        "engine": "duckdb",
+                        "session_id": id,
+                        "sql": sql,
+                        "row_count": response.row_count,
+                    }),
+                )
+                .await;
+        }
+        response
     }
 }
 

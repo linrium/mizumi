@@ -1,9 +1,8 @@
 # Chronicle
 
 Chronicle is a small Go Fiber server backed by a Tessera transparency log.
-Local runs use Tessera POSIX storage by default. The Kubernetes manifests use
-Tessera's AWS/S3 backend with RustFS for object storage and MySQL for
-sequencing.
+Local runs and the default Kubernetes manifests use Tessera POSIX storage, with
+log data written to a local directory or mounted persistent volume.
 
 ## Module
 
@@ -17,7 +16,7 @@ github.com/linrium/mizuumi/packages/chronicle
 go run .
 ```
 
-The server listens on `:3000`.
+The server listens on `:3008`.
 
 The default Tessera log directory is `.data/tessera`.
 
@@ -37,7 +36,7 @@ GET  /docs/*       Scalar API reference and OpenAPI spec
 ## Configuration
 
 ```text
-CHRONICLE_ADDR                         listen address, default :3000
+CHRONICLE_ADDR                         listen address, default :3008
 CHRONICLE_STORAGE_BACKEND              posix or aws-s3, default posix
 CHRONICLE_LOG_DIR                      Tessera POSIX log directory, default .data/tessera
 CHRONICLE_SIGNER_KEY_FILE              checkpoint signer key file, default .data/tessera/.state/signer.key

@@ -3,11 +3,6 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - rustfs-secret.yaml
-  - mysql-secret.yaml
-  - mysql-persistent-volume-claim.yaml
-  - mysql-service.yaml
-  - mysql-deployment.yaml
   - persistent-volume-claim.yaml
   - deployment.yaml
   - service.yaml

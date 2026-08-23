@@ -12,13 +12,14 @@ use adapters::inbound::http::create_router;
 use adapters::outbound::http::mlflow::MlflowHttpProxy;
 use adapters::outbound::http::uc::UnityCatalogHttpProxy;
 use application::{
-    chat_thread_service::ChatThreadService, dagster_service::DagsterService,
-    data_contract_service::DataContractService, expiry_worker::ExpiryWorker,
-    k8s_service::K8sQueryService, lineage_service::LineageService, llm_service::LlmService,
-    mlflow_service::MlflowProxyService, permission_service::PermissionService,
-    semantic_registry_service::SemanticRegistryService, streaming_service::StreamingJobService,
-    team_service::TeamService, test_event_service::TestEventService,
-    uc_service::UnityCatalogProxyService, user_service::UserService,
+    chat_thread_service::ChatThreadService, chronicle_service::ChronicleAuditService,
+    dagster_service::DagsterService, data_contract_service::DataContractService,
+    expiry_worker::ExpiryWorker, k8s_service::K8sQueryService, lineage_service::LineageService,
+    llm_service::LlmService, mlflow_service::MlflowProxyService,
+    permission_service::PermissionService, semantic_registry_service::SemanticRegistryService,
+    streaming_service::StreamingJobService, team_service::TeamService,
+    test_event_service::TestEventService, uc_service::UnityCatalogProxyService,
+    user_service::UserService,
 };
 use infrastructure::{auth::KeycloakAuth, config::Config, db, server::AppState, telemetry};
 
@@ -65,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if llm_service.is_none() {
         tracing::warn!("OpenAI API key not configured; LLM blast-radius analysis is disabled");
     }
+    let chronicle_service = ChronicleAuditService::new(config.chronicle.clone());
     let state = Arc::new(AppState {
         chat_thread_service: Arc::new(ChatThreadService::new(db.clone())),
         data_contract_service: Arc::new(DataContractService::new(
@@ -79,7 +81,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         mlflow_service: Arc::new(MlflowProxyService::new(MlflowHttpProxy::new(
             config.mlflow.base_url.clone(),
         ))),
-        k8s_service: Arc::new(K8sQueryService::new(config.duckdb_server.uri.clone())),
+        k8s_service: Arc::new(K8sQueryService::new(
+            config.duckdb_server.uri.clone(),
+            chronicle_service.clone(),
+        )),
         lineage_service: Arc::new(LineageService::new(
             db.clone(),
             config.unity_catalog.base_url.clone(),
@@ -93,6 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 uc_admin_token.clone(),
             )),
             llm_service,
+            chronicle_service.clone(),
         )),
         semantic_registry_service: Arc::new(SemanticRegistryService::new(db.clone())),
         streaming_service: Arc::new(StreamingJobService::new(db.clone())),

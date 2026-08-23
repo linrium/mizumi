@@ -116,6 +116,12 @@ spec:
               value: "debug"
             - name: TELEMETRY__ENABLED
               value: "false"
+            - name: CHRONICLE__ENABLED
+              value: "true"
+            - name: CHRONICLE__BASE_URL
+              value: "http://chronicle.chronicle.svc.cluster.local"
+            - name: CHRONICLE__SOURCE
+              value: "controlplane"
             - name: OTEL_SERVICE_NAME
               value: "controlplane"
             - name: OTEL_RESOURCE_ATTRIBUTES

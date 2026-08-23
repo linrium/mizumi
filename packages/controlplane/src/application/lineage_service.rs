@@ -739,9 +739,8 @@ impl LineageService {
         let common_constants = {
             let common_path = spark_root.join("common.py");
             if common_path.exists() {
-                let src = fs::read_to_string(&common_path).map_err(|e| {
-                    AppError::QueryFailed(format!("failed to read common.py: {e}"))
-                })?;
+                let src = fs::read_to_string(&common_path)
+                    .map_err(|e| AppError::QueryFailed(format!("failed to read common.py: {e}")))?;
                 extract_constants(&src)
             } else {
                 HashMap::new()
@@ -818,7 +817,11 @@ impl LineageService {
                 .unwrap_or(&rel_path)
                 .to_string();
             let constants = extract_constants(&contents);
-            let display_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or(&short_path).to_string();
+            let display_name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(&short_path)
+                .to_string();
             let job_id = graph.ensure_node(
                 "daft_job",
                 "daft",
@@ -895,7 +898,12 @@ impl LineageService {
                             if job_path.contains("/opt/daft/jobs/") {
                                 ("daft_job", "daft", "daft://mizumi", "packages/daft/jobs/")
                             } else {
-                                ("spark_job", "spark", "spark://mizumi", "packages/spark/jobs/")
+                                (
+                                    "spark_job",
+                                    "spark",
+                                    "spark://mizumi",
+                                    "packages/spark/jobs/",
+                                )
                             };
                         let full_rel = normalize_job_path(job_path);
                         let short_rel = full_rel
@@ -1515,9 +1523,16 @@ fn relative_to_repo(repo_root: &Path, path: &Path) -> String {
 }
 
 fn resolve_var_aliases(contents: &str, map: &mut HashMap<String, String>) {
-    for caps in VAR_ALIAS_PATTERN.get_or_init(var_alias_regex).captures_iter(contents) {
-        let Some(lhs) = caps.get(1).map(|m| m.as_str().to_string()) else { continue };
-        let Some(rhs) = caps.get(2).map(|m| m.as_str().to_string()) else { continue };
+    for caps in VAR_ALIAS_PATTERN
+        .get_or_init(var_alias_regex)
+        .captures_iter(contents)
+    {
+        let Some(lhs) = caps.get(1).map(|m| m.as_str().to_string()) else {
+            continue;
+        };
+        let Some(rhs) = caps.get(2).map(|m| m.as_str().to_string()) else {
+            continue;
+        };
         if map.contains_key(&lhs) {
             continue;
         }
@@ -1664,10 +1679,14 @@ fn add_spark_job_edges(
         }
     }
 
-    let save_vars: BTreeSet<String> = extract_var_usages(contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex))
-        .into_iter()
-        .chain(extract_var_usages(contents, WRITE_DELTA_VAR_PATTERN.get_or_init(write_delta_var_regex)))
-        .collect();
+    let save_vars: BTreeSet<String> =
+        extract_var_usages(contents, SAVE_VAR_PATTERN.get_or_init(save_var_regex))
+            .into_iter()
+            .chain(extract_var_usages(
+                contents,
+                WRITE_DELTA_VAR_PATTERN.get_or_init(write_delta_var_regex),
+            ))
+            .collect();
     for target_var in save_vars {
         if let Some(value) = constants.get(&target_var) {
             if let Some(table_id) = graph.ensure_table_for_path(value) {
@@ -1746,8 +1765,10 @@ fn constant_regex() -> Regex {
 fn var_alias_regex() -> Regex {
     // Matches VAR = OTHER_VAR or VAR = os.getenv("KEY", OTHER_VAR) — indirection to another constant.
     // (?m) makes $ match end-of-line, not end-of-string.
-    Regex::new(r#"(?m)([A-Z][A-Z0-9_]+)\s*=\s*(?:os\.getenv\s*\([^,)]+,\s*)?([A-Z][A-Z0-9_]+)\s*\)?\s*$"#)
-        .expect("valid var alias regex")
+    Regex::new(
+        r#"(?m)([A-Z][A-Z0-9_]+)\s*=\s*(?:os\.getenv\s*\([^,)]+,\s*)?([A-Z][A-Z0-9_]+)\s*\)?\s*$"#,
+    )
+    .expect("valid var alias regex")
 }
 
 fn app_name_regex() -> Regex {
@@ -1836,7 +1857,9 @@ mod tests {
     #[test]
     fn normalize_job_path_supports_controlplane_local_uri() {
         assert_eq!(
-            normalize_job_path("local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"),
+            normalize_job_path(
+                "local:///opt/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"
+            ),
             "packages/spark/jobs/hdbank/stream_banking_transactions_to_bronze.py"
         );
     }
@@ -2300,7 +2323,11 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
                 "train_baggage_damage_model",
                 json!({ "path": "packages/daft/jobs/vietjetair/train_baggage_damage_model.py" }),
             );
-            graph.add_alias(id, "vietjetair/train_baggage_damage_model.py".to_string(), AliasPriority::RepoPath);
+            graph.add_alias(
+                id,
+                "vietjetair/train_baggage_damage_model.py".to_string(),
+                AliasPriority::RepoPath,
+            );
             id
         });
     graph.add_edge(
@@ -2361,7 +2388,11 @@ fn ingest_static_nodes(graph: &mut GraphBuilder) {
                 "classify_baggage_damage",
                 json!({ "path": "packages/daft/jobs/vietjetair/classify_baggage_damage.py" }),
             );
-            graph.add_alias(id, "vietjetair/classify_baggage_damage.py".to_string(), AliasPriority::RepoPath);
+            graph.add_alias(
+                id,
+                "vietjetair/classify_baggage_damage.py".to_string(),
+                AliasPriority::RepoPath,
+            );
             id
         });
     // volume → classify job (can't be derived from repo scan; volume is not a UC table)

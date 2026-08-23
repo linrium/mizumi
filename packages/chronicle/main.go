@@ -179,7 +179,7 @@ type config struct {
 func loadConfig() config {
 	logDir := getenv("CHRONICLE_LOG_DIR", ".data/tessera")
 	return config{
-		listenAddr:       getenv("CHRONICLE_ADDR", ":3000"),
+		listenAddr:       getenv("CHRONICLE_ADDR", ":3008"),
 		logDir:           logDir,
 		signerKeyFile:    getenv("CHRONICLE_SIGNER_KEY_FILE", filepath.Join(logDir, ".state", "signer.key")),
 		storageBackend:   getenv("CHRONICLE_STORAGE_BACKEND", "posix"),

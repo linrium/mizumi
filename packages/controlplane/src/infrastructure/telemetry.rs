@@ -148,10 +148,7 @@ impl opentelemetry::propagation::Extractor for HeaderExtractor<'_> {
     }
 
     fn keys(&self) -> Vec<&str> {
-        self.0
-            .keys()
-            .map(|k| k.as_str())
-            .collect()
+        self.0.keys().map(|k| k.as_str()).collect()
     }
 }
 

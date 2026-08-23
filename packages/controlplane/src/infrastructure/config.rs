@@ -87,6 +87,16 @@ pub struct TelemetryConfig {
 }
 
 #[derive(Clone, Deserialize)]
+pub struct ChronicleConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_chronicle_base_url")]
+    pub base_url: String,
+    #[serde(default = "default_chronicle_source")]
+    pub source: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub bind_addr: String,
     #[serde(default)]
@@ -107,6 +117,8 @@ pub struct Config {
     pub openai: OpenAiConfig,
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+    #[serde(default)]
+    pub chronicle: ChronicleConfig,
 }
 
 impl Config {
@@ -167,6 +179,14 @@ fn default_openai_base_url() -> String {
     "https://api.openai.com/v1".to_string()
 }
 
+fn default_chronicle_base_url() -> String {
+    "http://localhost:3008".to_string()
+}
+
+fn default_chronicle_source() -> String {
+    "controlplane".to_string()
+}
+
 impl Default for DuckdbServerConfig {
     fn default() -> Self {
         Self {
@@ -198,6 +218,16 @@ impl Default for OpenAiConfig {
             api_key: String::new(),
             model: default_openai_model(),
             base_url: default_openai_base_url(),
+        }
+    }
+}
+
+impl Default for ChronicleConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: default_chronicle_base_url(),
+            source: default_chronicle_source(),
         }
     }
 }

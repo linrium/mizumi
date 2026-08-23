@@ -130,8 +130,8 @@ impl StreamingJobService {
     pub async fn get_job(&self, id: Uuid) -> Result<StreamingJobResponse, AppError> {
         let job = Self::normalize_job(
             streaming_jobs::get(&self.db, id)
-            .await?
-            .ok_or(AppError::NotFound)?,
+                .await?
+                .ok_or(AppError::NotFound)?,
         );
         let k8s_status = match spark::client().await {
             Ok(c) => spark::get_k8s_status(&c, &job.name, &job.namespace).await,
@@ -144,8 +144,8 @@ impl StreamingJobService {
     pub async fn delete_job(&self, id: Uuid) -> Result<(), AppError> {
         let job = Self::normalize_job(
             streaming_jobs::get(&self.db, id)
-            .await?
-            .ok_or(AppError::NotFound)?,
+                .await?
+                .ok_or(AppError::NotFound)?,
         );
 
         if let Ok(client) = spark::client().await {
@@ -161,8 +161,8 @@ impl StreamingJobService {
     pub async fn get_job_logs(&self, id: Uuid) -> Result<serde_json::Value, AppError> {
         let job = Self::normalize_job(
             streaming_jobs::get(&self.db, id)
-            .await?
-            .ok_or(AppError::NotFound)?,
+                .await?
+                .ok_or(AppError::NotFound)?,
         );
 
         let client = spark::client().await?;
@@ -181,8 +181,8 @@ impl StreamingJobService {
     pub async fn restart_job(&self, id: Uuid) -> Result<serde_json::Value, AppError> {
         let job = Self::normalize_job(
             streaming_jobs::get(&self.db, id)
-            .await?
-            .ok_or(AppError::NotFound)?,
+                .await?
+                .ok_or(AppError::NotFound)?,
         );
 
         let client = spark::client().await?;

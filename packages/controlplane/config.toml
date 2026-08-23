@@ -4,6 +4,11 @@ bypass_token = "test"
 [telemetry]
 enabled = false
 
+[chronicle]
+enabled = true
+base_url = "http://localhost:3008"
+source = "controlplane"
+
 [database]
 url = "postgres://controlplane:controlplane_password@localhost:5433/controlplane"
 

@@ -256,9 +256,9 @@ fn validate_sla_shape(odcs: &Value, checks: &mut Vec<DataContractValidationCheck
             "frequency" | "fy" | "latency" | "ly" | "retention" | "re"
         ) && !is_indefinite_retention(&property_lower, sla.get("value"))
             && sla
-            .get("unit")
-            .and_then(Value::as_str)
-            .is_none_or(|unit| unit.trim().is_empty())
+                .get("unit")
+                .and_then(Value::as_str)
+                .is_none_or(|unit| unit.trim().is_empty())
         {
             checks.push(failed(
                 &field,
@@ -303,9 +303,12 @@ fn is_indefinite_retention(property: &str, value: Option<&Value>) -> bool {
         return false;
     }
 
-    value
-        .and_then(Value::as_str)
-        .is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "forever" | "indefinite"))
+    value.and_then(Value::as_str).is_some_and(|value| {
+        matches!(
+            value.to_ascii_lowercase().as_str(),
+            "forever" | "indefinite"
+        )
+    })
 }
 
 fn has_scalar_value(value: Option<&Value>) -> bool {

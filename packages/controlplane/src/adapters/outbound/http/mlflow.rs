@@ -42,8 +42,8 @@ impl MlflowHttpProxy {
             Err(_) => return StatusCode::BAD_REQUEST.into_response(),
         };
 
-        let req_method = reqwest::Method::from_bytes(method.as_str().as_bytes())
-            .unwrap_or(reqwest::Method::GET);
+        let req_method =
+            reqwest::Method::from_bytes(method.as_str().as_bytes()).unwrap_or(reqwest::Method::GET);
 
         let mut req_builder = client().request(req_method, &target_url);
 

@@ -1,4 +1,5 @@
 pub mod chat_thread_service;
+pub mod chronicle_service;
 pub mod dagster_service;
 pub mod data_contract_service;
 pub mod expiry_worker;
