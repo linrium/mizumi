@@ -1300,14 +1300,30 @@ fn get_query_i64(response: &QueryResponse, row: Option<&Vec<Value>>, column: &st
 
 fn default_table_quality_rules(catalog: &str, schema_name: &str, object_name: &str) -> Vec<Value> {
     let table_ref = sql_table_ref(catalog, schema_name, object_name);
-    vec![json!({
+    let mut rules = vec![json!({
         "id": "row_count_positive",
         "description": "Table should contain at least one row.",
         "dimension": "completeness",
         "query": format!(
             "SELECT COUNT(*) > 0 AS passed, CAST(CASE WHEN COUNT(*) > 0 THEN 0 ELSE 1 END AS BIGINT) AS failed_rows, CAST(COUNT(*) AS BIGINT) AS total_rows FROM {table_ref}"
         )
-    })]
+    })];
+
+    if catalog == "hdbank"
+        && schema_name == "hdbank_partnership_prod_bronze"
+        && object_name == "customers_v1"
+    {
+        rules.push(json!({
+            "id": "simulated_failed_customer_quality_check",
+            "description": "Simulated failure: demo customer quality check should fail for UI validation.",
+            "dimension": "validity",
+            "query": format!(
+                "SELECT FALSE AS passed, CAST(1 AS BIGINT) AS failed_rows, CAST(COUNT(*) AS BIGINT) AS total_rows FROM {table_ref}"
+            )
+        }));
+    }
+
+    rules
 }
 
 fn default_property_quality_rules(

@@ -24,6 +24,14 @@ import {
   StatusIndicator,
   StatusLabel,
 } from "@/components/ui/status"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   activateTableContractAction,
@@ -169,6 +177,12 @@ function statusVariant(status: string) {
   if (status === "deprecated" || status === "retired") return "warning"
   if (status === "draft") return "default"
   return "info"
+}
+
+function qualityStatusClass(status: string) {
+  return status === "passed"
+    ? "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400"
+    : "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400"
 }
 
 function formatSlaValue(sla: SlaProperty) {
@@ -882,42 +896,53 @@ export default function TableContractsPage() {
                 ).toLocaleString()}
               </span>
               <Badge
-                variant={
-                  qualityStatus.status === "passed" ? "secondary" : "destructive"
-                }
+                variant="outline"
+                className={qualityStatusClass(qualityStatus.status)}
               >
                 {qualityStatus.status}
               </Badge>
             </div>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {qualityStatus.checks.map((check) => (
-                <div
-                  key={check.id}
-                  className="rounded-md border bg-background p-3 text-xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{check.description}</p>
-                      <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-                        {check.field ?? "table"} / {check.id}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        check.status === "passed" ? "secondary" : "destructive"
-                      }
-                      className="shrink-0"
-                    >
-                      {check.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-3 text-muted-foreground">{check.message}</p>
-                  <div className="mt-3 rounded-md bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
-                    failed {check.failed_rows ?? "?"} / total{" "}
-                    {check.total_rows ?? "?"}
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-hidden rounded-md border bg-background">
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Check</TableHead>
+                    <TableHead>Field</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Failed rows</TableHead>
+                    <TableHead className="text-right">Total rows</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {qualityStatus.checks.map((check) => (
+                    <TableRow key={check.id}>
+                      <TableCell className="min-w-[220px] align-top">
+                        <p className="font-medium">{check.description}</p>
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                          {check.id}
+                        </p>
+                      </TableCell>
+                      <TableCell className="align-top font-mono text-[11px] text-muted-foreground">
+                        {check.field ?? "table"}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge
+                          variant="outline"
+                          className={qualityStatusClass(check.status)}
+                        >
+                          {check.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="align-top text-right font-mono">
+                        {check.failed_rows ?? "?"}
+                      </TableCell>
+                      <TableCell className="align-top text-right font-mono">
+                        {check.total_rows ?? "?"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </div>
         ) : (
