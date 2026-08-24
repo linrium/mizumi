@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chronicle-witness-a
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle-witness-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chronicle-witness-a
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chronicle-witness-a
+    spec:
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: witness
+          image: chronicle:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /app/chronicle-witness
+          ports:
+            - name: http
+              containerPort: 3010
+          env:
+            - name: CHRONICLE_WITNESS_ADDR
+              value: ":3010"
+            - name: CHRONICLE_WITNESS_LOG_ORIGIN
+              value: chronicle
+            - name: CHRONICLE_WITNESS_SIGNER_KEY_FILE
+              value: /etc/chronicle/witness/witness.key
+            - name: CHRONICLE_WITNESS_LOG_VERIFIER_KEY_FILE
+              value: /etc/chronicle/witness/chronicle.pub
+            - name: CHRONICLE_WITNESS_STATE_DIR
+              value: /var/lib/chronicle-witness
+          volumeMounts:
+            - name: keys
+              mountPath: /etc/chronicle/witness
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/chronicle-witness
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: keys
+          secret:
+            secretName: chronicle-witness-demo-keys
+            items:
+              - key: witness-a.key
+                path: witness.key
+              - key: chronicle-signer.key.pub
+                path: chronicle.pub
+        - name: state
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chronicle-witness-a
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle-witness-a
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chronicle-witness-a
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chronicle-witness-b
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle-witness-b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chronicle-witness-b
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chronicle-witness-b
+    spec:
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: witness
+          image: chronicle:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /app/chronicle-witness
+          ports:
+            - name: http
+              containerPort: 3010
+          env:
+            - name: CHRONICLE_WITNESS_ADDR
+              value: ":3010"
+            - name: CHRONICLE_WITNESS_LOG_ORIGIN
+              value: chronicle
+            - name: CHRONICLE_WITNESS_SIGNER_KEY_FILE
+              value: /etc/chronicle/witness/witness.key
+            - name: CHRONICLE_WITNESS_LOG_VERIFIER_KEY_FILE
+              value: /etc/chronicle/witness/chronicle.pub
+            - name: CHRONICLE_WITNESS_STATE_DIR
+              value: /var/lib/chronicle-witness
+          volumeMounts:
+            - name: keys
+              mountPath: /etc/chronicle/witness
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/chronicle-witness
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: keys
+          secret:
+            secretName: chronicle-witness-demo-keys
+            items:
+              - key: witness-b.key
+                path: witness.key
+              - key: chronicle-signer.key.pub
+                path: chronicle.pub
+        - name: state
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chronicle-witness-b
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle-witness-b
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chronicle-witness-b
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -31,7 +31,7 @@ SERVICES=(
   "Keycloak|keycloak|keycloak-svc|8080:8080 8083:8080"
   "Dagster UI|dagster|dagster-dagster-webserver|8088:80"
   "MLflow UI|ml|mlflow-svc|5000:5000"
-  "Unity Catalog API|unitycatalog|unitycatalog-svc|8082:8080"
+  # "Unity Catalog API|unitycatalog|unitycatalog-svc|8082:8080"
   "Shared Postgres|shared-postgres|shared-postgres-svc|5433:5432"
   "DuckDB Quack|spark|duckdb-server-svc|8090:9494"
   # "Controlplane API|controlplane|controlplane-svc|4000:4000"

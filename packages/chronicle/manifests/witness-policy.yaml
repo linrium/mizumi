@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chronicle-witness-policy
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle
+data:
+  policy: |
+    log chronicle+b59447d9+AQrolSg0fHgLthI/SMPGLWKSxjh68AD1nFC1lfuFRJci
+    witness witness-a chronicle-witness-a+d20bc03f+BEq/8C02KWBHKydd2B/VxZngcySa7tf2iMvnFAZBZYM1 http://chronicle-witness-a.chronicle.svc.cluster.local
+    witness witness-b chronicle-witness-b+c43965fa+BDo+DdwgdqA72U9FKS6M1zXceB7WWQgd4T4EiwNayB8N http://chronicle-witness-b.chronicle.svc.cluster.local
+    group simulated-external-witnesses all witness-a witness-b
+    quorum simulated-external-witnesses

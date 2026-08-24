@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chronicle-witness-demo-keys
+  namespace: chronicle
+  labels:
+    app.kubernetes.io/name: chronicle
+type: Opaque
+stringData:
+  chronicle-signer.key: PRIVATE+KEY+chronicle+b59447d9+AWa3mRH8LpAqPYER7xo1r17eF+OOwn78YCeE/C43UErX
+  chronicle-signer.key.pub: chronicle+b59447d9+AQrolSg0fHgLthI/SMPGLWKSxjh68AD1nFC1lfuFRJci
+  witness-a.key: PRIVATE+KEY+chronicle-witness-a+d27eb421+AVrBsbTjWEUJCyWRoiJEfd2gxHAbJbx0sfhU+G6oImAa
+  witness-a.pub: chronicle-witness-a+d20bc03f+BEq/8C02KWBHKydd2B/VxZngcySa7tf2iMvnFAZBZYM1
+  witness-b.key: PRIVATE+KEY+chronicle-witness-b+c7b4bf09+AUMelL/NrdYCEM+x/Mm44jUc/YYGTw5PknIKX/ITb8ub
+  witness-b.pub: chronicle-witness-b+c43965fa+BDo+DdwgdqA72U9FKS6M1zXceB7WWQgd4T4EiwNayB8N

@@ -30,12 +30,24 @@ spec:
             - name: CHRONICLE_LOG_DIR
               value: /var/lib/chronicle/tessera
             - name: CHRONICLE_SIGNER_KEY_FILE
-              value: /var/lib/chronicle/tessera/.state/signer.key
+              value: /etc/chronicle/keys/signer.key
             - name: CHRONICLE_STORAGE_BACKEND
               value: posix
+            - name: CHRONICLE_WITNESS_POLICY_FILE
+              value: /etc/chronicle/witness/policy
+            - name: CHRONICLE_WITNESS_FAIL_OPEN
+              value: "false"
+            - name: CHRONICLE_WITNESS_TIMEOUT
+              value: 5s
           volumeMounts:
             - name: data
               mountPath: /var/lib/chronicle
+            - name: chronicle-keys
+              mountPath: /etc/chronicle/keys
+              readOnly: true
+            - name: witness-policy
+              mountPath: /etc/chronicle/witness
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /healthz
@@ -67,3 +79,14 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: chronicle-data
+        - name: chronicle-keys
+          secret:
+            secretName: chronicle-witness-demo-keys
+            items:
+              - key: chronicle-signer.key
+                path: signer.key
+              - key: chronicle-signer.key.pub
+                path: signer.key.pub
+        - name: witness-policy
+          configMap:
+            name: chronicle-witness-policy

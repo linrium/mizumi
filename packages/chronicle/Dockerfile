@@ -9,6 +9,7 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/chronicle .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/chronicle-witness ./cmd/witness
 
 FROM alpine:3.22
 
@@ -16,6 +17,7 @@ RUN addgroup -S -g 65532 chronicle && adduser -S -D -H -u 65532 -G chronicle chr
 
 WORKDIR /app
 COPY --from=build /out/chronicle /app/chronicle
+COPY --from=build /out/chronicle-witness /app/chronicle-witness
 
 RUN mkdir -p /var/lib/chronicle/tessera && chown -R chronicle:chronicle /var/lib/chronicle
 

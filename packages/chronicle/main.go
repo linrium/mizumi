@@ -61,11 +61,17 @@ func main() {
 		log.Fatalf("create Tessera storage driver: %v", err)
 	}
 
-	appender, shutdown, reader, err := tessera.NewAppender(ctx, driver, tessera.NewAppendOptions().
+	appendOpts := tessera.NewAppendOptions().
 		WithCheckpointSigner(signer).
 		WithCheckpointInterval(time.Second).
 		WithCheckpointRepublishInterval(time.Minute).
-		WithBatching(256, time.Second))
+		WithBatching(256, time.Second)
+	witnessPolicySource, err := configureWitnesses(appendOpts, cfg)
+	if err != nil {
+		log.Fatalf("configure Tessera witnesses: %v", err)
+	}
+
+	appender, shutdown, reader, err := tessera.NewAppender(ctx, driver, appendOpts)
 	if err != nil {
 		log.Fatalf("create Tessera appender: %v", err)
 	}
@@ -105,12 +111,16 @@ func main() {
 		}
 
 		return c.JSON(fiber.Map{
-			"storage_backend": cfg.storageBackend,
-			"log_dir":         cfg.logDir,
-			"signer":          signer.Name(),
-			"verifier_key":    verifierKey,
-			"next_index":      nextIndex,
-			"integrated_size": integratedSize,
+			"storage_backend":   cfg.storageBackend,
+			"log_dir":           cfg.logDir,
+			"signer":            signer.Name(),
+			"verifier_key":      verifierKey,
+			"next_index":        nextIndex,
+			"integrated_size":   integratedSize,
+			"witness_enabled":   witnessPolicySource != "",
+			"witness_policy":    witnessPolicySource,
+			"witness_fail_open": cfg.witnessFailOpen,
+			"witness_timeout":   cfg.witnessTimeout.String(),
 		})
 	})
 
@@ -177,25 +187,29 @@ func main() {
 }
 
 type config struct {
-	listenAddr       string
-	logDir           string
-	signerKeyFile    string
-	storageBackend   string
-	s3Endpoint       string
-	s3Bucket         string
-	s3BucketPrefix   string
-	s3AccessKey      string
-	s3SecretKey      string
-	s3Region         string
-	s3UsePathStyle   bool
-	mysqlDSN         string
-	mysqlHost        string
-	mysqlPort        string
-	mysqlDatabase    string
-	mysqlUser        string
-	mysqlPassword    string
-	mysqlMaxOpenConn int
-	mysqlMaxIdleConn int
+	listenAddr        string
+	logDir            string
+	signerKeyFile     string
+	storageBackend    string
+	s3Endpoint        string
+	s3Bucket          string
+	s3BucketPrefix    string
+	s3AccessKey       string
+	s3SecretKey       string
+	s3Region          string
+	s3UsePathStyle    bool
+	mysqlDSN          string
+	mysqlHost         string
+	mysqlPort         string
+	mysqlDatabase     string
+	mysqlUser         string
+	mysqlPassword     string
+	mysqlMaxOpenConn  int
+	mysqlMaxIdleConn  int
+	witnessPolicy     string
+	witnessPolicyFile string
+	witnessFailOpen   bool
+	witnessTimeout    time.Duration
 }
 
 type logEntryResponse struct {
@@ -225,26 +239,59 @@ type entryProofResponse struct {
 func loadConfig() config {
 	logDir := getenv("CHRONICLE_LOG_DIR", ".data/tessera")
 	return config{
-		listenAddr:       getenv("CHRONICLE_ADDR", ":3008"),
-		logDir:           logDir,
-		signerKeyFile:    getenv("CHRONICLE_SIGNER_KEY_FILE", filepath.Join(logDir, ".state", "signer.key")),
-		storageBackend:   getenv("CHRONICLE_STORAGE_BACKEND", "posix"),
-		s3Endpoint:       os.Getenv("CHRONICLE_AWS_S3_ENDPOINT"),
-		s3Bucket:         os.Getenv("CHRONICLE_AWS_S3_BUCKET"),
-		s3BucketPrefix:   os.Getenv("CHRONICLE_AWS_S3_BUCKET_PREFIX"),
-		s3AccessKey:      os.Getenv("CHRONICLE_AWS_S3_ACCESS_KEY"),
-		s3SecretKey:      os.Getenv("CHRONICLE_AWS_S3_SECRET_KEY"),
-		s3Region:         getenv("CHRONICLE_AWS_S3_REGION", "us-east-1"),
-		s3UsePathStyle:   getenvBool("CHRONICLE_AWS_S3_USE_PATH_STYLE", true),
-		mysqlDSN:         os.Getenv("CHRONICLE_AWS_MYSQL_DSN"),
-		mysqlHost:        getenv("CHRONICLE_AWS_MYSQL_HOST", "mysql"),
-		mysqlPort:        getenv("CHRONICLE_AWS_MYSQL_PORT", "3306"),
-		mysqlDatabase:    getenv("CHRONICLE_AWS_MYSQL_DATABASE", "tessera"),
-		mysqlUser:        os.Getenv("CHRONICLE_AWS_MYSQL_USER"),
-		mysqlPassword:    os.Getenv("CHRONICLE_AWS_MYSQL_PASSWORD"),
-		mysqlMaxOpenConn: getenvInt("CHRONICLE_AWS_MYSQL_MAX_OPEN_CONNS", 0),
-		mysqlMaxIdleConn: getenvInt("CHRONICLE_AWS_MYSQL_MAX_IDLE_CONNS", 2),
+		listenAddr:        getenv("CHRONICLE_ADDR", ":3008"),
+		logDir:            logDir,
+		signerKeyFile:     getenv("CHRONICLE_SIGNER_KEY_FILE", filepath.Join(logDir, ".state", "signer.key")),
+		storageBackend:    getenv("CHRONICLE_STORAGE_BACKEND", "posix"),
+		s3Endpoint:        os.Getenv("CHRONICLE_AWS_S3_ENDPOINT"),
+		s3Bucket:          os.Getenv("CHRONICLE_AWS_S3_BUCKET"),
+		s3BucketPrefix:    os.Getenv("CHRONICLE_AWS_S3_BUCKET_PREFIX"),
+		s3AccessKey:       os.Getenv("CHRONICLE_AWS_S3_ACCESS_KEY"),
+		s3SecretKey:       os.Getenv("CHRONICLE_AWS_S3_SECRET_KEY"),
+		s3Region:          getenv("CHRONICLE_AWS_S3_REGION", "us-east-1"),
+		s3UsePathStyle:    getenvBool("CHRONICLE_AWS_S3_USE_PATH_STYLE", true),
+		mysqlDSN:          os.Getenv("CHRONICLE_AWS_MYSQL_DSN"),
+		mysqlHost:         getenv("CHRONICLE_AWS_MYSQL_HOST", "mysql"),
+		mysqlPort:         getenv("CHRONICLE_AWS_MYSQL_PORT", "3306"),
+		mysqlDatabase:     getenv("CHRONICLE_AWS_MYSQL_DATABASE", "tessera"),
+		mysqlUser:         os.Getenv("CHRONICLE_AWS_MYSQL_USER"),
+		mysqlPassword:     os.Getenv("CHRONICLE_AWS_MYSQL_PASSWORD"),
+		mysqlMaxOpenConn:  getenvInt("CHRONICLE_AWS_MYSQL_MAX_OPEN_CONNS", 0),
+		mysqlMaxIdleConn:  getenvInt("CHRONICLE_AWS_MYSQL_MAX_IDLE_CONNS", 2),
+		witnessPolicy:     os.Getenv("CHRONICLE_WITNESS_POLICY"),
+		witnessPolicyFile: os.Getenv("CHRONICLE_WITNESS_POLICY_FILE"),
+		witnessFailOpen:   getenvBool("CHRONICLE_WITNESS_FAIL_OPEN", false),
+		witnessTimeout:    getenvDuration("CHRONICLE_WITNESS_TIMEOUT", 5*time.Second),
 	}
+}
+
+func configureWitnesses(opts *tessera.AppendOptions, cfg config) (string, error) {
+	var policy []byte
+	var source string
+	switch {
+	case strings.TrimSpace(cfg.witnessPolicy) != "":
+		policy = []byte(cfg.witnessPolicy)
+		source = "env:CHRONICLE_WITNESS_POLICY"
+	case strings.TrimSpace(cfg.witnessPolicyFile) != "":
+		raw, err := os.ReadFile(cfg.witnessPolicyFile)
+		if err != nil {
+			return "", fmt.Errorf("read CHRONICLE_WITNESS_POLICY_FILE: %w", err)
+		}
+		policy = raw
+		source = cfg.witnessPolicyFile
+	default:
+		return "", nil
+	}
+
+	group, err := tessera.NewWitnessGroupFromPolicy(policy)
+	if err != nil {
+		return "", err
+	}
+	opts.WithWitnesses(group, &tessera.WitnessOptions{
+		FailOpen: cfg.witnessFailOpen,
+		Timeout:  cfg.witnessTimeout,
+	})
+	return source, nil
 }
 
 func newStorageDriver(ctx context.Context, cfg config) (tessera.Driver, error) {
@@ -629,6 +676,18 @@ func getenvBool(key string, fallback bool) bool {
 		return fallback
 	}
 	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		log.Fatalf("parse %s: %v", key, err)
+	}
+	return parsed
+}
+
+func getenvDuration(key string, fallback time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
 	if err != nil {
 		log.Fatalf("parse %s: %v", key, err)
 	}

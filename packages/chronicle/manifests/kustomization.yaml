@@ -3,6 +3,9 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - witness-demo-keys.yaml
+  - witness-policy.yaml
+  - witnesses.yaml
   - persistent-volume-claim.yaml
   - deployment.yaml
   - service.yaml

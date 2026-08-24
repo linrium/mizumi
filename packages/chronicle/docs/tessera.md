@@ -126,6 +126,37 @@ go run .
 The S3 bucket must exist before Chronicle starts. The Kubernetes Deployment
 uses an init container to create the `chronicle` bucket in RustFS.
 
+## Witness Simulation
+
+Chronicle can ask Tessera to collect witness cosignatures before publishing a
+checkpoint. Configure this with either an inline Sigsum-style policy or a policy
+file:
+
+```sh
+CHRONICLE_WITNESS_POLICY_FILE=./witness-policy \
+CHRONICLE_WITNESS_FAIL_OPEN=false \
+CHRONICLE_WITNESS_TIMEOUT=5s \
+go run .
+```
+
+The Kubernetes manifests include two simulated external witnesses:
+
+- `chronicle-witness-a`
+- `chronicle-witness-b`
+
+Both run the Go witness server built into the Chronicle image as
+`/app/chronicle-witness`. The demo policy requires both witnesses:
+
+```text
+group simulated-external-witnesses all witness-a witness-b
+quorum simulated-external-witnesses
+```
+
+The demo keys in `manifests/witness-demo-keys.yaml` are development-only. Real
+deployments should generate independent witness keys, store each private key in
+that witness trust domain, and keep Chronicle's log signer stable for the life
+of the log.
+
 ## Operational Notes
 
 Keep `CHRONICLE_SIGNER_KEY_FILE` persistent for every storage backend. If you

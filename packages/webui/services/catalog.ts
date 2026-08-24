@@ -16,6 +16,22 @@ import {
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:4000"
 
+function collectionPath(
+  resource: string,
+  params: Record<string, string | number>
+) {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    search.set(key, String(value))
+  }
+
+  return `/${resource}?${search.toString()}`
+}
+
+function namedResourcePath(resource: string, ...parts: string[]) {
+  return `/${resource}/${encodeURIComponent(parts.join("."))}`
+}
+
 function getPermissionsPath(
   resourceType: ResourceType,
   catalog: string,
@@ -51,74 +67,92 @@ async function ucFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers["Content-Type"] = "application/json"
   }
 
-  const res = await fetch(`${API_BASE}/uc${path}`, {
+  const url = `${API_BASE}/uc${path}`
+  const res = await fetch(url, {
     cache: "no-store",
     headers,
     ...init,
   })
 
   if (!res.ok) {
-    throw new CatalogApiError(await res.text(), res.status)
+    throw new CatalogApiError(
+      `Unity Catalog request failed (${res.status}) for /uc${path}: ${await res.text()}`,
+      res.status
+    )
   }
 
   return (await res.json()) as T
 }
 
-export async function getCatalogs() {
+export function getCatalogs() {
   return ucFetch<{ catalogs: Catalog[] }>("/catalogs")
 }
 
-export async function getSchemas(catalog: string) {
+export function getSchemas(catalog: string) {
   return ucFetch<{ schemas: Schema[] }>(
-    `/schemas?catalog_name=${catalog}&max_results=200`
+    collectionPath("schemas", { catalog_name: catalog, max_results: 200 })
   )
 }
 
-export async function getTables(catalog: string, schema: string) {
+export function getTables(catalog: string, schema: string) {
   return ucFetch<{ tables: TableSummary[] }>(
-    `/tables?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
+    collectionPath("tables", {
+      catalog_name: catalog,
+      max_results: 200,
+      schema_name: schema,
+    })
   )
 }
 
-export async function getTable(catalog: string, schema: string, table: string) {
-  return ucFetch<TableDetail>(`/tables/${catalog}.${schema}.${table}`)
+export function getTable(catalog: string, schema: string, table: string) {
+  return ucFetch<TableDetail>(
+    namedResourcePath("tables", catalog, schema, table)
+  )
 }
 
-export async function getVolumes(catalog: string, schema: string) {
+export function getVolumes(catalog: string, schema: string) {
   return ucFetch<{ volumes: VolumeSummary[] }>(
-    `/volumes?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
+    collectionPath("volumes", {
+      catalog_name: catalog,
+      max_results: 200,
+      schema_name: schema,
+    })
   )
 }
 
-export async function getVolume(
-  catalog: string,
-  schema: string,
-  volume: string
-) {
-  return ucFetch<VolumeDetail>(`/volumes/${catalog}.${schema}.${volume}`)
+export function getVolume(catalog: string, schema: string, volume: string) {
+  return ucFetch<VolumeDetail>(
+    namedResourcePath("volumes", catalog, schema, volume)
+  )
 }
 
-export async function getModels(catalog: string, schema: string) {
+export function getModels(catalog: string, schema: string) {
   return ucFetch<{ registered_models: RegisteredModelSummary[] }>(
-    `/models?catalog_name=${catalog}&schema_name=${schema}&max_results=200`
+    collectionPath("models", {
+      catalog_name: catalog,
+      max_results: 200,
+      schema_name: schema,
+    })
   )
 }
 
-export async function getModel(catalog: string, schema: string, model: string) {
-  return ucFetch<RegisteredModelDetail>(`/models/${catalog}.${schema}.${model}`)
+export function getModel(catalog: string, schema: string, model: string) {
+  return ucFetch<RegisteredModelDetail>(
+    namedResourcePath("models", catalog, schema, model)
+  )
 }
 
-export async function getModelVersions(
+export function getModelVersions(
   catalog: string,
   schema: string,
   model: string
 ) {
   return ucFetch<{ model_versions?: ModelVersionSummary[] }>(
-    `/models/${catalog}.${schema}.${model}/versions?max_results=200`
+    `${namedResourcePath("models", catalog, schema, model)}/versions?${new URLSearchParams({ max_results: "200" }).toString()}`
   )
 }
 
-export async function getPermissions(
+export function getPermissions(
   resourceType: ResourceType,
   catalog: string,
   schema?: string,
@@ -143,7 +177,7 @@ export async function getEffectivePrivileges(
   return data.privileges
 }
 
-export async function patchPermissions(input: {
+export function patchPermissions(input: {
   resourceType: ResourceType
   catalog: string
   schema?: string
@@ -160,16 +194,16 @@ export async function patchPermissions(input: {
       input.table
     ),
     {
-      method: "PATCH",
       body: JSON.stringify({
         changes: [
           {
-            principal: input.principal,
             add: input.add,
+            principal: input.principal,
             remove: input.remove,
           },
         ],
       }),
+      method: "PATCH",
     }
   )
 }

@@ -2,7 +2,7 @@ const UC_BASE =
   process.env.UC_BASE_URL ??
   (process.env.NODE_ENV === "production"
     ? "http://unitycatalog-svc.unitycatalog.svc.cluster.local:8080/api/2.1/unity-catalog"
-    : "http://localhost:8082/api/2.1/unity-catalog")
+    : "http://localhost:18082/api/2.1/unity-catalog")
 
 type CatalogInfo = { name: string }
 type SchemaInfo = { name: string; catalog_name: string }
