@@ -17,12 +17,15 @@ import {
   IconShieldCheck,
   IconTable,
   IconTimeline,
+  IconUsersGroup,
 } from "@tabler/icons-react"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { JsonCodeViewer } from "@/components/json-code-viewer"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
 type TesseraStatus = {
@@ -32,6 +35,10 @@ type TesseraStatus = {
   verifier_key: string
   next_index: number
   integrated_size: number
+  witness_enabled: boolean
+  witness_policy?: string
+  witness_fail_open?: boolean
+  witness_timeout?: string
 }
 
 type HealthState = "checking" | "online" | "offline"
@@ -188,6 +195,23 @@ function Metric({
         {value}
       </div>
     </div>
+  )
+}
+
+function StatusBadge({
+  active,
+  activeText,
+  inactiveText,
+}: {
+  active: boolean
+  activeText: string
+  inactiveText: string
+}) {
+  return (
+    <Badge variant={active ? "success" : "warning"}>
+      <StatusDot state={active ? "online" : "checking"} />
+      {active ? activeText : inactiveText}
+    </Badge>
   )
 }
 
@@ -377,6 +401,11 @@ export default function Home() {
   }
 
   const storageLabel = status?.storage_backend || "Unknown"
+  const witnessesEnabled = status?.witness_enabled === true
+  const witnessMode =
+    status?.witness_fail_open === true ? "Fail-open" : "Blocking"
+  const witnessPolicy = status?.witness_policy || "Not configured"
+  const witnessTimeout = status?.witness_timeout || "Unavailable"
   const checkpointLines = useMemo(
     () => checkpoint.split("\n").filter(Boolean),
     [checkpoint],
@@ -465,6 +494,90 @@ export default function Home() {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-3 border-slate-200 border-b py-3">
+              <div className="flex items-center gap-2">
+                <IconUsersGroup className="size-4 text-slate-500" />
+                <CardTitle>Witnesses</CardTitle>
+              </div>
+              <StatusBadge
+                active={witnessesEnabled}
+                activeText="Enabled"
+                inactiveText="Disabled"
+              />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <div className="text-slate-500 text-xs">Policy source</div>
+                <div className="mt-1 break-all font-mono text-sm">
+                  {witnessPolicy}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-slate-500 text-xs">Mode</div>
+                  <div className="mt-1 font-medium text-sm">{witnessMode}</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-slate-500 text-xs">Timeout</div>
+                  <div className="mt-1 font-mono text-sm">{witnessTimeout}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="border-slate-200 border-b py-3">
+              <CardTitle>Checkpoint Publication</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <StatusBadge
+                active={witnessesEnabled && !status?.witness_fail_open}
+                activeText="Cosignatures required"
+                inactiveText={
+                  witnessesEnabled ? "Cosignatures optional" : "Log only"
+                }
+              />
+              <dl className="grid gap-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-slate-500">Latest checkpoint</dt>
+                  <dd className="font-mono">
+                    {parsedCheckpoint?.parseable
+                      ? formatNumber(parsedCheckpoint.size)
+                      : "Unavailable"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-slate-500">Integrated size</dt>
+                  <dd className="font-mono">
+                    {formatNumber(status?.integrated_size)}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="border-slate-200 border-b py-3">
+              <CardTitle>Witness Policy</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge variant={witnessesEnabled ? "outline" : "secondary"}>
+                {witnessesEnabled ? "Configured" : "No policy"}
+              </Badge>
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="text-slate-500 text-xs">Failure handling</div>
+                <div className="mt-1 font-medium text-sm">
+                  {status?.witness_fail_open
+                    ? "Publish when witnesses time out"
+                    : "Block publication on witness failure"}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         <div className="space-y-5">
