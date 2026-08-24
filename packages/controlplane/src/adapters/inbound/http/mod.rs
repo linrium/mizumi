@@ -241,6 +241,14 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             post(data_contracts::validate_contract_version),
         )
         .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/quality/run",
+            post(data_contracts::run_quality_checks),
+        )
+        .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/quality/latest",
+            get(data_contracts::get_latest_quality_result),
+        )
+        .route(
             "/api/data-contracts/{namespace}/{name}/versions/{version}/activate",
             post(data_contracts::activate_contract_version),
         )

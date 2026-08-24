@@ -1,5 +1,6 @@
 "use client"
 
+import Editor from "@monaco-editor/react"
 import {
   IconActivity,
   IconAlertTriangle,
@@ -12,25 +13,26 @@ import {
   IconRocket,
   IconShieldCheck,
 } from "@tabler/icons-react"
-import Editor from "@monaco-editor/react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   Status,
   StatusIndicator,
   StatusLabel,
 } from "@/components/ui/status"
+import { apiFetch as fetchWithAuth } from "@/lib/api-client"
 import {
   activateTableContractAction,
-  getTableContractRuntimeStatusAction,
+  getLatestTableContractQualityResultAction,
   getTableContractAction,
+  getTableContractRuntimeStatusAction,
   getTableContractYamlAction,
   importTableContractAction,
+  runTableContractQualityChecksAction,
   validateTableContractAction,
 } from "../../../../actions"
 
@@ -119,6 +121,24 @@ type ContractRuntimeStatus = {
   }
 }
 
+interface ContractQualityStatus {
+  run_id?: string
+  saved_at?: string
+  checked_at: string
+  status: "passed" | "failed" | "error" | "unknown" | string
+  warnings: string[]
+  checks: Array<{
+    id: string
+    description: string
+    field?: string | null
+    status: "passed" | "failed" | "error" | string
+    message: string
+    failed_rows?: number | null
+    total_rows?: number | null
+    query: string
+  }>
+}
+
 const DAGSTER_DAILY_SCHEDULE = "cross_sell_daily_schedule"
 
 const DAGSTER_ASSET_BY_TABLE: Record<string, string> = {
@@ -163,6 +183,23 @@ function valueToString(value: unknown) {
   if (typeof value === "string") return value
   if (typeof value === "number" || typeof value === "boolean") return String(value)
   return JSON.stringify(value)
+}
+
+function qualityRuleCount(contract: ContractDetail | null) {
+  const schemaObjects = contract?.definition.spec.schema ?? []
+  return schemaObjects.reduce((count, object) => {
+    const objectQuality = Array.isArray((object as { quality?: unknown }).quality)
+      ? ((object as { quality?: unknown[] }).quality?.length ?? 0)
+      : 0
+    const properties = Array.isArray(object.properties)
+      ? (object.properties as Array<{ quality?: unknown }>)
+      : []
+    const propertyQuality = properties.reduce<number>((sum, property) => {
+      const { quality } = property
+      return sum + (Array.isArray(quality) ? quality.length : 0)
+    }, 0)
+    return count + objectQuality + propertyQuality
+  }, 0)
 }
 
 function labelForSlaProperty(property?: string) {
@@ -418,6 +455,9 @@ export default function TableContractsPage() {
   const [runtimeStatus, setRuntimeStatus] =
     useState<ContractRuntimeStatus | null>(null)
   const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [qualityStatus, setQualityStatus] =
+    useState<ContractQualityStatus | null>(null)
+  const [qualityLoading, setQualityLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const fullPath = `${catalog}.${schema}.${table}`
@@ -425,6 +465,7 @@ export default function TableContractsPage() {
     () => contract?.definition.spec.schema?.[0]?.properties?.length ?? 0,
     [contract]
   )
+  const qualityCount = useMemo(() => qualityRuleCount(contract), [contract])
   const storedSlaProperties = useMemo(
     () => contract?.definition.spec.slaProperties ?? [],
     [contract]
@@ -449,6 +490,7 @@ export default function TableContractsPage() {
     setLoading(true)
     setError(null)
     setYaml("")
+    setQualityStatus(null)
     getTableContractAction(catalog, schema, table)
       .then((value: unknown) => setContract(value as ContractDetail | null))
       .catch((e: Error) => setError(e.message))
@@ -558,6 +600,31 @@ export default function TableContractsPage() {
     }
   }, [catalog, schema, table, contract?.definition.version])
 
+  useEffect(() => {
+    if (!contract) {
+      setQualityStatus(null)
+      return
+    }
+
+    let cancelled = false
+    getLatestTableContractQualityResultAction(
+      catalog,
+      schema,
+      table,
+      contract.definition.version
+    )
+      .then((value) => {
+        if (!cancelled) setQualityStatus(value as ContractQualityStatus | null)
+      })
+      .catch(() => {
+        if (!cancelled) setQualityStatus(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [catalog, schema, table, contract?.definition.version])
+
   function runImport() {
     startTransition(async () => {
       try {
@@ -590,6 +657,33 @@ export default function TableContractsPage() {
         })
       }
     })
+  }
+
+  function runQualityChecks() {
+    if (!contract) return
+    setQualityLoading(true)
+    runTableContractQualityChecksAction(
+      catalog,
+      schema,
+      table,
+      contract.definition.version
+    )
+      .then((value) => {
+        const result = value as ContractQualityStatus
+        setQualityStatus(result)
+        if (result.status === "passed") {
+          toast.success("Quality checks passed")
+        } else {
+          toast.warning("Quality checks completed", {
+            description: `${result.checks.filter((check) => check.status !== "passed").length} checks need attention.`,
+          })
+        }
+      })
+      .catch((e: Error) => {
+        setQualityStatus(null)
+        toast.error("Quality checks failed", { description: e.message })
+      })
+      .finally(() => setQualityLoading(false))
   }
 
   function runActivate() {
@@ -725,11 +819,12 @@ export default function TableContractsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-px border-b bg-border md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border-b bg-border md:grid-cols-5">
         {[
           ["ODCS", contract.definition.spec.apiVersion ?? "v3.1.0"],
           ["Owner", contract.definition.owner_principal],
           ["Fields", String(propertyCount)],
+          ["Quality", String(qualityCount)],
           ["Updated", new Date(contract.definition.updated_at).toLocaleString()],
         ].map(([label, value]) => (
           <div key={label} className="bg-background px-5 py-3">
@@ -754,6 +849,82 @@ export default function TableContractsPage() {
             </Badge>
           ))}
         </div>
+      </div>
+
+      <div className="border-b px-5 py-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <IconShieldCheck size={15} className="text-muted-foreground" />
+            <h3 className="text-xs font-semibold">Data quality</h3>
+            <Badge variant="outline">{qualityCount} checks</Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={runQualityChecks}
+            disabled={qualityLoading || isPending || qualityCount === 0}
+          >
+            <IconActivity />
+            {qualityLoading ? "Running..." : "Run checks"}
+          </Button>
+        </div>
+        {qualityCount === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No executable quality checks are defined in this contract.
+          </p>
+        ) : qualityStatus ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+              <span className="font-medium">
+                Saved{" "}
+                {new Date(
+                  qualityStatus.saved_at ?? qualityStatus.checked_at
+                ).toLocaleString()}
+              </span>
+              <Badge
+                variant={
+                  qualityStatus.status === "passed" ? "secondary" : "destructive"
+                }
+              >
+                {qualityStatus.status}
+              </Badge>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {qualityStatus.checks.map((check) => (
+                <div
+                  key={check.id}
+                  className="rounded-md border bg-background p-3 text-xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{check.description}</p>
+                      <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+                        {check.field ?? "table"} / {check.id}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        check.status === "passed" ? "secondary" : "destructive"
+                      }
+                      className="shrink-0"
+                    >
+                      {check.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-muted-foreground">{check.message}</p>
+                  <div className="mt-3 rounded-md bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
+                    failed {check.failed_rows ?? "?"} / total{" "}
+                    {check.total_rows ?? "?"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Run the declared DuckDB checks to verify the current table data.
+          </p>
+        )}
       </div>
 
       <div className="border-b px-5 py-4">

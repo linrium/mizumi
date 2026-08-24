@@ -11,7 +11,8 @@ use crate::{
     domain::entities::{
         data_contract::{
             CreateDataContractRequest, DataContractRuntimeStatusQuery,
-            ImportDataContractFromUcRequest, ValidateDataContractRequest,
+            ImportDataContractFromUcRequest, RunDataContractQualityRequest,
+            ValidateDataContractRequest,
         },
         semantic_registry::SemanticDefinitionsQuery,
     },
@@ -136,6 +137,35 @@ pub async fn validate_contract_version(
         .await
     {
         Ok(validation) => Json(validation).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+pub async fn run_quality_checks(
+    State(state): State<Arc<AppState>>,
+    Path((namespace, name, version)): Path<(String, String, i32)>,
+    Json(req): Json<RunDataContractQualityRequest>,
+) -> impl IntoResponse {
+    match state
+        .data_contract_service
+        .run_quality_checks(&namespace, &name, version, req, &state.k8s_service)
+        .await
+    {
+        Ok(result) => Json(result).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+pub async fn get_latest_quality_result(
+    State(state): State<Arc<AppState>>,
+    Path((namespace, name, version)): Path<(String, String, i32)>,
+) -> impl IntoResponse {
+    match state
+        .data_contract_service
+        .get_latest_quality_result(&namespace, &name, version)
+        .await
+    {
+        Ok(result) => Json(result).into_response(),
         Err(err) => err.into_response(),
     }
 }

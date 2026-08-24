@@ -12,20 +12,32 @@ use crate::{
 #[derive(Clone)]
 pub struct K8sQueryService {
     duckdb_server_uri: String,
+    uc_token: Option<String>,
     chronicle: ChronicleAuditService,
 }
 
 impl K8sQueryService {
-    pub fn new(duckdb_server_uri: String, chronicle: ChronicleAuditService) -> Self {
+    pub fn new(
+        duckdb_server_uri: String,
+        chronicle: ChronicleAuditService,
+        uc_token: Option<String>,
+    ) -> Self {
         Self {
             duckdb_server_uri,
+            uc_token,
             chronicle,
         }
     }
 
     pub async fn run_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
+        if self.duckdb_server_uri.starts_with("http://")
+            || self.duckdb_server_uri.starts_with("https://")
+        {
+            return self.run_duckdb_server_query(req).await;
+        }
+
         let sql = req.sql;
-        let id_token = req.id_token;
+        let id_token = req.id_token.or_else(|| self.uc_token.clone());
         let client = match duckdb::client().await {
             Ok(client) => client,
             Err(error) => {
@@ -88,6 +100,77 @@ impl K8sQueryService {
                         json!({
                             "engine": "duckdb",
                             "job_name": job_name,
+                            "sql": sql,
+                        }),
+                    )
+                    .await;
+            }
+        }
+
+        output
+    }
+
+    async fn run_duckdb_server_query(&self, req: QueryRequest) -> Result<QueryResponse, AppError> {
+        let sql = req.sql;
+        let url = format!("{}/query", self.duckdb_server_uri.trim_end_matches('/'));
+        let response = reqwest::Client::new()
+            .post(&url)
+            .json(&json!({
+                "sql": sql,
+                "uc_token": req.id_token.or_else(|| self.uc_token.clone()),
+            }))
+            .send()
+            .await
+            .map_err(|error| AppError::QueryFailed(error.to_string()))?;
+
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| AppError::QueryFailed(error.to_string()))?;
+
+        if !status.is_success() {
+            self.chronicle
+                .record_error(
+                    "data.query.failed",
+                    &body,
+                    json!({
+                        "engine": "duckdb-server",
+                        "uri": self.duckdb_server_uri,
+                        "sql": sql,
+                        "status": status.as_u16(),
+                    }),
+                )
+                .await;
+            return Err(AppError::QueryFailed(body));
+        }
+
+        let output = serde_json::from_str::<QueryResponse>(&body)
+            .map_err(|error| AppError::Parse(error.to_string()));
+        match &output {
+            Ok(response) => {
+                self.chronicle
+                    .record(
+                        "data.query.completed",
+                        json!({
+                            "outcome": "success",
+                            "engine": "duckdb-server",
+                            "uri": self.duckdb_server_uri,
+                            "sql": sql,
+                            "row_count": response.row_count,
+                            "columns": &response.columns,
+                        }),
+                    )
+                    .await;
+            }
+            Err(error) => {
+                self.chronicle
+                    .record_error(
+                        "data.query.failed",
+                        &error.to_string(),
+                        json!({
+                            "engine": "duckdb-server",
+                            "uri": self.duckdb_server_uri,
                             "sql": sql,
                         }),
                     )

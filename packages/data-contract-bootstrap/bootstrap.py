@@ -24,6 +24,8 @@ UC_TOKEN_FILE = os.environ.get("UC_TOKEN_FILE", "")
 CONTROLPLANE_TOKEN = env("CONTROLPLANE_TOKEN", "test")
 CONTRACT_VERSION = int(env("CONTRACT_VERSION", "1"))
 ACTIVATE_CONTRACTS = env("ACTIVATE_CONTRACTS", "true").lower() == "true"
+RUN_QUALITY_CHECKS = env("RUN_QUALITY_CHECKS", "true").lower() == "true"
+REQUIRE_QUALITY_CHECKS = env("REQUIRE_QUALITY_CHECKS", "false").lower() == "true"
 CATALOG_FILTER = os.environ.get("CATALOG_FILTER", "")
 SCHEMA_FILTER = os.environ.get("SCHEMA_FILTER", "")
 
@@ -146,6 +148,25 @@ def sync_table(full_name: str) -> None:
     )
     if not validation.get("valid"):
         raise RuntimeError(f"contract validation failed for {full_name}: {validation}")
+
+    if RUN_QUALITY_CHECKS:
+        quality = cp(
+            "POST",
+            contract_path(full_name, "/quality/run"),
+            {"id_token": UC_TOKEN or None},
+        )
+        quality_status = quality.get("status", "unknown")
+        print(f"quality checks for {full_name}@v{CONTRACT_VERSION}: {quality_status}")
+        for check in quality.get("checks", []):
+            print(
+                "- {id}: {status} ({message})".format(
+                    id=check.get("id", "quality"),
+                    status=check.get("status", "unknown"),
+                    message=check.get("message", ""),
+                )
+            )
+        if REQUIRE_QUALITY_CHECKS and quality_status != "passed":
+            raise RuntimeError(f"quality checks failed for {full_name}: {quality}")
 
     if ACTIVATE_CONTRACTS:
         cp("POST", contract_path(full_name, "/activate"))

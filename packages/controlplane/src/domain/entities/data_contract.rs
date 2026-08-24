@@ -41,6 +41,36 @@ pub struct ValidateDataContractRequest {
     pub metadata_only: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct RunDataContractQualityRequest {
+    #[serde(default)]
+    pub id_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataContractQualityResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<uuid::Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saved_at: Option<DateTime<Utc>>,
+    pub checked_at: DateTime<Utc>,
+    pub status: String,
+    pub warnings: Vec<String>,
+    pub checks: Vec<DataContractQualityCheckResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataContractQualityCheckResult {
+    pub id: String,
+    pub description: String,
+    pub field: Option<String>,
+    pub status: String,
+    pub message: String,
+    pub failed_rows: Option<i64>,
+    pub total_rows: Option<i64>,
+    pub query: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct DataContractRuntimeStatusQuery {
     #[serde(default)]
@@ -256,6 +286,24 @@ fn validate_quality_array(
                 field.unwrap_or("quality"),
                 "quality rule needs description, metric, or query",
             ));
+        }
+
+        if let Some(query) = rule.get("query").and_then(Value::as_str) {
+            if query.trim().is_empty() {
+                checks.push(failed(
+                    field.unwrap_or("quality"),
+                    "quality query cannot be empty",
+                ));
+            } else if !query
+                .trim_start()
+                .to_ascii_lowercase()
+                .starts_with("select")
+            {
+                checks.push(failed(
+                    field.unwrap_or("quality"),
+                    "quality query must be a SELECT statement",
+                ));
+            }
         }
     }
 }

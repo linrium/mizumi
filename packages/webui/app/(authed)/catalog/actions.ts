@@ -276,6 +276,38 @@ export async function validateTableContractAction(
   )
 }
 
+export async function runTableContractQualityChecksAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number
+) {
+  const namespace = `${catalog}.${schema}`
+  return controlplaneFetch(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/quality/run`,
+    {
+      body: JSON.stringify({}),
+      method: "POST",
+    }
+  )
+}
+
+export async function getLatestTableContractQualityResultAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number
+) {
+  const namespace = `${catalog}.${schema}`
+  try {
+    return await controlplaneFetch(
+      `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/quality/latest`
+    )
+  } catch {
+    return null
+  }
+}
+
 export async function activateTableContractAction(
   catalog: string,
   schema: string,

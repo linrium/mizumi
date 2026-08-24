@@ -84,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         k8s_service: Arc::new(K8sQueryService::new(
             config.duckdb_server.uri.clone(),
             chronicle_service.clone(),
+            Some(uc_admin_token.clone()),
         )),
         lineage_service: Arc::new(LineageService::new(
             db.clone(),
