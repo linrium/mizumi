@@ -89,14 +89,6 @@ const lookupExamples: Record<LookupMode, string> = {
 
 const tileWidth = 256
 
-async function readTextResponse(response: Response) {
-  const text = await response.text()
-  if (!response.ok) {
-    throw new Error(text || `${response.status} ${response.statusText}`)
-  }
-  return text
-}
-
 async function readBinaryResponse(response: Response) {
   const bytes = new Uint8Array(await response.arrayBuffer())
   if (!response.ok) {
@@ -140,6 +132,61 @@ function formatTileBytes(bytes: Uint8Array) {
     "base64:",
     formatBytesAsBase64(bytes),
   ].join("\n")
+}
+
+function formatEntryBundleBytes(bytes: Uint8Array) {
+  const decoder = new TextDecoder()
+  const entries = []
+
+  for (let offset = 0; offset < bytes.length; ) {
+    if (offset + 2 > bytes.length) {
+      entries.push({
+        error: `Dangling ${bytes.length - offset} byte(s) at offset ${offset}`,
+      })
+      break
+    }
+
+    const size = (bytes[offset] << 8) | bytes[offset + 1]
+    const start = offset + 2
+    const end = start + size
+    if (end > bytes.length) {
+      entries.push({
+        error: `Entry at offset ${offset} declares ${size} bytes, but only ${bytes.length - start} remain`,
+      })
+      break
+    }
+
+    const body = decoder.decode(bytes.slice(start, end))
+    let parsed: unknown = body
+    try {
+      parsed = JSON.parse(body)
+    } catch {
+      // Keep non-JSON entries as text.
+    }
+
+    entries.push({
+      offset,
+      size,
+      body: parsed,
+    })
+    offset = end
+  }
+
+  return JSON.stringify(
+    {
+      bytes: bytes.length,
+      entry_count: entries.length,
+      entries,
+    },
+    null,
+    2,
+  )
+}
+
+function formatEntryOrTileBytes(mode: LookupMode, bytes: Uint8Array) {
+  return mode === "tile"
+    ? formatTileBytes(bytes)
+    : formatEntryBundleBytes(bytes)
 }
 
 function formatNumber(value: number | undefined) {
@@ -426,11 +473,9 @@ export default function Home() {
       const response = await fetch(`/api/chronicle/${resourcePath}`, {
         cache: "no-store",
       })
-      if (lookupMode === "tile") {
-        setLookupResult(formatTileBytes(await readBinaryResponse(response)))
-      } else {
-        setLookupResult(await readTextResponse(response))
-      }
+      setLookupResult(
+        formatEntryOrTileBytes(lookupMode, await readBinaryResponse(response)),
+      )
     } catch (lookupError) {
       setError(
         lookupError instanceof Error ? lookupError.message : "Lookup failed",
