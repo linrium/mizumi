@@ -301,6 +301,32 @@ export async function getTableContractYamlAction(
   )
 }
 
+export async function getTableContractRuntimeStatusAction(
+  catalog: string,
+  schema: string,
+  table: string,
+  version: number,
+  options: {
+    assetKey?: string
+    scheduleName?: string
+    maxAgeHours?: number
+    availabilityTime?: string
+  }
+) {
+  const namespace = `${catalog}.${schema}`
+  const params = new URLSearchParams()
+  if (options.assetKey) params.set("asset_key", options.assetKey)
+  if (options.scheduleName) params.set("schedule_name", options.scheduleName)
+  if (options.maxAgeHours) params.set("max_age_hours", String(options.maxAgeHours))
+  if (options.availabilityTime) {
+    params.set("availability_time", options.availabilityTime)
+  }
+
+  return controlplaneFetch(
+    `/api/data-contracts/${encodeURIComponent(namespace)}/${encodeURIComponent(table)}/versions/${version}/runtime-status?${params.toString()}`
+  )
+}
+
 export async function getPermissionsAction(
   resourceType: "catalog" | "schema" | "table",
   catalog: string,

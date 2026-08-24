@@ -41,6 +41,50 @@ pub struct ValidateDataContractRequest {
     pub metadata_only: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct DataContractRuntimeStatusQuery {
+    #[serde(default)]
+    pub asset_key: Option<String>,
+    #[serde(default)]
+    pub schedule_name: Option<String>,
+    #[serde(default)]
+    pub max_age_hours: Option<f64>,
+    #[serde(default)]
+    pub availability_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DataContractRuntimeStatus {
+    pub checked_at: DateTime<Utc>,
+    pub status: String,
+    pub warnings: Vec<String>,
+    pub checks: Vec<DataContractRuntimeCheck>,
+    pub dagster: DataContractDagsterRuntime,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DataContractRuntimeCheck {
+    pub check: String,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct DataContractDagsterRuntime {
+    pub asset_key: Option<String>,
+    pub schedule_name: Option<String>,
+    pub schedule_status: Option<String>,
+    pub cron_schedule: Option<String>,
+    pub last_tick_status: Option<String>,
+    pub last_tick_timestamp: Option<f64>,
+    pub latest_run_status: Option<String>,
+    pub latest_run_id: Option<String>,
+    pub latest_materialization_timestamp: Option<String>,
+    pub latest_materialization_run_id: Option<String>,
+    pub in_progress_run_ids: Vec<String>,
+    pub unstarted_run_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DataContractSummary {
     #[serde(flatten)]

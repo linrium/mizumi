@@ -233,6 +233,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             get(data_contracts::get_contract_yaml),
         )
         .route(
+            "/api/data-contracts/{namespace}/{name}/versions/{version}/runtime-status",
+            get(data_contracts::get_contract_runtime_status),
+        )
+        .route(
             "/api/data-contracts/{namespace}/{name}/versions/{version}/validate",
             post(data_contracts::validate_contract_version),
         )

@@ -14,6 +14,8 @@ pub use dagster_assets::{
     list_asset_nodes, list_assets,
 };
 #[allow(unused_imports)]
+pub(crate) use dagster_client::gql_post;
+#[allow(unused_imports)]
 pub use dagster_runs::{
     LaunchRunRequest, LaunchRunResponse, ListRunsParams, Run, RunStats, RunsResponse, get_run,
     launch_run, list_runs, terminate_run,

@@ -1,22 +1,24 @@
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{DateTime, FixedOffset, NaiveTime, TimeZone, Utc};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    adapters::outbound::kubernetes::data_contract as data_contract_k8s,
+    adapters::outbound::{http::dagster::gql_post, kubernetes::data_contract as data_contract_k8s},
     application::{
         semantic_registry_service::SemanticRegistryService, uc_service::UnityCatalogProxyService,
     },
     domain::{
         entities::{
             data_contract::{
-                CreateDataContractRequest, DataContractDetail, DataContractSummary,
-                DataContractValidationCheck, DataContractValidationResult,
-                ImportDataContractFromUcRequest, ValidateDataContractRequest, is_data_contract,
-                validate_odcs,
+                CreateDataContractRequest, DataContractDagsterRuntime, DataContractDetail,
+                DataContractRuntimeCheck, DataContractRuntimeStatus,
+                DataContractRuntimeStatusQuery, DataContractSummary, DataContractValidationCheck,
+                DataContractValidationResult, ImportDataContractFromUcRequest,
+                ValidateDataContractRequest, is_data_contract, validate_odcs,
             },
             semantic_registry::{
                 CreateSemanticDefinitionRequest, SemanticDefinitionsQuery,
@@ -33,6 +35,107 @@ pub struct DataContractService {
     semantic_registry: SemanticRegistryService,
     uc_service: UnityCatalogProxyService,
     cli: DataContractCliConfig,
+}
+
+const CONTRACT_ASSET_STATUS_QUERY: &str = r#"
+query ContractAssetStatus($assetKeys: [AssetKeyInput!]!) {
+  assetsLatestInfo(assetKeys: $assetKeys) {
+    latestRun {
+      runId
+      status
+      startTime
+      endTime
+    }
+    latestMaterialization {
+      timestamp
+      runId
+    }
+    unstartedRunIds
+    inProgressRunIds
+  }
+}"#;
+
+const CONTRACT_SCHEDULE_STATUS_QUERY: &str = r#"
+query ContractScheduleStatus($selector: ScheduleSelector!) {
+  scheduleOrError(scheduleSelector: $selector) {
+    __typename
+    ... on Schedule {
+      name
+      cronSchedule
+      scheduleState {
+        status
+        ticks(limit: 1) {
+          timestamp
+          status
+        }
+      }
+    }
+    ... on ScheduleNotFoundError { message }
+    ... on PythonError { message }
+  }
+}"#;
+
+#[derive(Deserialize)]
+struct ContractAssetStatusData {
+    #[serde(rename = "assetsLatestInfo")]
+    assets_latest_info: Vec<GqlContractAssetInfo>,
+}
+
+#[derive(Deserialize)]
+struct GqlContractAssetInfo {
+    #[serde(rename = "latestRun")]
+    latest_run: Option<GqlContractLatestRun>,
+    #[serde(rename = "latestMaterialization")]
+    latest_materialization: Option<GqlContractLatestMaterialization>,
+    #[serde(rename = "unstartedRunIds", default)]
+    unstarted_run_ids: Vec<String>,
+    #[serde(rename = "inProgressRunIds", default)]
+    in_progress_run_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct GqlContractLatestRun {
+    #[serde(rename = "runId")]
+    run_id: String,
+    status: String,
+}
+
+#[derive(Deserialize)]
+struct GqlContractLatestMaterialization {
+    timestamp: String,
+    #[serde(rename = "runId")]
+    run_id: String,
+}
+
+#[derive(Deserialize)]
+struct ContractScheduleStatusData {
+    #[serde(rename = "scheduleOrError")]
+    schedule_or_error: GqlContractScheduleOrError,
+}
+
+#[derive(Deserialize)]
+struct GqlContractScheduleOrError {
+    #[serde(rename = "__typename")]
+    typename: String,
+    name: Option<String>,
+    #[serde(rename = "cronSchedule")]
+    cron_schedule: Option<String>,
+    #[serde(rename = "scheduleState")]
+    schedule_state: Option<GqlContractScheduleState>,
+    message: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GqlContractScheduleState {
+    status: String,
+    #[serde(default)]
+    ticks: Vec<GqlContractScheduleTick>,
+}
+
+#[derive(Deserialize)]
+struct GqlContractScheduleTick {
+    timestamp: f64,
+    status: String,
 }
 
 impl DataContractService {
@@ -256,6 +359,171 @@ impl DataContractService {
         ))
     }
 
+    pub async fn get_runtime_status(
+        &self,
+        namespace: &str,
+        name: &str,
+        version: i32,
+        query: DataContractRuntimeStatusQuery,
+    ) -> Result<DataContractRuntimeStatus, AppError> {
+        self.get_detail(namespace, name, version).await?;
+
+        let mut dagster = DataContractDagsterRuntime {
+            asset_key: query.asset_key.clone(),
+            schedule_name: query.schedule_name.clone(),
+            ..Default::default()
+        };
+        let mut checks = Vec::new();
+
+        if let Some(schedule_name) = query
+            .schedule_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            match fetch_contract_schedule_status(schedule_name).await {
+                Ok(schedule) => {
+                    dagster.schedule_name =
+                        schedule.name.or_else(|| Some(schedule_name.to_string()));
+                    dagster.cron_schedule = schedule.cron_schedule;
+                    dagster.schedule_status = schedule
+                        .schedule_state
+                        .as_ref()
+                        .map(|state| state.status.clone());
+                    dagster.last_tick_status = schedule
+                        .schedule_state
+                        .as_ref()
+                        .and_then(|state| state.ticks.first())
+                        .map(|tick| tick.status.clone());
+                    dagster.last_tick_timestamp = schedule
+                        .schedule_state
+                        .as_ref()
+                        .and_then(|state| state.ticks.first())
+                        .map(|tick| tick.timestamp);
+
+                    match dagster.schedule_status.as_deref() {
+                        Some("RUNNING") => checks.push(runtime_check(
+                            "dagster_schedule_enabled",
+                            "ok",
+                            format!("Dagster schedule {schedule_name} is running."),
+                        )),
+                        Some(status) => checks.push(runtime_check(
+                            "dagster_schedule_enabled",
+                            "warning",
+                            format!("Dagster schedule {schedule_name} is {status}."),
+                        )),
+                        None => checks.push(runtime_check(
+                            "dagster_schedule_enabled",
+                            "warning",
+                            format!("Dagster schedule {schedule_name} has no active state."),
+                        )),
+                    }
+
+                    if let Some(status) = dagster.last_tick_status.as_deref() {
+                        if status == "SUCCESS" {
+                            checks.push(runtime_check(
+                                "dagster_last_tick",
+                                "ok",
+                                "Latest schedule tick succeeded.".to_string(),
+                            ));
+                        } else {
+                            checks.push(runtime_check(
+                                "dagster_last_tick",
+                                "warning",
+                                format!("Latest schedule tick ended with {status}."),
+                            ));
+                        }
+                    }
+                }
+                Err(err) => checks.push(runtime_check(
+                    "dagster_schedule_status",
+                    "warning",
+                    format!("Could not read Dagster schedule status: {err}"),
+                )),
+            }
+        }
+
+        if let Some(asset_key) = query
+            .asset_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            match fetch_contract_asset_status(asset_key).await {
+                Ok(asset) => {
+                    if let Some(run) = asset.latest_run {
+                        dagster.latest_run_id = Some(run.run_id);
+                        dagster.latest_run_status = Some(run.status);
+                    }
+                    if let Some(materialization) = asset.latest_materialization {
+                        dagster.latest_materialization_timestamp = Some(materialization.timestamp);
+                        dagster.latest_materialization_run_id = Some(materialization.run_id);
+                    }
+                    dagster.in_progress_run_ids = asset.in_progress_run_ids;
+                    dagster.unstarted_run_ids = asset.unstarted_run_ids;
+
+                    match dagster.latest_run_status.as_deref() {
+                        Some("SUCCESS") | Some("STARTED") | Some("STARTING") => {
+                            checks.push(runtime_check(
+                                "dagster_latest_run",
+                                "ok",
+                                "Latest Dagster run is healthy.".to_string(),
+                            ))
+                        }
+                        Some(status) => checks.push(runtime_check(
+                            "dagster_latest_run",
+                            "warning",
+                            format!("Latest Dagster run ended with {status}."),
+                        )),
+                        None => checks.push(runtime_check(
+                            "dagster_latest_run",
+                            "warning",
+                            "No Dagster run was found for this asset.".to_string(),
+                        )),
+                    }
+
+                    evaluate_materialization_sla(&mut checks, &dagster, &query);
+                }
+                Err(err) => checks.push(runtime_check(
+                    "dagster_asset_status",
+                    "warning",
+                    format!("Could not read Dagster asset status: {err}"),
+                )),
+            }
+        }
+
+        if checks.is_empty() {
+            checks.push(runtime_check(
+                "runtime_status_configured",
+                "unknown",
+                "No Dagster asset key or schedule name was provided for runtime checks."
+                    .to_string(),
+            ));
+        }
+
+        let warnings = checks
+            .iter()
+            .filter(|check| check.status == "warning")
+            .map(|check| check.message.clone())
+            .collect::<Vec<_>>();
+        let status = if warnings.is_empty() && checks.iter().any(|check| check.status == "ok") {
+            "ok"
+        } else if warnings.is_empty() {
+            "unknown"
+        } else {
+            "warning"
+        }
+        .to_string();
+
+        Ok(DataContractRuntimeStatus {
+            checked_at: Utc::now(),
+            status,
+            warnings,
+            checks,
+            dagster,
+        })
+    }
+
     pub fn to_yaml(&self, detail: &DataContractDetail) -> Result<String, AppError> {
         serde_yaml::to_string(&detail.detail.definition.spec)
             .map_err(|e| AppError::Parse(format!("failed to serialize ODCS YAML: {e}")))
@@ -294,6 +562,200 @@ fn cli_result(valid: bool, logs: String) -> DataContractValidationResult {
             details: Some(logs),
         }],
     }
+}
+
+async fn fetch_contract_asset_status(asset_key: &str) -> Result<GqlContractAssetInfo, AppError> {
+    let key_path = asset_key
+        .split('/')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if key_path.is_empty() {
+        return Err(AppError::BadRequest(
+            "asset_key cannot be empty".to_string(),
+        ));
+    }
+
+    let data = gql_post::<ContractAssetStatusData>(
+        CONTRACT_ASSET_STATUS_QUERY,
+        json!({ "assetKeys": [{ "path": key_path }] }),
+    )
+    .await
+    .map_err(dagster_error)?;
+
+    data.assets_latest_info
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound)
+}
+
+async fn fetch_contract_schedule_status(
+    schedule_name: &str,
+) -> Result<GqlContractScheduleOrError, AppError> {
+    let data = gql_post::<ContractScheduleStatusData>(
+        CONTRACT_SCHEDULE_STATUS_QUERY,
+        json!({
+            "selector": {
+                "repositoryLocationName": "mizumi",
+                "repositoryName": "__repository__",
+                "scheduleName": schedule_name,
+            }
+        }),
+    )
+    .await
+    .map_err(dagster_error)?;
+    let schedule = data.schedule_or_error;
+
+    match schedule.typename.as_str() {
+        "Schedule" => Ok(schedule),
+        "ScheduleNotFoundError" => Err(AppError::NotFound),
+        _ => Err(AppError::QueryFailed(schedule.message.unwrap_or_else(
+            || format!("unexpected type: {}", schedule.typename),
+        ))),
+    }
+}
+
+fn dagster_error((_, body): (axum::http::StatusCode, Value)) -> AppError {
+    AppError::QueryFailed(
+        body.get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("Dagster request failed")
+            .to_string(),
+    )
+}
+
+fn evaluate_materialization_sla(
+    checks: &mut Vec<DataContractRuntimeCheck>,
+    dagster: &DataContractDagsterRuntime,
+    query: &DataContractRuntimeStatusQuery,
+) {
+    let Some(timestamp) = dagster.latest_materialization_timestamp.as_deref() else {
+        checks.push(runtime_check(
+            "dagster_latest_materialization",
+            "warning",
+            "No materialization was found for this Dagster asset.".to_string(),
+        ));
+        return;
+    };
+
+    let Some(materialized_at) = parse_dagster_timestamp(timestamp) else {
+        checks.push(runtime_check(
+            "dagster_latest_materialization",
+            "unknown",
+            format!("Latest materialization timestamp could not be parsed: {timestamp}."),
+        ));
+        return;
+    };
+
+    checks.push(runtime_check(
+        "dagster_latest_materialization",
+        "ok",
+        format!("Latest materialization completed at {}.", materialized_at),
+    ));
+
+    if let Some(max_age_hours) = query.max_age_hours {
+        let max_age = chrono::Duration::minutes((max_age_hours * 60.0).round() as i64);
+        let age = Utc::now().signed_duration_since(materialized_at);
+        if age > max_age {
+            checks.push(runtime_check(
+                "sla_frequency",
+                "warning",
+                format!(
+                    "Latest materialization is {:.1} hours old, exceeding the {:.1} hour SLA.",
+                    age.num_minutes() as f64 / 60.0,
+                    max_age_hours
+                ),
+            ));
+        } else {
+            checks.push(runtime_check(
+                "sla_frequency",
+                "ok",
+                format!(
+                    "Latest materialization is {:.1} hours old, within the {:.1} hour SLA.",
+                    age.num_minutes() as f64 / 60.0,
+                    max_age_hours
+                ),
+            ));
+        }
+    }
+
+    if let Some(availability_time) = query.availability_time.as_deref() {
+        if let Some(deadline) = daily_availability_deadline(availability_time) {
+            if Utc::now() >= deadline && materialized_at < deadline {
+                checks.push(runtime_check(
+                    "sla_time_of_availability",
+                    "warning",
+                    format!(
+                        "Today's availability deadline ({}) has passed without a fresh materialization.",
+                        deadline
+                    ),
+                ));
+            } else {
+                checks.push(runtime_check(
+                    "sla_time_of_availability",
+                    "ok",
+                    format!(
+                        "Availability target {} is currently satisfied.",
+                        availability_time
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+fn runtime_check(
+    check: impl Into<String>,
+    status: impl Into<String>,
+    message: impl Into<String>,
+) -> DataContractRuntimeCheck {
+    DataContractRuntimeCheck {
+        check: check.into(),
+        status: status.into(),
+        message: message.into(),
+    }
+}
+
+fn parse_dagster_timestamp(value: &str) -> Option<DateTime<Utc>> {
+    if let Ok(epoch) = value.parse::<f64>() {
+        let millis = if epoch > 100_000_000_000.0 {
+            epoch as i64
+        } else {
+            (epoch * 1000.0) as i64
+        };
+        return Utc.timestamp_millis_opt(millis).single();
+    }
+
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|timestamp| timestamp.with_timezone(&Utc))
+}
+
+fn daily_availability_deadline(value: &str) -> Option<DateTime<Utc>> {
+    let split_at = value
+        .char_indices()
+        .skip(1)
+        .find(|(_, char)| *char == '+' || *char == '-')?
+        .0;
+    let (time_part, offset_part) = value.split_at(split_at);
+    let time = NaiveTime::parse_from_str(time_part, "%H:%M").ok()?;
+    let offset = parse_fixed_offset(offset_part)?;
+    let today = Utc::now().date_naive();
+    let local_deadline = today.and_time(time);
+    offset
+        .from_local_datetime(&local_deadline)
+        .single()
+        .map(|deadline| deadline.with_timezone(&Utc))
+}
+
+fn parse_fixed_offset(value: &str) -> Option<FixedOffset> {
+    let sign = if value.starts_with('-') { -1 } else { 1 };
+    let rest = value.strip_prefix(['+', '-'])?;
+    let mut parts = rest.split(':');
+    let hours = parts.next()?.parse::<i32>().ok()?;
+    let minutes = parts.next()?.parse::<i32>().ok()?;
+    FixedOffset::east_opt(sign * ((hours * 60 + minutes) * 60))
 }
 
 fn ensure_data_contract(

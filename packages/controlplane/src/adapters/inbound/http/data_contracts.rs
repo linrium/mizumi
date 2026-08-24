@@ -10,7 +10,8 @@ use axum::{
 use crate::{
     domain::entities::{
         data_contract::{
-            CreateDataContractRequest, ImportDataContractFromUcRequest, ValidateDataContractRequest,
+            CreateDataContractRequest, DataContractRuntimeStatusQuery,
+            ImportDataContractFromUcRequest, ValidateDataContractRequest,
         },
         semantic_registry::SemanticDefinitionsQuery,
     },
@@ -105,6 +106,21 @@ pub async fn get_contract_yaml(
             yaml,
         )
             .into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+pub async fn get_contract_runtime_status(
+    State(state): State<Arc<AppState>>,
+    Path((namespace, name, version)): Path<(String, String, i32)>,
+    Query(query): Query<DataContractRuntimeStatusQuery>,
+) -> impl IntoResponse {
+    match state
+        .data_contract_service
+        .get_runtime_status(&namespace, &name, version, query)
+        .await
+    {
+        Ok(status) => Json(status).into_response(),
         Err(err) => err.into_response(),
     }
 }

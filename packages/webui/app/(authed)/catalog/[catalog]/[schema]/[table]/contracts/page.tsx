@@ -2,6 +2,7 @@
 
 import {
   IconActivity,
+  IconAlertTriangle,
   IconCalendarClock,
   IconClock,
   IconCopy,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/status"
 import {
   activateTableContractAction,
+  getTableContractRuntimeStatusAction,
   getTableContractAction,
   getTableContractYamlAction,
   importTableContractAction,
@@ -89,6 +91,31 @@ type ContractDetail = {
       field?: string
       details?: string
     }>
+  }
+}
+
+type ContractRuntimeStatus = {
+  checked_at: string
+  status: "ok" | "warning" | "unknown" | string
+  warnings: string[]
+  checks: Array<{
+    check: string
+    status: "ok" | "warning" | "unknown" | string
+    message: string
+  }>
+  dagster: {
+    asset_key?: string
+    schedule_name?: string
+    schedule_status?: string
+    cron_schedule?: string
+    last_tick_status?: string
+    last_tick_timestamp?: number
+    latest_run_status?: string
+    latest_run_id?: string
+    latest_materialization_timestamp?: string
+    latest_materialization_run_id?: string
+    in_progress_run_ids: string[]
+    unstarted_run_ids: string[]
   }
 }
 
@@ -231,6 +258,46 @@ function isDagsterSla(sla: SlaProperty) {
   return sla.scheduler?.toLowerCase() === "dagster"
 }
 
+function slaPropertyKey(sla: SlaProperty) {
+  return sla.property?.toLowerCase() ?? ""
+}
+
+function maxAgeHoursForFrequencySla(sla: SlaProperty | undefined) {
+  if (!sla) return undefined
+  const value =
+    typeof sla.value === "number"
+      ? sla.value
+      : Number.parseFloat(String(sla.value ?? ""))
+  if (!Number.isFinite(value) || value <= 0) return undefined
+
+  const unit = sla.unit?.toLowerCase()
+  const hours =
+    unit === "d" || unit === "day" || unit === "days"
+      ? value * 24
+      : unit === "h" || unit === "hour" || unit === "hours"
+        ? value
+        : unit === "m" || unit === "minute" || unit === "minutes"
+          ? value / 60
+          : undefined
+
+  // Allow a small execution window beyond the declared cadence.
+  return hours == null ? undefined : hours + 2
+}
+
+function availabilityTimeForSla(sla: SlaProperty | undefined) {
+  const value = valueToString(sla?.value)
+  return /^\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(value) ? value : undefined
+}
+
+function formatDagsterTimestamp(timestamp?: string) {
+  if (!timestamp) return "unknown"
+  const epoch = Number.parseFloat(timestamp)
+  const date = Number.isFinite(epoch)
+    ? new Date(epoch > 100_000_000_000 ? epoch : epoch * 1000)
+    : new Date(timestamp)
+  return Number.isNaN(date.getTime()) ? timestamp : date.toLocaleString()
+}
+
 function slaActionTargets(
   sla: SlaProperty,
   catalog: string,
@@ -348,6 +415,9 @@ export default function TableContractsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [streamingJobs, setStreamingJobs] = useState<StreamingJob[]>([])
+  const [runtimeStatus, setRuntimeStatus] =
+    useState<ContractRuntimeStatus | null>(null)
+  const [runtimeLoading, setRuntimeLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const fullPath = `${catalog}.${schema}.${table}`
@@ -355,12 +425,25 @@ export default function TableContractsPage() {
     () => contract?.definition.spec.schema?.[0]?.properties?.length ?? 0,
     [contract]
   )
-  const storedSlaProperties = contract?.definition.spec.slaProperties ?? []
-  const slaProperties =
-    storedSlaProperties.length > 0
-      ? storedSlaProperties
-      : defaultSlaProperties(schema, table)
+  const storedSlaProperties = useMemo(
+    () => contract?.definition.spec.slaProperties ?? [],
+    [contract]
+  )
+  const slaProperties = useMemo(
+    () =>
+      storedSlaProperties.length > 0
+        ? storedSlaProperties
+        : defaultSlaProperties(schema, table),
+    [schema, storedSlaProperties, table]
+  )
   const hasStoredSlaProperties = storedSlaProperties.length > 0
+  const dagsterSla = slaProperties.find(isDagsterSla)
+  const frequencySla = slaProperties.find(
+    (sla) => isDagsterSla(sla) && slaPropertyKey(sla) === "frequency"
+  )
+  const availabilitySla = slaProperties.find(
+    (sla) => isDagsterSla(sla) && slaPropertyKey(sla) === "timeofavailability"
+  )
 
   function load() {
     setLoading(true)
@@ -390,6 +473,58 @@ export default function TableContractsPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!contract || !dagsterSla) {
+      setRuntimeStatus(null)
+      setRuntimeLoading(false)
+      return
+    }
+
+    const assetKey = dagsterAssetForTable(catalog, schema, table)
+    const maxAgeHours = maxAgeHoursForFrequencySla(frequencySla)
+    const availabilityTime = availabilityTimeForSla(availabilitySla)
+    if (!assetKey && !dagsterSla) {
+      setRuntimeStatus(null)
+      return
+    }
+
+    let cancelled = false
+    setRuntimeLoading(true)
+    getTableContractRuntimeStatusAction(
+      catalog,
+      schema,
+      table,
+      contract.definition.version,
+      {
+        assetKey,
+        scheduleName: DAGSTER_DAILY_SCHEDULE,
+        maxAgeHours,
+        availabilityTime,
+      }
+    )
+      .then((value) => {
+        if (!cancelled) setRuntimeStatus(value as ContractRuntimeStatus)
+      })
+      .catch(() => {
+        if (!cancelled) setRuntimeStatus(null)
+      })
+      .finally(() => {
+        if (!cancelled) setRuntimeLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    availabilitySla,
+    catalog,
+    contract,
+    dagsterSla,
+    frequencySla,
+    schema,
+    table,
+  ])
 
   useEffect(() => {
     if (!contract) {
@@ -634,6 +769,78 @@ export default function TableContractsPage() {
             Inferred from Mizumi pipeline defaults. Sync to persist these entries into the
             ODCS YAML.
           </p>
+        )}
+        {(runtimeLoading || runtimeStatus) && (
+          <div
+            className={`mb-3 rounded-md border px-3 py-2 text-xs ${
+              runtimeStatus?.status === "warning"
+                ? "border-amber-300 bg-amber-50 text-amber-950"
+                : "bg-muted/40 text-muted-foreground"
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <IconAlertTriangle
+                  size={14}
+                  className={
+                    runtimeStatus?.status === "warning"
+                      ? "text-amber-600"
+                      : "text-muted-foreground"
+                  }
+                />
+                <span className="font-medium">
+                  {runtimeLoading
+                    ? "Checking Dagster SLA status..."
+                    : runtimeStatus?.status === "warning"
+                      ? "Dagster SLA warning"
+                      : "Dagster SLA status"}
+                </span>
+              </div>
+              {runtimeStatus && (
+                <Badge
+                  variant={
+                    runtimeStatus.status === "warning" ? "destructive" : "secondary"
+                  }
+                >
+                  {runtimeStatus.status}
+                </Badge>
+              )}
+            </div>
+            {runtimeStatus?.warnings.length ? (
+              <div className="mt-2 space-y-1">
+                {runtimeStatus.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : runtimeStatus ? (
+              <p className="mt-2">
+                Schedule and materialization checks are currently within the declared
+                SLA.
+              </p>
+            ) : null}
+            {runtimeStatus && (
+              <div className="mt-2 space-y-1 font-mono text-[11px]">
+                {[
+                  ["schedule", runtimeStatus.dagster.schedule_status ?? "unknown"],
+                  ["tick", runtimeStatus.dagster.last_tick_status ?? "unknown"],
+                  ["run", runtimeStatus.dagster.latest_run_status ?? "unknown"],
+                  [
+                    "materialized",
+                    formatDagsterTimestamp(
+                      runtimeStatus.dagster.latest_materialization_timestamp
+                    ),
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex min-w-0 gap-2">
+                    <span className="w-24 shrink-0 text-muted-foreground">
+                      {label}:
+                    </span>
+                    <span className="min-w-0 truncate">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {slaProperties.length === 0 ? (
           <p className="text-xs text-muted-foreground">
