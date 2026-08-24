@@ -83,9 +83,11 @@ type EntryProofResponse = {
 }
 
 const lookupExamples: Record<LookupMode, string> = {
-  entries: "000.p/1",
-  tile: "0/000.p/1",
+  entries: "",
+  tile: "",
 }
+
+const tileWidth = 256
 
 async function readTextResponse(response: Response) {
   const text = await response.text()
@@ -146,6 +148,32 @@ function parseCheckpoint(checkpoint: string): ParsedCheckpoint | null {
     signature: lines.slice(3).join("\n").trim(),
     parseable: Number.isFinite(size) && lines[2].length > 0,
   }
+}
+
+function formatTileIndex(index: number) {
+  const parts: string[] = []
+  let remaining = index
+  do {
+    parts.unshift(String(remaining % 1000).padStart(3, "0"))
+    remaining = Math.floor(remaining / 1000)
+  } while (remaining > 0)
+
+  return parts
+    .map((part, partIndex) =>
+      partIndex < parts.length - 1 ? `x${part}` : part,
+    )
+    .join("/")
+}
+
+function levelZeroTilePath(treeSize: number | undefined) {
+  if (!treeSize || treeSize < 1) {
+    return ""
+  }
+
+  const tileIndex = Math.floor((treeSize - 1) / tileWidth)
+  const partial = treeSize % tileWidth
+  const suffix = partial > 0 ? `.p/${partial}` : ""
+  return `0/${formatTileIndex(tileIndex)}${suffix}`
 }
 
 function StatusDot({ state }: { state: HealthState }) {
@@ -220,7 +248,7 @@ export default function Home() {
   const [status, setStatus] = useState<TesseraStatus | null>(null)
   const [checkpoint, setCheckpoint] = useState("")
   const [lookupMode, setLookupMode] = useState<LookupMode>("entries")
-  const [lookupPath, setLookupPath] = useState("000.p/1")
+  const [lookupPath, setLookupPath] = useState("")
   const [lookupResult, setLookupResult] = useState("")
   const [coveredIndex, setCoveredIndex] = useState("0")
   const [entries, setEntries] = useState<LogEntry[]>([])
@@ -301,6 +329,8 @@ export default function Home() {
         setEntryProof(null)
         if (data.entries[0]) {
           setCoveredIndex(String(data.entries[0].index))
+          setLookupMode("entries")
+          setLookupPath(data.entries[0].bundle)
         }
       } catch (entriesError) {
         setError(
@@ -337,17 +367,20 @@ export default function Home() {
       setError("Enter a tile or entry bundle path")
       return
     }
+    const resourcePath =
+      lookupMode === "entries" && cleanPath.startsWith("tile/entries/")
+        ? cleanPath
+        : lookupMode === "tile" && cleanPath.startsWith("tile/")
+          ? cleanPath
+          : `${lookupMode}/${cleanPath}`
 
     setLoading(true)
     setError("")
     setLookupResult("")
     try {
-      const response = await fetch(
-        `/api/chronicle/${lookupMode}/${cleanPath}`,
-        {
-          cache: "no-store",
-        },
-      )
+      const response = await fetch(`/api/chronicle/${resourcePath}`, {
+        cache: "no-store",
+      })
       setLookupResult(await readTextResponse(response))
     } catch (lookupError) {
       setError(
@@ -361,6 +394,8 @@ export default function Home() {
   const selectEntry = (entry: LogEntry) => {
     setSelectedEntry(entry)
     setCoveredIndex(String(entry.index))
+    setLookupMode("entries")
+    setLookupPath(entry.bundle)
     setEntryProof(null)
     setError("")
   }
@@ -395,7 +430,24 @@ export default function Home() {
 
   const selectLookupMode = (mode: LookupMode) => {
     setLookupMode(mode)
-    setLookupPath(lookupExamples[mode])
+    setLookupPath(
+      mode === "entries" && selectedEntry
+        ? selectedEntry.bundle
+        : mode === "tile" && suggestedTilePath
+          ? suggestedTilePath
+          : lookupExamples[mode],
+    )
+    setLookupResult("")
+    setError("")
+  }
+
+  const useSelectedEntryBundle = () => {
+    if (!selectedEntry) {
+      setError("Select an entry before reading its bundle")
+      return
+    }
+    setLookupMode("entries")
+    setLookupPath(selectedEntry.bundle)
     setLookupResult("")
     setError("")
   }
@@ -413,6 +465,10 @@ export default function Home() {
   const parsedCheckpoint = useMemo(
     () => parseCheckpoint(checkpoint),
     [checkpoint],
+  )
+  const suggestedTilePath = useMemo(
+    () => levelZeroTilePath(parsedCheckpoint?.size),
+    [parsedCheckpoint],
   )
   const coveredIndexNumber = Number.parseInt(coveredIndex, 10)
   const hasCoveredIndex = Number.isFinite(coveredIndexNumber)
@@ -933,9 +989,22 @@ export default function Home() {
                 />
                 <p className="text-slate-500 text-xs leading-5">
                   {lookupMode === "entries"
-                    ? "Use paths like 000.p/1 for entry bundles."
+                    ? "Entry bundle paths depend on the current tree size. Select an entry and use its Bundle value."
                     : "Use paths like 0/000.p/1 for hash tiles. Entry bundles live under the Entries tab."}
                 </p>
+                {lookupMode === "entries" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={useSelectedEntryBundle}
+                    disabled={!selectedEntry}
+                    className="w-full"
+                  >
+                    <IconTable />
+                    Use Selected Entry Bundle
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"

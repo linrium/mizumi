@@ -73,7 +73,13 @@ find .data/tessera/tile -type f
 find .data/tessera/tile/entries -type f
 ```
 
-Then request the path relative to the `tile` directory for `/tile/*`, or relative to `tile/entries` for the `/entries/*` convenience route. For example, if this file exists:
+Then request the path relative to the `tile` directory for `/tile/*`, or
+relative to `tile/entries` for the `/entries/*` convenience route. Entry bundle
+paths depend on the tree size and whether the bundle is partial, so do not
+assume a hard-coded path exists. You can also read real bundle paths from
+`GET /api/entries`.
+
+For example, if this file exists:
 
 ```text
 .data/tessera/tile/entries/000.p/1

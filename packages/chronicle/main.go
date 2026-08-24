@@ -382,12 +382,25 @@ func loadOrCreateSigner(path string) (note.Signer, string, error) {
 }
 
 func sendTile(c fiber.Ctx, reader tessera.LogReader, requested string) error {
+	requested = strings.TrimPrefix(requested, "tile/")
 	level, index, p, err := layout.ParseTileLevelIndexPartial(nextPathSegment(requested), trimFirstPathSegment(requested))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	tile, err := reader.ReadTile(c.Context(), level, index, p)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			size, sizeErr := reader.IntegratedSize(c.Context())
+			if sizeErr != nil {
+				return fiber.NewError(fiber.StatusInternalServerError, sizeErr.Error())
+			}
+			partial := layout.PartialTileSize(level, index, size)
+			if partial > 0 && partial != p {
+				tile, err = reader.ReadTile(c.Context(), level, index, partial)
+			}
+		}
+	}
 	if err != nil {
 		return logResourceError(err)
 	}
@@ -631,6 +644,8 @@ func queryUint(c fiber.Ctx, name string, fallback uint64, max uint64) (uint64, e
 }
 
 func sendEntryBundle(c fiber.Ctx, reader tessera.LogReader, requested string) error {
+	requested = strings.TrimPrefix(requested, "tile/entries/")
+	requested = strings.TrimPrefix(requested, "entries/")
 	index, p, err := layout.ParseTileIndexPartial(requested)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())

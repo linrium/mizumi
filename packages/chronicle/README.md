@@ -81,4 +81,6 @@ scripts/deploy-local-docker-desktop.sh
 
 See [docs/tessera.md](docs/tessera.md) for usage examples.
 
+See [docs/witnesses.md](docs/witnesses.md) for how witnessed checkpoints work.
+
 See [docs/openapi.md](docs/openapi.md) for the OpenAPI and Scalar integration.
