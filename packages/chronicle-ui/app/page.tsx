@@ -97,6 +97,51 @@ async function readTextResponse(response: Response) {
   return text
 }
 
+async function readBinaryResponse(response: Response) {
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!response.ok) {
+    const text = new TextDecoder().decode(bytes)
+    throw new Error(text || `${response.status} ${response.statusText}`)
+  }
+  return bytes
+}
+
+function formatBytesAsHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  )
+}
+
+function formatBytesAsBase64(bytes: Uint8Array) {
+  let binary = ""
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary)
+}
+
+function formatTileBytes(bytes: Uint8Array) {
+  const hashSize = 32
+  const hashes = []
+  for (let offset = 0; offset < bytes.length; offset += hashSize) {
+    hashes.push(formatBytesAsHex(bytes.slice(offset, offset + hashSize)))
+  }
+
+  return [
+    `bytes: ${bytes.length}`,
+    `hash_size: ${hashSize}`,
+    `hash_count: ${Math.ceil(bytes.length / hashSize)}`,
+    "",
+    "hex_hashes:",
+    ...hashes.map(
+      (hash, index) => `${String(index).padStart(3, "0")}: ${hash}`,
+    ),
+    "",
+    "base64:",
+    formatBytesAsBase64(bytes),
+  ].join("\n")
+}
+
 function formatNumber(value: number | undefined) {
   return typeof value === "number" ? value.toLocaleString() : "0"
 }
@@ -381,7 +426,11 @@ export default function Home() {
       const response = await fetch(`/api/chronicle/${resourcePath}`, {
         cache: "no-store",
       })
-      setLookupResult(await readTextResponse(response))
+      if (lookupMode === "tile") {
+        setLookupResult(formatTileBytes(await readBinaryResponse(response)))
+      } else {
+        setLookupResult(await readTextResponse(response))
+      }
     } catch (lookupError) {
       setError(
         lookupError instanceof Error ? lookupError.message : "Lookup failed",

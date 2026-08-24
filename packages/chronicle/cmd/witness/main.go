@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -61,21 +63,41 @@ func main() {
 		rw.Header().Set("Content-Type", "application/json")
 		_, _ = rw.Write([]byte(`{"ok":true}`))
 	})
-	mux.HandleFunc("/add-checkpoint", witnessHandler.AddCheckpoint)
+	mux.HandleFunc("/add-checkpoint", func(rw http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("witness /add-checkpoint read request body: %v", err)
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+		_ = r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		log.Printf("witness /add-checkpoint request remote=%s bytes=%d body:\n%s", r.RemoteAddr, len(body), string(body))
+
+		recorder := &loggingResponseWriter{ResponseWriter: rw, statusCode: http.StatusOK}
+		witnessHandler.AddCheckpoint(recorder, r)
+
+		log.Printf("witness /add-checkpoint response status=%d bytes=%d body:\n%s", recorder.statusCode, recorder.body.Len(), recorder.body.String())
+	})
 	mux.HandleFunc("/checkpoint", func(rw http.ResponseWriter, r *http.Request) {
 		origin := r.URL.Query().Get("origin")
 		if origin == "" {
 			origin = cfg.logOrigin
 		}
+		log.Printf("witness /checkpoint request remote=%s origin=%s", r.RemoteAddr, origin)
 		cp, err := w.GetCheckpoint(r.Context(), origin)
 		if err != nil {
+			log.Printf("witness /checkpoint response origin=%s status=%d error=%v", origin, http.StatusInternalServerError, err)
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if cp == nil {
+			log.Printf("witness /checkpoint response origin=%s status=%d", origin, http.StatusNotFound)
 			http.NotFound(rw, r)
 			return
 		}
+		log.Printf("witness /checkpoint response origin=%s status=%d bytes=%d body:\n%s", origin, http.StatusOK, len(cp), string(cp))
 		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = rw.Write(cp)
 	})
@@ -108,6 +130,22 @@ type witnessConfig struct {
 	signerKey          string
 	signerKeyFile      string
 	stateDir           string
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+	body       bytes.Buffer
+}
+
+func (w *loggingResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *loggingResponseWriter) Write(body []byte) (int, error) {
+	w.body.Write(body)
+	return w.ResponseWriter.Write(body)
 }
 
 func loadWitnessConfig() witnessConfig {
